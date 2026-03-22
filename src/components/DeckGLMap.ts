@@ -480,6 +480,11 @@ export class DeckGLMap {
   private lastAircraftFetchZoom = -1;
   private aircraftFetchSeq = 0;
 
+  public setHotspots(hotspots: HotspotWithBreaking[]): void {
+    this.hotspots = hotspots;
+    this.debouncedRebuildLayers();
+  }
+
   constructor(container: HTMLElement, initialState: DeckMapState) {
     this.container = container;
     this.state = {
@@ -488,8 +493,7 @@ export class DeckGLMap {
       layers: { ...initialState.layers },
     };
     this.hotspots = [...INTEL_HOTSPOTS];
-
-    this.debouncedRebuildLayers = debounce(() => {
+  this.debouncedRebuildLayers = debounce(() => {
       if (this.renderPaused || this.webglLost || !this.maplibreMap) return;
       this.maplibreMap.resize();
       try { this.deckOverlay?.setProps({ layers: this.buildLayers() }); } catch { /* map mid-teardown */ }

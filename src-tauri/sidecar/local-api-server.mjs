@@ -1327,6 +1327,46 @@ async function dispatch(requestUrl, req, routes, context) {
     return json({ error: 'POST required' }, 405);
   }
 
+  if (requestUrl.pathname === '/api/customs-events') {
+    try {
+      const { initSQLite, getDb } = await import('./database/sqlite.js');
+      initSQLite(context.dataDir);
+      const db = getDb();
+      const rows = db.prepare('SELECT * FROM EventoGeopolitico ORDER BY timestamp DESC LIMIT 50').all();
+      
+      const events = rows.map(r => ({
+        id: r.id,
+        title: r.title,
+        description: r.description,
+        explainability: 'Score adjusted by LLM Adjudicator. (Mocked LLM Log)',
+        score: r.severity_score,
+        lat: 30 + (Math.random() * 10 - 5),
+        lon: 32 + (Math.random() * 10 - 5),
+        severity: r.severity_score >= 0.85 ? 'critical' : (r.severity_score >= 0.70 ? 'high' : 'medium'),
+        timestamp: new Date(r.timestamp).getTime()
+      }));
+
+      return json(events);
+    } catch (e) {
+      context.logger.error('[api] customs-events error: ' + e.message);
+      return json({ error: e.message }, 500);
+    }
+  }
+
+  if (requestUrl.pathname === '/api/trigger-ingestion') {
+    try {
+      const { initSQLite } = await import('./database/sqlite.js');
+      initSQLite(context.dataDir);
+      
+      const { runIngestionPipeline } = await import('./services/ingestion/pipeline.js');
+      const result = await runIngestionPipeline();
+      return json(result);
+    } catch (e) {
+      context.logger.error('[api] trigger-ingestion error: ' + e.message);
+      return json({ error: e.message }, 500);
+    }
+  }
+
   if (requestUrl.pathname === '/api/local-env-update-batch') {
     if (req.method !== 'POST') return json({ error: 'POST required' }, 405);
     const body = await readBody(req);

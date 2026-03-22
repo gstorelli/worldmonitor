@@ -53,6 +53,7 @@ import {
   EscalationCorrelationPanel,
   EconomicCorrelationPanel,
   DisasterCorrelationPanel,
+  AlertFeedPanel,
 } from '@/components';
 import { SatelliteFiresPanel } from '@/components/SatelliteFiresPanel';
 import { focusInvestmentOnMap } from '@/services/investments-focus';
@@ -651,6 +652,8 @@ export class PanelLayoutManager implements AppModule {
         }
       });
     }
+
+    this.createPanel('alert-feed', () => new AlertFeedPanel());
 
     if (this.shouldCreatePanel('cii')) {
       const ciiPanel = new CIIPanel();

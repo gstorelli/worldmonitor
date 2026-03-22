@@ -67,6 +67,7 @@ import {
   fetchCriticalMinerals,
   fetchSanctionsPressure,
   fetchRadiationWatch,
+  fetchCustomsEvents,
 } from '@/services';
 import { getMarketWatchlistEntries } from '@/services/market-watchlist';
 import { fetchStockAnalysesForTargets, getStockAnalysisTargets } from '@/services/stock-analysis';
@@ -406,6 +407,9 @@ export class DataLoaderManager implements AppModule {
         if (shouldLoad('supply-chain')) {
           tasks.push({ name: 'supplyChain', task: runGuarded('supplyChain', () => this.loadSupplyChain()) });
         }
+      }
+      if (shouldLoad('alert-feed')) {
+        tasks.push({ name: 'customsEvents', task: runGuarded('customsEvents', () => this.loadCustomsEvents()) });
       }
     }
 
@@ -2816,6 +2820,42 @@ export class DataLoaderManager implements AppModule {
       dataFreshness.recordUpdate('thermal-escalation' as DataSourceId, result.clusters.length);
     } catch (error) {
       console.error('[App] Thermal escalation fetch failed:', error);
+    }
+  }
+
+  async loadCustomsEvents(): Promise<void> {
+    try {
+      const events = await fetchCustomsEvents();
+      this.callPanel('alert-feed', 'renderAlerts', events);
+      
+      const hotspots = events.map(e => {
+        let level: 'high' | 'elevated' | 'low' = 'low';
+        let escalationScore: 1 | 2 | 3 | 4 | 5 = 1;
+        if (e.severity === 'critical') {
+          level = 'high';
+          escalationScore = 5;
+        } else if (e.severity === 'high') {
+          level = 'high';
+          escalationScore = 4;
+        } else if (e.severity === 'medium') {
+          level = 'elevated';
+          escalationScore = 3;
+        } else {
+          escalationScore = 1;
+        }
+        return {
+          id: e.id,
+          name: e.title,
+          lat: e.lat,
+          lon: e.lon,
+          keywords: [e.severity],
+          level,
+          escalationScore
+        };
+      });
+      this.ctx.map?.setHotspots(hotspots);
+    } catch (error) {
+      console.error('[App] Customs events fetch failed:', error);
     }
   }
 }

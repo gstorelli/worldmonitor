@@ -134,6 +134,7 @@ export class MapContainer {
   private cachedSpeciesRecovery: SpeciesRecovery[] | null = null;
   private cachedRenewableInstallations: RenewableInstallation[] | null = null;
   private cachedHotspotActivity: NewsItem[] | null = null;
+  private cachedHotspots: Hotspot[] | null = null;
   private cachedEscalationFlights: MilitaryFlight[] | null = null;
   private cachedEscalationVessels: MilitaryVessel[] | null = null;
   private cachedImageryScenes: ImageryScene[] | null = null;
@@ -298,6 +299,7 @@ export class MapContainer {
     if (this.cachedCIIScores) this.setCIIScores(this.cachedCIIScores);
     if (this.cachedSpeciesRecovery) this.setSpeciesRecoveryZones(this.cachedSpeciesRecovery);
     if (this.cachedRenewableInstallations) this.setRenewableInstallations(this.cachedRenewableInstallations);
+    if (this.cachedHotspots) this.setHotspots(this.cachedHotspots);
     if (this.cachedHotspotActivity) this.updateHotspotActivity(this.cachedHotspotActivity);
     if (this.cachedEscalationFlights && this.cachedEscalationVessels) this.updateMilitaryForEscalation(this.cachedEscalationFlights, this.cachedEscalationVessels);
     if (this.cachedImageryScenes) this.setImageryScenes(this.cachedImageryScenes);
@@ -669,6 +671,16 @@ export class MapContainer {
     // SVG map does not support renewable installations layer
   }
 
+  public setHotspots(hotspots: Hotspot[]): void {
+    this.cachedHotspots = hotspots;
+    if (this.useGlobe) { this.globeMap?.setHotspots(hotspots); return; }
+    if (this.useDeckGL) {
+      this.deckGLMap?.setHotspots(hotspots);
+    } else {
+      // svgMap doesn't render hotspots natively yet
+    }
+  }
+
   public updateHotspotActivity(news: NewsItem[]): void {
     this.cachedHotspotActivity = news;
     if (this.useDeckGL) {
@@ -986,6 +998,7 @@ export class MapContainer {
     this.cachedCIIScores = null;
     this.cachedSpeciesRecovery = null;
     this.cachedRenewableInstallations = null;
+    this.cachedHotspots = null;
     this.cachedHotspotActivity = null;
     this.cachedEscalationFlights = null;
     this.cachedEscalationVessels = null;
