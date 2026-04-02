@@ -26,7 +26,7 @@ Configura queste variabili nella sezione **Settings → Environment Variables** 
 
 | Variabile | Descrizione | Obbligatoria |
 |-----------|-------------|:------------:|
-| `RISK_SENTINEL_WEBHOOK_URL` | URL dell'endpoint di ingestion di Risk Sentinel (default: `http://localhost:3100/api/n8n/ingest`) | ✅ |
+| `RISK_SENTINEL_WEBHOOK_URL` | URL dell'endpoint di ingestion di Risk Sentinel (es: `https://your-site.netlify.app/api/n8n-ingest`) | ✅ |
 
 ### Credenziali per Workflow Specifici
 

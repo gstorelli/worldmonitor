@@ -64,7 +64,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.RISK_SENTINEL_WEBHOOK_URL || 'http://localhost:3100/api/n8n/ingest' }}",
+        "url": "={{ $env.RISK_SENTINEL_WEBHOOK_URL || 'https://YOUR-SITE.netlify.app/api/n8n-ingest' }}",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify($input.item.json) }}",
