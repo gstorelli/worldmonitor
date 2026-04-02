@@ -38,10 +38,10 @@ export const FULL_PANELS: Record<string, PanelConfig> = {
   commodities: { name: 'Metals & Materials', enabled: true, priority: 1 },
   'energy-complex': { name: 'Energy Complex', enabled: true, priority: 1 },
   markets: { name: 'Markets', enabled: true, priority: 1 },
-  'stock-analysis': { name: 'Stock Analysis', enabled: false, priority: 1, premium: 'locked' },
-  'stock-backtest': { name: 'Backtesting', enabled: false, priority: 1, premium: 'locked' },
-  'daily-market-brief': { name: 'Daily Market Brief', enabled: false, priority: 1, premium: 'locked' },
-  'chat-analyst': { name: 'WM Analyst', enabled: false, priority: 1, premium: 'locked' },
+  'stock-analysis': { name: 'Stock Analysis', enabled: false, priority: 1 },
+  'stock-backtest': { name: 'Backtesting', enabled: false, priority: 1 },
+  'daily-market-brief': { name: 'Daily Market Brief', enabled: false, priority: 1 },
+  'chat-analyst': { name: 'Risk Analyst', enabled: false, priority: 1 },
   economic: { name: 'Macro Stress', enabled: true, priority: 1 },
   'trade-policy': { name: 'Trade Policy', enabled: true, priority: 1 },
   'supply-chain': { name: 'Supply Chain', enabled: true, priority: 1 },
@@ -88,8 +88,8 @@ export const FULL_PANELS: Record<string, PanelConfig> = {
   'world-clock': { name: 'World Clock', enabled: false, priority: 2 },
   'national-debt': { name: 'Global Debt Clock', enabled: false, priority: 2 },
   'cross-source-signals': { name: 'Cross-Source Signals', enabled: true, priority: 2 },
-  'market-implications': { name: 'AI Market Implications', enabled: false, priority: 1, premium: 'locked' },
-  deduction: { name: 'Deduct Situation', enabled: false, priority: 1, premium: 'locked' },
+  'market-implications': { name: 'AI Market Implications', enabled: false, priority: 1 },
+  deduction: { name: 'Deduct Situation', enabled: false, priority: 1 },
   'geo-hubs': { name: 'Geopolitical Hubs', enabled: false, priority: 2 },
   'tech-hubs': { name: 'Hot Tech Hubs', enabled: false, priority: 2 },
   'positive-feed': { name: 'Good News Feed', enabled: false, priority: 1 },
@@ -211,9 +211,8 @@ export function getEffectivePanelConfig(key: string, _variant: string): PanelCon
   return ALL_PANELS[key] || { name: key, enabled: false, priority: 2 };
 }
 
-export function isPanelEntitled(_key: string, config: PanelConfig): boolean {
-  if (!config.premium) return true;
-  if (config.premium === 'locked') return isDesktopRuntime();
+export function isPanelEntitled(_key: string, _config: PanelConfig): boolean {
+  // Risk Sentinel: no premium tiers — all panels are always available
   return true;
 }
 

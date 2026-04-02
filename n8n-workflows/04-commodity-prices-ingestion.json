@@ -1,0 +1,107 @@
+{
+  "name": "Risk Sentinel — Commodity Prices Ingestion (Customs Focus)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "minutes", "minutesInterval": 30 }]
+        }
+      },
+      "id": "schedule-commodity",
+      "name": "Schedule (Every 30min)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [250, 300],
+      "notes": "Polls commodity prices every 30 minutes during trading hours"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// ─── Customs-Critical Commodity Symbols ───\n// Focus on commodities relevant to customs risk assessment\n// Mapped to HS codes where applicable\n\nconst CUSTOMS_COMMODITIES = [\n  // Semiconductors (HS 8542)\n  { symbol: 'SOXX', name: 'Semiconductor Index', hsCode: '8542', category: 'Semiconductors', sensitivity: 0.95 },\n  // Nickel & Critical Metals (HS 7501-7508)\n  { symbol: 'NI=F', name: 'Nickel Futures', hsCode: '7502', category: 'Critical Metals', sensitivity: 0.85 },\n  { symbol: 'HG=F', name: 'Copper Futures', hsCode: '7403', category: 'Critical Metals', sensitivity: 0.80 },\n  { symbol: 'ALI=F', name: 'Aluminum Futures', hsCode: '7601', category: 'Critical Metals', sensitivity: 0.75 },\n  // Oil & Gas (HS 2709-2711)\n  { symbol: 'CL=F', name: 'WTI Crude Oil', hsCode: '2709', category: 'Energy', sensitivity: 0.90 },\n  { symbol: 'BZ=F', name: 'Brent Crude', hsCode: '2709', category: 'Energy', sensitivity: 0.90 },\n  { symbol: 'NG=F', name: 'Natural Gas', hsCode: '2711', category: 'Energy', sensitivity: 0.85 },\n  // Agricultural / Grain (HS 1001-1005)\n  { symbol: 'ZW=F', name: 'Wheat Futures', hsCode: '1001', category: 'Agriculture', sensitivity: 0.75 },\n  { symbol: 'ZC=F', name: 'Corn Futures', hsCode: '1005', category: 'Agriculture', sensitivity: 0.70 },\n  { symbol: 'ZS=F', name: 'Soybean Futures', hsCode: '1201', category: 'Agriculture', sensitivity: 0.70 },\n  // Fertilizers (HS 3105)\n  { symbol: 'MOS', name: 'Mosaic (Fertilizers)', hsCode: '3105', category: 'Fertilizers', sensitivity: 0.75 },\n  { symbol: 'NTR', name: 'Nutrien (Fertilizers)', hsCode: '3105', category: 'Fertilizers', sensitivity: 0.75 },\n  // Gold (HS 7108)\n  { symbol: 'GC=F', name: 'Gold Futures', hsCode: '7108', category: 'Precious Metals', sensitivity: 0.70 },\n  // Pharmaceuticals (HS 3004)\n  { symbol: 'XLV', name: 'Healthcare ETF', hsCode: '3004', category: 'Pharmaceuticals', sensitivity: 0.70 },\n];\n\nreturn CUSTOMS_COMMODITIES.map(c => ({ json: c }));"
+      },
+      "id": "commodity-list",
+      "name": "Define Customs Commodities",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 300],
+      "notes": "Lists all customs-critical commodity symbols with HS codes and sensitivity weights"
+    },
+    {
+      "parameters": {
+        "url": "=https://query1.finance.yahoo.com/v8/finance/chart/{{ encodeURIComponent($json.symbol) }}",
+        "options": {
+          "timeout": 10000
+        },
+        "headerParameters": {
+          "parameters": [
+            { "name": "User-Agent", "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" }
+          ]
+        }
+      },
+      "id": "yahoo-fetch",
+      "name": "Yahoo Finance — Quote",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [750, 300],
+      "notes": "Fetches real-time price data from Yahoo Finance. Rate limit: stagger 200ms between requests.",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Parse Yahoo Finance chart response and enrich with customs metadata\nconst commodity = $('Define Customs Commodities').item.json;\nconst data = $input.item.json;\n\nconst result = data?.chart?.result?.[0];\nconst meta = result?.meta;\n\nif (!meta) {\n  return { json: { ...commodity, price: null, change: null, error: 'no data' } };\n}\n\nconst price = meta.regularMarketPrice;\nconst prevClose = meta.chartPreviousClose || meta.previousClose || price;\nconst change = prevClose ? Math.round(((price - prevClose) / prevClose) * 10000) / 100 : 0;\nconst closes = result?.indicators?.quote?.[0]?.close || [];\nconst sparkline = closes.filter(v => v != null);\n\n// Volatility signal (simplistic: daily range vs average)\nconst high = meta.regularMarketDayHigh || price;\nconst low = meta.regularMarketDayLow || price;\nconst dayRange = high - low;\nconst volatility = price > 0 ? Math.round((dayRange / price) * 10000) / 100 : 0;\n\n// Trade alert threshold\nconst absChange = Math.abs(change);\nlet alertLevel = 'normal';\nif (absChange >= 5) alertLevel = 'critical';\nelse if (absChange >= 3) alertLevel = 'elevated';\nelse if (absChange >= 1.5) alertLevel = 'moderate';\n\nreturn {\n  json: {\n    symbol: commodity.symbol,\n    name: commodity.name,\n    hsCode: commodity.hsCode,\n    category: commodity.category,\n    sensitivity: commodity.sensitivity,\n    price,\n    change,\n    volatility,\n    alertLevel,\n    sparkline: sparkline.slice(-20),\n    fetchedAt: new Date().toISOString(),\n  }\n};"
+      },
+      "id": "parse-quotes",
+      "name": "Parse & Enrich Quotes",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1000, 300],
+      "notes": "Parses Yahoo Finance response, calculates change/volatility, assigns alert levels"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Aggregate all commodity quotes into final payload\nconst quotes = $input.all().map(i => i.json).filter(q => q.price != null);\n\n// Group by category\nconst byCategory = {};\nfor (const q of quotes) {\n  if (!byCategory[q.category]) byCategory[q.category] = [];\n  byCategory[q.category].push(q);\n}\n\n// Identify elevated commodities for customs alerting\nconst elevated = quotes.filter(q => q.alertLevel !== 'normal');\n\nreturn [{\n  json: {\n    source: 'yahoo-finance',\n    pipeline: 'commodity-customs-tracker',\n    quotes,\n    byCategory,\n    alerts: elevated,\n    summary: {\n      total: quotes.length,\n      critical: elevated.filter(q => q.alertLevel === 'critical').length,\n      elevated: elevated.filter(q => q.alertLevel === 'elevated').length,\n      moderate: elevated.filter(q => q.alertLevel === 'moderate').length,\n    },\n    processedAt: new Date().toISOString(),\n  }\n}];"
+      },
+      "id": "aggregate-quotes",
+      "name": "Aggregate Commodity Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.RISK_SENTINEL_WEBHOOK_URL || 'http://localhost:3100/api/n8n/ingest' }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($input.item.json) }}",
+        "options": { "timeout": 10000 }
+      },
+      "id": "push-commodities",
+      "name": "Push to Risk Sentinel API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1500, 300]
+    }
+  ],
+  "connections": {
+    "Schedule (Every 30min)": {
+      "main": [[ { "node": "Define Customs Commodities", "type": "main", "index": 0 } ]]
+    },
+    "Define Customs Commodities": {
+      "main": [[ { "node": "Yahoo Finance — Quote", "type": "main", "index": 0 } ]]
+    },
+    "Yahoo Finance — Quote": {
+      "main": [[ { "node": "Parse & Enrich Quotes", "type": "main", "index": 0 } ]]
+    },
+    "Parse & Enrich Quotes": {
+      "main": [[ { "node": "Aggregate Commodity Data", "type": "main", "index": 0 } ]]
+    },
+    "Aggregate Commodity Data": {
+      "main": [[ { "node": "Push to Risk Sentinel API", "type": "main", "index": 0 } ]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "meta": { "templateCredsSetupCompleted": true, "instanceId": "risk-sentinel-phd" }
+}

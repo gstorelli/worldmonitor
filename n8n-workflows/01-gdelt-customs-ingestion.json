@@ -1,0 +1,197 @@
+{
+  "name": "Risk Sentinel — GDELT Customs Intelligence Ingestion",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "trigger-cron",
+      "name": "Cron Trigger (Every 2h)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [250, 300],
+      "notes": "Runs every 2 hours to fetch fresh GDELT customs-relevant articles"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "hours", "hoursInterval": 2 }]
+        }
+      },
+      "id": "trigger-cron-config",
+      "name": "Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://api.gdeltproject.org/api/v2/doc/doc",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "query", "value": "(customs OR tariff OR \"trade war\" OR embargo OR sanction OR \"supply chain\" OR \"trade route\" OR \"port disruption\") sourcelang:eng" },
+            { "name": "mode", "value": "artlist" },
+            { "name": "maxrecords", "value": "250" },
+            { "name": "format", "value": "json" },
+            { "name": "sort", "value": "date" },
+            { "name": "timespan", "value": "1d" }
+          ]
+        },
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "gdelt-fetch-customs",
+      "name": "GDELT — Customs & Trade Intelligence",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [500, 200],
+      "notes": "Fetches last 24h of customs/tariff/trade articles from GDELT Doc API. Rate limit: 1 request per 5 seconds."
+    },
+    {
+      "parameters": {
+        "url": "https://api.gdeltproject.org/api/v2/doc/doc",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "query", "value": "(\"strait of hormuz\" OR \"suez canal\" OR \"panama canal\" OR \"malacca strait\" OR \"taiwan strait\" OR gibraltar OR \"bab el mandeb\" OR piracy OR \"naval blockade\") sourcelang:eng" },
+            { "name": "mode", "value": "artlist" },
+            { "name": "maxrecords", "value": "100" },
+            { "name": "format", "value": "json" },
+            { "name": "sort", "value": "date" },
+            { "name": "timespan", "value": "1d" }
+          ]
+        },
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "gdelt-fetch-routes",
+      "name": "GDELT — Critical Trade Routes",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [500, 400],
+      "notes": "Fetches articles about critical maritime chokepoints (Suez, Hormuz, Panama, etc.)"
+    },
+    {
+      "parameters": {
+        "url": "https://api.gdeltproject.org/api/v2/doc/doc",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "query", "value": "(semiconductor OR chip OR \"rare earth\" OR lithium OR nickel OR oil OR LNG OR grain OR wheat OR fertilizer OR pharma) (shortage OR disruption OR price OR export OR ban) sourcelang:eng" },
+            { "name": "mode", "value": "artlist" },
+            { "name": "maxrecords", "value": "100" },
+            { "name": "format", "value": "json" },
+            { "name": "sort", "value": "date" },
+            { "name": "timespan", "value": "1d" }
+          ]
+        },
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "gdelt-fetch-commodities",
+      "name": "GDELT — Commodity Disruptions",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [500, 600],
+      "notes": "Fetches articles about critical commodity disruptions relevant to customs risk."
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// ─── Risk Scoring Engine (8 Dimensions) ───\n// Weights from PhD spec: Event Severity (0.18), Source Confidence (0.10),\n// Trade Exposure (0.18), Route Criticality (0.14), Commodity Sensitivity (0.12),\n// Escalation Momentum (0.10), Customs Relevance (0.12), Geophysical Impact (0.06).\n\nconst WEIGHTS = {\n  eventSeverity: 0.18,\n  sourceConfidence: 0.10,\n  tradeExposure: 0.18,\n  routeCriticality: 0.14,\n  commoditySensitivity: 0.12,\n  escalationMomentum: 0.10,\n  customsRelevance: 0.12,\n  geophysicalImpact: 0.06,\n};\n\nconst SEVERITY_KEYWORDS = {\n  critical: { score: 100, words: ['attack', 'war', 'missile', 'bomb', 'invasion', 'nuclear', 'blockade', 'sanction'] },\n  high:     { score: 75,  words: ['escalation', 'tension', 'threat', 'crisis', 'disruption', 'collision', 'grounding'] },\n  moderate: { score: 50,  words: ['warning', 'alert', 'protest', 'strike', 'delay', 'shortage', 'volatility'] },\n  low:      { score: 25,  words: ['concern', 'uncertainty', 'discuss', 'monitor', 'review', 'report'] },\n};\n\nconst ROUTE_KEYWORDS = {\n  'Suez Canal':       { criticality: 0.95, words: ['suez', 'red sea', 'bab el mandeb'] },\n  'Strait of Hormuz': { criticality: 0.90, words: ['hormuz', 'strait of hormuz'] },\n  'Panama Canal':     { criticality: 0.85, words: ['panama', 'panama canal'] },\n  'Taiwan Strait':    { criticality: 0.85, words: ['taiwan strait', 'taiwan'] },\n  'Malacca Strait':   { criticality: 0.80, words: ['malacca'] },\n  'Gibraltar':        { criticality: 0.70, words: ['gibraltar'] },\n};\n\nconst COMMODITY_KEYWORDS = {\n  'Semiconductors':       { sensitivity: 0.95, words: ['semiconductor', 'chip', 'silicon', 'tsmc'] },\n  'Oil & Gas':            { sensitivity: 0.90, words: ['oil', 'gas', 'lng', 'crude', 'energy'] },\n  'Grain & Agriculture':  { sensitivity: 0.75, words: ['grain', 'wheat', 'corn', 'agriculture', 'food', 'fertilizer'] },\n  'Pharmaceuticals':      { sensitivity: 0.70, words: ['pharma', 'medicine', 'drug'] },\n  'Consumer Goods':       { sensitivity: 0.60, words: ['consumer', 'retail', 'goods', 'container'] },\n};\n\nconst CUSTOMS_KEYWORDS = ['tariff', 'customs', 'duty', 'import', 'export', 'trade policy', 'quota', 'origin', 'hs code', 'classification', 'valuation', 'clearance', 'smuggling', 'counterfeit', 'contraband'];\n\nfunction matchKeywords(text, wordList) {\n  const lower = text.toLowerCase();\n  return wordList.some(w => lower.includes(w));\n}\n\nfunction scoreArticle(article) {\n  const text = `${article.title || ''} ${article.seendate || ''}`;\n  const lower = text.toLowerCase();\n\n  // 1. Event Severity\n  let eventSeverity = 10;\n  for (const [, cfg] of Object.entries(SEVERITY_KEYWORDS)) {\n    if (matchKeywords(text, cfg.words)) { eventSeverity = cfg.score; break; }\n  }\n\n  // 2. Source Confidence (based on domain reputation — simplified)\n  const domain = (article.domain || '').toLowerCase();\n  const trustedDomains = ['reuters.com', 'apnews.com', 'bbc.com', 'aljazeera.com', 'ft.com', 'economist.com', 'wsj.com', 'nytimes.com', 'bloomberg.com'];\n  const sourceConfidence = trustedDomains.some(d => domain.includes(d)) ? 85 : 50;\n\n  // 3. Trade Exposure (keyword density)\n  const tradeWords = ['trade', 'import', 'export', 'bilateral', 'deficit', 'surplus', 'commerce', 'shipping', 'freight', 'port'];\n  const tradeHits = tradeWords.filter(w => lower.includes(w)).length;\n  const tradeExposure = Math.min(100, tradeHits * 20);\n\n  // 4. Route Criticality\n  let routeCriticality = 0;\n  let matchedRoute = null;\n  for (const [name, cfg] of Object.entries(ROUTE_KEYWORDS)) {\n    if (matchKeywords(text, cfg.words)) { routeCriticality = cfg.criticality * 100; matchedRoute = name; break; }\n  }\n\n  // 5. Commodity Sensitivity\n  let commoditySensitivity = 0;\n  let matchedCommodity = null;\n  for (const [name, cfg] of Object.entries(COMMODITY_KEYWORDS)) {\n    if (matchKeywords(text, cfg.words)) { commoditySensitivity = cfg.sensitivity * 100; matchedCommodity = name; break; }\n  }\n\n  // 6. Escalation Momentum (presence of escalation language)\n  const escalationWords = ['escalat', 'intensif', 'worsen', 'spread', 'surge', 'spike', 'unprecedented'];\n  const escalationMomentum = escalationWords.some(w => lower.includes(w)) ? 75 : 15;\n\n  // 7. Customs Relevance\n  const customsHits = CUSTOMS_KEYWORDS.filter(w => lower.includes(w)).length;\n  const customsRelevance = Math.min(100, customsHits * 25);\n\n  // 8. Geophysical/Climate Impact\n  const geoWords = ['earthquake', 'tsunami', 'hurricane', 'typhoon', 'flood', 'drought', 'volcanic', 'wildfire', 'cyclone'];\n  const geophysicalImpact = geoWords.some(w => lower.includes(w)) ? 70 : 5;\n\n  // Compute weighted score\n  const dimensions = { eventSeverity, sourceConfidence, tradeExposure, routeCriticality, commoditySensitivity, escalationMomentum, customsRelevance, geophysicalImpact };\n  const riskScore = Math.round(\n    WEIGHTS.eventSeverity * eventSeverity +\n    WEIGHTS.sourceConfidence * sourceConfidence +\n    WEIGHTS.tradeExposure * tradeExposure +\n    WEIGHTS.routeCriticality * routeCriticality +\n    WEIGHTS.commoditySensitivity * commoditySensitivity +\n    WEIGHTS.escalationMomentum * escalationMomentum +\n    WEIGHTS.customsRelevance * customsRelevance +\n    WEIGHTS.geophysicalImpact * geophysicalImpact\n  );\n\n  // Classify level\n  let level = 'Low';\n  if (riskScore >= 85) level = 'Critical';\n  else if (riskScore >= 70) level = 'High';\n  else if (riskScore >= 50) level = 'Elevated';\n  else if (riskScore >= 25) level = 'Moderate';\n\n  return {\n    ...article,\n    riskScore,\n    riskLevel: level,\n    dimensions,\n    matchedRoute,\n    matchedCommodity,\n    scoredAt: new Date().toISOString(),\n  };\n}\n\n// Process each article from the merged GDELT results\nconst articles = $input.item.json.articles || [];\nconst scored = articles.map(scoreArticle).sort((a, b) => b.riskScore - a.riskScore);\n\nreturn { json: { scoredArticles: scored, totalArticles: scored.length, scoredAt: new Date().toISOString() } };"
+      },
+      "id": "risk-scoring-engine",
+      "name": "Risk Scoring Engine (8 Dimensions)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [800, 300],
+      "notes": "Implements the 8-dimension risk scoring algorithm from the PhD spec. Weights: EventSeverity 0.18, SourceConfidence 0.10, TradeExposure 0.18, RouteCriticality 0.14, CommoditySensitivity 0.12, EscalationMomentum 0.10, CustomsRelevance 0.12, GeophysicalImpact 0.06."
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Merge all 3 GDELT fetches into a single articles array\nconst customs = $('GDELT — Customs & Trade Intelligence').first().json;\nconst routes = $('GDELT — Critical Trade Routes').first().json;\nconst commodities = $('GDELT — Commodity Disruptions').first().json;\n\nconst allArticles = [\n  ...(customs?.articles || []),\n  ...(routes?.articles || []),\n  ...(commodities?.articles || []),\n];\n\n// Deduplicate by URL\nconst seen = new Set();\nconst deduped = allArticles.filter(a => {\n  if (!a.url || seen.has(a.url)) return false;\n  seen.add(a.url);\n  return true;\n});\n\nreturn { json: { articles: deduped, totalRaw: allArticles.length, totalDeduped: deduped.length } };"
+      },
+      "id": "merge-and-dedup",
+      "name": "Merge & Deduplicate Articles",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 300],
+      "notes": "Merges articles from all 3 GDELT queries and deduplicates by URL"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Filter articles by minimum risk threshold and prepare final output\nconst MIN_RISK_SCORE = 25;\nconst data = $input.item.json;\nconst filtered = (data.scoredArticles || []).filter(a => a.riskScore >= MIN_RISK_SCORE);\n\n// Group by risk level\nconst byLevel = { Critical: [], High: [], Elevated: [], Moderate: [] };\nfor (const a of filtered) {\n  if (byLevel[a.riskLevel]) byLevel[a.riskLevel].push(a);\n}\n\nreturn {\n  json: {\n    alerts: filtered,\n    summary: {\n      total: filtered.length,\n      critical: byLevel.Critical.length,\n      high: byLevel.High.length,\n      elevated: byLevel.Elevated.length,\n      moderate: byLevel.Moderate.length,\n    },\n    processedAt: new Date().toISOString(),\n  }\n};"
+      },
+      "id": "filter-and-classify",
+      "name": "Filter & Classify Alerts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1000, 300],
+      "notes": "Filters out Low-risk articles (score < 25) and groups remaining by risk level"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.RISK_SENTINEL_WEBHOOK_URL || 'http://localhost:3100/api/n8n/ingest' }}",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "source", "value": "gdelt" },
+            { "name": "pipeline", "value": "customs-intelligence" }
+          ]
+        },
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($input.item.json) }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "push-to-risk-sentinel",
+      "name": "Push to Risk Sentinel API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1200, 300],
+      "notes": "Sends scored and filtered alerts to Risk Sentinel's ingestion endpoint. Set RISK_SENTINEL_WEBHOOK_URL in n8n environment variables."
+    }
+  ],
+  "connections": {
+    "Schedule": {
+      "main": [
+        [
+          { "node": "GDELT — Customs & Trade Intelligence", "type": "main", "index": 0 },
+          { "node": "GDELT — Critical Trade Routes", "type": "main", "index": 0 },
+          { "node": "GDELT — Commodity Disruptions", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "GDELT — Customs & Trade Intelligence": {
+      "main": [[ { "node": "Merge & Deduplicate Articles", "type": "main", "index": 0 } ]]
+    },
+    "GDELT — Critical Trade Routes": {
+      "main": [[ { "node": "Merge & Deduplicate Articles", "type": "main", "index": 0 } ]]
+    },
+    "GDELT — Commodity Disruptions": {
+      "main": [[ { "node": "Merge & Deduplicate Articles", "type": "main", "index": 0 } ]]
+    },
+    "Merge & Deduplicate Articles": {
+      "main": [[ { "node": "Risk Scoring Engine (8 Dimensions)", "type": "main", "index": 0 } ]]
+    },
+    "Risk Scoring Engine (8 Dimensions)": {
+      "main": [[ { "node": "Filter & Classify Alerts", "type": "main", "index": 0 } ]]
+    },
+    "Filter & Classify Alerts": {
+      "main": [[ { "node": "Push to Risk Sentinel API", "type": "main", "index": 0 } ]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "risk-sentinel-phd"
+  }
+}

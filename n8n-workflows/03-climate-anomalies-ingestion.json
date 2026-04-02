@@ -1,0 +1,99 @@
+{
+  "name": "Risk Sentinel — Open-Meteo Climate Anomalies Ingestion",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "hours", "hoursInterval": 3 }]
+        }
+      },
+      "id": "schedule-climate",
+      "name": "Schedule (Every 3h)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [250, 300],
+      "notes": "Polls Open-Meteo every 3 hours for climate anomaly data across trade-critical zones"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// ─── Generate Open-Meteo batch requests for trade-critical climate zones ───\n// Each zone monitors temperature and precipitation anomalies that could\n// disrupt trade routes, ports, and commodity production regions.\n\nconst TRADE_CLIMATE_ZONES = [\n  // Maritime chokepoints\n  { name: 'Suez / Red Sea',      lat: 29.93, lon: 32.55, tradeRelevance: 'Suez Canal maritime traffic' },\n  { name: 'Strait of Hormuz',    lat: 26.57, lon: 56.25, tradeRelevance: 'Oil/LNG tanker routes' },\n  { name: 'Panama Canal Zone',   lat: 9.08,  lon: -79.68, tradeRelevance: 'Panama Canal water levels' },\n  { name: 'Malacca Strait',      lat: 2.50,  lon: 101.50, tradeRelevance: 'Asia-Europe shipping lane' },\n  { name: 'Taiwan Strait',       lat: 24.50, lon: 119.50, tradeRelevance: 'Semiconductor supply chain' },\n  // Commodity production hubs\n  { name: 'US Midwest (Grain)',   lat: 41.88, lon: -87.63, tradeRelevance: 'Wheat/corn production belt' },\n  { name: 'Ukraine (Grain)',      lat: 48.38, lon: 31.17, tradeRelevance: 'Black Sea grain corridor' },\n  { name: 'Brazil (Soy/Coffee)',  lat: -15.79, lon: -47.88, tradeRelevance: 'Major commodity exporter' },\n  { name: 'Persian Gulf (Oil)',   lat: 25.29, lon: 51.53, tradeRelevance: 'Oil production & export hub' },\n  { name: 'Australia (Mining)',   lat: -23.70, lon: 133.78, tradeRelevance: 'Iron ore, lithium, nickel' },\n  { name: 'Chile (Copper)',       lat: -33.45, lon: -70.67, tradeRelevance: 'World copper supply' },\n  { name: 'DRC (Cobalt)',         lat: -4.32, lon: 15.31, tradeRelevance: 'Cobalt/coltan mining' },\n  // Major ports\n  { name: 'Port Shanghai',       lat: 31.23, lon: 121.47, tradeRelevance: 'World busiest container port' },\n  { name: 'Port Rotterdam',      lat: 51.95, lon: 4.12, tradeRelevance: 'Europe gateway port' },\n  { name: 'Port Singapore',      lat: 1.26, lon: 103.84, tradeRelevance: 'Transshipment hub' },\n];\n\nconst endDate = new Date().toISOString().slice(0, 10);\nconst startDate = new Date(Date.now() - 21 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);\n\nconst requests = TRADE_CLIMATE_ZONES.map(zone => ({\n  zone,\n  url: `https://archive-api.open-meteo.com/v1/archive?latitude=${zone.lat}&longitude=${zone.lon}&start_date=${startDate}&end_date=${endDate}&daily=temperature_2m_mean,precipitation_sum&timezone=auto`,\n}));\n\nreturn requests.map(r => ({ json: r }));"
+      },
+      "id": "generate-requests",
+      "name": "Generate Zone Requests",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 300],
+      "notes": "Generates Open-Meteo API requests for 15 trade-critical climate zones"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "options": { "timeout": 20000 }
+      },
+      "id": "open-meteo-fetch",
+      "name": "Open-Meteo — Archive Data",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [750, 300],
+      "notes": "Fetches 21-day temperature and precipitation archive for each zone"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// ─── Climate Anomaly Detection & Trade Impact Scoring ───\n// Compares last 7 days of observations against the 21-day baseline\n// to detect temperature and precipitation anomalies.\n\nconst zone = $('Generate Zone Requests').item.json.zone;\nconst daily = $input.item.json.daily || {};\nconst times = daily.time || [];\nconst temps = daily.temperature_2m_mean || [];\nconst precips = daily.precipitation_sum || [];\n\nif (times.length < 14) {\n  return { json: { zone: zone.name, skipped: true, reason: 'insufficient data' } };\n}\n\n// Baseline: days 1–14, Recent: last 7 days\nconst baselineTemps = temps.slice(0, -7).filter(t => t != null);\nconst baselinePrecips = precips.slice(0, -7).filter(p => p != null);\nconst recentTemps = temps.slice(-7).filter(t => t != null);\nconst recentPrecips = precips.slice(-7).filter(p => p != null);\n\nconst avg = arr => arr.length ? arr.reduce((s, v) => s + v, 0) / arr.length : 0;\n\nconst baselineTempAvg = avg(baselineTemps);\nconst baselinePrecipAvg = avg(baselinePrecips);\nconst recentTempAvg = avg(recentTemps);\nconst recentPrecipAvg = avg(recentPrecips);\n\nconst tempDelta = Math.round((recentTempAvg - baselineTempAvg) * 10) / 10;\nconst precipDelta = Math.round((recentPrecipAvg - baselinePrecipAvg) * 10) / 10;\n\n// Severity classification\nconst absTemp = Math.abs(tempDelta);\nconst absPrecip = Math.abs(precipDelta);\nlet severity = 'Normal';\nif (absTemp >= 5 || absPrecip >= 12) severity = 'Extreme';\nelse if (absTemp >= 3 || absPrecip >= 6) severity = 'Moderate';\n\n// Anomaly type\nlet type = 'Stable';\nif (tempDelta > 3) type = 'Warm';\nelse if (tempDelta < -3) type = 'Cold';\nelse if (precipDelta > 6) type = 'Wet';\nelse if (precipDelta < -6) type = 'Dry';\n\n// Trade impact assessment\nlet tradeImpact = 'None';\nif (severity === 'Extreme') {\n  tradeImpact = 'High — potential disruption to ' + zone.tradeRelevance;\n} else if (severity === 'Moderate') {\n  tradeImpact = 'Moderate — monitor ' + zone.tradeRelevance;\n}\n\nreturn {\n  json: {\n    zone: zone.name,\n    location: { latitude: zone.lat, longitude: zone.lon },\n    tradeRelevance: zone.tradeRelevance,\n    tempDelta,\n    precipDelta,\n    severity,\n    type,\n    tradeImpact,\n    period: `${times.slice(-7)[0]} to ${times[times.length - 1]}`,\n    processedAt: new Date().toISOString(),\n  }\n};"
+      },
+      "id": "detect-anomalies",
+      "name": "Detect Climate Anomalies",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1000, 300],
+      "notes": "Detects temperature/precipitation anomalies and assesses trade impact per zone"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Aggregate all zone anomalies into a single payload\nconst anomalies = $input.all().map(i => i.json).filter(a => !a.skipped);\nconst extremeCount = anomalies.filter(a => a.severity === 'Extreme').length;\nconst moderateCount = anomalies.filter(a => a.severity === 'Moderate').length;\n\nreturn [{\n  json: {\n    source: 'open-meteo',\n    pipeline: 'climate-trade-anomalies',\n    anomalies,\n    summary: {\n      totalZones: anomalies.length,\n      extreme: extremeCount,\n      moderate: moderateCount,\n      normal: anomalies.length - extremeCount - moderateCount,\n    },\n    processedAt: new Date().toISOString(),\n  }\n}];"
+      },
+      "id": "aggregate-anomalies",
+      "name": "Aggregate All Zones",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.RISK_SENTINEL_WEBHOOK_URL || 'http://localhost:3100/api/n8n/ingest' }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($input.item.json) }}",
+        "options": { "timeout": 10000 }
+      },
+      "id": "push-climate",
+      "name": "Push to Risk Sentinel API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1500, 300]
+    }
+  ],
+  "connections": {
+    "Schedule (Every 3h)": {
+      "main": [[ { "node": "Generate Zone Requests", "type": "main", "index": 0 } ]]
+    },
+    "Generate Zone Requests": {
+      "main": [[ { "node": "Open-Meteo — Archive Data", "type": "main", "index": 0 } ]]
+    },
+    "Open-Meteo — Archive Data": {
+      "main": [[ { "node": "Detect Climate Anomalies", "type": "main", "index": 0 } ]]
+    },
+    "Detect Climate Anomalies": {
+      "main": [[ { "node": "Aggregate All Zones", "type": "main", "index": 0 } ]]
+    },
+    "Aggregate All Zones": {
+      "main": [[ { "node": "Push to Risk Sentinel API", "type": "main", "index": 0 } ]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "meta": { "templateCredsSetupCompleted": true, "instanceId": "risk-sentinel-phd" }
+}

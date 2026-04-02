@@ -1,0 +1,73 @@
+{
+  "name": "Risk Sentinel — USGS Seismic Data Ingestion",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "hours", "hoursInterval": 1 }]
+        }
+      },
+      "id": "schedule-seismic",
+      "name": "Schedule (Every 1h)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [250, 300],
+      "notes": "Polls USGS earthquake feed every hour"
+    },
+    {
+      "parameters": {
+        "url": "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/4.5_day.geojson",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "usgs-fetch",
+      "name": "USGS — Earthquakes M4.5+ (24h)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [500, 300],
+      "notes": "Fetches all earthquakes magnitude ≥ 4.5 in the last 24 hours from USGS GeoJSON feed"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// ─── USGS Earthquake Processing & Trade Route Impact ───\n// Assess whether earthquakes could impact critical trade infrastructure.\n\nconst CRITICAL_TRADE_ZONES = [\n  { name: 'Suez Canal',       lat: 30.45, lon: 32.35, radiusKm: 500, routeCriticality: 0.95 },\n  { name: 'Strait of Hormuz', lat: 26.57, lon: 56.25, radiusKm: 400, routeCriticality: 0.90 },\n  { name: 'Panama Canal',     lat: 9.08,  lon: -79.68, radiusKm: 300, routeCriticality: 0.85 },\n  { name: 'Taiwan Strait',    lat: 24.50, lon: 119.50, radiusKm: 500, routeCriticality: 0.85 },\n  { name: 'Malacca Strait',   lat: 2.50,  lon: 101.50, radiusKm: 400, routeCriticality: 0.80 },\n  { name: 'Gibraltar',        lat: 36.13, lon: -5.35,  radiusKm: 300, routeCriticality: 0.70 },\n  // Major ports\n  { name: 'Port of Shanghai', lat: 31.23, lon: 121.47, radiusKm: 200, routeCriticality: 0.75 },\n  { name: 'Port of Singapore', lat: 1.26, lon: 103.84, radiusKm: 200, routeCriticality: 0.75 },\n  { name: 'Port of Rotterdam', lat: 51.95, lon: 4.12,  radiusKm: 200, routeCriticality: 0.65 },\n];\n\nconst NUCLEAR_TEST_SITES = [\n  { name: 'Punggye-ri',    lat: 41.28, lon: 129.08, radiusKm: 100 },\n  { name: 'Lop Nur',       lat: 41.39, lon: 89.03,  radiusKm: 100 },\n  { name: 'Novaya Zemlya', lat: 73.37, lon: 54.78,  radiusKm: 100 },\n];\n\nfunction haversineKm(lat1, lon1, lat2, lon2) {\n  const R = 6371;\n  const dLat = ((lat2 - lat1) * Math.PI) / 180;\n  const dLon = ((lon2 - lon1) * Math.PI) / 180;\n  const a = Math.sin(dLat / 2) ** 2 + Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;\n  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));\n}\n\nconst geojson = $input.item.json;\nconst features = geojson.features || [];\n\nconst earthquakes = features\n  .filter(f => f?.properties && f?.geometry?.coordinates)\n  .map(f => {\n    const lat = f.geometry.coordinates[1];\n    const lon = f.geometry.coordinates[0];\n    const mag = f.properties.mag || 0;\n    const depthKm = f.geometry.coordinates[2] || 0;\n\n    // Check proximity to trade routes\n    let nearestRoute = null;\n    let routeDistance = Infinity;\n    for (const zone of CRITICAL_TRADE_ZONES) {\n      const km = haversineKm(lat, lon, zone.lat, zone.lon);\n      if (km < zone.radiusKm && km < routeDistance) {\n        nearestRoute = zone;\n        routeDistance = km;\n      }\n    }\n\n    // Check proximity to nuclear test sites\n    let nearTestSite = false;\n    let testSiteName = null;\n    for (const site of NUCLEAR_TEST_SITES) {\n      if (haversineKm(lat, lon, site.lat, site.lon) < site.radiusKm) {\n        nearTestSite = true;\n        testSiteName = site.name;\n        break;\n      }\n    }\n\n    // Risk score for customs\n    let tradeImpactScore = 0;\n    if (nearestRoute) {\n      const magFactor = Math.min(1, mag / 9);\n      const proximityFactor = 1 - (routeDistance / nearestRoute.radiusKm);\n      tradeImpactScore = Math.round(magFactor * 0.5 * 100 + proximityFactor * nearestRoute.routeCriticality * 0.5 * 100);\n    }\n\n    return {\n      id: String(f.id || ''),\n      place: String(f.properties.place || ''),\n      magnitude: mag,\n      depthKm,\n      location: { latitude: lat, longitude: lon },\n      occurredAt: f.properties.time,\n      sourceUrl: String(f.properties.url || ''),\n      nearTradeRoute: nearestRoute ? nearestRoute.name : null,\n      tradeRouteDistanceKm: nearestRoute ? Math.round(routeDistance) : null,\n      tradeImpactScore,\n      nearTestSite,\n      testSiteName,\n    };\n  })\n  .sort((a, b) => b.tradeImpactScore - a.tradeImpactScore);\n\nconst tradeRelevant = earthquakes.filter(e => e.tradeImpactScore > 0);\n\nreturn {\n  json: {\n    earthquakes,\n    summary: {\n      total: earthquakes.length,\n      tradeRelevant: tradeRelevant.length,\n      nearTestSites: earthquakes.filter(e => e.nearTestSite).length,\n      maxMagnitude: Math.max(...earthquakes.map(e => e.magnitude), 0),\n    },\n    processedAt: new Date().toISOString(),\n  }\n};"
+      },
+      "id": "process-earthquakes",
+      "name": "Process & Score Trade Impact",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [750, 300],
+      "notes": "Enriches earthquakes with proximity to trade routes and nuclear test sites, computes trade impact score"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.RISK_SENTINEL_WEBHOOK_URL || 'http://localhost:3100/api/n8n/ingest' }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ source: 'usgs', pipeline: 'seismic-trade-impact', ...$input.item.json }) }}",
+        "options": { "timeout": 10000 }
+      },
+      "id": "push-seismic",
+      "name": "Push to Risk Sentinel API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1000, 300],
+      "notes": "Sends processed earthquake data to Risk Sentinel ingestion endpoint"
+    }
+  ],
+  "connections": {
+    "Schedule (Every 1h)": {
+      "main": [[ { "node": "USGS — Earthquakes M4.5+ (24h)", "type": "main", "index": 0 } ]]
+    },
+    "USGS — Earthquakes M4.5+ (24h)": {
+      "main": [[ { "node": "Process & Score Trade Impact", "type": "main", "index": 0 } ]]
+    },
+    "Process & Score Trade Impact": {
+      "main": [[ { "node": "Push to Risk Sentinel API", "type": "main", "index": 0 } ]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "meta": { "templateCredsSetupCompleted": true, "instanceId": "risk-sentinel-phd" }
+}

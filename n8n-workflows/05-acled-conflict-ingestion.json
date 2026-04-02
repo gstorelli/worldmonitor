@@ -1,0 +1,96 @@
+{
+  "name": "Risk Sentinel — ACLED Conflict Events Ingestion",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "hours", "hoursInterval": 6 }]
+        }
+      },
+      "id": "schedule-acled",
+      "name": "Schedule (Every 6h)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [250, 300],
+      "notes": "ACLED data updates daily; polling every 6h ensures freshness without excess API calls"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Generate ACLED API request parameters\nconst now = Date.now();\nconst startDate = new Date(now - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];\nconst endDate = new Date(now).toISOString().split('T')[0];\n\nreturn {\n  json: {\n    startDate,\n    endDate,\n    eventTypes: 'Battles|Explosions/Remote violence|Violence against civilians|Riots|Strategic developments',\n  }\n};"
+      },
+      "id": "build-params",
+      "name": "Build ACLED Query",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://acleddata.com/api/acled/read",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "event_type", "value": "={{ $json.eventTypes }}" },
+            { "name": "event_date", "value": "={{ $json.startDate }}|{{ $json.endDate }}" },
+            { "name": "event_date_where", "value": "BETWEEN" },
+            { "name": "limit", "value": "500" },
+            { "name": "_format", "value": "json" }
+          ]
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": { "timeout": 15000 }
+      },
+      "id": "acled-fetch",
+      "name": "ACLED — Conflict Events (30d)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [750, 300],
+      "notes": "Fetches last 30 days of armed conflict events from ACLED. Requires ACLED API credentials configured in n8n (Header Auth with Bearer token)."
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// ─── Process ACLED events for customs/trade route impact ───\n\nconst TRADE_CHOKEPOINTS = [\n  { name: 'Red Sea / Bab el-Mandeb', lat: 12.60, lon: 43.33, radiusKm: 500 },\n  { name: 'Strait of Hormuz',        lat: 26.57, lon: 56.25, radiusKm: 400 },\n  { name: 'Suez Canal',              lat: 30.45, lon: 32.35, radiusKm: 300 },\n  { name: 'Gulf of Aden',            lat: 12.78, lon: 45.02, radiusKm: 400 },\n  { name: 'Eastern Mediterranean',   lat: 34.00, lon: 34.00, radiusKm: 500 },\n  { name: 'Black Sea',               lat: 43.50, lon: 34.00, radiusKm: 500 },\n  { name: 'Gulf of Guinea',          lat: 3.00,  lon: 3.00,  radiusKm: 500 },\n  { name: 'Malacca Strait',          lat: 2.50,  lon: 101.50, radiusKm: 300 },\n];\n\nfunction haversineKm(lat1, lon1, lat2, lon2) {\n  const R = 6371;\n  const dLat = ((lat2 - lat1) * Math.PI) / 180;\n  const dLon = ((lon2 - lon1) * Math.PI) / 180;\n  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;\n  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));\n}\n\nconst rawData = $input.item.json;\nconst rawEvents = rawData.data || [];\n\nconst events = rawEvents\n  .filter(e => {\n    const lat = parseFloat(e.latitude || '');\n    const lon = parseFloat(e.longitude || '');\n    return Number.isFinite(lat) && Number.isFinite(lon) && lat >= -90 && lat <= 90;\n  })\n  .map(e => {\n    const lat = parseFloat(e.latitude);\n    const lon = parseFloat(e.longitude);\n    const fatalities = parseInt(e.fatalities || '0', 10) || 0;\n\n    // Check proximity to trade chokepoints\n    let nearChokepoint = null;\n    let chokepointDistance = Infinity;\n    for (const cp of TRADE_CHOKEPOINTS) {\n      const km = haversineKm(lat, lon, cp.lat, cp.lon);\n      if (km < cp.radiusKm && km < chokepointDistance) {\n        nearChokepoint = cp.name;\n        chokepointDistance = km;\n      }\n    }\n\n    // Severity score for customs impact\n    let severityScore = 20;\n    if (fatalities >= 50) severityScore = 100;\n    else if (fatalities >= 10) severityScore = 75;\n    else if (fatalities >= 1) severityScore = 50;\n    if (nearChokepoint) severityScore = Math.min(100, severityScore + 25);\n\n    return {\n      id: `acled-${e.event_id_cnty}`,\n      eventType: e.event_type || '',\n      subEventType: e.sub_event_type || '',\n      country: e.country || '',\n      admin1: e.admin1 || '',\n      location: { latitude: lat, longitude: lon },\n      occurredAt: new Date(e.event_date || '').getTime(),\n      fatalities,\n      actors: [e.actor1, e.actor2].filter(Boolean),\n      source: e.source || '',\n      nearChokepoint,\n      chokepointDistanceKm: nearChokepoint ? Math.round(chokepointDistance) : null,\n      severityScore,\n    };\n  })\n  .sort((a, b) => b.severityScore - a.severityScore);\n\nconst tradeRelevant = events.filter(e => e.nearChokepoint);\nconst byCountry = {};\nfor (const e of events) {\n  byCountry[e.country] = (byCountry[e.country] || 0) + 1;\n}\n\nreturn {\n  json: {\n    source: 'acled',\n    pipeline: 'conflict-trade-impact',\n    events,\n    tradeRelevant,\n    summary: {\n      totalEvents: events.length,\n      tradeRelevantEvents: tradeRelevant.length,\n      totalFatalities: events.reduce((s, e) => s + e.fatalities, 0),\n      topCountries: Object.entries(byCountry).sort((a, b) => b[1] - a[1]).slice(0, 10),\n      chokepoints: [...new Set(tradeRelevant.map(e => e.nearChokepoint))],\n    },\n    processedAt: new Date().toISOString(),\n  }\n};"
+      },
+      "id": "process-acled",
+      "name": "Process Conflicts & Trade Impact",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1000, 300],
+      "notes": "Maps ACLED events to trade chokepoint proximity and computes severity scores"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.RISK_SENTINEL_WEBHOOK_URL || 'http://localhost:3100/api/n8n/ingest' }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($input.item.json) }}",
+        "options": { "timeout": 10000 }
+      },
+      "id": "push-acled",
+      "name": "Push to Risk Sentinel API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1250, 300]
+    }
+  ],
+  "connections": {
+    "Schedule (Every 6h)": {
+      "main": [[ { "node": "Build ACLED Query", "type": "main", "index": 0 } ]]
+    },
+    "Build ACLED Query": {
+      "main": [[ { "node": "ACLED — Conflict Events (30d)", "type": "main", "index": 0 } ]]
+    },
+    "ACLED — Conflict Events (30d)": {
+      "main": [[ { "node": "Process Conflicts & Trade Impact", "type": "main", "index": 0 } ]]
+    },
+    "Process Conflicts & Trade Impact": {
+      "main": [[ { "node": "Push to Risk Sentinel API", "type": "main", "index": 0 } ]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "meta": { "templateCredsSetupCompleted": true, "instanceId": "risk-sentinel-phd" }
+}
