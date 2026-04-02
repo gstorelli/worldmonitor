@@ -90,6 +90,18 @@ Full stack details in the **[architecture docs](https://docs.worldmonitor.app/ar
 
 ---
 
+## Flight Data
+
+Flight data provided gracefully by [Wingbits](https://wingbits.com?utm_source=worldmonitor&utm_medium=referral&utm_campaign=worldmonitor), the most advanced ADS-B flight data solution.
+
+---
+
+## Data Sources
+
+WorldMonitor aggregates 30+ external data sources across geopolitics, finance, energy, climate, aviation, and cyber. See the full [data sources catalog](https://docs.worldmonitor.app/data-sources) for providers, feed tiers, and collection methods.
+
+---
+
 ## Contributing
 
 Contributions welcome! See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.

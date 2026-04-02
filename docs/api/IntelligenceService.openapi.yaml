@@ -120,6 +120,39 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Error'
+    /api/intelligence/v1/get-country-risk:
+        get:
+            tags:
+                - IntelligenceService
+            summary: GetCountryRisk
+            description: GetCountryRisk retrieves composite risk intelligence for a specific country.
+            operationId: GetCountryRisk
+            parameters:
+                - name: country_code
+                  in: query
+                  description: ISO 3166-1 alpha-2 country code.
+                  required: false
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: Successful response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/GetCountryRiskResponse'
+                "400":
+                    description: Validation error
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ValidationError'
+                default:
+                    description: Error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Error'
     /api/intelligence/v1/get-country-intel-brief:
         get:
             tags:
@@ -131,6 +164,12 @@ paths:
                 - name: country_code
                   in: query
                   description: ISO 3166-1 alpha-2 country code.
+                  required: false
+                  schema:
+                    type: string
+                - name: framework
+                  in: query
+                  description: Optional analytical framework instructions to append to system prompt. Max 2000 chars enforced at handler level.
                   required: false
                   schema:
                     type: string
@@ -522,6 +561,123 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Error'
+    /api/intelligence/v1/get-gdelt-topic-timeline:
+        get:
+            tags:
+                - IntelligenceService
+            summary: GetGdeltTopicTimeline
+            description: GetGdeltTopicTimeline retrieves tone and volume timelines for a GDELT intel topic.
+            operationId: GetGdeltTopicTimeline
+            parameters:
+                - name: topic
+                  in: query
+                  description: Topic ID (military, cyber, nuclear, sanctions, intelligence, maritime).
+                  required: false
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: Successful response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/GetGdeltTopicTimelineResponse'
+                "400":
+                    description: Validation error
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ValidationError'
+                default:
+                    description: Error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Error'
+    /api/intelligence/v1/list-cross-source-signals:
+        get:
+            tags:
+                - IntelligenceService
+            summary: ListCrossSourceSignals
+            description: ListCrossSourceSignals returns cross-domain signals ranked by severity with composite escalation detection.
+            operationId: ListCrossSourceSignals
+            responses:
+                "200":
+                    description: Successful response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ListCrossSourceSignalsResponse'
+                "400":
+                    description: Validation error
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ValidationError'
+                default:
+                    description: Error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Error'
+    /api/intelligence/v1/list-market-implications:
+        get:
+            tags:
+                - IntelligenceService
+            summary: ListMarketImplications
+            description: ListMarketImplications returns AI-generated trade-implication cards from live world state.
+            operationId: ListMarketImplications
+            parameters:
+                - name: frameworkId
+                  in: query
+                  required: false
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: Successful response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ListMarketImplicationsResponse'
+                "400":
+                    description: Validation error
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ValidationError'
+                default:
+                    description: Error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Error'
+    /api/intelligence/v1/get-social-velocity:
+        get:
+            tags:
+                - IntelligenceService
+            summary: GetSocialVelocity
+            description: GetSocialVelocity returns trending Reddit posts from r/worldnews and r/geopolitics ranked by velocity.
+            operationId: GetSocialVelocity
+            responses:
+                "200":
+                    description: Successful response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/GetSocialVelocityResponse'
+                "400":
+                    description: Validation error
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ValidationError'
+                default:
+                    description: Error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Error'
 components:
     schemas:
         Error:
@@ -891,6 +1047,45 @@ components:
                         type: string
                         description: Related entities identified.
             description: EventClassification represents an AI-generated classification of a real-world event.
+        GetCountryRiskRequest:
+            type: object
+            properties:
+                countryCode:
+                    type: string
+                    pattern: ^[A-Z]{2}$
+                    description: ISO 3166-1 alpha-2 country code.
+            required:
+                - countryCode
+            description: GetCountryRiskRequest specifies which country to retrieve risk intelligence for.
+        GetCountryRiskResponse:
+            type: object
+            properties:
+                countryCode:
+                    type: string
+                    description: ISO 3166-1 alpha-2 country code.
+                countryName:
+                    type: string
+                    description: Country name.
+                cii:
+                    $ref: '#/components/schemas/CiiScore'
+                advisoryLevel:
+                    type: string
+                    description: Travel advisory level from government sources (e.g. "do-not-travel", "reconsider", "caution"). Empty if none.
+                sanctionsActive:
+                    type: boolean
+                    description: Whether this country has active OFAC sanctions designations.
+                sanctionsCount:
+                    type: integer
+                    format: int32
+                    description: Count of sanctioned entities associated with this country.
+                fetchedAt:
+                    type: integer
+                    format: int64
+                    description: 'Data freshness timestamp derived from CII computedAt, as Unix epoch milliseconds.. Warning: Values > 2^53 may lose precision in JavaScript'
+                upstreamUnavailable:
+                    type: boolean
+                    description: True when all upstream Redis keys were unavailable. Signals CDN cache bypass.
+            description: GetCountryRiskResponse contains composite risk intelligence for a specific country.
         GetCountryIntelBriefRequest:
             type: object
             properties:
@@ -898,6 +1093,9 @@ components:
                     type: string
                     pattern: ^[A-Z]{2}$
                     description: ISO 3166-1 alpha-2 country code.
+                framework:
+                    type: string
+                    description: Optional analytical framework instructions to append to system prompt. Max 2000 chars enforced at handler level.
             required:
                 - countryCode
             description: GetCountryIntelBriefRequest specifies which country to generate a brief for.
@@ -995,6 +1193,9 @@ components:
                     type: string
                 geoContext:
                     type: string
+                framework:
+                    type: string
+                    description: Optional analytical framework instructions.
         DeductSituationResponse:
             type: object
             properties:
@@ -1543,3 +1744,227 @@ components:
                     type: string
                 country:
                     type: string
+        GetGdeltTopicTimelineRequest:
+            type: object
+            properties:
+                topic:
+                    type: string
+                    description: Topic ID (military, cyber, nuclear, sanctions, intelligence, maritime).
+            description: GetGdeltTopicTimelineRequest retrieves tone and volume timelines for a GDELT intel topic.
+        GetGdeltTopicTimelineResponse:
+            type: object
+            properties:
+                topic:
+                    type: string
+                    description: Topic ID.
+                tone:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/GdeltTimelinePoint'
+                vol:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/GdeltTimelinePoint'
+                fetchedAt:
+                    type: string
+                    description: ISO timestamp when this data was fetched.
+                error:
+                    type: string
+                    description: Error message if fetch failed.
+            description: GetGdeltTopicTimelineResponse contains tone and volume timelines for a topic.
+        GdeltTimelinePoint:
+            type: object
+            properties:
+                date:
+                    type: string
+                    description: Date string from GDELT (e.g. "20240101T000000").
+                value:
+                    type: number
+                    format: double
+                    description: Tone or volume value at this point.
+            description: GdeltTimelinePoint is a single data point in a tone or volume timeline.
+        ListCrossSourceSignalsRequest:
+            type: object
+            description: ListCrossSourceSignalsRequest has no required parameters (returns all signals).
+        ListCrossSourceSignalsResponse:
+            type: object
+            properties:
+                signals:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/CrossSourceSignal'
+                evaluatedAt:
+                    type: integer
+                    format: int64
+                    description: 'Timestamp when the aggregator last ran (Unix epoch milliseconds).. Warning: Values > 2^53 may lose precision in JavaScript'
+                compositeCount:
+                    type: integer
+                    format: int32
+                    description: Total number of composite escalation zones detected.
+            description: ListCrossSourceSignalsResponse contains ranked cross-domain signals.
+        CrossSourceSignal:
+            type: object
+            properties:
+                id:
+                    type: string
+                    description: Unique signal identifier.
+                type:
+                    type: string
+                    enum:
+                        - CROSS_SOURCE_SIGNAL_TYPE_UNSPECIFIED
+                        - CROSS_SOURCE_SIGNAL_TYPE_COMPOSITE_ESCALATION
+                        - CROSS_SOURCE_SIGNAL_TYPE_THERMAL_SPIKE
+                        - CROSS_SOURCE_SIGNAL_TYPE_GPS_JAMMING
+                        - CROSS_SOURCE_SIGNAL_TYPE_MILITARY_FLIGHT_SURGE
+                        - CROSS_SOURCE_SIGNAL_TYPE_UNREST_SURGE
+                        - CROSS_SOURCE_SIGNAL_TYPE_OREF_ALERT_CLUSTER
+                        - CROSS_SOURCE_SIGNAL_TYPE_VIX_SPIKE
+                        - CROSS_SOURCE_SIGNAL_TYPE_COMMODITY_SHOCK
+                        - CROSS_SOURCE_SIGNAL_TYPE_CYBER_ESCALATION
+                        - CROSS_SOURCE_SIGNAL_TYPE_SHIPPING_DISRUPTION
+                        - CROSS_SOURCE_SIGNAL_TYPE_SANCTIONS_SURGE
+                        - CROSS_SOURCE_SIGNAL_TYPE_EARTHQUAKE_SIGNIFICANT
+                        - CROSS_SOURCE_SIGNAL_TYPE_RADIATION_ANOMALY
+                        - CROSS_SOURCE_SIGNAL_TYPE_INFRASTRUCTURE_OUTAGE
+                        - CROSS_SOURCE_SIGNAL_TYPE_WILDFIRE_ESCALATION
+                        - CROSS_SOURCE_SIGNAL_TYPE_DISPLACEMENT_SURGE
+                        - CROSS_SOURCE_SIGNAL_TYPE_FORECAST_DETERIORATION
+                        - CROSS_SOURCE_SIGNAL_TYPE_MARKET_STRESS
+                        - CROSS_SOURCE_SIGNAL_TYPE_WEATHER_EXTREME
+                        - CROSS_SOURCE_SIGNAL_TYPE_MEDIA_TONE_DETERIORATION
+                        - CROSS_SOURCE_SIGNAL_TYPE_RISK_SCORE_SPIKE
+                    description: CrossSourceSignalType enumerates all monitored cross-domain signal categories.
+                theater:
+                    type: string
+                    description: Theater / geographic context (e.g. "Eastern Europe", "Red Sea", "Global Markets").
+                summary:
+                    type: string
+                    description: Human-readable summary of the signal.
+                severity:
+                    type: string
+                    enum:
+                        - CROSS_SOURCE_SIGNAL_SEVERITY_UNSPECIFIED
+                        - CROSS_SOURCE_SIGNAL_SEVERITY_LOW
+                        - CROSS_SOURCE_SIGNAL_SEVERITY_MEDIUM
+                        - CROSS_SOURCE_SIGNAL_SEVERITY_HIGH
+                        - CROSS_SOURCE_SIGNAL_SEVERITY_CRITICAL
+                    description: CrossSourceSignalSeverity indicates the urgency tier of a detected signal.
+                severityScore:
+                    type: number
+                    format: double
+                    description: 'Raw severity score used for ranking (higher = more severe).. Warning: Values > 2^53 may lose precision in JavaScript'
+                detectedAt:
+                    type: integer
+                    format: int64
+                    description: 'Detection timestamp (Unix epoch milliseconds).. Warning: Values > 2^53 may lose precision in JavaScript'
+                contributingTypes:
+                    type: array
+                    items:
+                        type: string
+                        description: 'For COMPOSITE_ESCALATION: list of contributing signal type names.'
+                signalCount:
+                    type: integer
+                    format: int32
+                    description: 'For COMPOSITE_ESCALATION: number of co-firing signals in theater.'
+            description: CrossSourceSignal represents a single detected cross-domain signal event.
+        ListMarketImplicationsRequest:
+            type: object
+            properties:
+                frameworkId:
+                    type: string
+        ListMarketImplicationsResponse:
+            type: object
+            properties:
+                cards:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/MarketImplicationCard'
+                degraded:
+                    type: boolean
+                emptyReason:
+                    type: string
+                generatedAt:
+                    type: string
+        MarketImplicationCard:
+            type: object
+            properties:
+                ticker:
+                    type: string
+                name:
+                    type: string
+                direction:
+                    type: string
+                timeframe:
+                    type: string
+                confidence:
+                    type: string
+                title:
+                    type: string
+                narrative:
+                    type: string
+                riskCaveat:
+                    type: string
+                driver:
+                    type: string
+                transmissionChain:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/TransmissionNode'
+        TransmissionNode:
+            type: object
+            properties:
+                node:
+                    type: string
+                impactType:
+                    type: string
+                logic:
+                    type: string
+        GetSocialVelocityRequest:
+            type: object
+        GetSocialVelocityResponse:
+            type: object
+            properties:
+                posts:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/SocialVelocityPost'
+                fetchedAt:
+                    type: integer
+                    format: int64
+                    description: 'Warning: Values > 2^53 may lose precision in JavaScript'
+        SocialVelocityPost:
+            type: object
+            properties:
+                id:
+                    type: string
+                    description: Reddit post ID.
+                title:
+                    type: string
+                    description: Post title.
+                subreddit:
+                    type: string
+                    description: Subreddit name (without r/ prefix).
+                url:
+                    type: string
+                    description: Direct URL to the post.
+                score:
+                    type: integer
+                    format: int32
+                    description: Reddit score (upvotes - downvotes).
+                upvoteRatio:
+                    type: number
+                    format: double
+                    description: Upvote ratio (0.0–1.0).
+                numComments:
+                    type: integer
+                    format: int32
+                    description: Number of comments.
+                velocityScore:
+                    type: number
+                    format: double
+                    description: Composite velocity score accounting for recency, score, and ratio.
+                createdAt:
+                    type: integer
+                    format: int64
+                    description: 'Unix epoch milliseconds when posted.. Warning: Values > 2^53 may lose precision in JavaScript'
+            description: SocialVelocityPost represents a trending Reddit post with velocity scoring.

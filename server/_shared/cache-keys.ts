@@ -1,4 +1,16 @@
 /**
+ * Shared Redis pointer keys for simulation artifacts.
+ * Defined here so TypeScript handlers and seed scripts agree on the exact string.
+ * The MJS seed script keeps its own copy (cannot import TS source directly).
+ */
+export const SIMULATION_OUTCOME_LATEST_KEY = 'forecast:simulation-outcome:latest';
+export const SIMULATION_PACKAGE_LATEST_KEY = 'forecast:simulation-package:latest';
+export const CLIMATE_ANOMALIES_KEY = 'climate:anomalies:v2';
+export const CLIMATE_ZONE_NORMALS_KEY = 'climate:zone-normals:v1';
+export const CLIMATE_CO2_MONITORING_KEY = 'climate:co2-monitoring:v1';
+export const CLIMATE_NEWS_KEY = 'climate:news-intelligence:v1';
+
+/**
  * Static cache keys for the bootstrap endpoint.
  * Only keys with NO request-varying suffixes are included.
  */
@@ -19,9 +31,12 @@ export const BOOTSTRAP_CACHE_KEYS: Record<string, string> = {
   chokepointTransits: 'supply_chain:chokepoint_transits:v1',
   minerals:         'supply_chain:minerals:v2',
   giving:           'giving:summary:v1',
-  climateAnomalies: 'climate:anomalies:v1',
+  climateAnomalies: 'climate:anomalies:v2',
+  co2Monitoring:    'climate:co2-monitoring:v1',
+  climateNews:      'climate:news-intelligence:v1',
   radiationWatch:  'radiation:observations:v1',
   thermalEscalation: 'thermal:escalation:v1',
+  crossSourceSignals: 'intelligence:cross-source-signals:v1',
   wildfires:        'wildfire:fires:v1',
   marketQuotes:     'market:stocks-bootstrap:v1',
   commodityQuotes:  'market:commodities-bootstrap:v1',
@@ -54,11 +69,24 @@ export const BOOTSTRAP_CACHE_KEYS: Record<string, string> = {
   sanctionsPressure: 'sanctions:pressure:v1',
   groceryBasket:     'economic:grocery-basket:v1',
   bigmac:            'economic:bigmac:v1',
+  fuelPrices:        'economic:fuel-prices:v1',
   cryptoSectors:    'market:crypto-sectors:v1',
   defiTokens:       'market:defi-tokens:v1',
   aiTokens:         'market:ai-tokens:v1',
   otherTokens:      'market:other-tokens:v1',
   nationalDebt:     'economic:national-debt:v1',
+  marketImplications: 'intelligence:market-implications:v1',
+  fearGreedIndex:   'market:fear-greed:v1',
+  crudeInventories: 'economic:crude-inventories:v1',
+  natGasStorage:    'economic:nat-gas-storage:v1',
+  ecbFxRates:       'economic:ecb-fx-rates:v1',
+  euGasStorage:     'economic:eu-gas-storage:v1',
+  eurostatCountryData: 'economic:eurostat-country-data:v1',
+  euFsi:            'economic:fsi-eu:v1',
+  shippingStress:   'supply_chain:shipping_stress:v1',
+  socialVelocity:   'intelligence:social:reddit:v1',
+  diseaseOutbreaks: 'health:disease-outbreaks:v1',
+  economicStress:   'economic:stress-index:v1',
 };
 
 export const BOOTSTRAP_TIERS: Record<string, 'slow' | 'fast'> = {
@@ -66,7 +94,7 @@ export const BOOTSTRAP_TIERS: Record<string, 'slow' | 'fast'> = {
   minerals: 'slow', giving: 'slow', sectors: 'slow',
   progressData: 'slow', renewableEnergy: 'slow',
   etfFlows: 'slow', shippingRates: 'fast', wildfires: 'slow',
-  climateAnomalies: 'slow', sanctionsPressure: 'slow', radiationWatch: 'slow', thermalEscalation: 'slow', cyberThreats: 'slow', techReadiness: 'slow',
+  climateAnomalies: 'slow', co2Monitoring: 'slow', climateNews: 'slow', sanctionsPressure: 'slow', radiationWatch: 'slow', thermalEscalation: 'slow', crossSourceSignals: 'slow', cyberThreats: 'slow', techReadiness: 'slow',
   theaterPosture: 'fast', naturalEvents: 'slow',
   cryptoQuotes: 'slow', gulfQuotes: 'slow', stablecoinMarkets: 'slow',
   unrestEvents: 'slow', ucdpEvents: 'slow', techEvents: 'slow',
@@ -83,9 +111,22 @@ export const BOOTSTRAP_TIERS: Record<string, 'slow' | 'fast'> = {
   consumerPricesMovers: 'slow', consumerPricesSpread: 'slow',
   groceryBasket: 'slow',
   bigmac: 'slow',
+  fuelPrices: 'slow',
   cryptoSectors: 'slow',
   defiTokens: 'slow',
   aiTokens: 'slow',
   otherTokens: 'slow',
   nationalDebt: 'slow',
+  marketImplications: 'slow',
+  fearGreedIndex: 'slow',
+  crudeInventories: 'slow',
+  natGasStorage: 'slow',
+  ecbFxRates: 'slow',
+  euGasStorage: 'slow',
+  eurostatCountryData: 'slow',
+  euFsi: 'slow',
+  shippingStress: 'fast',
+  socialVelocity: 'fast',
+  diseaseOutbreaks: 'slow',
+  economicStress: 'slow',
 };

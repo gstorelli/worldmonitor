@@ -29,6 +29,7 @@ import type { PositionSample } from '@/services/aviation';
 import { fetchAircraftPositions } from '@/services/aviation';
 import type { MilitaryFlight } from '@/types';
 import { isProUser } from '@/services/widget-store';
+import { getAuthState } from '@/services/auth-state';
 
 export interface SearchManagerCallbacks {
   openCountryBriefByCode: (code: string, country: string) => void;
@@ -207,12 +208,17 @@ export class SearchManager implements AppModule {
 
     this.ctx.searchModal.registerSource('country', this.buildCountrySearchItems());
 
-    this.ctx.searchModal.setActivePanels(Object.keys(this.ctx.panels));
+    this.ctx.searchModal.setActivePanels(
+      Object.entries(this.ctx.panelSettings).filter(([, v]) => v.enabled).map(([k]) => k)
+    );
     this.ctx.searchModal.setOnSelect((result) => this.handleSearchResult(result));
     this.ctx.searchModal.setOnCommand((cmd) => this.handleCommand(cmd));
 
-    if (isProUser()) {
+    // Always wire flight search — check pro status reactively inside the callback
+    // so mid-session sign-ins get the feature without a page reload.
+    {
       this.ctx.searchModal.setOnFlightSearch((callsign) => {
+        if (!isProUser() && getAuthState().user?.role !== 'pro') return;
         fetchAircraftPositions({ callsign }).then((positions) => {
           if (!this.ctx.searchModal) return;
           // Deduplicate by callsign: keep the most recently observed entry per callsign.
@@ -263,8 +269,20 @@ export class SearchManager implements AppModule {
     switch (result.type) {
       case 'news': {
         const item = result.data as NewsItem;
-        this.scrollToPanel('politics');
-        this.highlightNewsItem(item.link);
+        // Find which panel contains this item (may not always be 'politics')
+        let targetPanelId = 'politics';
+        let targetPanel = this.ctx.newsPanels['politics'] ?? null;
+        for (const [panelId, panel] of Object.entries(this.ctx.newsPanels)) {
+          if (panel.hasNewsItem(item.link)) {
+            targetPanelId = panelId;
+            targetPanel = panel;
+            break;
+          }
+        }
+        this.scrollToPanel(targetPanelId);
+        if (targetPanel) {
+          setTimeout(() => targetPanel!.scrollToNewsItem(item.link), 300);
+        }
         break;
       }
       case 'hotspot': {
@@ -545,16 +563,6 @@ export class SearchManager implements AppModule {
     }
   }
 
-  private highlightNewsItem(itemId: string): void {
-    setTimeout(() => {
-      const item = document.querySelector(`[data-news-id="${CSS.escape(itemId)}"]`);
-      if (item) {
-        item.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        this.applyHighlight(item);
-      }
-    }, 100);
-  }
-
   private applyHighlight(el: Element): void {
     const prev = this.highlightTimers.get(el);
     if (prev) clearTimeout(prev);
@@ -606,7 +614,9 @@ export class SearchManager implements AppModule {
   updateSearchIndex(): void {
     if (!this.ctx.searchModal) return;
 
-    this.ctx.searchModal.setActivePanels(Object.keys(this.ctx.panels));
+    this.ctx.searchModal.setActivePanels(
+      Object.entries(this.ctx.panelSettings).filter(([, v]) => v.enabled).map(([k]) => k)
+    );
     this.ctx.searchModal.registerSource('country', this.buildCountrySearchItems());
 
     const newsItems = this.ctx.allNews.slice(0, 500).map(n => ({

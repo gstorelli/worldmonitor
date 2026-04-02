@@ -1,6 +1,8 @@
 import { getCorsHeaders, getPublicCorsHeaders, isDisallowedOrigin } from './_cors.js';
 import { validateApiKey } from './_api-key.js';
 import { jsonResponse } from './_json-response.js';
+// @ts-expect-error — JS module, no declaration file
+import { redisPipeline } from './_upstash-json.js';
 
 export const config = { runtime: 'edge' };
 
@@ -23,9 +25,12 @@ const BOOTSTRAP_CACHE_KEYS = {
   chokepointTransits: 'supply_chain:chokepoint_transits:v1',
   minerals:         'supply_chain:minerals:v2',
   giving:           'giving:summary:v1',
-  climateAnomalies: 'climate:anomalies:v1',
+  climateAnomalies: 'climate:anomalies:v2',
+  co2Monitoring: 'climate:co2-monitoring:v1',
+  climateNews:      'climate:news-intelligence:v1',
   radiationWatch: 'radiation:observations:v1',
   thermalEscalation: 'thermal:escalation:v1',
+  crossSourceSignals: 'intelligence:cross-source-signals:v1',
   wildfires:        'wildfire:fires:v1',
   cyberThreats:     'cyber:threats-bootstrap:v2',
   techReadiness:    'economic:worldbank-techreadiness:v1',
@@ -64,13 +69,26 @@ const BOOTSTRAP_CACHE_KEYS = {
   consumerPricesSpread:     'consumer-prices:retailer-spread:ae:essentials-ae',
   groceryBasket: 'economic:grocery-basket:v1',
   bigmac:        'economic:bigmac:v1',
+  fuelPrices:    'economic:fuel-prices:v1',
   nationalDebt:      'economic:national-debt:v1',
+  euGasStorage:      'economic:eu-gas-storage:v1',
+  eurostatCountryData: 'economic:eurostat-country-data:v1',
+  marketImplications: 'intelligence:market-implications:v1',
+  fearGreedIndex:    'market:fear-greed:v1',
+  crudeInventories:  'economic:crude-inventories:v1',
+  natGasStorage:     'economic:nat-gas-storage:v1',
+  ecbFxRates:        'economic:ecb-fx-rates:v1',
+  euFsi:             'economic:fsi-eu:v1',
+  shippingStress:    'supply_chain:shipping_stress:v1',
+  socialVelocity:    'intelligence:social:reddit:v1',
+  diseaseOutbreaks:  'health:disease-outbreaks:v1',
+  economicStress:    'economic:stress-index:v1',
 };
 
 const SLOW_KEYS = new Set([
   'bisPolicy', 'bisExchange', 'bisCredit', 'minerals', 'giving',
-  'sectors', 'etfFlows', 'wildfires', 'climateAnomalies',
-  'radiationWatch', 'thermalEscalation',
+  'sectors', 'etfFlows', 'wildfires', 'climateAnomalies', 'co2Monitoring', 'climateNews',
+  'radiationWatch', 'thermalEscalation', 'crossSourceSignals',
   'cyberThreats', 'techReadiness', 'progressData', 'renewableEnergy',
   'naturalEvents',
   'cryptoQuotes', 'cryptoSectors', 'defiTokens', 'aiTokens', 'otherTokens',
@@ -82,13 +100,24 @@ const SLOW_KEYS = new Set([
   'consumerPricesOverview', 'consumerPricesCategories', 'consumerPricesMovers', 'consumerPricesSpread',
   'groceryBasket',
   'bigmac',
+  'fuelPrices',
   'nationalDebt',
+  'euGasStorage',
+  'eurostatCountryData',
+  'marketImplications',
+  'fearGreedIndex',
+  'crudeInventories',
+  'natGasStorage',
+  'ecbFxRates',
+  'euFsi',
+  'diseaseOutbreaks',
+  'economicStress',
 ]);
 const FAST_KEYS = new Set([
   'earthquakes', 'outages', 'serviceStatuses', 'ddosAttacks', 'trafficAnomalies', 'macroSignals', 'chokepoints', 'chokepointTransits',
   'marketQuotes', 'commodityQuotes', 'positiveGeoEvents', 'riskScores', 'flightDelays','insights', 'predictions',
   'iranEvents', 'temporalAnomalies', 'weatherAlerts', 'spending', 'theaterPosture', 'gdeltIntel',
-  'correlationCards', 'forecasts', 'shippingRates',
+  'correlationCards', 'forecasts', 'shippingRates', 'shippingStress', 'socialVelocity',
 ]);
 
 // No public/s-maxage: CF (in front of api.worldmonitor.app) ignores Vary: Origin and would
@@ -109,23 +138,13 @@ async function getCachedJsonBatch(keys) {
   const result = new Map();
   if (keys.length === 0) return result;
 
-  const url = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
-  if (!url || !token) return result;
-
   // Always read unprefixed keys — bootstrap is a read-only consumer of
   // production cache data. Preview/branch deploys don't run handlers that
   // populate prefixed keys, so prefixing would always miss.
   const pipeline = keys.map((k) => ['GET', k]);
-  const resp = await fetch(`${url}/pipeline`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(pipeline),
-    signal: AbortSignal.timeout(3000),
-  });
-  if (!resp.ok) return result;
+  const data = await redisPipeline(pipeline, 3000);
+  if (!data) return result;
 
-  const data = await resp.json();
   for (let i = 0; i < keys.length; i++) {
     const raw = data[i]?.result;
     if (raw) {

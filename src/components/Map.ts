@@ -2880,7 +2880,7 @@ export class MapComponent {
       'padding:8px 12px',
       'border-radius:3px',
       'font-size:11px',
-      'font-family:monospace',
+      'font-family:var(--font-mono)',
       'color:#d4d4d4',
       'max-width:240px',
       'z-index:1000',
@@ -3331,7 +3331,7 @@ export class MapComponent {
     return getHotspotEscalation(hotspotId);
   }
 
-  public setView(view: MapView): void {
+  public setView(view: MapView, zoom?: number): void {
     this.state.view = view;
 
     // Region-specific zoom and pan settings
@@ -3348,7 +3348,7 @@ export class MapComponent {
     };
 
     const settings = viewSettings[view];
-    this.state.zoom = settings.zoom;
+    this.state.zoom = zoom ?? settings.zoom;
     this.state.pan = settings.pan;
     this.applyTransform();
     this.render();

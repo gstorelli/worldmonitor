@@ -47,6 +47,8 @@ export {
   VARIANT_PANEL_OVERRIDES,
   getEffectivePanelConfig,
   isPanelEntitled,
+  FREE_MAX_PANELS,
+  FREE_MAX_SOURCES,
 } from './panels';
 
 // ============================================
@@ -70,6 +72,7 @@ export {
   STRATEGIC_WATERWAYS,
   ECONOMIC_CENTERS,
   SANCTIONED_COUNTRIES,
+  SANCTIONED_COUNTRIES_ALPHA2,
   SPACEPORTS,
   CRITICAL_MINERALS,
 } from './geo';
