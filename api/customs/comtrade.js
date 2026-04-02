@@ -1,45 +1,27 @@
-import { readJsonFromUpstash, setCachedData } from '../_upstash-json.js';
+import { readJsonFromUpstash } from '../_upstash-json.js';
 
 export const config = {
   runtime: 'edge',
 };
 
 export default async function handler(req) {
-  const apiKey = process.env.COMTRADE_API_KEY;
-  if (!apiKey) {
-    return new Response(JSON.stringify({ error: 'COMTRADE_API_KEY not configured' }), { status: 401 });
-  }
-
-  const cacheKey = 'risk_sentinel:comtrade:v1';
+  const cacheKey = 'risk_sentinel:n8n:comtrade';
   
   try {
     const cached = await readJsonFromUpstash(cacheKey);
-    if (cached) {
-      return new Response(JSON.stringify(cached), {
-        headers: {
-          'Content-Type': 'application/json',
-          'Cache-Control': 's-maxage=3600',
-        },
-      });
-    }
+    const mockData = [{
+      id: `comtrade-dummy-${Date.now()}`,
+      source: 'UN_COMTRADE',
+      title: '[N8N SYNC PENDING] Anomalia Baseline Flussi Commerciali',
+      severity: 'low',
+      timestamp: new Date().toISOString(),
+      metadata: { note: 'Dati simulati. Flusso n8n non ancora inizializzato.' }
+    }];
 
-    const mockEvents = [
-      {
-        id: `comtrade-${Date.now()}`,
-        source: 'UN_COMTRADE',
-        title: 'Anomalous drop in Semiconductor Exports (HS 8541)',
-        severity: 'medium',
-        timestamp: new Date().toISOString(),
-        metadata: { commodityCode: '8541', variancePercentage: -15.4 }
-      }
-    ];
-
-    await setCachedData(cacheKey, mockEvents, 3600);
-
-    return new Response(JSON.stringify(mockEvents), {
+    return new Response(JSON.stringify(cached || mockData), {
       headers: {
         'Content-Type': 'application/json',
-        'Cache-Control': 's-maxage=3600',
+        'Cache-Control': 's-maxage=60',
       },
     });
   } catch (err) {

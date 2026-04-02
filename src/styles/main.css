@@ -6,16 +6,16 @@
    ============================================================ */
 :root {
   /* Backgrounds */
-  --bg: #11151c;
-  --bg-secondary: #161b22;
-  --surface: #1c2331;
-  --surface-hover: #232c3d;
-  --surface-active: #2b364a;
+  --bg: #07131b;
+  --bg-secondary: #0d1e29;
+  --surface: #112635;
+  --surface-hover: #183347;
+  --surface-active: #1d3e58;
 
   /* Borders */
-  --border: #2c3645;
-  --border-strong: #3f4c60;
-  --border-subtle: #1e2533;
+  --border: #1a3c5a;
+  --border-strong: #23547b;
+  --border-subtle: #0d1b26;
 
   /* Text */
   --text: #e8e8e8;
@@ -24,7 +24,7 @@
   --text-muted: #666;
   --text-faint: #555;
   --text-ghost: #444;
-  --accent: #f97316;
+  --accent: #eab308; /* Institutional Yellow / Gold */
 
   /* Overlays & shadows */
   --overlay-subtle: rgba(255, 255, 255, 0.03);

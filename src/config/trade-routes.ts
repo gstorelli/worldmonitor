@@ -13,6 +13,7 @@ export interface TradeRoute {
   status: TradeRouteStatus;
   volumeDesc: string;
   waypoints: string[];
+  customsPriority?: boolean; // Highlight for Risk Sentinel
 }
 
 export interface TradeRouteSegment {
@@ -25,6 +26,7 @@ export interface TradeRouteSegment {
   targetPosition: [number, number];
   segmentIndex: number;
   totalSegments: number;
+  customsPriority?: boolean;
 }
 
 export const TRADE_ROUTES: TradeRoute[] = [
@@ -37,6 +39,7 @@ export const TRADE_ROUTES: TradeRoute[] = [
     status: 'active',
     volumeDesc: '47M+ TEU/year',
     waypoints: ['malacca_strait', 'bab_el_mandeb', 'suez'],
+    customsPriority: true,
   },
   {
     id: 'china-us-west',
@@ -77,6 +80,7 @@ export const TRADE_ROUTES: TradeRoute[] = [
     status: 'active',
     volumeDesc: '6.5M+ bpd',
     waypoints: ['hormuz_strait', 'bab_el_mandeb', 'suez', 'gibraltar'],
+    customsPriority: true,
   },
   {
     id: 'gulf-asia-oil',
@@ -97,6 +101,7 @@ export const TRADE_ROUTES: TradeRoute[] = [
     status: 'active',
     volumeDesc: '77M+ tonnes/year',
     waypoints: ['hormuz_strait', 'bab_el_mandeb', 'suez'],
+    customsPriority: true,
   },
   {
     id: 'qatar-asia-lng',
@@ -127,6 +132,7 @@ export const TRADE_ROUTES: TradeRoute[] = [
     status: 'active',
     volumeDesc: '140M+ tonnes/year',
     waypoints: ['bosphorus'],
+    customsPriority: true,
   },
   {
     id: 'intra-asia-container',
@@ -147,6 +153,7 @@ export const TRADE_ROUTES: TradeRoute[] = [
     status: 'active',
     volumeDesc: '10M+ TEU/year',
     waypoints: ['bab_el_mandeb', 'suez', 'gibraltar'],
+    customsPriority: true,
   },
   {
     id: 'brazil-china-bulk',
@@ -187,6 +194,7 @@ export const TRADE_ROUTES: TradeRoute[] = [
     status: 'active',
     volumeDesc: '6M+ TEU/year',
     waypoints: ['bab_el_mandeb', 'suez', 'gibraltar'],
+    customsPriority: true,
   },
   {
     id: 'india-se-asia',
@@ -284,6 +292,7 @@ export function resolveTradeRouteSegments(): TradeRouteSegment[] {
         targetPosition: chain[i + 1]!,
         segmentIndex: i,
         totalSegments,
+        customsPriority: route.customsPriority,
       });
     }
   }

@@ -1,41 +1,28 @@
-import { readJsonFromUpstash, setCachedData } from '../_upstash-json.js';
+import { readJsonFromUpstash } from '../_upstash-json.js';
 
 export const config = {
   runtime: 'edge',
 };
 
 export default async function handler(req) {
-  const cacheKey = 'risk_sentinel:openmeteo:v1';
+  const cacheKey = 'risk_sentinel:n8n:openmeteo';
   
   try {
     const cached = await readJsonFromUpstash(cacheKey);
-    if (cached) {
-      return new Response(JSON.stringify(cached), {
-        headers: {
-          'Content-Type': 'application/json',
-          'Cache-Control': 's-maxage=300',
-        },
-      });
-    }
+    const mockData = [{
+      id: `meteo-dummy-${Date.now()}`,
+      source: 'OPEN_METEO',
+      title: '[N8N SYNC PENDING] Allerta Meteo Simulativa sul Mediterraneo',
+      severity: 'medium',
+      coordinates: [14.2681, 40.8518], // Naples
+      timestamp: new Date().toISOString(),
+      metadata: { note: 'Dati simulati. Flusso n8n non ancora inizializzato.' }
+    }];
 
-    const mockEvents = [
-      {
-        id: `meteo-${Date.now()}`,
-        source: 'OPEN_METEO',
-        title: 'Extreme Weather Alert: Typhoon trajectory crossing major shipping lane',
-        severity: 'high',
-        coordinates: [114.1694, 22.3193], // Hong Kong
-        timestamp: new Date().toISOString(),
-        metadata: { windSpeed: 120, condition: 'Typhoon' }
-      }
-    ];
-
-    await setCachedData(cacheKey, mockEvents, 300);
-
-    return new Response(JSON.stringify(mockEvents), {
+    return new Response(JSON.stringify(cached || mockData), {
       headers: {
         'Content-Type': 'application/json',
-        'Cache-Control': 's-maxage=300',
+        'Cache-Control': 's-maxage=60',
       },
     });
   } catch (err) {

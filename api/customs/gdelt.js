@@ -1,42 +1,29 @@
-import { readJsonFromUpstash, setCachedData } from '../_upstash-json.js';
+import { readJsonFromUpstash } from '../_upstash-json.js';
 
 export const config = {
   runtime: 'edge',
 };
 
 export default async function handler(req) {
-  const cacheKey = 'risk_sentinel:gdelt:v1';
+  // n8n will push directly to this Redis key
+  const cacheKey = 'risk_sentinel:n8n:gdelt';
   
   try {
     const cached = await readJsonFromUpstash(cacheKey);
-    if (cached) {
-      return new Response(JSON.stringify(cached), {
-        headers: {
-          'Content-Type': 'application/json',
-          'Cache-Control': 's-maxage=300',
-        },
-      });
-    }
+    const mockData = [{
+      id: `gdelt-dummy-${Date.now()}`,
+      source: 'GDELT',
+      title: '[N8N SYNC PENDING] Interruzione Logistica in Fase di Rilevamento',
+      severity: 'medium',
+      coordinates: [12.4964, 41.9028], // Rome dummy
+      timestamp: new Date().toISOString(),
+      metadata: { note: 'Dati simulati. Flusso n8n non ancora inizializzato.' }
+    }];
 
-    // Mock payload since we are bypassing proto for now
-    const mockEvents = [
-      {
-        id: `gdelt-${Date.now()}`,
-        source: 'GDELT',
-        title: 'Geopolitical Tension detected in East Asia Trade Route',
-        severity: 'high',
-        coordinates: [120.9842, 23.6978], // Taiwan Strait
-        timestamp: new Date().toISOString(),
-        metadata: { tradeImpact: 'high', articlesCount: 15 }
-      }
-    ];
-
-    await setCachedData(cacheKey, mockEvents, 300); // cache for 5 minutes
-
-    return new Response(JSON.stringify(mockEvents), {
+    return new Response(JSON.stringify(cached || mockData), {
       headers: {
         'Content-Type': 'application/json',
-        'Cache-Control': 's-maxage=300',
+        'Cache-Control': 's-maxage=60',
       },
     });
   } catch (err) {
