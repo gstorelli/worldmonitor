@@ -81,7 +81,7 @@ export function getEffectivePanelConfig(key: string, _variant: string): PanelCon
   return ALL_PANELS[key] || { name: key, enabled: false, priority: 2 };
 }
 
-export function isPanelEntitled(key: string, config: PanelConfig): boolean {
+export function isPanelEntitled(_key: string, config: PanelConfig): boolean {
   if (!config.premium) return true;
   if (config.premium === 'locked') return isDesktopRuntime();
   return true;

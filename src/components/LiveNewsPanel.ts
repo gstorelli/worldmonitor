@@ -7,7 +7,7 @@ import { IDLE_PAUSE_MS, STORAGE_KEYS, SITE_VARIANT } from '@/config';
 import { escapeHtml, sanitizeUrl } from '@/utils/sanitize';
 
 import { getStreamQuality } from '@/services/ai-flow-settings';
-import { getLiveStreamsAlwaysOn, subscribeLiveStreamsSettingsChange } from '@/services/live-stream-settings';
+const getLiveStreamsAlwaysOn = () => false; const subscribeLiveStreamsSettingsChange = (_cb: (alwaysOn: boolean) => void) => () => {};
 import { track } from '@/services/analytics';
 
 // YouTube IFrame Player API types

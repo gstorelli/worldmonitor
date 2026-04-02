@@ -27,7 +27,7 @@ interface PreparedCluster {
 }
 
 export class NewsPanel extends Panel {
-  private clusteredMode = false;
+
   private deviationEl: HTMLElement | null = null;
   private relatedAssetContext = new Map<string, RelatedAssetContext>();
   private onRelatedAssetClick?: (asset: RelatedAsset) => void;

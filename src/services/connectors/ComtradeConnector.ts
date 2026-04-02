@@ -4,7 +4,7 @@ export class ComtradeConnector implements IConnector {
   id = 'comtrade';
   name = 'UN Comtrade Supply Chain';
 
-  async fetchAlerts(params?: any): Promise<RiskEvent[]> {
+  async fetchAlerts(_params?: any): Promise<RiskEvent[]> {
     try {
       const res = await fetch('/api/customs/comtrade');
       if (!res.ok) throw new Error('Failed to fetch UN Comtrade');

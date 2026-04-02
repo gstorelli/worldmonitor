@@ -10,8 +10,6 @@ import {
   ALL_PANELS,
   VARIANT_DEFAULTS,
   getEffectivePanelConfig,
-  FREE_MAX_PANELS,
-  FREE_MAX_SOURCES,
 } from '@/config';
 import { sanitizeLayersForVariant } from '@/config/map-layer-definitions';
 import type { MapVariant } from '@/config/map-layer-definitions';
@@ -52,7 +50,7 @@ import { trackEvent, trackDeeplinkOpened, initAuthAnalytics } from '@/services/a
 import { preloadCountryGeometry, getCountryNameByCode } from '@/services/country-geometry';
 import { initI18n, t } from '@/services/i18n';
 
-import { computeDefaultDisabledSources, getLocaleBoostedSources, getTotalFeedCount, FEEDS, INTEL_SOURCES } from '@/config/feeds';
+import { computeDefaultDisabledSources, getLocaleBoostedSources, getTotalFeedCount } from '@/config/feeds';
 import { fetchBootstrapData, getBootstrapHydrationState, markBootstrapAsLive, type BootstrapHydrationState } from '@/services/bootstrap';
 import { describeFreshness } from '@/services/persistent-cache';
 import { DesktopUpdater } from '@/app/desktop-updater';
@@ -955,9 +953,7 @@ export class App {
    */
   private enforceFreeTierLimits(): void {
     if (isProUser()) return;
-
-    // --- Panel limit ---
-    const panelSettings = loadFromStorage<Record<string, PanelConfig>>(STORAGE_KEYS.panels, {});
+    const { panelSettings } = this.state;
     let cwDisabled = false;
     for (const key of Object.keys(panelSettings)) {
       if (key.startsWith('cw-') && panelSettings[key]?.enabled) {
@@ -965,37 +961,7 @@ export class App {
         cwDisabled = true;
       }
     }
-    const enabledKeys = Object.entries(panelSettings)
-      .filter(([k, v]) => v.enabled && !k.startsWith('cw-'))
-      .sort(([ka, a], [kb, b]) => (a.priority ?? 99) - (b.priority ?? 99) || ka.localeCompare(kb))
-      .map(([k]) => k);
-    const needsTrim = enabledKeys.length > FREE_MAX_PANELS;
-    if (needsTrim) {
-      for (const key of enabledKeys.slice(FREE_MAX_PANELS)) {
-        panelSettings[key] = { ...panelSettings[key]!, enabled: false };
-      }
-      console.log(`[App] Free tier: trimmed ${enabledKeys.length - FREE_MAX_PANELS} panel(s) to enforce ${FREE_MAX_PANELS}-panel limit`);
-    }
-    if (cwDisabled || needsTrim) saveToStorage(STORAGE_KEYS.panels, panelSettings);
-
-    // --- Source limit ---
-    const disabledSources = new Set(loadFromStorage<string[]>(STORAGE_KEYS.disabledFeeds, []));
-    const allSourceNames = (() => {
-      const s = new Set<string>();
-      Object.values(FEEDS).forEach(feeds => feeds?.forEach(f => s.add(f.name)));
-      INTEL_SOURCES.forEach(f => s.add(f.name));
-      return Array.from(s).sort((a, b) => a.localeCompare(b));
-    })();
-    const currentlyEnabled = allSourceNames.filter(n => !disabledSources.has(n));
-    const enabledCount = currentlyEnabled.length;
-    if (enabledCount > FREE_MAX_SOURCES) {
-      const toDisable = enabledCount - FREE_MAX_SOURCES;
-      for (const name of currentlyEnabled.slice(FREE_MAX_SOURCES)) {
-        disabledSources.add(name);
-      }
-      saveToStorage(STORAGE_KEYS.disabledFeeds, Array.from(disabledSources));
-      console.log(`[App] Free tier: disabled ${toDisable} source(s) to enforce ${FREE_MAX_SOURCES}-source limit`);
-    }
+    if (cwDisabled) saveToStorage(STORAGE_KEYS.panels, panelSettings);
   }
 
   public destroy(): void {

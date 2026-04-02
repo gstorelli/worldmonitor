@@ -1,5 +1,5 @@
 import type { Feed } from '@/types';
-import { SITE_VARIANT } from './variant';
+
 import { rssProxyUrl } from '@/utils';
 
 const rss = rssProxyUrl;
@@ -728,7 +728,7 @@ const FULL_FEEDS: Record<string, Feed[]> = {
 };
 
 // Tech/AI variant feeds
-const TECH_FEEDS: Record<string, Feed[]> = {
+export const TECH_FEEDS: Record<string, Feed[]> = {
   tech: [
     { name: 'TechCrunch', url: rss('https://techcrunch.com/feed/') },
     { name: 'The Verge', url: rss('https://www.theverge.com/rss/index.xml') },
@@ -951,7 +951,7 @@ const TECH_FEEDS: Record<string, Feed[]> = {
 };
 
 // Finance/Trading variant feeds (all free RSS / Google News proxies)
-const FINANCE_FEEDS: Record<string, Feed[]> = {
+export const FINANCE_FEEDS: Record<string, Feed[]> = {
   markets: [
     { name: 'CNBC', url: rss('https://www.cnbc.com/id/100003114/device/rss/rss.html') },
     // Direct MarketWatch RSS returns frequent 403s from cloud IPs; use Google News fallback.
@@ -1051,7 +1051,7 @@ const FINANCE_FEEDS: Record<string, Feed[]> = {
   ],
 };
 
-const HAPPY_FEEDS: Record<string, Feed[]> = {
+export const HAPPY_FEEDS: Record<string, Feed[]> = {
   positive: [
     { name: 'Good News Network', url: rss('https://www.goodnewsnetwork.org/feed/') },
     { name: 'Positive.News', url: rss('https://www.positive.news/feed/') },
@@ -1094,7 +1094,7 @@ const HAPPY_FEEDS: Record<string, Feed[]> = {
 };
 
 // Commodity variant feeds (from commodity.ts)
-const COMMODITY_FEEDS: Record<string, Feed[]> = {
+export const COMMODITY_FEEDS: Record<string, Feed[]> = {
   'commodity-news': [
     { name: 'Kitco News', url: rss('https://www.kitco.com/rss/KitcoNews.xml') },
     { name: 'Mining.com', url: rss('https://www.mining.com/feed/') },

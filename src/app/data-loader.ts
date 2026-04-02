@@ -52,7 +52,7 @@ import {
   updateBaseline,
   calculateDeviation,
   addToSignalHistory,
-  analysisWorker,
+
   fetchPizzIntStatus,
   fetchGdeltTensions,
   fetchNaturalEvents,
@@ -95,7 +95,7 @@ import {
   mergeStockAnalysisHistory,
 } from '@/services/stock-analysis-history';
 import { checkBatchForBreakingAlerts, dispatchOrefBreakingAlert } from '@/services/breaking-news-alerts';
-import { mlWorker } from '@/services/ml-worker';
+
 
 import { ingestProtests, ingestFlights, ingestVessels, ingestEarthquakes, detectGeoConvergence, geoConvergenceToSignal } from '@/services/geo-convergence';
 import { signalAggregator } from '@/services/signal-aggregator';
@@ -183,8 +183,7 @@ import { fetchCachedRiskScores } from '@/services/cached-risk-scores';
 import type { ThreatLevel as ClientThreatLevel } from '@/types';
 import type { NewsItem as ProtoNewsItem, ThreatLevel as ProtoThreatLevel } from '@/generated/client/worldmonitor/news/v1/service_client';
 import { fetchMarketImplications } from '@/services/market-implications';
-import { fetchDiseaseOutbreaks } from '@/services/disease-outbreaks';
-import { fetchSocialVelocity } from '@/services/social-velocity';
+
 import { fetchShippingStress } from '@/services/supply-chain';
 import { getTopActiveGeoHubs } from '@/services/geo-activity';
 import { getTopActiveHubs } from '@/services/tech-activity';

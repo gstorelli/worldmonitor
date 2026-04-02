@@ -4,7 +4,7 @@ export class AcledConnector implements IConnector {
   id = 'acled';
   name = 'ACLED Conflict Events';
 
-  async fetchAlerts(params?: any): Promise<RiskEvent[]> {
+  async fetchAlerts(_params?: any): Promise<RiskEvent[]> {
     try {
       const res = await fetch('/api/customs/acled');
       if (!res.ok) throw new Error('Failed to fetch ACLED');

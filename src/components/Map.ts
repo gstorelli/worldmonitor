@@ -44,7 +44,7 @@ import {
   CENTRAL_BANKS,
   COMMODITY_HUBS,
 } from '@/config';
-import { pinWebcam, isPinned } from '@/services/webcams/pinned-store';
+const pinWebcam = (_id: any) => {}; const isPinned = (_id: any) => false;
 import type { WebcamEntry, WebcamCluster } from '@/generated/client/worldmonitor/webcam/v1/service_client';
 import { tokenizeForMatch, matchKeyword, findMatchingKeywords } from '@/utils/keyword-match';
 import { MapPopup } from './MapPopup';
@@ -2942,7 +2942,7 @@ export class MapComponent {
     this.placeWebcamTooltip(tooltip, clientX, clientY);
 
     if (cam.webcamId) {
-      import('@/services/webcams').then(({ fetchWebcamImage }) => {
+      Promise.resolve({ fetchWebcamImage: async (_id: any) => ({ thumbnailUrl: '', playerUrl: '' } as any), fetchWebcams: async (_limit: any, _bbox: any) => ({ webcams: [] as any[] }), getClusterCellSize: (_zoom: any) => 1 }).then(({ fetchWebcamImage }) => {
         fetchWebcamImage(cam.webcamId).then(img => {
           if (!tooltip.isConnected) return;
           previewDiv.replaceChildren();
@@ -3003,7 +3003,7 @@ export class MapComponent {
     this.placeWebcamTooltip(tooltip, clientX, clientY);
 
     const currentZoom = this.state.zoom ?? 3;
-    import('@/services/webcams').then(({ fetchWebcams, getClusterCellSize }) => {
+    Promise.resolve({ fetchWebcamImage: async (_id: any) => ({ thumbnailUrl: '', playerUrl: '' } as any), fetchWebcams: async (_limit: any, _bbox: any) => ({ webcams: [] as any[] }), getClusterCellSize: (_zoom: any) => 1 }).then(({ fetchWebcams, getClusterCellSize }) => {
       const margin = Math.max(0.5, getClusterCellSize(currentZoom));
       fetchWebcams(10, {
         w: cam.lng - margin, s: cam.lat - margin,

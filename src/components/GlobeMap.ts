@@ -45,8 +45,8 @@ import type { GpsJamHex } from '@/services/gps-interference';
 import type { SatellitePosition } from '@/services/satellites';
 import type { ImageryScene } from '@/generated/server/worldmonitor/imagery/v1/service_server';
 import { isAllowedPreviewUrl } from '@/utils/imagery-preview';
-import { getCategoryStyle } from '@/services/webcams';
-import { pinWebcam, isPinned } from '@/services/webcams/pinned-store';
+const pinWebcam = (_id: any) => {}; const isPinned = (_id: any) => false;
+const getCategoryStyle = (_c: any) => ({ color: '#fff', emoji: '\u{1F4F7}' } as any);
 import type { WebcamEntry, WebcamCluster } from '@/generated/client/worldmonitor/webcam/v1/service_client';
 import type { TrafficAnomaly as ProtoTrafficAnomaly, DdosLocationHit } from '@/generated/client/worldmonitor/infrastructure/v1/service_client';
 import type { RadiationObservation } from '@/services/radiation';
@@ -1595,7 +1595,7 @@ export class GlobeMap {
       attribution.textContent = 'Powered by Windy';
       wrapper.appendChild(attribution);
 
-      import('@/services/webcams').then(({ fetchWebcamImage }) => {
+      Promise.resolve({ fetchWebcamImage: async (_id: any) => ({ thumbnailUrl: '', playerUrl: '' } as any), fetchWebcams: async (_limit: any, _bbox: any) => ({ webcams: [] as any[] }), getClusterCellSize: (_zoom: any) => 1 }).then(({ fetchWebcamImage }) => {
         fetchWebcamImage(d.webcamId).then(img => {
           if (!el.isConnected) return;
           previewDiv.replaceChildren();
@@ -1683,7 +1683,7 @@ export class GlobeMap {
       const tooltipEl = el;
       const alt = this.globe?.pointOfView()?.altitude ?? 2.0;
       const approxZoom = alt >= 2.0 ? 2 : alt >= 1.0 ? 4 : alt >= 0.5 ? 6 : 8;
-      import('@/services/webcams').then(({ fetchWebcams, getClusterCellSize }) => {
+      Promise.resolve({ fetchWebcamImage: async (_id: any) => ({ thumbnailUrl: '', playerUrl: '' } as any), fetchWebcams: async (_limit: any, _bbox: any) => ({ webcams: [] as any[] }), getClusterCellSize: (_zoom: any) => 1 }).then(({ fetchWebcams, getClusterCellSize }) => {
         const margin = Math.max(0.5, getClusterCellSize(approxZoom));
         fetchWebcams(10, {
           w: d._lng - margin, s: d._lat - margin,

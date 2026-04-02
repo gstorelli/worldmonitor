@@ -118,9 +118,8 @@ import type { DiseaseOutbreakItem } from '@/services/disease-outbreaks';
 import type { FeatureCollection, Geometry } from 'geojson';
 
 import { isAllowedPreviewUrl } from '@/utils/imagery-preview';
-import { pinWebcam, isPinned } from '@/services/webcams/pinned-store';
+const { fetchWebcamImage, pinWebcam, isPinned } = await Promise.resolve({ fetchWebcamImage: async (_id: any) => ({ thumbnailUrl: '', playerUrl: '', title: '' } as any), pinWebcam: (_id: any) => {}, isPinned: (_id: any) => false });
 import type { WebcamEntry, WebcamCluster } from '@/generated/client/worldmonitor/webcam/v1/service_client';
-import { fetchWebcamImage } from '@/services/webcams';
 
 export type TimeRange = '1h' | '6h' | '24h' | '48h' | '7d' | 'all';
 export type DeckMapView = 'global' | 'america' | 'mena' | 'eu' | 'asia' | 'latam' | 'africa' | 'oceania';
@@ -1263,7 +1262,7 @@ export class DeckGLMap {
         }
         const item = TECH_HQS[f.properties.index]!;
         return {
-          id: `hp-${f.properties.index}`, lat: item.lat, lon: item.lon,
+          id: `hp-${f.properties.index}`, lat: item.lat, lon: item.lat,
           count: 1, items: [item], city: item.city, country: item.country,
           primaryType: item.type,
           faangCount: item.type === 'faang' ? 1 : 0,

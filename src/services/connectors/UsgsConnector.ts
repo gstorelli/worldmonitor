@@ -4,7 +4,7 @@ export class UsgsConnector implements IConnector {
   id = 'usgs';
   name = 'USGS Earthquakes';
 
-  async fetchAlerts(params?: any): Promise<RiskEvent[]> {
+  async fetchAlerts(_params?: any): Promise<RiskEvent[]> {
     try {
       const res = await fetch('/api/customs/usgs');
       if (!res.ok) throw new Error('Failed to fetch USGS');
