@@ -4,7 +4,7 @@ import type { NewsItem, ClusteredEvent, DeviationLevel, RelatedAsset, RelatedAss
 import { THREAT_PRIORITY } from '@/services/threat-classifier';
 import { formatTime, getCSSColor } from '@/utils';
 import { escapeHtml, sanitizeUrl } from '@/utils/sanitize';
-import { analysisWorker, enrichWithVelocityML, getClusterAssetContext, MAX_DISTANCE_KM, activityTracker, generateSummary, translateText } from '@/services';
+import { getClusterAssetContext, MAX_DISTANCE_KM, activityTracker, generateSummary, translateText } from '@/services';
 import { getSourcePropagandaRisk, getSourceTier, getSourceType } from '@/config/feeds';
 import { SITE_VARIANT } from '@/config';
 import { t, getCurrentLanguage } from '@/services/i18n';
@@ -27,7 +27,7 @@ interface PreparedCluster {
 }
 
 export class NewsPanel extends Panel {
-  private clusteredMode = true;
+  private clusteredMode = false;
   private deviationEl: HTMLElement | null = null;
   private relatedAssetContext = new Map<string, RelatedAssetContext>();
   private onRelatedAssetClick?: (asset: RelatedAsset) => void;
@@ -393,14 +393,7 @@ export class NewsPanel extends Panel {
     }
 
     this.setDataBadge('live');
-
-    // Always show flat items immediately for instant visual feedback,
-    // then upgrade to clustered view in the background when ready.
     this.renderFlat(items);
-
-    if (this.clusteredMode) {
-      void this.renderClustersAsync(items);
-    }
   }
 
   public renderFilteredEmpty(message: string): void {
@@ -415,20 +408,7 @@ export class NewsPanel extends Panel {
     this.setContent(`<div class="panel-empty">${escapeHtml(message)}</div>`);
   }
 
-  private async renderClustersAsync(items: NewsItem[]): Promise<void> {
-    const requestId = ++this.renderRequestId;
-
-    try {
-      const clusters = await analysisWorker.clusterNews(items);
-      if (requestId !== this.renderRequestId) return;
-      const enriched = await enrichWithVelocityML(clusters);
-      this.renderClusters(enriched);
-    } catch (error) {
-      if (requestId !== this.renderRequestId) return;
-      // Keep already-rendered flat list visible when clustering fails.
-      console.warn('[NewsPanel] Failed to cluster news, keeping flat list:', error);
-    }
-  }
+    // Clustering has been removed.
 
   private renderFlat(items: NewsItem[]): void {
     this.lastRawItems = items;

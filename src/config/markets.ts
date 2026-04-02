@@ -10,5 +10,5 @@ export const COMMODITIES: Commodity[] = commodityConfig.commodities as Commodity
 
 export const MARKET_SYMBOLS: MarketSymbol[] = stocksConfig.symbols as MarketSymbol[];
 
-export const CRYPTO_IDS = cryptoConfig.ids as readonly string[];
-export const CRYPTO_MAP: Record<string, { name: string; symbol: string }> = cryptoConfig.meta;
+export const CRYPTO_IDS: readonly string[] = [];
+export const CRYPTO_MAP: Record<string, { name: string; symbol: string }> = {};

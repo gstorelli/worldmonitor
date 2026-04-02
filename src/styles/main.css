@@ -6,16 +6,16 @@
    ============================================================ */
 :root {
   /* Backgrounds */
-  --bg: #0a0a0a;
-  --bg-secondary: #111;
-  --surface: #141414;
-  --surface-hover: #1e1e1e;
-  --surface-active: #1a1a2e;
+  --bg: #11151c;
+  --bg-secondary: #161b22;
+  --surface: #1c2331;
+  --surface-hover: #232c3d;
+  --surface-active: #2b364a;
 
   /* Borders */
-  --border: #2a2a2a;
-  --border-strong: #444;
-  --border-subtle: #1a1a1a;
+  --border: #2c3645;
+  --border-strong: #3f4c60;
+  --border-subtle: #1e2533;
 
   /* Text */
   --text: #e8e8e8;
@@ -24,7 +24,7 @@
   --text-muted: #666;
   --text-faint: #555;
   --text-ghost: #444;
-  --accent: #fff;
+  --accent: #f97316;
 
   /* Overlays & shadows */
   --overlay-subtle: rgba(255, 255, 255, 0.03);
@@ -44,8 +44,8 @@
   --input-bg: #1a1a1a;
 
   /* Panels */
-  --panel-bg: #141414;
-  --panel-border: #2a2a2a;
+  --panel-bg: var(--surface);
+  --panel-border: var(--border);
 
   /* Map */
   --map-bg: #020a08;
@@ -89,7 +89,7 @@
   --semantic-positive: #44ff88;
 
   /* Threat levels */
-  --threat-critical: #ef4444;
+  --threat-critical: #ea580c;
   --threat-high: #f97316;
   --threat-medium: #eab308;
   --threat-low: #22c55e;

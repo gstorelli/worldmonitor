@@ -8,23 +8,11 @@ import { isDesktopRuntime } from '@/services/runtime';
 const _desktop = isDesktopRuntime();
 
 export const FULL_PANELS: Record<string, PanelConfig> = {
-  map: { name: 'Global Map', enabled: true, priority: 1 },
-  'live-news': { name: 'Live News', enabled: true, priority: 1 },
-  insights: { name: 'AI Insights', enabled: true, priority: 1 },
-  'strategic-posture': { name: 'AI Strategic Posture', enabled: true, priority: 1 },
-  cii: { name: 'Country Instability', enabled: true, priority: 1 },
-  'strategic-risk': { name: 'Strategic Risk Overview', enabled: true, priority: 1 },
-  intel: { name: 'Intel Feed', enabled: true, priority: 1 },
-  'gdelt-intel': { name: 'Live Intelligence', enabled: true, priority: 1 },
-  cascade: { name: 'Infrastructure Cascade', enabled: true, priority: 1 },
-  'military-correlation': { name: 'Force Posture', enabled: true, priority: 2 },
-  'economic-correlation': { name: 'Economic Warfare', enabled: true, priority: 2 },
-  'trade-policy': { name: 'Trade Policy', enabled: true, priority: 1 },
-  'supply-chain': { name: 'Supply Chain', enabled: true, priority: 1 },
-  commodities: { name: 'Metals & Materials', enabled: true, priority: 1 },
-  'sanctions-pressure': { name: 'Sanctions Pressure', enabled: true, priority: 2 },
-  'alert-feed': { name: 'Risk Alerts', enabled: true, priority: 1 },
-  monitors: { name: 'My Monitors', enabled: true, priority: 2 },
+  'gdelt-intel': { name: 'Global Tension', enabled: true, priority: 1 },
+  commodities: { name: 'Commodity Stress', enabled: true, priority: 1 },
+  'supply-chain': { name: 'Supply Chain Anomalies', enabled: true, priority: 1 },
+  'trade-policy': { name: 'Trade Restrictions', enabled: true, priority: 1 },
+  'sanctions-pressure': { name: 'Sanctions Alerts', enabled: true, priority: 1 },
 };
 
 export const FULL_MAP_LAYERS: MapLayers = {
@@ -54,6 +42,7 @@ export const FULL_MAP_LAYERS: MapLayers = {
   spaceports: false,
   minerals: false,
   fires: false,
+  diseaseOutbreaks: false,
   ucdpEvents: false,
   displacement: false,
   climate: false,

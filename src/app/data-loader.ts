@@ -96,7 +96,7 @@ import {
 } from '@/services/stock-analysis-history';
 import { checkBatchForBreakingAlerts, dispatchOrefBreakingAlert } from '@/services/breaking-news-alerts';
 import { mlWorker } from '@/services/ml-worker';
-import { clusterNewsHybrid } from '@/services/clustering';
+
 import { ingestProtests, ingestFlights, ingestVessels, ingestEarthquakes, detectGeoConvergence, geoConvergenceToSignal } from '@/services/geo-convergence';
 import { signalAggregator } from '@/services/signal-aggregator';
 import { updateAndCheck, consumeServerAnomalies, fetchLiveAnomalies } from '@/services/temporal-baseline';
@@ -152,8 +152,7 @@ import {
   UcdpEventsPanel,
   TradePolicyPanel,
   SupplyChainPanel,
-  DiseaseOutbreaksPanel,
-  SocialVelocityPanel,
+
 } from '@/components';
 import { SatelliteFiresPanel } from '@/components/SatelliteFiresPanel';
 import { classifyNewsItem } from '@/services/positive-classifier';
@@ -529,8 +528,7 @@ export class DataLoaderManager implements AppModule {
       tasks.push({ name: 'firms', task: runGuarded('firms', () => this.loadFirmsData()) });
     }
     if (this.ctx.mapLayers.natural) tasks.push({ name: 'natural', task: runGuarded('natural', () => this.loadNatural()) });
-    if (this.ctx.mapLayers.diseaseOutbreaks || shouldLoad('disease-outbreaks')) tasks.push({ name: 'diseaseOutbreaks', task: runGuarded('diseaseOutbreaks', () => this.loadDiseaseOutbreaks()) });
-    if (shouldLoad('social-velocity')) tasks.push({ name: 'socialVelocity', task: runGuarded('socialVelocity', () => this.loadSocialVelocity()) });
+
     if (shouldLoad('economic')) tasks.push({ name: 'economicStress', task: runGuarded('economicStress', () => this.loadEconomicStress()) });
     if (SITE_VARIANT !== 'happy' && this.ctx.mapLayers.weather) tasks.push({ name: 'weather', task: runGuarded('weather', () => this.loadWeatherAlerts()) });
     if (SITE_VARIANT !== 'happy' && !isDesktopRuntime() && this.ctx.mapLayers.ais) tasks.push({ name: 'ais', task: runGuarded('ais', () => this.loadAisSignals()) });
@@ -671,9 +669,7 @@ export class DataLoaderManager implements AppModule {
         case 'gpsJamming':
           await this.loadIntelligenceSignals();
           break;
-        case 'diseaseOutbreaks':
-          await this.loadDiseaseOutbreaks();
-          break;
+
       }
     } finally {
       this.ctx.inFlight.delete(layer);
@@ -1130,9 +1126,7 @@ export class DataLoaderManager implements AppModule {
     this.updateMonitorResults();
 
     try {
-      this.ctx.latestClusters = mlWorker.isAvailable
-        ? await clusterNewsHybrid(this.ctx.allNews)
-        : await analysisWorker.clusterNews(this.ctx.allNews);
+      this.ctx.latestClusters = [];
 
       const insightsPanel = this.ctx.panels['insights'] as InsightsPanel | undefined;
       insightsPanel?.updateInsights(this.ctx.latestClusters);
@@ -2351,48 +2345,7 @@ export class DataLoaderManager implements AppModule {
     }
   }
 
-  private lastWebcamBbox: { w: number; s: number; e: number; n: number; zoom: number } | null = null;
-  private lastWebcamFetchAt = 0;
-
-  async loadWebcams(): Promise<void> {
-    if (!this.ctx.map) return;
-    try {
-      const map = this.ctx.map;
-      const zoom = Math.max(2, map.getState().zoom ?? 3);
-
-      const now = Date.now();
-      if (now - this.lastWebcamFetchAt < 1000) return;
-
-      const bboxStr = map.getBbox();
-      const parts = bboxStr ? bboxStr.split(',').map(Number) : [-180, -90, 180, 90];
-      const w = parts[0] ?? -180;
-      const s = parts[1] ?? -90;
-      const e = parts[2] ?? 180;
-      const n = parts[3] ?? 90;
-
-      if (this.lastWebcamBbox && this.lastWebcamBbox.zoom === zoom) {
-        const prev = this.lastWebcamBbox;
-        const overlapW = Math.max(0, Math.min(prev.e, e) - Math.max(prev.w, w));
-        const overlapH = Math.max(0, Math.min(prev.n, n) - Math.max(prev.s, s));
-        const overlapArea = overlapW * overlapH;
-        const currentArea = Math.max(0.001, (e - w) * (n - s));
-        if (overlapArea / currentArea > 0.8) return;
-      }
-
-      this.lastWebcamFetchAt = now;
-      this.lastWebcamBbox = { w, s, e, n, zoom };
-
-      const { fetchWebcams } = await import('@/services/webcams');
-      const result = await fetchWebcams(zoom, { w, s, e, n });
-
-      const allMarkers = [...result.webcams, ...result.clusters];
-      map.setWebcams(allMarkers);
-      map.setLayerReady('webcams', allMarkers.length > 0);
-    } catch (err) {
-      console.warn('[data-loader] webcams failed:', err);
-      this.ctx.map?.setLayerReady('webcams', false);
-    }
-  }
+  async loadWebcams(): Promise<void> {}
 
   async loadFlightDelays(): Promise<void> {
     try {
@@ -2745,31 +2698,7 @@ export class DataLoaderManager implements AppModule {
     }
   }
 
-  async loadDiseaseOutbreaks(): Promise<void> {
-    try {
-      const data = await fetchDiseaseOutbreaks();
-      if (data.outbreaks?.length) {
-        const panel = this.ctx.panels['disease-outbreaks'] as DiseaseOutbreaksPanel | undefined;
-        panel?.updateData(data.outbreaks);
-        this.ctx.map?.setDiseaseOutbreaks(data.outbreaks);
-        this.ctx.map?.setLayerReady('diseaseOutbreaks', true);
-      }
-    } catch (e) {
-      console.error('[App] Disease outbreaks load failed:', e);
-    }
-  }
-
-  async loadSocialVelocity(): Promise<void> {
-    try {
-      const data = await fetchSocialVelocity();
-      if (data.posts?.length) {
-        const panel = this.ctx.panels['social-velocity'] as SocialVelocityPanel | undefined;
-        panel?.updateData(data.posts);
-      }
-    } catch (e) {
-      console.error('[App] Social velocity load failed:', e);
-    }
-  }
+  // Disease outbreaks and social velocity removed.
 
   async loadEconomicStress(): Promise<void> {
     try {
@@ -2800,12 +2729,6 @@ export class DataLoaderManager implements AppModule {
 
   async runCorrelationAnalysis(): Promise<void> {
     try {
-      if (this.ctx.latestClusters.length === 0 && this.ctx.allNews.length > 0) {
-        this.ctx.latestClusters = mlWorker.isAvailable
-          ? await clusterNewsHybrid(this.ctx.allNews)
-          : await analysisWorker.clusterNews(this.ctx.allNews);
-      }
-
       if (this.ctx.latestClusters.length > 0) {
         ingestNewsForCII(this.ctx.latestClusters);
         dataFreshness.recordUpdate('gdelt', this.ctx.latestClusters.length);
@@ -2816,11 +2739,8 @@ export class DataLoaderManager implements AppModule {
           ?.setActivities(getTopActiveHubs(this.ctx.latestClusters));
       }
 
-      const signals = await analysisWorker.analyzeCorrelations(
-        this.ctx.latestClusters,
-        this.ctx.latestPredictions,
-        this.ctx.latestMarkets
-      );
+      // Correlation analysis removed
+
 
       let geoSignals: ReturnType<typeof geoConvergenceToSignal>[] = [];
       if (!isInLearningMode()) {
@@ -2829,7 +2749,7 @@ export class DataLoaderManager implements AppModule {
       }
 
       const keywordSpikeSignals = drainTrendingSignals();
-      const allSignals = [...signals, ...geoSignals, ...keywordSpikeSignals];
+      const allSignals = [...geoSignals, ...keywordSpikeSignals];
       if (allSignals.length > 0) {
         addToSignalHistory(allSignals);
         if (this.shouldShowIntelligenceNotifications()) this.ctx.signalModal?.show(allSignals);
