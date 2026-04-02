@@ -118,7 +118,7 @@ import type { DiseaseOutbreakItem } from '@/services/disease-outbreaks';
 import type { FeatureCollection, Geometry } from 'geojson';
 
 import { isAllowedPreviewUrl } from '@/utils/imagery-preview';
-const { fetchWebcamImage, pinWebcam, isPinned } = await Promise.resolve({ fetchWebcamImage: async (_id: any) => ({ thumbnailUrl: '', playerUrl: '', title: '' } as any), pinWebcam: (_id: any) => {}, isPinned: (_id: any) => false });
+const { fetchWebcamImage, pinWebcam, isPinned } = { fetchWebcamImage: async (_id: any) => ({ thumbnailUrl: '', playerUrl: '', title: '' } as any), pinWebcam: (_id: any) => {}, isPinned: (_id: any) => false };
 import type { WebcamEntry, WebcamCluster } from '@/generated/client/worldmonitor/webcam/v1/service_client';
 
 export type TimeRange = '1h' | '6h' | '24h' | '48h' | '7d' | 'all';
