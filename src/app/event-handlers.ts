@@ -1479,6 +1479,10 @@ export class EventHandlerManager implements AppModule {
         } else {
           this.ctx.map?.switchToFlat();
         }
+        if (this.ctx.mapLayers.resilienceScore && !this.ctx.map?.isDeckGLActive?.()) {
+          this.ctx.mapLayers = { ...this.ctx.mapLayers, resilienceScore: false };
+          saveToStorage(STORAGE_KEYS.mapLayers, this.ctx.mapLayers);
+        }
       });
     });
   }

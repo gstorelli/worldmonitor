@@ -5,7 +5,7 @@ const originalFetch = globalThis.fetch;
 const originalEnv = { ...process.env };
 
 const VALID_KEY = 'wm_test_key_123';
-const BASE_URL = 'https://api.worldmonitor.app/mcp';
+const BASE_URL = 'https://worldmonitor.app/mcp';
 
 function makeReq(method = 'POST', body = null, headers = {}) {
   return new Request(BASE_URL, {
@@ -118,12 +118,12 @@ describe('api/mcp.ts — PRO MCP Server', () => {
 
   // --- tools/list ---
 
-  it('tools/list returns 28 tools with name, description, inputSchema', async () => {
+  it('tools/list returns 32 tools with name, description, inputSchema', async () => {
     const res = await handler(makeReq('POST', { jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} }));
     assert.equal(res.status, 200);
     const body = await res.json();
     assert.ok(Array.isArray(body.result?.tools), 'result.tools must be an array');
-    assert.equal(body.result.tools.length, 28, `Expected 28 tools, got ${body.result.tools.length}`);
+    assert.equal(body.result.tools.length, 32, `Expected 32 tools, got ${body.result.tools.length}`);
     for (const tool of body.result.tools) {
       assert.ok(tool.name, 'tool.name must be present');
       assert.ok(tool.description, 'tool.description must be present');
@@ -167,11 +167,13 @@ describe('api/mcp.ts — PRO MCP Server', () => {
       [
         { key: 'seed-meta:climate:anomalies', maxStaleMin: 120 },
         { key: 'seed-meta:climate:co2-monitoring', maxStaleMin: 2880 },
+        { key: 'seed-meta:climate:ocean-ice', maxStaleMin: 1440 },
         { key: 'seed-meta:weather:alerts', maxStaleMin: 45 },
       ],
       [
         { fetchedAt: now - 30 * 60_000 },
         { fetchedAt: now - 60 * 60_000 },
+        { fetchedAt: now - 24 * 60 * 60_000 },
         null,
       ],
       now,
@@ -187,11 +189,13 @@ describe('api/mcp.ts — PRO MCP Server', () => {
       [
         { key: 'seed-meta:climate:anomalies', maxStaleMin: 120 },
         { key: 'seed-meta:climate:co2-monitoring', maxStaleMin: 2880 },
+        { key: 'seed-meta:climate:ocean-ice', maxStaleMin: 1440 },
         { key: 'seed-meta:weather:alerts', maxStaleMin: 45 },
       ],
       [
         { fetchedAt: now - 30 * 60_000 },
         { fetchedAt: now - 24 * 60 * 60_000 },
+        { fetchedAt: now - 12 * 60 * 60_000 },
         { fetchedAt: now - 15 * 60_000 },
       ],
       now,

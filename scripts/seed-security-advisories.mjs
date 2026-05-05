@@ -71,9 +71,10 @@ const BY_COUNTRY_NAME = Object.fromEntries(
 function extractCountry(title, feed) {
   if (feed.targetCountry) return feed.targetCountry;
   if (feed.sourceCountry === 'EU' || feed.sourceCountry === 'INT') return undefined;
-  const lower = title.toLowerCase();
+  const normalized = title.normalize('NFKD').replace(/\p{Diacritic}/gu, '').toLowerCase()
+    .replace(/['.(),/-]/g, ' ').replace(/\s+/g, ' ');
   for (const [name, code] of SORTED_COUNTRY_ENTRIES) {
-    if (lower.includes(name)) return code;
+    if (normalized.includes(name)) return code;
   }
   return undefined;
 }
@@ -213,12 +214,20 @@ function validate(data) {
   return Array.isArray(data?.advisories) && data.advisories.length > 0;
 }
 
+export function declareRecords(data) {
+  return Array.isArray(data?.advisories) ? data.advisories.length : 0;
+}
+
 runSeed('intelligence', 'advisories', CANONICAL_KEY, fetchAll, {
   validateFn: validate,
   ttlSeconds: TTL,
   recordCount: (d) => d?.advisories?.length || 0,
   sourceVersion: 'rss-feeds',
-  extraKeys: [{ key: BOOTSTRAP_KEY, transform: (d) => d, ttl: TTL }],
+  extraKeys: [{ key: BOOTSTRAP_KEY, transform: (d) => d, ttl: TTL, declareRecords }],
+
+  declareRecords,
+  schemaVersion: 1,
+  maxStaleMin: 120,
 }).catch((err) => {
   const _cause = err.cause ? ` (cause: ${err.cause.message || err.cause.code || err.cause})` : ''; console.error('FATAL:', (err.message || err) + _cause);
   process.exit(1);

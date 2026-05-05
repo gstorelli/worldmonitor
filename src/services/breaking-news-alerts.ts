@@ -1,3 +1,9 @@
+// @notification-source: rss (list-feed-digest)
+//   /api/notify fetch in this file forwards RSS NewsItem objects as
+//   rss_alert notifications. `payload.description` is set when the upstream
+//   NewsItem carried a snippet (post-RSS-description-fix, 2026-04-24), so
+//   the relay can render a context line without a second Redis lookup.
+//   Enforced by tests/notification-relay-payload-audit.test.mjs.
 import type { NewsItem } from '@/types';
 import type { OrefAlert } from '@/services/oref-alerts';
 import { getSourceTier } from '@/config/feeds';
@@ -13,6 +19,14 @@ export interface BreakingAlert {
   threatLevel: 'critical' | 'high';
   timestamp: Date;
   origin: 'rss_alert' | 'keyword_spike' | 'hotspot_escalation' | 'military_surge' | 'oref_siren';
+  importanceScore?: number;
+  /**
+   * RSS article description (cleaned, ≤400 chars). Present on rss_alert
+   * origins when the upstream NewsItem carried a snippet. Enables the relay
+   * to render a context line under the push/Telegram title without a second
+   * lookup. Absent/empty → relay renders title-only today.
+   */
+  description?: string;
 }
 
 export interface AlertSettings {
@@ -21,6 +35,12 @@ export interface AlertSettings {
   desktopNotificationsEnabled: boolean;
   sensitivity: 'critical-only' | 'critical-and-high';
 }
+
+// When VITE_RELAY_GATES_READY=1 the Railway relay has taken over external notifications
+// (Telegram/Slack/Email). The client /api/notify call is suppressed to prevent duplicates.
+// See Appendix E of docs/internal/news-alerts-enhancements-from-trendradar.md.
+const RELAY_GATES_READY = import.meta.env.VITE_RELAY_GATES_READY === '1';
+const IMPORTANCE_SCORE_MIN = 30; // Items below this threshold are too low-signal for the banner
 
 const SETTINGS_KEY = 'wm-breaking-alerts-v1';
 const DEDUPE_KEY = 'wm-breaking-alerts-dedupe';
@@ -158,34 +178,44 @@ function dispatchAlert(alert: BreakingAlert): void {
   saveDedupeMap();
   document.dispatchEvent(new CustomEvent('wm:breaking-news', { detail: alert }));
 
-  void (async () => {
-    const token = await getClerkToken();
-    if (!token) { console.warn('[breaking-news-alerts] no Clerk token, skipping notify'); return; }
-    const body = JSON.stringify({
-      eventType: alert.origin,
-      payload: { title: alert.headline, source: alert.source, link: alert.link },
-      severity: alert.threatLevel,
-      variant: SITE_VARIANT,
-    });
-    if (isDesktopRuntime()) {
-      // On desktop the fetch patch intercepts /api/* and routes to the local sidecar.
-      // Use XHR to send directly to the cloud relay endpoint, bypassing the interceptor.
-      const xhr = new XMLHttpRequest();
-      xhr.open('POST', `${getRemoteApiBaseUrl()}/api/notify`);
-      xhr.setRequestHeader('Content-Type', 'application/json');
-      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-      xhr.send(body);
-    } else {
-      fetch('/api/notify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body,
-      }).then((res) => {
-        if (!res.ok) console.warn('[breaking-news-alerts] notify returned', res.status, alert.origin);
-        else console.log('[breaking-news-alerts] notify queued:', alert.origin, alert.threatLevel);
-      }).catch((err) => { console.warn('[breaking-news-alerts] notify network error:', err); });
-    }
-  })();
+  if (!RELAY_GATES_READY) {
+    void (async () => {
+      const token = await getClerkToken();
+      if (!token) { console.warn('[breaking-news-alerts] no Clerk token, skipping notify'); return; }
+      // source: rss (list-feed-digest) — RSS-origin producer; carries
+      // `description` when the upstream NewsItem had a snippet so the relay
+      // can render a context line without a secondary Redis lookup.
+      const body = JSON.stringify({
+        eventType: alert.origin,
+        payload: {
+          title: alert.headline,
+          source: alert.source,
+          link: alert.link,
+          ...(alert.description ? { description: alert.description } : {}),
+        },
+        severity: alert.threatLevel,
+        variant: SITE_VARIANT,
+      });
+      if (isDesktopRuntime()) {
+        // On desktop the fetch patch intercepts /api/* and routes to the local sidecar.
+        // Use XHR to send directly to the cloud relay endpoint, bypassing the interceptor.
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `${getRemoteApiBaseUrl()}/api/notify`);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+        xhr.send(body);
+      } else {
+        fetch('/api/notify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body,
+        }).then((res) => {
+          if (!res.ok) console.warn('[breaking-news-alerts] notify returned', res.status, alert.origin);
+          else console.log('[breaking-news-alerts] notify queued:', alert.origin, alert.threatLevel);
+        }).catch((err) => { console.warn('[breaking-news-alerts] notify network error:', err); });
+      }
+    })();
+  }
 }
 
 export function checkBatchForBreakingAlerts(items: NewsItem[]): void {
@@ -217,6 +247,14 @@ export function checkBatchForBreakingAlerts(items: NewsItem[]): void {
     const key = makeAlertKey(item.title, item.source, item.link);
     if (isDuplicate(key)) continue;
 
+    // Sustained/fading stories are already well-covered; only break/develop phases
+    // warrant a banner interrupt. Unspecified (no storyMeta) passes through.
+    const phase = item.storyMeta?.phase;
+    if (phase === 'sustained' || phase === 'fading') continue;
+
+    // Items below the importance threshold are too low-signal for the banner.
+    if (item.importanceScore !== undefined && item.importanceScore < IMPORTANCE_SCORE_MIN) continue;
+
     const isBetter = !best
       || (level === 'critical' && best.threatLevel !== 'critical')
       || (level === best.threatLevel && item.pubDate.getTime() > best.timestamp.getTime());
@@ -230,6 +268,8 @@ export function checkBatchForBreakingAlerts(items: NewsItem[]): void {
         threatLevel: level as 'critical' | 'high',
         timestamp: item.pubDate,
         origin: 'rss_alert',
+        importanceScore: item.importanceScore,
+        ...(item.snippet ? { description: item.snippet } : {}),
       };
     }
   }

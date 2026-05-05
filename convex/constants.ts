@@ -5,12 +5,27 @@ export const channelTypeValidator = v.union(
   v.literal("slack"),
   v.literal("email"),
   v.literal("discord"),
+  v.literal("webhook"),
+  v.literal("web_push"),
 );
 
 export const sensitivityValidator = v.union(
   v.literal("all"),
   v.literal("high"),
   v.literal("critical"),
+);
+
+export const quietHoursOverrideValidator = v.union(
+  v.literal("critical_only"),
+  v.literal("silence_all"),
+  v.literal("batch_on_wake"),
+);
+
+export const digestModeValidator = v.union(
+  v.literal("realtime"),
+  v.literal("daily"),
+  v.literal("twice_daily"),
+  v.literal("weekly"),
 );
 
 export const CURRENT_PREFS_SCHEMA_VERSION = 1;

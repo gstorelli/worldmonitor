@@ -1,5 +1,8 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { computeMonthlyNormals, buildZoneNormalsFromBatch } from '../scripts/seed-climate-zone-normals.mjs';
 import { hasRequiredClimateZones } from '../scripts/_climate-zones.mjs';
@@ -16,6 +19,21 @@ import {
   parseAnnualCo2Rows,
   parseGlobalMonthlyPpbRows,
 } from '../scripts/seed-co2-monitoring.mjs';
+import {
+  buildIceTrend12mFromClimatology,
+  buildIceTrend12m,
+  buildOceanIcePayload,
+  computeOceanBaselineOffsets,
+  computeSeaIceMonthlyMedians,
+  countIndicators,
+  extractLatestOceanSeriesPath,
+  parseOceanTemperatureRows,
+  parseOhcYearlyRows,
+  parseSeaIceClimatologyRows,
+  parseSeaIceDailyRows,
+  parseSeaIceMonthlyRows,
+  parseSeaLevelOverlay,
+} from '../scripts/seed-climate-ocean-ice.mjs';
 
 describe('climate zone normals', () => {
   it('aggregates per-year monthly means into calendar-month normals', () => {
@@ -296,6 +314,231 @@ describe('co2 monitoring seed', () => {
   });
 });
 
+describe('ocean ice seed', () => {
+  it('parses the live NSIDC daily CSV spacing format', () => {
+    const dailyRows = parseSeaIceDailyRows(`
+Year, Month, Day,     Extent,    Missing, Source Data
+1978,    10,  26,     10.231,      0.000, ['source-a']
+2026,     3,  31,     14.130,      0.000, ['source-b']
+`);
+
+    assert.equal(dailyRows.length, 2);
+    assert.equal(dailyRows[0].month, 10);
+    assert.equal(dailyRows[1].day, 31);
+    assert.equal(dailyRows[1].extent, 14.13);
+  });
+
+  it('computes monthly sea ice medians and trend anomalies from NSIDC rows', () => {
+    const dailyRows = parseSeaIceDailyRows(`
+2025,05,31,12.30,10.10
+2025,06,30,10.50,8.20
+2026,03,30,14.00,12.00
+2026,03,31,13.95,11.95
+`);
+    const medians = computeSeaIceMonthlyMedians(new Map([
+      [3, parseSeaIceMonthlyRows('1981,3,NSIDC-0051,N,14.80,13.20\n1990,3,NSIDC-0051,N,14.70,13.10\n2010,3,NSIDC-0051,N,14.65,13.05', 3)],
+      [5, parseSeaIceMonthlyRows('1981,5,NSIDC-0051,N,12.60,10.90\n1990,5,NSIDC-0051,N,12.40,10.70\n2010,5,NSIDC-0051,N,12.50,10.80', 5)],
+      [6, parseSeaIceMonthlyRows('1981,6,NSIDC-0051,N,10.90,9.50\n1990,6,NSIDC-0051,N,10.80,9.40\n2010,6,NSIDC-0051,N,10.70,9.30', 6)],
+    ]));
+
+    assert.equal(dailyRows.at(-1).extent, 13.95);
+    assert.equal(medians.get(3), 14.7);
+    assert.equal(medians.get(5), 12.5);
+
+    const trend = buildIceTrend12m(dailyRows, medians);
+    assert.equal(trend.length, 3);
+    assert.deepEqual(trend[0], { month: '2025-05', extentMkm2: 12.3, anomalyMkm2: -0.2 });
+    assert.deepEqual(trend[2], { month: '2026-03', extentMkm2: 13.95, anomalyMkm2: -0.75 });
+  });
+
+  it('parses NSIDC daily climatology medians and maps recent months against same-day baselines', () => {
+    const climatologyRows = parseSeaIceClimatologyRows(`
+std Years = 1981-2010
+DOY,   Average Extent,   Std Deviation,      10th,      25th,      50th,      75th,      90th
+090,           15.100,           0.400,    14.500,    14.800,    15.200,    15.400,    15.600
+151,           12.100,           0.300,    11.700,    11.900,    12.200,    12.300,    12.500
+181,           10.600,           0.250,    10.100,    10.400,    10.700,    10.900,    11.100
+`);
+    const dailyRows = parseSeaIceDailyRows(`
+2025,05,31,12.30,0.00
+2025,06,30,10.50,0.00
+2026,03,31,13.95,0.00
+`);
+    const climatologyByDoy = new Map(climatologyRows.map((row) => [row.doy, row.medianExtent]));
+
+    assert.equal(climatologyRows.length, 3);
+    assert.equal(climatologyRows[0].medianExtent, 15.2);
+
+    const trend = buildIceTrend12mFromClimatology(dailyRows, climatologyByDoy);
+    assert.equal(trend.length, 3);
+    assert.deepEqual(trend[0], { month: '2025-05', extentMkm2: 12.3, anomalyMkm2: 0.1 });
+    assert.deepEqual(trend[2], { month: '2026-03', extentMkm2: 13.95, anomalyMkm2: -1.25 });
+  });
+
+  it('parses sea level, OHC, and NOAA ocean-only temperature rows', () => {
+    const seaLevel = parseSeaLevelOverlay(`
+      <div>RISE SINCE 1993</div>
+      <div>98.8</div>
+      <div>millimeters</div>
+      <p>The annual rate of rise has increased from 0.08 inches/year (0.20 centimeters/year) in 1993
+      to the current yearly rate of 0.17 inches/year (0.44 centimeters/year).</p>
+    `);
+    assert.equal(seaLevel.seaLevelMmAbove1993, 98.8);
+    assert.equal(seaLevel.seaLevelAnnualRiseMm, 4.4);
+
+    const ohcRows = parseOhcYearlyRows(`
+YEAR WO WOse NH NHse SH SHse
+2024.500 21.469 0.195 10.174 0.268 11.295 0.421
+2025.500 22.845 0.175 11.850 0.239 10.995 0.242
+`);
+    assert.equal(ohcRows.length, 2);
+    assert.equal(ohcRows.at(-1).world, 22.845);
+
+    const sstRows = parseOceanTemperatureRows(`
+2024 11    0.605664 -999.000000 -999.000000 -999.000000
+2024 12    0.569422 -999.000000 -999.000000 -999.000000
+2025  1    0.615606 -999.000000 -999.000000 -999.000000
+`);
+    assert.equal(sstRows.length, 3);
+    assert.equal(sstRows.at(-1).year, 2025);
+    assert.equal(sstRows.at(-1).month, 1);
+    assert.equal(sstRows.at(-1).anomaly, 0.615606);
+  });
+
+  it('derives the requested 1971-2000 SST baseline offset from NOAA ocean-only history', () => {
+    const baselineRows = parseOceanTemperatureRows(`
+1991  3    0.220000 -999.000000 -999.000000 -999.000000
+1992  3    0.260000 -999.000000 -999.000000 -999.000000
+2020  3    0.280000 -999.000000 -999.000000 -999.000000
+1991  4    0.300000 -999.000000 -999.000000 -999.000000
+2020  4    0.360000 -999.000000 -999.000000 -999.000000
+`);
+    const offsets = computeOceanBaselineOffsets(baselineRows);
+
+    assert.equal(offsets.get(3), 0.253);
+    assert.equal(offsets.get(4), 0.33);
+  });
+
+  it('finds the latest NOAA ocean-only monthly series in the index', () => {
+    const path = extractLatestOceanSeriesPath(`
+<td><a href="aravg.mon.ocean.90S.90N.v6.0.0.202512.asc">aravg.mon.ocean.90S.90N.v6.0.0.202512.asc</a></td>
+<td><a href="aravg.mon.ocean.90S.90N.v6.0.0.202412.asc">aravg.mon.ocean.90S.90N.v6.0.0.202412.asc</a></td>
+<td><a href="aravg.mon.ocean.90S.90N.v6.1.0.202501.asc">aravg.mon.ocean.90S.90N.v6.1.0.202501.asc</a></td>
+`);
+
+    assert.equal(path, 'aravg.mon.ocean.90S.90N.v6.0.0.202512.asc');
+  });
+
+  it('merges all source sections and keeps the latest measured timestamp', () => {
+    // positional: [seaIce, seaLevel, ohc, sst]
+    const payload = buildOceanIcePayload([
+      {
+        data: { arctic_extent_mkm2: 13.95, arctic_extent_anomaly_mkm2: -0.75, arctic_trend: 'below_average' },
+        measuredAt: Date.UTC(2026, 2, 31),
+      },
+      {
+        data: { sea_level_mm_above_1993: 98.8, sea_level_annual_rise_mm: 4.4 },
+      },
+      {
+        data: { ohc_0_700m_zj: 228.45 },
+        measuredAt: Date.UTC(2026, 2, 1),
+      },
+      {
+        data: { sst_anomaly_c: 0.91 },
+      },
+    ]);
+
+    assert.equal(payload.arctic_extent_mkm2, 13.95);
+    assert.equal(payload.ohc_0_700m_zj, 228.45);
+    assert.equal(payload.sst_anomaly_c, 0.91);
+    assert.equal(payload.sea_level_annual_rise_mm, 4.4);
+    assert.equal(payload.measured_at, Date.UTC(2026, 2, 31));
+  });
+
+  it('counts partial scalar sections so validation does not discard useful partial data', () => {
+    assert.equal(countIndicators({ sea_level_annual_rise_mm: 4.4 }), 1);
+    assert.equal(countIndicators({ arctic_extent_anomaly_mkm2: -0.75 }), 1);
+    assert.equal(countIndicators({ ice_trend_12m: [{ month: '2026-03', extent_mkm2: 13.95, anomaly_mkm2: -0.75 }] }), 1);
+  });
+
+  it('preserves prior cache for failed source groups only', () => {
+    const prior = {
+      arctic_extent_mkm2: 13.5,
+      arctic_extent_anomaly_mkm2: -0.5,
+      arctic_trend: 'below_average',
+      sea_level_mm_above_1993: 98.8,
+      sea_level_annual_rise_mm: 4.4,
+      ohc_0_700m_zj: 220.0,
+      sst_anomaly_c: 0.85,
+    };
+    // seaIce succeeded, seaLevel failed (null), ohc failed (null), sst succeeded
+    const payload = buildOceanIcePayload(
+      [
+        { data: { arctic_extent_mkm2: 14.0 }, measuredAt: Date.UTC(2026, 2, 31) },
+        null,
+        null,
+        { data: { sst_anomaly_c: 0.91 } },
+      ],
+      prior,
+    );
+
+    assert.equal(payload.arctic_extent_mkm2, 14.0);
+    assert.equal(payload.arctic_extent_anomaly_mkm2, undefined, 'sea-ice section omitted anomaly — must not bleed from prior');
+    assert.equal(payload.arctic_trend, undefined, 'sea-ice section omitted trend — must not bleed from prior');
+    assert.equal(payload.sea_level_mm_above_1993, 98.8, 'sea-level failed — falls back to prior');
+    assert.equal(payload.ohc_0_700m_zj, 220.0, 'ohc failed — falls back to prior');
+    assert.equal(payload.sst_anomaly_c, 0.91, 'sst succeeded — uses fresh value');
+  });
+
+  it('sea-ice climatology unavailable + unrelated failure does not reintroduce stale anomaly/trend', () => {
+    const prior = {
+      arctic_extent_mkm2: 13.5,
+      arctic_extent_anomaly_mkm2: -0.5,
+      arctic_trend: 'below_average',
+      ohc_0_700m_zj: 220.0,
+    };
+    // seaIce succeeded but omitted anomaly/trend (no climatology), seaLevel ok, ohc failed, sst ok
+    const payload = buildOceanIcePayload(
+      [
+        { data: { arctic_extent_mkm2: 14.0 }, measuredAt: Date.UTC(2026, 2, 31) },
+        { data: { sea_level_mm_above_1993: 99.0 } },
+        null,
+        { data: { sst_anomaly_c: 0.91 } },
+      ],
+      prior,
+    );
+
+    assert.equal(payload.arctic_extent_mkm2, 14.0);
+    assert.equal(payload.arctic_extent_anomaly_mkm2, undefined, 'must not reintroduce stale anomaly');
+    assert.equal(payload.arctic_trend, undefined, 'must not reintroduce stale trend');
+    assert.equal(payload.ohc_0_700m_zj, 220.0, 'ohc failed — prior preserved');
+    assert.equal(payload.sst_anomaly_c, 0.91);
+  });
+
+  it('does not use prior cache when all sources succeed', () => {
+    const payload = buildOceanIcePayload(
+      [
+        { data: { arctic_extent_mkm2: 14.0 }, measuredAt: Date.UTC(2026, 2, 31) },
+        { data: { sea_level_mm_above_1993: 99.0 } },
+        { data: { ohc_0_700m_zj: 230.0 } },
+        { data: { sst_anomaly_c: 0.91 } },
+      ],
+      undefined,
+    );
+
+    assert.equal(payload.arctic_extent_mkm2, 14.0);
+    assert.equal(payload.sea_level_mm_above_1993, 99.0);
+  });
+
+  it('fallback sea level rate regex matches the current rate, not the historical one', () => {
+    const seaLevel = parseSeaLevelOverlay(`
+      <p>The rate has increased from 0.08 inches/year (0.20 centimeters/year) in 1993
+      to the current rate of 0.17 inches/year (0.44 centimeters/year).</p>
+    `);
+    assert.equal(seaLevel.seaLevelAnnualRiseMm, 4.4);
+  });
+});
+
 describe('open-meteo archive helper', () => {
   it('caps oversized Retry-After values', () => {
     assert.equal(parseRetryAfterMs('86400'), 60_000);
@@ -385,5 +628,92 @@ describe('open-meteo archive helper', () => {
     } finally {
       globalThis.fetch = originalFetch;
     }
+  });
+});
+
+describe('climate-anomalies CACHE_TTL + maxStaleMin co-pinned to 3h cron cadence', () => {
+  // Regression-locks the fix for the 2026-04-27 silent-EMPTY-window incident.
+  // climate-anomalies is bundled into seed-bundle-climate (cron `0 */3 * * *`,
+  // every 3h, runbook Bundle 6). The previous CACHE_TTL=10800s (3h) equalled
+  // the cron cadence exactly — any cron jitter (1-3min normal Railway
+  // variance) caused the data key to expire BEFORE the next cron could
+  // refresh it, with health emitting status=EMPTY records=0 because
+  // seedAgeMin (~3h+drift) was still < maxStaleMin (4h). Production logs
+  // 2026-04-27T00:00:59 + 03:03:35 show the 3h+3min drift pattern.
+  //
+  // Fix: TTL = 9h (3× cron cadence) so data survives one missed cron + drift,
+  // co-pinned to maxStaleMin (also 9h / 540min) so the data key is always
+  // alive when the alarm would fire — no silent-EMPTY window. maxStaleMin =
+  // 9h (3× cron cadence per project convention) fires on a real outage but
+  // tolerates routine drift. (An earlier draft used TTL=6h but the
+  // `TTL_min >= maxStaleMin` test below caught the residual 6h-9h gap and
+  // forced TTL up to match.)
+
+  const __dirname = dirname(fileURLToPath(import.meta.url));
+  const root = resolve(__dirname, '..');
+  const seedSrc = readFileSync(resolve(root, 'scripts/seed-climate-anomalies.mjs'), 'utf-8');
+  const healthSrc = readFileSync(resolve(root, 'api/health.js'), 'utf-8');
+  const bundleSrc = readFileSync(resolve(root, 'scripts/seed-bundle-climate.mjs'), 'utf-8');
+
+  function extractCacheTtlSec() {
+    const m = seedSrc.match(/const\s+CACHE_TTL\s*=\s*(\d+)/m);
+    if (!m) throw new Error('could not find CACHE_TTL in seed-climate-anomalies.mjs');
+    return parseInt(m[1], 10);
+  }
+
+  function extractBundleSectionGateSec(label) {
+    const re = new RegExp(`label:\\s*'${label}'[\\s\\S]*?intervalMs:\\s*(\\d+)\\s*\\*\\s*HOUR`, 'm');
+    const m = bundleSrc.match(re);
+    if (!m) throw new Error(`could not find bundle entry for ${label}`);
+    return parseInt(m[1], 10) * 3600;
+  }
+
+  function extractMaxStaleMin(name) {
+    const re = new RegExp(`${name}:\\s*\\{[^}]*?maxStaleMin:\\s*(\\d+)`, 'ms');
+    const m = healthSrc.match(re);
+    if (!m) throw new Error(`could not find ${name}.maxStaleMin in health src`);
+    return parseInt(m[1], 10);
+  }
+
+  it('Anomalies bundle section gate is 3h (matches cron cadence)', () => {
+    assert.equal(extractBundleSectionGateSec('Anomalies'), 3 * 3600);
+  });
+
+  it('CACHE_TTL is 32400s (9h, 3× the 3h cron cadence; co-pinned to maxStaleMin)', () => {
+    assert.equal(extractCacheTtlSec(), 32400);
+  });
+
+  it('CACHE_TTL > cron cadence (data survives one missed cron + drift)', () => {
+    const ttl = extractCacheTtlSec();
+    const cron = extractBundleSectionGateSec('Anomalies');
+    assert.ok(
+      ttl >= cron * 2,
+      `CACHE_TTL (${ttl}s) must be >= 2× cron cadence (${cron * 2}s); ` +
+      `tighter values create silent-EMPTY windows on every cron-jitter cycle — see 2026-04-27 incident.`,
+    );
+  });
+
+  it('climateAnomalies.maxStaleMin is 540 (3× cron cadence per project convention)', () => {
+    assert.equal(extractMaxStaleMin('climateAnomalies'), 540);
+  });
+
+  it('CACHE_TTL_min >= maxStaleMin (no silent-EMPTY window: data survives at least until alarm fires)', () => {
+    const ttlMin = extractCacheTtlSec() / 60;
+    const maxStale = extractMaxStaleMin('climateAnomalies');
+    assert.ok(
+      ttlMin >= maxStale,
+      `CACHE_TTL_min (${ttlMin}) must be >= maxStaleMin (${maxStale}); ` +
+      `larger maxStaleMin creates a (TTL, maxStaleMin) silent window where data is gone but no alarm fires.`,
+    );
+  });
+
+  it('maxStaleMin >= 2.5× cron cadence (no false-STALE on routine cron drift)', () => {
+    const cronMin = extractBundleSectionGateSec('Anomalies') / 60;
+    const maxStale = extractMaxStaleMin('climateAnomalies');
+    assert.ok(
+      maxStale >= cronMin * 2.5,
+      `climateAnomalies.maxStaleMin (${maxStale}) must be >= ${cronMin * 2.5} (2.5× cron cadence); ` +
+      `tighter values flip to STALE_SEED on routine cron drift.`,
+    );
   });
 });
