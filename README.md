@@ -58,6 +58,7 @@ Il sistema integra **30+ sorgenti OSINT** (Open Source Intelligence) — tra cui
 Le operazioni doganali sono sempre più esposte a rischi sistemici interconnessi: conflitti armati che bloccano rotte marittime (Houthi nel Mar Rosso), sanzioni economiche che alterano i flussi commerciali, eventi climatici estremi che distruggono raccolti e infrastrutture, e volatilità dei prezzi delle materie prime che impatta direttamente sui dazi e sulle classificazioni tariffarie.
 
 Le Dogane necessitano di un sistema che:
+
 1. **Anticipi** le disruption prima che impattino sui flussi commerciali
 2. **Quantifichi** il rischio in modo trasparente e spiegabile
 3. **Correli** eventi apparentemente scollegati (es. terremoto + chiusura porto + scarsità commodity)
@@ -203,6 +204,7 @@ RiskScore = 0.18 × EventSeverity
 ## Pipeline n8n (Low-Code Data Ingestion)
 
 I flussi di elaborazione dati sono implementati come **workflow n8n importabili**, rendendo la pipeline:
+
 - **Visiva**: ogni nodo è visibile nell'editor grafico
 - **Spiegabile**: si può tracciare ogni trasformazione dall'input all'output
 - **Riproducibile**: stesso input → stesso output (scoring deterministico)
@@ -348,6 +350,7 @@ FRED_API_KEY=your-key                   # Macro indicators (FRED)
 Il sistema include **86 pannelli** organizzati per dominio. Quelli rilevanti per il dottorato:
 
 ### Intelligence & Geopolitica
+
 | Pannello | Descrizione |
 |----------|-------------|
 | Global Map | Mappa globale con 45+ data layer sovrapposti |
@@ -361,6 +364,7 @@ Il sistema include **86 pannelli** organizzati per dominio. Quelli rilevanti per
 | Infrastructure Cascade | Monitoraggio cascate infrastrutturali |
 
 ### Commercio & Dogane
+
 | Pannello | Descrizione |
 |----------|-------------|
 | Metals & Materials | Prezzi metalli e materiali critici |
@@ -374,6 +378,7 @@ Il sistema include **86 pannelli** organizzati per dominio. Quelli rilevanti per
 | Commodity News | News su materie prime |
 
 ### Rischio Naturale
+
 | Pannello | Descrizione |
 |----------|-------------|
 | Fires | Incendi rilevati da satellite (FIRMS) |
@@ -385,6 +390,7 @@ Il sistema include **86 pannelli** organizzati per dominio. Quelli rilevanti per
 ## Roadmap e Next Steps
 
 ### Fase 1 — Completata ✅
+
 - [x] Fork da WorldMonitor e rebranding Risk Sentinel
 - [x] Rimozione UI premium/Pro/locked
 - [x] Integrazione sistema di pannelli completo (86 pannelli)
@@ -393,14 +399,18 @@ Il sistema include **86 pannelli** organizzati per dominio. Quelli rilevanti per
 - [x] Build pipeline funzionante (Netlify/Vercel)
 
 ### Fase 2 — Completata ✅ (Stabilizzazione & Commodity Tracker)
+
 *In questa fase il progetto è stato completamente sganciato dall'infrastruttura commerciale originale, diventando un tool di ricerca 100% open e self-hosted.*
+
 - [x] **Transizione Accademica & CI/CD**: Disinstallazione radicale dei pacchetti `convex` e `@dodopayments`. Creazione di stub mockati per i servizi cloud (`entitlements.ts`, `api-keys.ts`, `mcp-clients.ts`) in modo da far passare tutti i typecheck (`npm run typecheck:all`) e i test del sidecar (`npm run test:sidecar`).
 - [x] **Endpoint di Ingestion n8n**: Consolidamento e standardizzazione dello script di ricezione webhook in `api/n8n/ingest.js`. Il sistema è ora pronto a ricevere il payload dai 5 workflow n8n e salvarlo su Redis.
 - [x] **Persistenza Redis (Upstash)**: Integrazione del salvataggio dati elaborati da n8n in cache (tramite `UPSTASH_REDIS_REST_URL`), rendendo il sistema indipendente dai vecchi database Convex.
 - [x] **Commodity Tracker (Filtri HS)**: Verticalizzazione del pannello `CommoditiesPanel` (Metals & Materials). È stato integrato il modulo `Hs2Picker` che permette di filtrare dinamicamente i dati di mercato in base ai codici doganali Harmonized System (es. 85 per semiconduttori, 27 per petrolio), agganciandosi al campo `hsCode` popolato dall'ingestion n8n.
 
 ### Fase 3 — In Corso 🔄 (Deployment, Validazione & RAG)
+
 *Obiettivo attuale: rendere il sistema live e iniziare a raccogliere/validare i dati per il paper di ricerca, oltre a introdurre l'infrastruttura semantica (Knowledge Graph e RAG).*
+
 - [ ] **Deployment Infrastruttura Live**:
   - [ ] Deploy dell'app web su Vercel/Netlify.
   - [ ] Deploy di n8n su un server/VPS dedicato (es. Railway, DigitalOcean).
@@ -413,12 +423,14 @@ Il sistema include **86 pannelli** organizzati per dominio. Quelli rilevanti per
 - [ ] **Classificatore Semantico**: Costruzione del classificatore LLM-based per valutare automaticamente la *rilevanza doganale* dei testi analizzati.
 
 ### Fase 4 — Moduli Customs-Specifici
+
 - [ ] **Critical Trade Routes Monitor** — overlay visivo su mappa delle rotte con status real-time
 - [ ] **Country Exposure Index** — esposizione commerciale per paese (da UN Comtrade)
 - [ ] **Alert Triage & Deduplication** — sistema anti-alert-fatigue con prioritizzazione intelligente
 - [ ] **Commodity Matrix** — matrice rischio paese × commodity interattiva
 
 ### Fase 5 — Sperimentazione & Validazione
+
 - [ ] Dataset di test: 1000+ eventi GDELT annotati manualmente per rilevanza doganale
 - [ ] Metriche: Precision, Recall, F1-score dell'algoritmo di scoring
 - [ ] Confronto con baseline (keyword-only, random forest, BERT classifier)
@@ -426,6 +438,7 @@ Il sistema include **86 pannelli** organizzati per dominio. Quelli rilevanti per
 - [ ] A/B testing: scoring 8D vs scoring semplificato (4D)
 
 ### Fase 6 — Disseminazione
+
 - [ ] Articolo su rivista internazionale (target: *Decision Support Systems*, *GIScience*, o *Government Information Quarterly*)
 - [ ] Presentazione a conferenza (target: EGOV, dg.o, ACM SIGSPATIAL)
 - [ ] Dissertazione finale di dottorato
@@ -454,6 +467,7 @@ Questo progetto è un **fork** di [WorldMonitor](https://github.com/koala73/worl
 Il fork è stato realizzato per scopi di **ricerca accademica** nell'ambito di un dottorato di ricerca presso l'Università degli Studi di Bari "Aldo Moro", in collaborazione con l'Agenzia delle Dogane e dei Monopoli (ADM).
 
 Le modifiche includono:
+
 - Rimozione della logica premium/commerciale
 - Aggiunta pipeline n8n per data ingestion trasparente
 - Implementazione del Risk Scoring Engine a 8 dimensioni

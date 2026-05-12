@@ -44,7 +44,7 @@ import type { DisplacementFlow } from '@/services/displacement';
 import type { ClimateAnomaly } from '@/services/climate';
 import type { GpsJamHex } from '@/services/gps-interference';
 import type { SatellitePosition } from '@/services/satellites';
-import type { ImageryScene } from '@/generated/server/worldmonitor/imagery/v1/service_server';
+import type { ImageryScene } from '@/services/imagery';
 import { isAllowedPreviewUrl } from '@/utils/imagery-preview';
 const pinWebcam = (_id: any) => {}; const isPinned = (_id: any) => false;
 const getCategoryStyle = (_c: any) => ({ color: '#fff', emoji: '\u{1F4F7}' } as any);

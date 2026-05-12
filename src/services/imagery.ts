@@ -1,7 +1,7 @@
 import { toApiUrl } from '@/services/runtime';
-import type { ImageryScene } from '@/generated/server/worldmonitor/imagery/v1/service_server';
 
-export type { ImageryScene };
+
+export type ImageryScene = any;
 
 export interface ImagerySearchParams {
   bbox: string;
