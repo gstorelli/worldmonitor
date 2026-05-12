@@ -6,7 +6,6 @@
  */
 
 import { subscribeAuthState, type AuthSession } from './auth-state';
-import { onSubscriptionChange, type SubscriptionInfo } from './billing';
 import { getClerkUserCreatedAt } from './clerk';
 
 // ---------------------------------------------------------------------------
@@ -88,7 +87,7 @@ export async function initAnalytics(): Promise<void> {
 export function identifyUser(
   userId: string,
   plan: string,
-  subStatus?: SubscriptionInfo['status'] | null,
+  subStatus?: any | null,
   planKey?: string | null,
 ): void {
   window.umami?.identify({
@@ -104,18 +103,14 @@ export function clearIdentity(): void {
 }
 
 let _unsubAuth: (() => void) | null = null;
-let _unsubBilling: (() => void) | null = null;
 
-// Cached latest values so either subscription firing can re-identify with full data
 let _lastAuth: AuthSession | null = null;
-let _lastSub: SubscriptionInfo | null = null;
 
 function _syncIdentity(): void {
   const user = _lastAuth?.user;
   if (user) {
-    identifyUser(user.id, user.role, _lastSub?.status ?? null, _lastSub?.planKey ?? null);
+    identifyUser(user.id, user.role, null, null);
   } else {
-    _lastSub = null;
     clearIdentity();
   }
 }
@@ -132,7 +127,6 @@ export function initAuthAnalytics(): void {
     const prevUserId = _lastAuth?.user?.id ?? null;
     const nextUserId = state.user?.id ?? null;
     if (prevUserId !== nextUserId) {
-      _lastSub = null;
       // Detect a genuine sign-UP (not a sign-in). Null→non-null id transition
       // plus a createdAt within FRESH_SIGNUP_WINDOW_MS of now means Clerk
       // just created this account. Firing trackSignUp on the button click
@@ -160,21 +154,13 @@ export function initAuthAnalytics(): void {
     _lastAuth = state;
     _syncIdentity();
   });
-
-  _unsubBilling = onSubscriptionChange((sub) => {
-    _lastSub = sub;
-    _syncIdentity();
-  });
 }
 
 /** Tear down auth + billing listeners. Symmetric with initAuthAnalytics(). */
 export function destroyAuthAnalytics(): void {
   _unsubAuth?.();
-  _unsubBilling?.();
   _unsubAuth = null;
-  _unsubBilling = null;
   _lastAuth = null;
-  _lastSub = null;
   clearIdentity();
 }
 

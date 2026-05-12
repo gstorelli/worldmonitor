@@ -197,6 +197,7 @@ export interface MarketData {
   price: number | null;
   change: number | null;
   sparkline?: number[];
+  hsCode?: string;
 }
 
 export interface CryptoData {

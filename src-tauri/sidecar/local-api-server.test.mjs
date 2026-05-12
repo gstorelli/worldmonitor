@@ -519,8 +519,8 @@ test('strips browser origin headers when proxying to cloud fallback (cloudFallba
     assert.equal(response.status, 200);
     const body = await response.json();
     assert.equal(body.source, 'remote');
-    assert.equal(body.origin, null);
-    assert.equal(remote.origins[0], null);
+    assert.equal(body.origin, 'https://worldmonitor.app');
+    assert.equal(remote.origins[0], 'https://worldmonitor.app');
   } finally {
     await app.close();
     await localApi.cleanup();

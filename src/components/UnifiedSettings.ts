@@ -13,7 +13,7 @@ import { getAuthState } from '@/services/auth-state';
 import { track } from '@/services/analytics';
 import { isEntitled, hasFeature, onEntitlementChange, getEntitlementState } from '@/services/entitlements';
 import { hasPremiumAccess } from '@/services/panel-gating';
-import { getSubscription, openBillingPortal, prereserveBillingPortalTab } from '@/services/billing';
+
 import { createApiKey, listApiKeys, revokeApiKey, type ApiKeyInfo } from '@/services/api-keys';
 import { listMcpClients, revokeMcpClient, fetchMcpQuota, type McpClientInfo, type McpQuota } from '@/services/mcp-clients';
 
@@ -106,12 +106,6 @@ export class UnifiedSettings {
       }
 
       if (target.closest('.manage-billing-btn')) {
-        // Pre-reserve the portal tab synchronously inside the click
-        // handler so the popup blocker doesn't suppress the eventual
-        // window.open inside openBillingPortal (which runs after an
-        // await of the Convex action).
-        const reservedWin = prereserveBillingPortalTab();
-        void openBillingPortal(reservedWin);
         return;
       }
 
@@ -559,25 +553,12 @@ export class UnifiedSettings {
       return '<div class="upgrade-pro-section upgrade-pro-loading" hidden aria-hidden="true"></div>';
     }
     if (isEntitled()) {
-      const sub = getSubscription();
-      const planName = sub?.displayName ?? 'Pro';
-      const statusColor = sub?.status === 'active' ? '#22c55e' : sub?.status === 'on_hold' ? '#eab308' : '#ef4444';
-      const statusBorderColor = sub?.status === 'active' ? '#22c55e33' : sub?.status === 'on_hold' ? '#eab30833' : '#ef444433';
-      const statusBgColor = sub?.status === 'active' ? '#22c55e0a' : sub?.status === 'on_hold' ? '#eab3080a' : '#ef44440a';
-
+      const planName = 'Pro';
+      const statusColor = '#22c55e';
+      const statusBorderColor = '#22c55e33';
+      const statusBgColor = '#22c55e0a';
+      
       let statusLine = '';
-      if (sub?.currentPeriodEnd) {
-        const dateStr = new Date(sub.currentPeriodEnd).toLocaleDateString();
-        if (sub.status === 'active') {
-          statusLine = `Renews: ${dateStr}`;
-        } else if (sub.status === 'on_hold') {
-          statusLine = 'On hold -- please update payment method';
-        } else if (sub.status === 'cancelled') {
-          statusLine = `Cancelled -- access until ${dateStr}`;
-        } else if (sub.status === 'expired') {
-          statusLine = 'Expired';
-        }
-      }
 
       return `
         <div class="upgrade-pro-section upgrade-pro-active" style="margin-top:16px;padding:14px 16px;border:1px solid ${statusBorderColor};border-radius:6px;background:${statusBgColor};">
@@ -632,8 +613,6 @@ export class UnifiedSettings {
     // → getCustomerPortalUrl cascade this PR is trying to eliminate).
     if (isEntitled()) {
       this.close();
-      const reservedWin = prereserveBillingPortalTab();
-      void openBillingPortal(reservedWin);
       return;
     }
     this.close();
@@ -641,9 +620,7 @@ export class UnifiedSettings {
       window.open('https://worldmonitor.app/pro', '_blank');
       return;
     }
-    import('@/services/checkout').then(m => import('@/config/products').then(p => m.startCheckout(p.DEFAULT_UPGRADE_PRODUCT))).catch(() => {
-      window.open('https://worldmonitor.app/pro', '_blank');
-    });
+    window.open('https://worldmonitor.app/pro', '_blank');
   }
 
   private categoryMatchesVariant(catDef: { variants?: string[] }): boolean {
@@ -914,9 +891,7 @@ export class UnifiedSettings {
           import('@/services/clerk').then(m => m.openSignIn()).catch(() => {});
         } else {
           this.close();
-          import('@/services/checkout').then(m => import('@/config/products').then(p => m.startCheckout(p.DODO_PRODUCTS.API_STARTER_MONTHLY))).catch(() => {
-            window.open('https://worldmonitor.app/pro', '_blank');
-          });
+          window.open('https://worldmonitor.app/pro', '_blank');
         }
       });
     }

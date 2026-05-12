@@ -11,6 +11,7 @@ import {
   resetMarketWatchlist,
   setMarketWatchlistEntries,
 } from '@/services/market-watchlist';
+import { Hs2Picker } from './RouteExplorer/Hs2Picker';
 
 export class MarketPanel extends Panel {
   private settingsBtn: HTMLButtonElement | null = null;
@@ -471,8 +472,11 @@ const XAU_CURRENCY_CONFIG: Array<{ symbol: string; label: string; flag: string; 
 
 export class CommoditiesPanel extends Panel {
   private _tab: CommoditiesTab = 'commodities';
-  private _commodityData: Array<{ display: string; price: number | null; change: number | null; sparkline?: number[]; symbol?: string }> = [];
+  private _commodityData: Array<{ display: string; price: number | null; change: number | null; sparkline?: number[]; symbol?: string; hsCode?: string }> = [];
   private _fxRates: EcbFxRateItem[] = [];
+  private _hsFilter: string | null = null;
+  private _hsPicker: Hs2Picker | null = null;
+  private _filterBtn: HTMLButtonElement | null = null;
 
   constructor() {
     super({ id: 'commodities', title: t('panels.commodities'), infoTooltip: t('components.commodities.infoTooltip') });
@@ -486,12 +490,57 @@ export class CommoditiesPanel extends Panel {
         (tab === 'xau' && SITE_VARIANT === 'commodity')
       ) {
         this._tab = tab as CommoditiesTab;
+        if (this._filterBtn) {
+          this._filterBtn.style.display = this._tab === 'commodities' ? 'block' : 'none';
+        }
         this._render();
       }
     });
+
+    this.createFilterButton();
   }
 
-  public renderCommodities(data: Array<{ symbol?: string; display: string; price: number | null; change: number | null; sparkline?: number[] }>): void {
+  private createFilterButton(): void {
+    this._filterBtn = document.createElement('button');
+    this._filterBtn.className = 'live-news-settings-btn';
+    this._filterBtn.title = 'Filter by HS Code';
+    this._filterBtn.textContent = 'HS Filter';
+    this._filterBtn.style.display = 'block';
+    this._filterBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.toggleHsPicker();
+    });
+    this.header.appendChild(this._filterBtn);
+  }
+
+  private toggleHsPicker(): void {
+    if (this._hsPicker) {
+      this._hsPicker.element.remove();
+      this._hsPicker = null;
+      this._hsFilter = null;
+      this._filterBtn!.classList.remove('active');
+      this._render();
+      return;
+    }
+
+    this._hsPicker = new Hs2Picker({
+      placeholder: 'Filter by HS Code...',
+      onCommit: (hs2) => {
+        this._hsFilter = hs2;
+        this._filterBtn!.classList.add('active');
+        this._render();
+      },
+      onCancel: () => {
+        this.toggleHsPicker();
+      }
+    });
+
+    this._hsPicker.element.style.margin = '0 12px 10px 12px';
+    this.content.prepend(this._hsPicker.element);
+    this._hsPicker.focusInput();
+  }
+
+  public renderCommodities(data: Array<{ symbol?: string; display: string; price: number | null; change: number | null; sparkline?: number[]; hsCode?: string }>): void {
     this._commodityData = data;
     this._render();
   }
@@ -569,15 +618,20 @@ export class CommoditiesPanel extends Panel {
     }
 
     // Metals/Commodities tab — exclude FX and spot gold symbols from the display grid
-    const validData = this._commodityData.filter(
+    let validData = this._commodityData.filter(
       (d) => d.price !== null && !d.symbol?.endsWith('=X'),
     );
+    if (this._hsFilter) {
+      validData = validData.filter(d => d.hsCode && d.hsCode.startsWith(this._hsFilter!));
+    }
+    
     if (validData.length === 0) {
-      if (!hasFx) {
+      if (!hasFx && !this._hsFilter) {
         this.showRetrying(t('common.failedCommodities'));
         return;
       }
-      this.setContent(tabBar + `<div style="padding:8px;color:var(--text-dim);font-size:12px">${t('common.failedCommodities')}</div>`);
+      this.setContent(tabBar + `<div style="padding:8px;color:var(--text-dim);font-size:12px">${this._hsFilter ? 'No commodities match this HS filter.' : t('common.failedCommodities')}</div>`);
+      if (this._hsPicker) this.content.prepend(this._hsPicker.element);
       return;
     }
 
@@ -592,6 +646,9 @@ export class CommoditiesPanel extends Panel {
       `).join('') + '</div>';
 
     this.setContent(tabBar + grid);
+    if (this._hsPicker) {
+      this.content.prepend(this._hsPicker.element);
+    }
   }
 }
 

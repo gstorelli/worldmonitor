@@ -1,4 +1,4 @@
-import { DEFAULT_UPGRADE_PRODUCT } from '@/config/products';
+
 import { type AuthSession, getAuthState, subscribeAuthState } from '@/services/auth-state';
 import { openSignIn } from '@/services/clerk';
 import { PanelGateReason, getPanelGateReason } from '@/services/panel-gating';
@@ -452,10 +452,6 @@ export class ResilienceWidget {
       return;
     }
 
-    import('@/services/checkout')
-      .then((module) => module.startCheckout(DEFAULT_UPGRADE_PRODUCT))
-      .catch(() => {
-        window.open('https://worldmonitor.app/pro', '_blank');
-      });
+    window.open('https://worldmonitor.app/pro', '_blank');
   }
 }

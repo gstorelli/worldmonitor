@@ -60,15 +60,7 @@ export function renderNotificationsSettings(host: NotificationsSettingsHost): No
         const upgradeBtn = container.querySelector<HTMLButtonElement>('#usNotifUpgradeBtn');
         if (upgradeBtn) {
           upgradeBtn.addEventListener('click', () => {
-            if (!host.isSignedIn) {
-              import('@/services/clerk').then(m => m.openSignIn()).catch(() => {
-                window.open('https://worldmonitor.app/pro', '_blank');
-              });
-              return;
-            }
-            import('@/services/checkout').then(m => import('@/config/products').then(p => m.startCheckout(p.DEFAULT_UPGRADE_PRODUCT))).catch(() => {
-              window.open('https://worldmonitor.app/pro', '_blank');
-            });
+            window.open('https://worldmonitor.app/pro', '_blank');
           }, { signal });
         }
         return () => ac.abort();
