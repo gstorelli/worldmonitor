@@ -386,31 +386,35 @@ Il sistema include **86 pannelli** organizzati per dominio. Quelli rilevanti per
 
 ### Fase 1 — Completata ✅
 - [x] Fork da WorldMonitor e rebranding Risk Sentinel
-- [x] Rimozione logica premium/Pro/locked
+- [x] Rimozione UI premium/Pro/locked
 - [x] Integrazione sistema di pannelli completo (86 pannelli)
-- [x] Progettazione e implementazione Risk Scoring Engine (8 dimensioni)
+- [x] Progettazione Risk Scoring Engine (8 dimensioni)
 - [x] Creazione 5 workflow n8n per data ingestion
-- [x] Build pipeline funzionante (Netlify)
+- [x] Build pipeline funzionante (Netlify/Vercel)
 
-### Fase 2 — In Corso 🔄
-- [ ] **Endpoint di ingestion n8n** (`POST /api/n8n/ingest`) per ricevere dati dai workflow
-- [ ] Deployment workflow n8n su server dedicato
-- [ ] Connessione n8n → Redis / endpoint Risk Sentinel
-- [ ] Validazione dati live con pannelli attivi
-- [ ] Verticalizzazione pannello "Commodity Risk Tracker" con filtri HS
+### Fase 2 — Completata ✅ (Stabilizzazione & Commodity Tracker)
+*In questa fase il progetto è stato completamente sganciato dall'infrastruttura commerciale originale, diventando un tool di ricerca 100% open e self-hosted.*
+- [x] **Transizione Accademica & CI/CD**: Disinstallazione radicale dei pacchetti `convex` e `@dodopayments`. Creazione di stub mockati per i servizi cloud (`entitlements.ts`, `api-keys.ts`, `mcp-clients.ts`) in modo da far passare tutti i typecheck (`npm run typecheck:all`) e i test del sidecar (`npm run test:sidecar`).
+- [x] **Endpoint di Ingestion n8n**: Consolidamento e standardizzazione dello script di ricezione webhook in `api/n8n/ingest.js`. Il sistema è ora pronto a ricevere il payload dai 5 workflow n8n e salvarlo su Redis.
+- [x] **Persistenza Redis (Upstash)**: Integrazione del salvataggio dati elaborati da n8n in cache (tramite `UPSTASH_REDIS_REST_URL`), rendendo il sistema indipendente dai vecchi database Convex.
+- [x] **Commodity Tracker (Filtri HS)**: Verticalizzazione del pannello `CommoditiesPanel` (Metals & Materials). È stato integrato il modulo `Hs2Picker` che permette di filtrare dinamicamente i dati di mercato in base ai codici doganali Harmonized System (es. 85 per semiconduttori, 27 per petrolio), agganciandosi al campo `hsCode` popolato dall'ingestion n8n.
 
-### Fase 3 — Knowledge Graph & RAG
-- [ ] Implementazione ontologia del dominio doganale:
+### Fase 3 — In Corso 🔄 (Deployment, Validazione & RAG)
+*Obiettivo attuale: rendere il sistema live e iniziare a raccogliere/validare i dati per il paper di ricerca, oltre a introdurre l'infrastruttura semantica (Knowledge Graph e RAG).*
+- [ ] **Deployment Infrastruttura Live**:
+  - [ ] Deploy dell'app web su Vercel/Netlify.
+  - [ ] Deploy di n8n su un server/VPS dedicato (es. Railway, DigitalOcean).
+  - [ ] Configurazione dei Webhook n8n affinché puntino all'endpoint `POST /api/n8n/ingest` dell'app live.
+- [ ] **Validazione Dati Live**: Test in produzione dei pannelli con dati freschi inseriti su Redis dalle pipeline n8n.
+- [ ] **Implementazione Ontologia Doganale (Knowledge Graph)**:
   - Entità: `EventoGeopolitico`, `EventoSismico`, `EventoClimatico`, `RottaCommerciale`, `CommoditySensibile`, `NodoLogistico`, `Paese`, `FlussoCommerciale`
   - Relazioni: `affects_route`, `involves_commodity`, `located_in`, `flows_between`, `transits_route`, `exposes_to`
-- [ ] Integrazione Qdrant (embedded) per vector search
-- [ ] RAG su corpus di articoli storici per analisi trend
-- [ ] Classificatore semantico rilevanza doganale (LLM-based)
+- [ ] **Vector Search & RAG**: Integrazione Qdrant (embedded) e Retrieval-Augmented Generation su corpus di articoli storici per analisi trend.
+- [ ] **Classificatore Semantico**: Costruzione del classificatore LLM-based per valutare automaticamente la *rilevanza doganale* dei testi analizzati.
 
 ### Fase 4 — Moduli Customs-Specifici
 - [ ] **Critical Trade Routes Monitor** — overlay visivo su mappa delle rotte con status real-time
 - [ ] **Country Exposure Index** — esposizione commerciale per paese (da UN Comtrade)
-- [ ] **Customs Relevance Classifier** — classificatore ML per rilevanza doganale
 - [ ] **Alert Triage & Deduplication** — sistema anti-alert-fatigue con prioritizzazione intelligente
 - [ ] **Commodity Matrix** — matrice rischio paese × commodity interattiva
 
