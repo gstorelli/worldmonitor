@@ -79,7 +79,6 @@
       "owner": "@SebastienMelki",
       "removal_issue": null
     },
-
     {
       "path": "api/download.js",
       "category": "non-json",
@@ -122,7 +121,6 @@
       "owner": "@SebastienMelki",
       "removal_issue": null
     },
-
     {
       "path": "api/opensky.js",
       "category": "upstream-proxy",
@@ -172,7 +170,6 @@
       "owner": "@SebastienMelki",
       "removal_issue": null
     },
-
     {
       "path": "api/health.js",
       "category": "ops-admin",
@@ -236,7 +233,6 @@
       "owner": "@SebastienMelki",
       "removal_issue": null
     },
-
     {
       "path": "api/bootstrap.js",
       "category": "internal-helper",
@@ -307,7 +303,6 @@
       "owner": "@SebastienMelki",
       "removal_issue": null
     },
-
     {
       "path": "api/latest-brief.ts",
       "category": "deferred",
@@ -351,34 +346,12 @@
       "removal_issue": "TBD"
     },
     {
-      "path": "api/create-checkout.ts",
-      "category": "deferred",
-      "reason": "Creates a Dodo Payments checkout session. Payments domain is still stabilizing (Clerk + Dodo integration); migrate once shape is frozen.",
-      "owner": "@SebastienMelki",
-      "removal_issue": "TBD"
-    },
-    {
-      "path": "api/customer-portal.ts",
-      "category": "deferred",
-      "reason": "Issues a Dodo customer-portal redirect URL. Paired with create-checkout.ts; migrate together.",
-      "owner": "@SebastienMelki",
-      "removal_issue": "TBD"
-    },
-    {
-      "path": "api/product-catalog.js",
-      "category": "deferred",
-      "reason": "Returns Dodo product catalog (pricing tiers). Migrate alongside the rest of the payments surface.",
-      "owner": "@SebastienMelki",
-      "removal_issue": "TBD"
-    },
-    {
       "path": "api/referral/me.ts",
       "category": "deferred",
       "reason": "Returns the signed-in user's referral state. Auth-gated; part of user/v1 service.",
       "owner": "@SebastienMelki",
       "removal_issue": "TBD"
     },
-
     {
       "path": "api/scenario/v1/run.ts",
       "category": "deferred",
@@ -414,7 +387,6 @@
       "owner": "@SebastienMelki",
       "removal_issue": "#3282"
     },
-
     {
       "path": "api/v2/shipping/webhooks/[subscriberId].ts",
       "category": "migration-pending",
@@ -449,6 +421,55 @@
       "reason": "Migrating to analyst/v1.ListAgentSkills in commit 9 of #3207. Blocked on sebuf#150.",
       "owner": "@SebastienMelki",
       "removal_issue": "#3207"
+    },
+    {
+      "path": "api/customs/acled.js",
+      "category": "upstream-proxy",
+      "reason": "Customs/n8n direct integration endpoints.",
+      "owner": "@SebastienMelki",
+      "removal_issue": null
+    },
+    {
+      "path": "api/customs/classify.js",
+      "category": "upstream-proxy",
+      "reason": "Customs/n8n direct integration endpoints.",
+      "owner": "@SebastienMelki",
+      "removal_issue": null
+    },
+    {
+      "path": "api/customs/comtrade.js",
+      "category": "upstream-proxy",
+      "reason": "Customs/n8n direct integration endpoints.",
+      "owner": "@SebastienMelki",
+      "removal_issue": null
+    },
+    {
+      "path": "api/customs/gdelt.js",
+      "category": "upstream-proxy",
+      "reason": "Customs/n8n direct integration endpoints.",
+      "owner": "@SebastienMelki",
+      "removal_issue": null
+    },
+    {
+      "path": "api/customs/open-meteo.js",
+      "category": "upstream-proxy",
+      "reason": "Customs/n8n direct integration endpoints.",
+      "owner": "@SebastienMelki",
+      "removal_issue": null
+    },
+    {
+      "path": "api/customs/usgs.js",
+      "category": "upstream-proxy",
+      "reason": "Customs/n8n direct integration endpoints.",
+      "owner": "@SebastienMelki",
+      "removal_issue": null
+    },
+    {
+      "path": "api/n8n/ingest.js",
+      "category": "upstream-proxy",
+      "reason": "Customs/n8n direct integration endpoints.",
+      "owner": "@SebastienMelki",
+      "removal_issue": null
     }
   ]
 }
