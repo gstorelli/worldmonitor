@@ -725,13 +725,43 @@ export class App {
     const initStart = performance.now();
     await initDB();
     await initI18n();
+    // Localize the static index.html shell — <title>, meta description, and
+    // sr-only <h1> are baked in English so search crawlers see something
+    // before JS runs; once i18n is ready we swap them to the user's locale.
+    document.title = t('shell.documentTitle');
+    const setMeta = (sel: string, val: string) => {
+      const el = document.querySelector(sel);
+      if (el) el.setAttribute('content', val);
+    };
+    setMeta('meta[name="description"]', t('shell.metaDescription'));
+    setMeta('meta[property="og:title"]', t('shell.documentTitle'));
+    setMeta('meta[property="og:description"]', t('shell.metaDescription'));
+    setMeta('meta[name="twitter:title"]', t('shell.documentTitle'));
+    setMeta('meta[name="twitter:description"]', t('shell.metaDescription'));
+    // Mirror of OG_LOCALE in pro-test/src/i18n.ts. The two packages have
+    // separate Vite roots and bundlers and can't share an import — keep the
+    // tables aligned by hand when adding a locale here OR there.
+    const ogLocaleMap: Record<string, string> = {
+      en: 'en_US', ar: 'ar_SA', bg: 'bg_BG', cs: 'cs_CZ', de: 'de_DE', el: 'el_GR',
+      es: 'es_ES', fr: 'fr_FR', it: 'it_IT', ja: 'ja_JP', ko: 'ko_KR', nl: 'nl_NL',
+      pl: 'pl_PL', pt: 'pt_BR', ro: 'ro_RO', ru: 'ru_RU', sv: 'sv_SE', th: 'th_TH',
+      tr: 'tr_TR', vi: 'vi_VN', zh: 'zh_CN',
+    };
+    const baseLang = (document.documentElement.lang || 'en').split('-')[0] || 'en';
+    setMeta('meta[property="og:locale"]', ogLocaleMap[baseLang] || `${baseLang}_${baseLang.toUpperCase()}`);
+    const srH1 = document.querySelector('body > h1');
+    if (srH1) srH1.textContent = t('shell.documentTitle');
     const aiFlow = getAiFlowSettings();
     if (aiFlow.browserModel || isDesktopRuntime()) {
       await mlWorker.init();
       if (BETA_MODE) mlWorker.loadModel('summarization-beta').catch(() => { });
     }
 
-    if (aiFlow.headlineMemory) {
+    // Headline Memory requires Browser Local Model to be ON — `isHeadlineMemoryEnabled()`
+    // ANDs both flags. Without this gate, leaving Headline Memory on while turning
+    // Browser Local Model off would silently download/run an embeddings model the user
+    // opted out of via the parent toggle.
+    if (isHeadlineMemoryEnabled()) {
       mlWorker.init().then(ok => {
         if (ok) mlWorker.loadModel('embeddings').catch(() => { });
       }).catch(() => { });
@@ -741,8 +771,16 @@ export class App {
       if (key === 'browserModel') {
         const s = getAiFlowSettings();
         if (s.browserModel) {
-          mlWorker.init();
-        } else if (!isHeadlineMemoryEnabled()) {
+          mlWorker.init().then(ok => {
+            // Re-honor Headline Memory's persisted value on parent re-enable.
+            if (ok && isHeadlineMemoryEnabled()) {
+              mlWorker.loadModel('embeddings').catch(() => { });
+            }
+          }).catch(() => { });
+        } else if (!isDesktopRuntime()) {
+          // Browser Local Model is the parent toggle for ALL local-model use,
+          // including Headline Memory. Terminate unconditionally on web —
+          // any persisted Headline Memory value is now non-effective.
           mlWorker.terminate();
         }
       }
