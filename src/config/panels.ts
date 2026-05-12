@@ -198,7 +198,7 @@ export const FULL_MAP_LAYERS: MapLayers = {
   processingPlants: false,
   commodityPorts: true,
   webcams: false,
-  weatherRadar: false,
+  resilienceScore: false,
 };
 
 export const FULL_MOBILE_MAP_LAYERS = FULL_MAP_LAYERS;

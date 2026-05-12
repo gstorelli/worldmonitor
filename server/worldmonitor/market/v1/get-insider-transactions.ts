@@ -6,7 +6,8 @@ import type {
 } from '../../../../src/generated/server/worldmonitor/market/v1/service_server';
 import { cachedFetchJson } from '../../../_shared/redis';
 import { CHROME_UA, finnhubGate } from '../../../_shared/constants';
-import { UPSTREAM_TIMEOUT_MS, sanitizeSymbol } from './_shared';
+const UPSTREAM_TIMEOUT_MS = 10000;
+function sanitizeSymbol(s?: string): string { return (s || '').trim().toUpperCase(); }
 
 const CACHE_TTL_SECONDS = 86_400;
 const SIX_MONTHS_MS = 6 * 30 * 24 * 60 * 60 * 1_000;
