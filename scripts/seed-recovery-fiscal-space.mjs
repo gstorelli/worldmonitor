@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { loadEnvFile, runSeed, loadSharedConfig, imfSdmxFetchIndicator } from './_seed-utils.mjs';
+import { imfWeoContentMeta, IMF_WEO_MAX_CONTENT_AGE_MIN } from './_imf-weo-content-age-helpers.mjs';
 
 loadEnvFile(import.meta.url);
 
@@ -12,12 +13,26 @@ const CACHE_TTL = 35 * 24 * 3600;
 // `validate.toString()`.
 export const FISCAL_SPACE_VALIDATION_FLOORS = { fiscal3: 150, gap: 100 };
 
-// Hyperinflation cap on the debt-sustainability gap indicator. Above this
-// CPI threshold the formula's inflation-tax term dominates and produces a
-// misleadingly positive "gap" that masks underlying fiscal pathology
-// (Argentina, Lebanon, Venezuela). Drop to null in that regime — the
-// other 3 fiscalSpace indicators still score those countries.
-export const INFLATION_GAP_CAP_PCT = 25;
+// Inflation cap on the debt-sustainability gap indicator. Above this CPI
+// threshold the formula's inflation-tax term dominates: high nominal-GDP
+// growth combined with near-zero real interest on legacy debt produces a
+// misleadingly positive "gap" that masks underlying fiscal pathology.
+// Drop to null in that regime — the other 3 fiscalSpace indicators still
+// score those countries.
+//
+// Threshold tightened 25% → 10% in 2026-05-19 follow-up to PR #3669. The
+// original 25% cap caught the clearly-broken cases (Argentina ~200%,
+// Venezuela ~250%) but let Lebanon (14.6% CPI) score #1 globally on this
+// indicator because its 18% nominal GDP growth was mechanically shrinking
+// its 139% debt-to-GDP ratio. That's mathematically correct (post-WWII
+// US/UK proved inflation can erode debt) but only when paired with capital
+// controls + financial repression + stable institutions — none of which
+// apply to Lebanon. The 10% cap is the rough IMF DSA boundary at which
+// inflation expectations stay anchored enough for the gap interpretation
+// to remain honest. Trade-off: drops ~15 mid-inflation EMs (Egypt, Nigeria,
+// Kazakhstan, Ethiopia, etc.) from this single indicator; fiscal-3 still
+// scores them.
+export const INFLATION_GAP_CAP_PCT = 10;
 
 const ISO2_TO_ISO3 = loadSharedConfig('iso2-to-iso3.json');
 const ISO3_TO_ISO2 = Object.fromEntries(Object.entries(ISO2_TO_ISO3).map(([k, v]) => [v, k]));
@@ -80,7 +95,7 @@ export function latestCommonYear(byYearMaps) {
  * growth and inflation). Output is in percent of GDP. Returns null when:
  *
  *   - debt is null or ≤ 0 (negative net debt is rare; r-division undefined)
- *   - inflation > INFLATION_GAP_CAP_PCT (hyperinflation; gap is unreliable)
+ *   - inflation > INFLATION_GAP_CAP_PCT (inflation-tax regime; see comment on the constant)
  *   - any of {pb, fb, realG} is null (insufficient data)
  *
  * `r` is derived from the algebraic identity:
@@ -266,6 +281,11 @@ if (process.argv[1]?.endsWith('seed-recovery-fiscal-space.mjs')) {
     recordCount: (data) => Object.keys(data?.countries ?? {}).length,
 
     declareRecords,
+    // Content-age: IMF WEO per-country dict. imfWeoContentMeta maps each
+    // country's `year` via the WEO horizon-safe end-of-(year-1) convention
+    // and drops forecast years past the clock-skew limit — issue #3845.
+    contentMeta: imfWeoContentMeta,
+    maxContentAgeMin: IMF_WEO_MAX_CONTENT_AGE_MIN,
     schemaVersion: 2,
     // 90d = 3× the 30-day cron interval per the health-maxstalemin-write-cadence
     // skill (rule: maxStaleMin = write_interval × 2-3). Bumped from 86400 (2×, at

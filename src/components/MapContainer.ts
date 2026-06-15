@@ -3,6 +3,11 @@
  * Renders DeckGLMap (WebGL) on desktop, fallback to D3/SVG MapComponent on mobile.
  * Supports an optional 3D globe mode (globe.gl) selectable from Settings.
  */
+// MapContainer is dynamic-imported from panel-layout, so this CSS rides into
+// the lazy chunk instead of blocking the entry HTML — it's 98% unused at first
+// paint anyway. Keep this import at the top of the file so Vite associates it
+// with this module's chunk, not whichever sibling pulls it in first.
+import 'maplibre-gl/dist/maplibre-gl.css';
 import { isMobileDevice } from '@/utils';
 import { MapComponent } from './Map';
 import { DeckGLMap, type DeckMapView, type CountryClickPayload } from './DeckGLMap';
@@ -99,6 +104,7 @@ export class MapContainer {
   private useGlobe: boolean;
   private isResizingInternal = false;
   private resizeObserver: ResizeObserver | null = null;
+  private globeInitToken = 0;
 
   // ─── Callback cache (survives map mode switches) ───────────────────────────
   private cachedOnStateChanged: ((state: MapContainerState) => void) | null = null;
@@ -157,7 +163,7 @@ export class MapContainer {
     this.container = container;
     this.initialState = initialState;
     this.isMobile = isMobileDevice();
-    this.useGlobe = preferGlobe && this.hasWebGLSupport();
+    this.useGlobe = preferGlobe && this.hasGlobeSupport();
 
     this.useDeckGL = !this.useGlobe && this.shouldUseDeckGL();
 
@@ -181,6 +187,19 @@ export class MapContainer {
     }
   }
 
+  private hasGlobeSupport(): boolean {
+    try {
+      const canvas = document.createElement('canvas');
+      return !!(
+        canvas.getContext('webgl2')
+        || canvas.getContext('webgl')
+        || canvas.getContext('experimental-webgl')
+      );
+    } catch {
+      return false;
+    }
+  }
+
   private shouldUseDeckGL(): boolean {
     if (!this.hasWebGLSupport()) return false;
     if (!this.isMobile) return true;
@@ -193,18 +212,40 @@ export class MapContainer {
     console.log(logMessage);
     this.useDeckGL = false;
     this.deckGLMap = null;
-    this.container.classList.remove('deckgl-mode');
+    this.container.classList.remove('deckgl-mode', 'globe-mode');
     this.container.classList.add('svg-mode');
     // DeckGLMap mutates DOM early during construction. If initialization throws,
-    // clear partial deck.gl nodes before creating the SVG fallback.
+    // clear partial WebGL nodes before creating the SVG fallback.
     this.container.innerHTML = '';
     this.svgMap = new MapComponent(this.container, this.initialState);
+  }
+
+  private createGlobeMap(): void {
+    const token = ++this.globeInitToken;
+    try {
+      this.globeMap = new GlobeMap(this.container, this.initialState, {
+        onInitError: (error) => this.handleGlobeInitFailure(token, error),
+      });
+    } catch (error) {
+      this.handleGlobeInitFailure(token, error);
+    }
+  }
+
+  private handleGlobeInitFailure(token: number, error: unknown): void {
+    if (token !== this.globeInitToken || !this.useGlobe) return;
+    console.warn('[MapContainer] Globe initialization failed, falling back to SVG map', error);
+    this.globeMap?.destroy();
+    this.globeMap = null;
+    this.useGlobe = false;
+    this.useDeckGL = false;
+    this.initSvgMap('[MapContainer] Initializing SVG map (globe fallback mode)');
+    this.rehydrateActiveMap();
   }
 
   private init(): void {
     if (this.useGlobe) {
       console.log('[MapContainer] Initializing 3D globe (globe.gl mode)');
-      this.globeMap = new GlobeMap(this.container, this.initialState);
+      this.createGlobeMap();
     } else if (this.useDeckGL) {
       console.log('[MapContainer] Initializing deck.gl map (desktop mode)');
       try {
@@ -242,7 +283,7 @@ export class MapContainer {
     this.destroyFlatMap();
     this.useGlobe = true;
     this.useDeckGL = false;
-    this.globeMap = new GlobeMap(this.container, this.initialState);
+    this.createGlobeMap();
     this.restoreViewport(snapshot, center);
     this.rehydrateActiveMap();
   }
@@ -259,6 +300,7 @@ export class MapContainer {
     const center = this.getCenter();
     this.resizeObserver?.disconnect();
     this.resizeObserver = null;
+    this.globeInitToken++;
     this.globeMap?.destroy();
     this.globeMap = null;
     this.useGlobe = false;
@@ -1056,6 +1098,7 @@ export class MapContainer {
 
   public destroy(): void {
     this.resizeObserver?.disconnect();
+    this.globeInitToken++;
     this.globeMap?.destroy();
     this.deckGLMap?.destroy();
     this.svgMap?.destroy();

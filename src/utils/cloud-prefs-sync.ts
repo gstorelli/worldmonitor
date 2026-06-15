@@ -16,9 +16,21 @@ import { CLOUD_SYNC_KEYS, type CloudSyncKey } from './sync-keys';
 import { isDesktopRuntime } from '@/services/runtime';
 import { getClerkToken } from '@/services/clerk';
 import { FEEDS } from '@/config/feeds';
-import { applyMigrationChain, buildMigrations } from './cloud-prefs-migrations';
+import {
+  applyMigrationChain,
+  buildMigrations,
+  mergeCloudWithLocalDirty,
+  settledDirtyKeys,
+} from './cloud-prefs-migrations';
+import { setTrustedHtml, trustedHtml } from '@/utils/dom-utils';
+
 
 const ENABLED = import.meta.env.VITE_CLOUD_PREFS_ENABLED === 'true';
+export const CLOUD_PREFS_APPLIED_EVENT = 'wm:cloud-prefs-applied';
+
+export interface CloudPrefsAppliedDetail {
+  keys: CloudSyncKey[];
+}
 
 // localStorage state keys — never uploaded to cloud
 const KEY_SYNC_VERSION = 'wm-cloud-sync-version';
@@ -66,6 +78,32 @@ let _installed = false;
 let _suppressPatch = false; // prevents applyCloudBlob from re-triggering upload
 let _cachedToken: string | null = null; // synchronous token cache for flush()
 
+// Sync keys the user has mutated locally since the last clean upload. On a
+// 409 CONFLICT we must NOT overwrite these with the cloud blob — they are
+// the edits the user just made (e.g. a watchlist typed seconds ago). The
+// install() setItem/removeItem patch records them; a clean upload clears the
+// SETTLED ones. See resolveConflictWithMerge + mergeCloudWithLocalDirty.
+const _dirtyKeys = new Set<CloudSyncKey>();
+
+/**
+ * Clear dirty keys that a just-succeeded upload actually durably synced —
+ * NOT the whole set. A user can mutate another pref *while postCloudPrefs is
+ * in flight*: the setItem patch marks it dirty, but it was never in the
+ * posted blob. Blanket-clearing would drop that tracking, so a subsequent
+ * 409 would see an empty dirty set and mergeCloudWithLocalDirty would let
+ * applyCloudBlob clobber the just-made edit — the very bug this set exists
+ * to prevent.
+ *
+ * The "settled" decision is the pure `settledDirtyKeys` (testable without
+ * the sync runtime): a key is settled iff the posted value still equals the
+ * current local value.
+ */
+function clearSettledDirtyKeys(postedBlob: Record<string, string>): void {
+  for (const key of settledDirtyKeys(postedBlob, buildCloudBlob(), _dirtyKeys)) {
+    _dirtyKeys.delete(key as CloudSyncKey);
+  }
+}
+
 // ── 503 retry tracking ───────────────────────────────────────────────────────
 //
 // _retryTimer holds the single pending 503-retry setTimeout (we cancel and
@@ -80,6 +118,15 @@ let _cachedToken: string | null = null; // synchronous token cache for flush()
 
 let _retryTimer: ReturnType<typeof setTimeout> | null = null;
 let _authGeneration = 0;
+
+// Count of uploadNow calls currently in their async phase. `_debounceTimer`
+// alone can't tell "no upload of any kind in progress" — the debounce
+// callback nulls the timer synchronously BEFORE uploadNow starts awaiting,
+// so a late flush response checking only the timer would claim 'synced'
+// mid-upload (and observers would see a synced → conflict/error regression
+// if that upload then fails). onSignIn doesn't need this: it bumps
+// _authGeneration on entry, which already makes stale flush handlers bail.
+let _uploadsInFlight = 0;
 
 function clearRetryTimer(): void {
   if (_retryTimer !== null) {
@@ -124,20 +171,31 @@ function buildCloudBlob(): Record<string, string> {
   return blob;
 }
 
+function dispatchCloudPrefsApplied(keys: CloudSyncKey[]): void {
+  if (keys.length === 0 || typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent<CloudPrefsAppliedDetail>(CLOUD_PREFS_APPLIED_EVENT, {
+    detail: { keys },
+  }));
+}
+
 function applyCloudBlob(data: Record<string, unknown>): void {
+  const changedKeys: CloudSyncKey[] = [];
   _suppressPatch = true;
   try {
     for (const key of CLOUD_SYNC_KEYS) {
       const val = data[key];
       if (typeof val === 'string') {
+        if (localStorage.getItem(key) !== val) changedKeys.push(key);
         localStorage.setItem(key, val);
       } else if (!(key in data)) {
+        if (localStorage.getItem(key) !== null) changedKeys.push(key);
         localStorage.removeItem(key);
       }
     }
   } finally {
     _suppressPatch = false;
   }
+  dispatchCloudPrefsApplied(changedKeys);
 }
 
 function applyMigrations(
@@ -187,14 +245,14 @@ function showUndoToast(prevBlobJson: string): void {
 
   const toast = document.createElement('div');
   toast.className = 'wm-sync-restore-toast update-toast';
-  toast.innerHTML = `
+  setTrustedHtml(toast, trustedHtml(`
     <div class="update-toast-body">
       <div class="update-toast-title">Settings restored</div>
       <div class="update-toast-detail">Your preferences were loaded from the cloud.</div>
     </div>
     <button class="update-toast-action" data-action="undo">Undo</button>
     <button class="update-toast-dismiss" data-action="dismiss" aria-label="Dismiss">\u00d7</button>
-  `;
+  `, "legacy direct innerHTML migration"));
 
   const autoTimer = setTimeout(() => toast.remove(), 5000);
 
@@ -202,14 +260,19 @@ function showUndoToast(prevBlobJson: string): void {
     const action = (e.target as HTMLElement).closest('[data-action]')?.getAttribute('data-action');
     if (action === 'undo') {
       const prev = JSON.parse(prevBlobJson) as Record<string, string>;
+      const restoredKeys: CloudSyncKey[] = [];
       _suppressPatch = true;
       try {
         for (const [k, v] of Object.entries(prev)) {
-          if (CLOUD_SYNC_KEYS.includes(k as CloudSyncKey)) localStorage.setItem(k, v);
+          if (!CLOUD_SYNC_KEYS.includes(k as CloudSyncKey)) continue;
+          const key = k as CloudSyncKey;
+          if (localStorage.getItem(key) !== v) restoredKeys.push(key);
+          localStorage.setItem(key, v);
         }
       } finally {
         _suppressPatch = false;
       }
+      dispatchCloudPrefsApplied(restoredKeys);
       toast.remove();
       clearTimeout(autoTimer);
     } else if (action === 'dismiss') {
@@ -320,6 +383,41 @@ async function postCloudPrefs(
 
 // ── Core logic ────────────────────────────────────────────────────────────────
 
+/**
+ * Resolve a 409 CONFLICT without losing local edits. Fetch the fresh cloud
+ * row, merge the user's locally-dirty keys over it (mergeCloudWithLocalDirty),
+ * apply the merge to localStorage, and re-post. On success the dirty set is
+ * cleared and state goes 'synced'; on a second conflict or a failed fetch the
+ * dirty set is preserved so the next pref change / sign-in retries.
+ *
+ * Replaces the previous "fetch cloud → applyCloudBlob → re-post buildCloudBlob"
+ * path, which overwrote localStorage with the cloud blob *before* rebuilding
+ * the post body — silently discarding the edit the user had just made (e.g. a
+ * watchlist typed seconds earlier, then lost on the debounced upload's 409).
+ */
+async function resolveConflictWithMerge(token: string, variant: string): Promise<boolean> {
+  const fresh = await fetchCloudPrefs(token, variant);
+  if (!fresh) {
+    setState('error');
+    return false;
+  }
+  const migratedCloud = applyMigrations(fresh.data, fresh.schemaVersion ?? 1);
+  const merged = mergeCloudWithLocalDirty(migratedCloud, buildCloudBlob(), _dirtyKeys);
+  applyCloudBlob(merged);
+  setSyncVersion(fresh.syncVersion);
+  setLocalSchemaVersion(CURRENT_PREFS_SCHEMA_VERSION);
+  const retry = await postCloudPrefs(token, variant, merged, fresh.syncVersion);
+  if ('conflict' in retry) {
+    setState('conflict');
+    return false;
+  }
+  setSyncVersion(retry.syncVersion);
+  clearSettledDirtyKeys(merged);
+  Storage.prototype.setItem.call(localStorage, KEY_LAST_SYNC_AT, String(Date.now()));
+  setState('synced');
+  return true;
+}
+
 export async function onSignIn(userId: string, variant: string): Promise<void> {
   if (!isEnabled()) return;
 
@@ -347,18 +445,23 @@ export async function onSignIn(userId: string, variant: string): Promise<void> {
 
       const migrated = applyMigrations(cloud.data, cloud.schemaVersion ?? 1);
       const migrationChanged = (cloud.schemaVersion ?? 1) < CURRENT_PREFS_SCHEMA_VERSION;
-      applyCloudBlob(migrated);
+      // Cloud is ahead, but the user may have un-uploaded local edits — e.g.
+      // onSignIn re-fired by a 503 retry after the user changed a pref. Merge
+      // those dirty keys over the cloud blob instead of clobbering them.
+      const hasDirty = _dirtyKeys.size > 0;
+      const toApply = hasDirty
+        ? mergeCloudWithLocalDirty(migrated, buildCloudBlob(), _dirtyKeys)
+        : migrated;
+      applyCloudBlob(toApply);
       setSyncVersion(cloud.syncVersion);
       // After applyCloudBlob, local data IS at CURRENT schema (applyMigrations
       // ran every step from cloud.schemaVersion to CURRENT). Mark it so the
       // post paths don't redundantly re-run migrations on already-clean data.
       setLocalSchemaVersion(CURRENT_PREFS_SCHEMA_VERSION);
-      // If applyMigrations advanced the schema, force an upload so the cloud
-      // row's schemaVersion catches up. Without this, the cloud blob stays at
-      // the old schemaVersion and the migration re-runs on every load until
-      // any user pref change happens to fire schedulePrefUpload organically.
-      // Idempotent migrations make that harmless but wasteful and noisy.
-      if (migrationChanged) schedulePrefUpload(variant);
+      // Force an upload when the cloud row's schemaVersion is behind (so it
+      // catches up — otherwise the migration re-runs every load) OR when we
+      // merged in local dirty keys the cloud row doesn't have yet.
+      if (migrationChanged || hasDirty) schedulePrefUpload(variant);
       Storage.prototype.setItem.call(localStorage, KEY_LAST_SYNC_AT, String(Date.now()));
 
       if (isFirstEverSync && prevBlobJson && Object.keys(cloud.data).length > 0) {
@@ -377,19 +480,13 @@ export async function onSignIn(userId: string, variant: string): Promise<void> {
       const result = await postCloudPrefs(token, variant, blob, getSyncVersion());
 
       if ('conflict' in result) {
-        setState('conflict');
-        const fresh = await fetchCloudPrefs(token, variant);
-        if (fresh) {
-          const migrated = applyMigrations(fresh.data, fresh.schemaVersion ?? 1);
-          applyCloudBlob(migrated);
-          setSyncVersion(fresh.syncVersion);
-          setLocalSchemaVersion(CURRENT_PREFS_SCHEMA_VERSION);
-          setState('synced');
-        } else {
-          setState('error');
-        }
+        // Merge instead of clobber — see resolveConflictWithMerge. The old
+        // path here applied the cloud blob over localStorage and stopped,
+        // discarding the local edits this branch was trying to upload.
+        await resolveConflictWithMerge(token, variant);
       } else {
         setSyncVersion(result.syncVersion);
+        clearSettledDirtyKeys(blob);
         Storage.prototype.setItem.call(localStorage, KEY_LAST_SYNC_AT, String(Date.now()));
         setState('synced');
       }
@@ -452,6 +549,9 @@ export function onSignOut(): void {
   clearRetryTimer();
   _authGeneration += 1;
   _cachedToken = null;
+  // Dirty-key tracking is per-user session state — drop it so edits made by
+  // the next signed-in user don't merge against the prior user's pending set.
+  _dirtyKeys.clear();
 
   // Preserve prefs; only clear sync metadata
   localStorage.removeItem(KEY_SYNC_VERSION);
@@ -467,38 +567,28 @@ async function uploadNow(variant: string): Promise<void> {
   // called by the debounced upload path), so we want to inherit the current
   // generation, not start a new one.
   const myGeneration = _authGeneration;
-
-  const token = await getClerkToken();
-  if (!token) return;
-  _cachedToken = token;
-
-  setState('syncing');
+  _uploadsInFlight += 1;
 
   try {
-    const result = await postCloudPrefs(token, variant, migrateLocalBlobIfNeeded(), getSyncVersion());
+    const token = await getClerkToken();
+    if (!token) return;
+    _cachedToken = token;
+
+    setState('syncing');
+
+    const postedBlob = migrateLocalBlobIfNeeded();
+    const result = await postCloudPrefs(token, variant, postedBlob, getSyncVersion());
 
     if ('conflict' in result) {
       setState('conflict');
-      const fresh = await fetchCloudPrefs(token, variant);
-      if (fresh) {
-        const migrated = applyMigrations(fresh.data, fresh.schemaVersion ?? 1);
-        applyCloudBlob(migrated);
-        setSyncVersion(fresh.syncVersion);
-        // applyCloudBlob just put migrated data into local at CURRENT schema.
-        setLocalSchemaVersion(CURRENT_PREFS_SCHEMA_VERSION);
-        const retryResult = await postCloudPrefs(token, variant, buildCloudBlob(), fresh.syncVersion);
-        if (!('conflict' in retryResult)) {
-          setSyncVersion(retryResult.syncVersion);
-          Storage.prototype.setItem.call(localStorage, KEY_LAST_SYNC_AT, String(Date.now()));
-          setState('synced');
-        } else {
-          setState('conflict');
-        }
-      } else {
-        setState('error');
-      }
+      // Merge the user's locally-dirty keys over the fresh cloud row instead
+      // of overwriting localStorage with cloud (the old path did
+      // applyCloudBlob(cloud) then re-posted buildCloudBlob() — which by then
+      // WAS the cloud blob, so the user's just-made edit was silently lost).
+      await resolveConflictWithMerge(token, variant);
     } else {
       setSyncVersion(result.syncVersion);
+      clearSettledDirtyKeys(postedBlob);
       Storage.prototype.setItem.call(localStorage, KEY_LAST_SYNC_AT, String(Date.now()));
       setState('synced');
     }
@@ -525,6 +615,8 @@ async function uploadNow(variant: string): Promise<void> {
     }
     console.warn('[cloud-prefs] uploadNow failed:', err);
     setState(!navigator.onLine || (err instanceof TypeError && err.message.includes('fetch')) ? 'offline' : 'error');
+  } finally {
+    _uploadsInFlight -= 1;
   }
 }
 
@@ -573,6 +665,7 @@ export function install(variant: string): void {
   Storage.prototype.setItem = function setItem(key: string, value: string) {
     originalSetItem.call(this, key, value);
     if (this === localStorage && !_suppressPatch && CLOUD_SYNC_KEYS.includes(key as CloudSyncKey)) {
+      _dirtyKeys.add(key as CloudSyncKey);
       schedulePrefUpload(_currentVariant);
     }
   };
@@ -581,6 +674,7 @@ export function install(variant: string): void {
   Storage.prototype.removeItem = function removeItem(key: string) {
     originalRemoveItem.call(this, key);
     if (this === localStorage && !_suppressPatch && CLOUD_SYNC_KEYS.includes(key as CloudSyncKey)) {
+      _dirtyKeys.add(key as CloudSyncKey);
       schedulePrefUpload(_currentVariant);
     }
   };
@@ -611,6 +705,7 @@ export function install(variant: string): void {
     // CURRENT_PREFS_SCHEMA_VERSION onto unmigrated local data, even on
     // best-effort unload flush.
     const blob = migrateLocalBlobIfNeeded();
+    const myGeneration = _authGeneration;
     const payload = JSON.stringify({ variant: _currentVariant, data: blob, expectedSyncVersion: getSyncVersion(), schemaVersion: CURRENT_PREFS_SCHEMA_VERSION });
     fetch('/api/user-prefs', {
       method: 'POST',
@@ -620,6 +715,36 @@ export function install(variant: string): void {
         Authorization: `Bearer ${_cachedToken}`,
       },
       body: payload,
+    }).then(async (res) => {
+      // The flush's most common trigger is NOT a real unload — it's
+      // visibilitychange→hidden on a tab switch, after which the tab stays
+      // alive. A successful flush advances the server row's syncVersion, so
+      // skipping the response here strands local KEY_SYNC_VERSION one
+      // version behind and GUARANTEES a 409 on the next pref save. Adopt
+      // the new version when the response is observable (true unloads never
+      // get here; the next boot's onSignIn GET heals those instead).
+      //
+      // Non-2xx (409/5xx): change nothing — keeping the stale version and
+      // the dirty keys is what routes the next upload through the
+      // conflict-merge path, which is the correct recovery.
+      if (!res.ok) return;
+      const body = (await res.json().catch(() => null)) as { syncVersion?: number } | null;
+      if (typeof body?.syncVersion !== 'number') return;
+      // Auth generation: a sign-out or user switch while the flush was in
+      // flight already cleared/replaced sync state — don't resurrect a
+      // version marker for the previous session.
+      if (_authGeneration !== myGeneration) return;
+      // Monotonic: a slow flush response must not regress the version past
+      // a newer upload (or conflict-merge) that completed meanwhile.
+      if (body.syncVersion <= getSyncVersion()) return;
+      setSyncVersion(body.syncVersion);
+      clearSettledDirtyKeys(blob);
+      Storage.prototype.setItem.call(localStorage, KEY_LAST_SYNC_AT, String(Date.now()));
+      // Only claim 'synced' when no newer edit re-armed the debounce AND no
+      // uploadNow is mid-flight (the debounce callback nulls the timer
+      // synchronously before uploadNow's async work, so the timer alone
+      // can't distinguish "idle" from "upload in progress").
+      if (_debounceTimer === null && _uploadsInFlight === 0) setState('synced');
     }).catch(() => { /* best-effort on unload */ });
   };
 

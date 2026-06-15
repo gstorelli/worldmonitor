@@ -15,12 +15,12 @@
 //     through to the original stub — the brief must always ship.
 //
 // Cache semantics:
-//   - brief:llm:whymatters:v3:{storyHash}:{leadHash} — 24h, shared
-//     across users for the same (story, lead) pair. v3 includes
-//     SHA-256 of the resolved digest lead so per-story rationales
-//     re-generate when the lead changes (rationales must align with
-//     the headline frame). v2 rows were lead-blind and could drift.
-//   - brief:llm:digest:v5:{userId|public}:{sensitivity}:{poolHash}
+//   - brief:llm:whymatters:v5:{storyHash} — 24h, shared across users
+//     for the same story. v4 bumped from v3 alongside the F6
+//     date-grounding line: every v3 row was produced from a prompt
+//     with no notion of "today" and may state a fabricated year, so
+//     v3 rows must not survive the deploy. v2 rows were lead-blind.
+//   - brief:llm:digest:v8:{userId|public}:{sensitivity}:{poolHash}
 //     — 4h. The canonical synthesis is now ALWAYS produced through
 //     this path (formerly split with `generateAISummary` in the
 //     digest cron). Material includes profile-SHA, greeting bucket,
@@ -29,15 +29,16 @@
 //     When isPublic=true, the userId slot in the key is the literal
 //     string 'public' so all public-share readers of the same
 //     (date, sensitivity, story-pool) hit the same row — no PII in
-//     the public cache key. v4 rows ignored on rollout (eviction
-//     paid once after the v5 grounding-validator landed in response
-//     to the May 12 hallucination incident — see generateDigestProse
-//     header comment).
+//     the public cache key. v6 bumped from v5 for the F6
+//     date-grounding line (same reason as whymatters v4); v5 landed
+//     the grounding validator after the May 12 hallucination — see
+//     generateDigestProse header comment.
 
 import { createHash } from 'node:crypto';
 
 import {
   WHY_MATTERS_SYSTEM,
+  briefDateLine,
   buildWhyMattersUserPrompt,
   hashBriefStory,
   parseWhyMatters,
@@ -107,8 +108,8 @@ const BRIEF_LLM_SKIP_PROVIDERS = ['ollama', 'groq'];
  *
  * Three-layer graceful degradation:
  *   1. `deps.callAnalystWhyMatters(story)` — the analyst-context edge
- *      endpoint (brief:llm:whymatters:v3 cache lives there). Preferred.
- *   2. Legacy direct-Gemini chain: cacheGet (v2) → callLLM → cacheSet.
+ *      endpoint (brief:llm:whymatters:v8 cache lives there). Preferred.
+ *   2. Legacy direct-Gemini chain: cacheGet (v4) → callLLM → cacheSet.
  *      Runs whenever the analyst call is missing, returns null, or throws.
  *   3. Caller (enrichBriefEnvelopeWithLLM) uses the baseline stub if
  *      this function returns null.
@@ -152,13 +153,22 @@ export async function generateWhyMatters(story, deps) {
     }
   }
 
-  // Fallback path: legacy direct-Gemini chain with the v3 cache.
-  // Bumped v2→v3 on 2026-04-24 alongside the RSS-description fix: rows
-  // keyed on the prior v2 prefix were produced from headline-only prompts
-  // and may reference hallucinated named actors. The prefix bump forces
-  // a clean cold-start on first tick after deploy; entries expire in
-  // ≤24h so the prior prefix ages out naturally without a DEL sweep.
-  const key = `brief:llm:whymatters:v3:${await hashBriefStory(story)}`;
+  // Fallback path: legacy direct-Gemini chain with the v4 cache.
+  // Bumped v3→v4 on 2026-05-14 alongside the F6 date-grounding line:
+  // every v3 row was produced from a buildWhyMattersPrompt prompt with
+  // no notion of "today", so a v3 row may state a fabricated year
+  // (the bug F6 fixes). Serving v3 on a cache hit would keep shipping
+  // that fabrication for the 24h TTL — the prefix bump forces a clean
+  // cold-start through the date-grounded prompt on first tick after
+  // deploy. (v2→v3 was the 2026-04-24 RSS-description fix.) Entries
+  // expire in ≤24h so the prior prefix ages out without a DEL sweep.
+  //
+  // v4→v5: 2026-05-17 PR #3751. `hashBriefStory` folds `story.category`
+  // into the key; pre-PR every story carried 'General' (no category was
+  // persisted on story:track:v1), post-PR carries the per-story
+  // Title-Cased EventCategory value. Every v4 cache row is now stale.
+  // Bump invalidates them cleanly.
+  const key = `brief:llm:whymatters:v5:${await hashBriefStory(story)}`;
   try {
     const hit = await deps.cacheGet(key);
     if (typeof hit === 'string' && hit.length > 0) return hit;
@@ -271,14 +281,19 @@ export function parseStoryDescription(text, headline) {
  */
 export async function generateStoryDescription(story, deps) {
   // Shares hashBriefStory() with whyMatters — the key prefix
-  // (`brief:llm:description:v2:`) is what separates the two cache
+  // (`brief:llm:description:v3:`) is what separates the two cache
   // namespaces; the material is the six fields including description.
   // Bumped v1→v2 on 2026-04-24 alongside the RSS-description fix so
   // cached pre-grounding output (hallucinated named actors from
   // headline-only prompts) is evicted. hashBriefStory itself includes
   // description in the hash material, so content drift invalidates
   // naturally too — the prefix bump is belt-and-braces.
-  const key = `brief:llm:description:v2:${await hashBriefStory(story)}`;
+  //
+  // v2→v3: 2026-05-17 PR #3751. `hashBriefStory` folds `story.category`
+  // into the hash material — same story-shape change as whymatters
+  // v4→v5. Pre-PR every category was 'General'; post-PR carries the
+  // per-story Title-Cased EventCategory. Bump invalidates v2 entries.
+  const key = `brief:llm:description:v3:${await hashBriefStory(story)}`;
   try {
     const hit = await deps.cacheGet(key);
     if (typeof hit === 'string') {
@@ -329,8 +344,16 @@ const DIGEST_PROSE_SYSTEM_BASE =
   "impactful development by its specific actor and event (e.g. \"Pentagon " +
   "chief Hegseth declared the US blockade on Iran is going global\"), NOT " +
   'an editorial framing about "geopolitical tensions" or "shifting ' +
-  'landscapes". Subsequent sentences may give brief context. Reference at ' +
-  'most 1–2 threads. No vapid hedging.>",\n' +
+  'landscapes". Subsequent sentences may give brief context about THE SAME ' +
+  'story (causes, stakes, prior developments). Reference a SECOND story ONLY ' +
+  'when there is a substantive link to the primary one (shared actor, causal ' +
+  'connection, direct policy consequence, same geographic theatre). NEVER ' +
+  'staple unrelated stories together using weak temporal connectives like ' +
+  '"This comes as", "Meanwhile", "At the same time", "In other news", or ' +
+  '"Elsewhere" — those produce editorially incoherent leads that mention two ' +
+  'unrelated events in one sentence without explaining why they belong ' +
+  'together. If two top stories are unrelated, just lead with the most ' +
+  'impactful one and let the threads list cover the rest. No vapid hedging.>",\n' +
   '  "threads": [\n' +
   '    { "tag": "<one-word editorial category e.g. Energy, Diplomacy, Climate>", ' +
   '"teaser": "<one sentence naming a SPECIFIC event or actor — e.g. ' +
@@ -348,6 +371,14 @@ const DIGEST_PROSE_SYSTEM_BASE =
   '"buzzing with developments", "intricate shifts", "evolving landscape", ' +
   '"navigating", "discerning reader", "continues to simmer", "shape the ' +
   'coming months", "strategic importance".\n' +
+  'BANNED stitching phrases (do NOT use any of these to staple two stories ' +
+  'together in the lead — they signal unrelated content awkwardly joined): ' +
+  '"this comes as", "this declaration comes as", "this announcement comes as", ' +
+  '"meanwhile", "at the same time", "in other news", "elsewhere", "across the ' +
+  'world", "on another front", "in a separate development". If two stories ' +
+  'are not substantively linked (no shared actor, no causal connection, no ' +
+  'direct policy consequence, no same geographic theatre), do NOT stitch them ' +
+  'into one sentence — lead with the more impactful one alone.\n' +
   'Threads: 3–6 items reflecting actual clusters in the stories. ' +
   'Signals: 2–4 items, forward-looking. ' +
   'rankedStoryHashes: at least the top 3 stories by editorial importance, ' +
@@ -387,6 +418,7 @@ export function greetingBucket(greeting) {
  * @property {string|null} [profile]   formatted user profile lines, or null for non-personalised
  * @property {string|null} [greeting]  e.g. "Good morning", or null for non-personalised
  * @property {boolean}     [isPublic]  true = strip personalisation, build a generic lead
+ * @property {string}      [todayIso]  ISO date for the date-grounding line; defaults to today (UTC)
  */
 
 /**
@@ -435,7 +467,13 @@ export function buildDigestPrompt(stories, sensitivity, ctx = {}) {
   }
   userParts.push('', "Today's surfaced stories (ranked):", ...lines);
 
-  return { system: DIGEST_PROSE_SYSTEM_BASE, user: userParts.join('\n') };
+  // F6: the static system prompt has no notion of "now" — without an
+  // explicit date the model fabricates years (a May 2026 brief shipped
+  // a "deploy ... in 2024" line). briefDateLine pins the current date.
+  return {
+    system: `${DIGEST_PROSE_SYSTEM_BASE}\n${briefDateLine(ctx?.todayIso)}`,
+    user: userParts.join('\n'),
+  };
 }
 
 // Back-compat alias for tests that import the old constant name.
@@ -674,6 +712,41 @@ export function checkLeadGrounding(synthesis, stories) {
 }
 
 /**
+ * Lead ↔ single-story coherence check (F4). Returns true iff `lead`
+ * shares ≥1 proper-noun anchor with `headline`. Reuses the same
+ * anchor machinery as `checkLeadGrounding` (capitalised, length ≥4,
+ * stopword-filtered headline anchors; token-set membership against
+ * the lead) but with a FIXED threshold of 1 — coherence asks only
+ * "is the lead about the same story?", not "how well-grounded is it?".
+ *
+ * `checkLeadGrounding` itself is the wrong fit here: scoped to one
+ * story, a single headline can carry ≥4 anchor tokens, which trips
+ * its `size >= 4 ? 2 : 1` threshold up to 2 — too strict for
+ * coherence, where a lead legitimately about card #1 may name only
+ * one of its entities.
+ *
+ * Used by the cron's lead/card-#1 coherence telemetry
+ * (`composeAndStoreBriefForUser`) — see plan
+ * docs/plans/2026-05-14-001-…-plan.md (F4, Phase 4).
+ *
+ * @param {string} lead — the canonical synthesis lead
+ * @param {string} headline — the rendered first card's headline
+ * @returns {boolean} true = coherent (or check-skipped); false = the
+ *   lead names none of the headline's proper-noun anchors
+ */
+export function leadGroundsAgainstStory(lead, headline) {
+  const anchors = new Set(extractAnchorTokens(typeof headline === 'string' ? headline : ''));
+  // No proper-noun anchors in the headline → cannot judge coherence,
+  // skip (same "degenerate corpus → accept" stance as checkLeadGrounding).
+  if (anchors.size === 0) return true;
+  const leadTokens = groundingTokenSet(typeof lead === 'string' ? lead : '');
+  for (const tok of anchors) {
+    if (leadTokens.has(tok)) return true;
+  }
+  return false;
+}
+
+/**
  * Strict shape check for a parsed digest-prose object. Used by BOTH
  * parseDigestProse (fresh LLM output) AND generateDigestProse's
  * cache-hit path, so a bad row written under an older/buggy version
@@ -852,12 +925,22 @@ function hashDigestInput(userId, stories, sensitivity, ctx = {}) {
  * @param {DigestPromptCtx} [ctx]
  */
 export async function generateDigestProse(userId, stories, sensitivity, deps, ctx = {}) {
-  // v5 key (2026-05-12): bumped from v4 alongside the grounding
-  // gate in validateDigestProseShape. v4 rows may have been written
-  // for shape-valid but content-fabricated leads (May 12 incident:
-  // a Trump-era geopolitics pool shipped a "President Biden crypto
+  // v6 key (2026-05-14): bumped from v5 alongside the F6 date-grounding
+  // line appended to DIGEST_PROSE_SYSTEM_BASE by buildDigestPrompt.
+  // Every v5 row was produced from a prompt with no notion of "today"
+  // and may state a fabricated year in the lead/threads/signals — the
+  // exact bug F6 fixes. validateDigestProseShape revalidates cache
+  // hits, but its grounding gate is proper-noun based and does NOT
+  // catch date/numeric fabrication, so a v5 row would re-pass and
+  // ship for the 4h TTL. Evicting v5 forces regeneration through the
+  // date-grounded prompt.
+  //
+  // v5 (2026-05-12): bumped from v4 alongside the grounding gate in
+  // validateDigestProseShape. v4 rows may have been written for
+  // shape-valid but content-fabricated leads (May 12 incident: a
+  // Trump-era geopolitics pool shipped a "President Biden crypto
   // executive order" fabricated lead that passed the shape-only
-  // validator). Evicting v4 forces regeneration through the new
+  // validator). Evicting v4 forced regeneration through the new
   // grounded gate; ungrounded re-rolls fall through to L2/L3.
   //
   // v4 (2026-04-25 evening): bumped from v3 when the prompt gained
@@ -866,7 +949,28 @@ export async function generateDigestProse(userId, stories, sensitivity, deps, ct
   // shipped vapid editorial filler ("the global stage is buzzing",
   // "navigating the evolving landscape"). v3 cache rows still in
   // TTL would otherwise serve stale vapid leads for 4h post-deploy.
-  const key = `brief:llm:digest:v5:${hashDigestInput(userId, stories, sensitivity, ctx)}`;
+  //
+  // v7 (2026-05-17): bumped from v6 alongside PR #3751's category
+  // persistence. `hashDigestInput` folds `s.category` into the hash
+  // material; pre-PR every story carried 'General' (no category was
+  // persisted on story:track:v1), post-PR carries the per-story
+  // Title-Cased EventCategory value. v6 cache rows would otherwise
+  // serve digest prose generated against the pre-PR all-General pool
+  // for the full 4h TTL. Sibling bumps applied to whymatters (v4→v5)
+  // and description (v2→v3) — all three caches depend on the same
+  // story.category field via hashBriefStory / hashDigestInput.
+  //
+  // v8 (2026-05-18): bumped from v7 when DIGEST_PROSE_SYSTEM_BASE gained
+  // anti-stitching instructions (May 17 brief shipped a lead that stapled
+  // Ebola + Israel-Lebanon with "This declaration comes as…" — two
+  // unrelated top stories awkwardly joined). The prompt now explicitly
+  // forbids weak temporal connectives ("This comes as", "Meanwhile",
+  // "At the same time", "In other news", "Elsewhere", "Across the world",
+  // "On another front", "In a separate development") and instructs the
+  // model to lead with ONE primary story when two top stories aren't
+  // substantively linked. v7 cache rows would otherwise serve stitched
+  // leads for the full 4h TTL. Prompt content change → cache invalidation.
+  const key = `brief:llm:digest:v8:${hashDigestInput(userId, stories, sensitivity, ctx)}`;
   try {
     const hit = await deps.cacheGet(key);
     // CRITICAL: re-run the shape+grounding validator on cache hits.
@@ -991,11 +1095,24 @@ async function mapLimit(items, limit, fn) {
  * BriefEnvelope (structure unchanged; only string/array field
  * contents are substituted).
  *
+ * `opts.skipDigestProse` — when true, the per-user digest-prose call
+ * is SKIPPED entirely and `envelope.data.digest` is passed through
+ * untouched; only per-story `whyMatters` / `description` are
+ * enriched. The compose path passes this because it has ALREADY
+ * produced the canonical synthesis (via `runSynthesisWithFallback`)
+ * and spliced it into the envelope. Without the skip, this function
+ * re-synthesises here — a SECOND, ctx-free `generateDigestProse`
+ * call that overwrites the compose-pass synthesis and breaks the
+ * compose↔send parity contract. See plan
+ * docs/plans/2026-05-14-001-fix-brief-pipeline-parity-grounding-opinion-plan.md
+ * (F1, "call site 2") + Codex review R2.
+ *
  * @param {object} envelope
  * @param {{ userId: string; sensitivity?: string }} rule
  * @param {{ callLLM: Function; cacheGet: Function; cacheSet: Function }} deps
+ * @param {{ skipDigestProse?: boolean }} [opts]
  */
-export async function enrichBriefEnvelopeWithLLM(envelope, rule, deps) {
+export async function enrichBriefEnvelopeWithLLM(envelope, rule, deps, opts = {}) {
   if (!envelope?.data || !Array.isArray(envelope.data.stories)) return envelope;
   const stories = envelope.data.stories;
   // Default to 'high' (NOT 'all') so the digest prompt and cache key
@@ -1023,16 +1140,22 @@ export async function enrichBriefEnvelopeWithLLM(envelope, rule, deps) {
     };
   });
 
-  // Per-user digest prose — one call.
-  const prose = await generateDigestProse(rule.userId, stories, sensitivity, deps);
-  const digest = prose
-    ? {
+  // Per-user digest prose — one call, UNLESS the caller already
+  // supplied the canonical synthesis (skipDigestProse). See the
+  // function-header note: re-synthesising here is the "call site 2"
+  // parity regression.
+  let digest = envelope.data.digest;
+  if (opts?.skipDigestProse !== true) {
+    const prose = await generateDigestProse(rule.userId, stories, sensitivity, deps);
+    if (prose) {
+      digest = {
         ...envelope.data.digest,
         lead: prose.lead,
         threads: prose.threads,
         signals: prose.signals,
-      }
-    : envelope.data.digest;
+      };
+    }
+  }
 
   return {
     ...envelope,

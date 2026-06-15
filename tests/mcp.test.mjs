@@ -1,11 +1,21 @@
 import { describe, it, beforeEach, afterEach, mock } from 'node:test';
 import { strict as assert } from 'node:assert';
+import {
+  BASE_URL,
+  HMAC_SECRET,
+  PRO_USER_ID,
+  PRO_TOKEN_ID,
+  PRO_BEARER,
+  makePipelineMock,
+  makeProDeps,
+  proReq,
+  callBody,
+} from './helpers/mcp-pro-deps.mjs';
 
 const originalFetch = globalThis.fetch;
 const originalEnv = { ...process.env };
 
 const VALID_KEY = 'wm_test_key_123';
-const BASE_URL = 'https://worldmonitor.app/mcp';
 
 function makeReq(method = 'POST', body = null, headers = {}) {
   return new Request(BASE_URL, {
@@ -36,6 +46,11 @@ describe('api/mcp.ts — PRO MCP Server', () => {
     // No UPSTASH vars — rate limiter gracefully skipped, Redis reads return null
     delete process.env.UPSTASH_REDIS_REST_URL;
     delete process.env.UPSTASH_REDIS_REST_TOKEN;
+    // Telemetry is default-on in prod; off in tests so the JSON line per
+    // tools/call doesn't pollute CI stdout and trip any future stdout-grep
+    // assertion. The four `telemetry:`-prefixed tests below re-enable it
+    // locally.
+    process.env.MCP_TELEMETRY = 'false';
 
     const mod = await import(`../api/mcp.ts?t=${Date.now()}`);
     handler = mod.default;
@@ -65,10 +80,13 @@ describe('api/mcp.ts — PRO MCP Server', () => {
     assert.equal(body.error?.code, -32001);
   });
 
-  it('returns JSON-RPC -32001 when invalid API key provided', async () => {
+  it('returns HTTP 401 + WWW-Authenticate when invalid API key provided', async () => {
     const req = makeReq('POST', initBody(), { 'X-WorldMonitor-Key': 'wrong_key' });
     const res = await handler(req);
-    assert.equal(res.status, 200);
+    assert.equal(res.status, 401);
+    const wwwAuth = res.headers.get('www-authenticate') ?? '';
+    assert.ok(wwwAuth.includes('Bearer realm="worldmonitor"'), 'must include WWW-Authenticate Bearer realm');
+    assert.ok(wwwAuth.includes('error="invalid_token"'), 'must include error="invalid_token" per RFC 6750');
     const body = await res.json();
     assert.equal(body.error?.code, -32001);
   });
@@ -116,14 +134,48 @@ describe('api/mcp.ts — PRO MCP Server', () => {
     assert.equal(body.error?.code, -32600);
   });
 
+  // --- logging/setLevel ---
+
+  it('logging/setLevel with valid level returns success', async () => {
+    for (const level of ['debug', 'info', 'notice', 'warning', 'error', 'critical', 'alert', 'emergency']) {
+      const res = await handler(makeReq('POST', {
+        jsonrpc: '2.0', id: 10, method: 'logging/setLevel',
+        params: { level },
+      }));
+      assert.equal(res.status, 200);
+      const body = await res.json();
+      assert.deepStrictEqual(body.result, {}, `level "${level}" must return empty success result`);
+      assert.equal(body.error, undefined, `level "${level}" must not return an error`);
+    }
+  });
+
+  it('logging/setLevel with invalid level returns JSON-RPC -32602', async () => {
+    for (const bad of ['trace', 'warn', 'CRITICAL', 'Info', '', 42, null, undefined]) {
+      const res = await handler(makeReq('POST', {
+        jsonrpc: '2.0', id: 11, method: 'logging/setLevel',
+        params: { level: bad },
+      }));
+      const body = await res.json();
+      assert.equal(body.error?.code, -32602, `level ${JSON.stringify(bad)} must be rejected with -32602`);
+    }
+  });
+
+  it('initialize response advertises logging capability', async () => {
+    const res = await handler(makeReq('POST', initBody(12)));
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.ok(body.result?.capabilities?.logging, 'capabilities.logging must be present');
+    assert.deepStrictEqual(body.result.capabilities.logging, {}, 'capabilities.logging must be an empty object');
+  });
+
   // --- tools/list ---
 
-  it('tools/list returns 38 tools with name, description, inputSchema', async () => {
+  it('tools/list returns 39 tools with name, description, inputSchema', async () => {
     const res = await handler(makeReq('POST', { jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} }));
     assert.equal(res.status, 200);
     const body = await res.json();
     assert.ok(Array.isArray(body.result?.tools), 'result.tools must be an array');
-    assert.equal(body.result.tools.length, 38, `Expected 38 tools, got ${body.result.tools.length}`);
+    assert.equal(body.result.tools.length, 39, `Expected 39 tools, got ${body.result.tools.length}`);
     for (const tool of body.result.tools) {
       assert.ok(tool.name, 'tool.name must be present');
       assert.ok(tool.description, 'tool.description must be present');
@@ -132,6 +184,8 @@ describe('api/mcp.ts — PRO MCP Server', () => {
       assert.ok(!('_execute' in tool), 'Internal _execute must not be exposed in tools/list');
       assert.ok(!('_coverageKeys' in tool), 'Internal _coverageKeys must not be exposed in tools/list');
       assert.ok(!('_apiPaths' in tool), 'Internal _apiPaths must not be exposed in tools/list (Tier-4 parity)');
+      assert.ok(!('_postFilter' in tool), 'Internal _postFilter must not be exposed in tools/list (issue #3677)');
+      assert.ok(!('_outputBudgetBytes' in tool), 'Internal _outputBudgetBytes must not be exposed in tools/list (PR-B)');
     }
     const toolNames = body.result.tools.map((t) => t.name);
     assert.ok(toolNames.includes('get_displacement_data'), 'get_displacement_data must be registered (U1 Tier 1 regression)');
@@ -140,6 +194,7 @@ describe('api/mcp.ts — PRO MCP Server', () => {
     assert.ok(toolNames.includes('get_consumer_prices'), 'get_consumer_prices must be registered (U4)');
     assert.ok(toolNames.includes('get_tariff_trends'), 'get_tariff_trends must be registered (U5)');
     assert.ok(toolNames.includes('get_chokepoint_status'), 'get_chokepoint_status must be registered (U6)');
+    assert.ok(toolNames.includes('describe_tool'), 'describe_tool must be registered (v1.5.0 schema compression)');
   });
 
   // --- tools/call ---
@@ -212,6 +267,32 @@ describe('api/mcp.ts — PRO MCP Server', () => {
     assert.equal(freshness.cached_at, new Date(now - 24 * 60 * 60_000).toISOString());
   });
 
+  it('evaluateFreshness marks below-floor recordCount stale even when fetchedAt is fresh', () => {
+    const now = Date.UTC(2026, 5, 11, 12, 0, 0);
+    const freshness = evaluateFreshness(
+      [
+        { key: 'seed-meta:supply_chain:portwatch-ports', maxStaleMin: 2160, minRecordCount: 174 },
+      ],
+      [
+        { fetchedAt: now - 12 * 60 * 60_000, recordCount: 139 },
+      ],
+      now,
+    );
+
+    assert.equal(freshness.stale, true);
+    assert.equal(freshness.cached_at, new Date(now - 12 * 60 * 60_000).toISOString());
+  });
+
+  it('get_chokepoint_status declares the PortWatch 174-country freshness floor', async () => {
+    const { CACHE_TOOLS } = await import(`../api/mcp/registry/cache-tools.ts?t=${Date.now()}`);
+    const tool = CACHE_TOOLS.find((candidate) => candidate.name === 'get_chokepoint_status');
+    const portwatchFreshness = tool?._freshnessChecks?.find(
+      (check) => check.key === 'seed-meta:supply_chain:portwatch-ports',
+    );
+
+    assert.equal(portwatchFreshness?.minRecordCount, 174);
+  });
+
   // --- Rate limiting ---
 
   it('returns JSON-RPC -32029 when rate limited', async () => {
@@ -260,6 +341,741 @@ describe('api/mcp.ts — PRO MCP Server', () => {
     assert.equal(res.status, 200, 'Must return HTTP 200, not 500');
     const body = await res.json();
     assert.equal(body.error?.code, -32603, 'Must return JSON-RPC -32603, not throw');
+  });
+
+  // --- inputSchema completion + cache-tool _postFilter narrowing (issue #3677) ---
+
+  it('tools/list: cache tools advertise filter properties (issue #3677 — no more empty {})', async () => {
+    const res = await handler(makeReq('POST', { jsonrpc: '2.0', id: 700, method: 'tools/list', params: {} }));
+    const body = await res.json();
+    const byName = Object.fromEntries(body.result.tools.map((t) => [t.name, t]));
+    // Representative cache tools across every shape (array payload, object-keyed
+    // map, multi-key bundle) must now declare ≥1 filter property.
+    for (const name of [
+      'get_market_data', 'get_country_macro', 'get_conflict_events',
+      'get_economic_data', 'get_chokepoint_status', 'get_eu_housing_cycle',
+      'get_sanctions_data', 'get_forecast_predictions',
+    ]) {
+      const props = byName[name]?.inputSchema?.properties ?? {};
+      assert.ok(Object.keys(props).length > 0, `${name} must declare at least one filter property`);
+    }
+    // The exact params from the issue #3677 worked example.
+    assert.ok(byName.get_market_data.inputSchema.properties.symbols, 'get_market_data must declare symbols');
+    assert.ok(byName.get_market_data.inputSchema.properties.asset_class, 'get_market_data must declare asset_class');
+  });
+
+  // Mock Upstash REST: data keys + seed-meta keys resolve from the supplied
+  // maps. Any OTHER single-key GET resolves as "key absent" ({} → null) so the
+  // unmocked keys of a multi-key bundle tool don't hit the network. Non-GET
+  // traffic (the rate-limiter EVALSHA) falls through and throws —
+  // applyPerMinuteLimit swallows that (graceful degradation).
+  function mockCacheKeys(keyMap, metaKeys = {}) {
+    const all = { ...keyMap, ...metaKeys };
+    globalThis.fetch = async (url) => {
+      const u = url.toString();
+      for (const [k, v] of Object.entries(all)) {
+        if (u.includes(`/get/${encodeURIComponent(k)}`)) {
+          return new Response(JSON.stringify({ result: JSON.stringify(v) }), {
+            status: 200, headers: { 'Content-Type': 'application/json' },
+          });
+        }
+      }
+      if (u.includes('/get/')) {
+        return new Response(JSON.stringify({}), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      return originalFetch(url);
+    };
+  }
+
+  async function callTool(name, args) {
+    process.env.UPSTASH_REDIS_REST_URL = 'https://fake.upstash.io';
+    process.env.UPSTASH_REDIS_REST_TOKEN = 'fake_token';
+    const freshMod = await import(`../api/mcp.ts?t=${Date.now()}`);
+    const res = await freshMod.default(makeReq('POST', {
+      jsonrpc: '2.0', id: 701, method: 'tools/call', params: { name, arguments: args },
+    }));
+    const body = await res.json();
+    assert.ok(body.result?.content, `${name} must return result.content (got ${JSON.stringify(body.error)})`);
+    return JSON.parse(body.result.content[0].text);
+  }
+
+  it('get_market_data: omitting args returns the full payload (additive guarantee)', async () => {
+    const stocks = { quotes: [{ symbol: 'AAPL', price: 100 }, { symbol: 'MSFT', price: 200 }] };
+    const crypto = { quotes: [{ symbol: 'BTC', price: 50000 }] };
+    mockCacheKeys(
+      { 'market:stocks-bootstrap:v1': stocks, 'market:crypto:v1': crypto },
+      { 'seed-meta:market:stocks': { fetchedAt: Date.now() - 60_000, recordCount: 3 } },
+    );
+    const out = await callTool('get_market_data', {});
+    assert.equal(out.data['stocks-bootstrap'].quotes.length, 2, 'no args → all stock quotes');
+    assert.ok(out.data.crypto, 'no args → crypto slice present');
+  });
+
+  // --- Telemetry ---
+
+  it('telemetry: successful tools/call emits one mcp.toolcall line with the documented fields', async () => {
+    process.env.MCP_TELEMETRY = 'true';
+    mockCacheKeys(
+      { 'market:stocks-bootstrap:v1': { quotes: [{ symbol: 'AAPL', price: 100 }] }, 'market:crypto:v1': { quotes: [] } },
+      { 'seed-meta:market:stocks': { fetchedAt: Date.now() - 60_000, recordCount: 1 } },
+    );
+    const captured = [];
+    const origLog = console.log;
+    console.log = (line) => captured.push(line);
+    try {
+      await callTool('get_market_data', {});
+    } finally {
+      console.log = origLog;
+    }
+    const tc = captured.filter((l) => l && typeof l === 'object' && !Array.isArray(l) && l.tag === 'mcp.toolcall');
+    assert.equal(tc.length, 1, `expected exactly one mcp.toolcall line, got ${tc.length}`);
+    const ev = tc[0];
+    assert.equal(ev.tool, 'get_market_data');
+    assert.equal(ev.auth_kind, 'env_key');
+    assert.equal(ev.ok, true);
+    assert.equal(ev.jmespath_used, false);
+    assert.equal(ev.jmespath_failed, null);
+    assert.equal(typeof ev.latency_ms, 'number');
+    assert.equal(typeof ev.bytes_pre_jmespath, 'number');
+    assert.equal(typeof ev.bytes_post_jmespath, 'number');
+    assert.ok(ev.bytes_post_jmespath > 0, 'bytes_post_jmespath must be > 0 on a successful response');
+    assert.equal(typeof ev.ts, 'string');
+    assert.equal(typeof ev.user_id, 'string');
+    assert.ok(ev.user_id.length > 0, 'user_id must be a non-empty string');
+    assert.notEqual(ev.user_id, VALID_KEY, 'env_key user_id MUST be hashed — never log the raw API key');
+  });
+
+  it('telemetry: tool-execution throw emits one mcp.toolcall line with ok:false + error_kind:server_error', async () => {
+    process.env.MCP_TELEMETRY = 'true';
+    process.env.UPSTASH_REDIS_REST_URL = 'https://fake.upstash.io';
+    process.env.UPSTASH_REDIS_REST_TOKEN = 'fake_token';
+    // Force the cache-tool fetch path to throw — dispatchToolsCall's outer
+    // catch fires, latency_ms is captured BEFORE rollback, and one
+    // mcp.toolcall line with ok:false must land.
+    globalThis.fetch = async () => { throw new TypeError('fetch failed'); };
+
+    const captured = [];
+    const origLog = console.log;
+    const origErr = console.error;
+    console.log = (line) => captured.push(line);
+    console.error = () => {}; // swallow the captureSilentError stderr noise
+    try {
+      const freshMod = await import(`../api/mcp.ts?t=${Date.now()}`);
+      const res = await freshMod.default(makeReq('POST', {
+        jsonrpc: '2.0', id: 901, method: 'tools/call',
+        params: { name: 'get_market_data', arguments: {} },
+      }));
+      const body = await res.json();
+      assert.equal(body.error?.code, -32603, 'must return JSON-RPC -32603 on tool throw');
+    } finally {
+      console.log = origLog;
+      console.error = origErr;
+    }
+    const tc = captured.filter((l) => l && typeof l === 'object' && !Array.isArray(l) && l.tag === 'mcp.toolcall');
+    assert.equal(tc.length, 1, `expected exactly one mcp.toolcall line, got ${tc.length}`);
+    const ev = tc[0];
+    assert.equal(ev.ok, false);
+    assert.equal(ev.error_kind, 'server_error');
+    assert.equal(ev.tool, 'get_market_data');
+    assert.equal(typeof ev.latency_ms, 'number');
+    assert.ok(Number.isFinite(ev.latency_ms), 'latency_ms must be finite (captured before rollback)');
+    assert.equal(typeof ev.user_id, 'string');
+    assert.ok(ev.user_id.length > 0, 'user_id must be present on the error path too');
+    assert.notEqual(ev.user_id, VALID_KEY, 'error-path env_key user_id MUST be hashed — the key-never-logged contract holds on the ok:false branch too');
+  });
+
+  it('telemetry: invalid jmespath expression emits ok:true with jmespath_failed=invalid_expression', async () => {
+    process.env.MCP_TELEMETRY = 'true';
+    mockCacheKeys(
+      { 'market:stocks-bootstrap:v1': { quotes: [{ symbol: 'AAPL', price: 100 }] }, 'market:crypto:v1': { quotes: [] } },
+      { 'seed-meta:market:stocks': { fetchedAt: Date.now() - 60_000, recordCount: 1 } },
+    );
+    const captured = [];
+    const origLog = console.log;
+    console.log = (line) => captured.push(line);
+    try {
+      process.env.UPSTASH_REDIS_REST_URL = 'https://fake.upstash.io';
+      process.env.UPSTASH_REDIS_REST_TOKEN = 'fake_token';
+      const freshMod = await import(`../api/mcp.ts?t=${Date.now()}`);
+      const res = await freshMod.default(makeReq('POST', {
+        jsonrpc: '2.0', id: 902, method: 'tools/call',
+        params: { name: 'get_market_data', arguments: { jmespath: 'a.' } },
+      }));
+      const body = await res.json();
+      // applyJmespath soft-fails — tool dispatch still succeeds.
+      assert.ok(body.result?.content, 'soft jmespath failure must still return a successful response');
+    } finally {
+      console.log = origLog;
+    }
+    const tc = captured.filter((l) => l && typeof l === 'object' && !Array.isArray(l) && l.tag === 'mcp.toolcall');
+    assert.equal(tc.length, 1, `expected exactly one mcp.toolcall line, got ${tc.length}`);
+    const ev = tc[0];
+    assert.equal(ev.ok, true, 'jmespath failure is a *user* error, not a system error');
+    assert.equal(ev.jmespath_used, true);
+    assert.equal(ev.jmespath_failed, 'invalid_expression');
+  });
+
+  it('telemetry: initialize emits mcp.tools_list_emitted with tools_array_bytes, tool_count, client_user_agent', async () => {
+    process.env.MCP_TELEMETRY = 'true';
+    const mod = await import(`../api/mcp.ts?t=${Date.now()}`);
+    const expectedToolCount = mod.__testing__.TOOL_REGISTRY.length;
+    const captured = [];
+    const origLog = console.log;
+    console.log = (line) => captured.push(line);
+    try {
+      await mod.default(makeReq('POST', initBody(42), { 'user-agent': 'wm-test/1.0' }));
+    } finally {
+      console.log = origLog;
+    }
+    const ev = captured.filter((l) => l && typeof l === 'object' && !Array.isArray(l) && l.tag === 'mcp.tools_list_emitted');
+    assert.equal(ev.length, 1, `expected exactly one mcp.tools_list_emitted line, got ${ev.length}`);
+    assert.equal(typeof ev[0].tools_array_bytes, 'number');
+    assert.ok(ev[0].tools_array_bytes > 0, 'tools_array_bytes must be > 0');
+    assert.equal(ev[0].tool_count, expectedToolCount, 'tool_count must equal current registry size');
+    assert.equal(ev[0].client_user_agent, 'wm-test/1.0');
+    assert.equal(ev[0].auth_kind, 'env_key');
+    assert.equal(typeof ev[0].user_id, 'string');
+    assert.ok(ev[0].user_id.length > 0, 'user_id must be present on initialize too');
+    assert.notEqual(ev[0].user_id, VALID_KEY, 'initialize user_id MUST be hashed for env_key — raw key never logged');
+  });
+
+  it('telemetry: 32 KB User-Agent is capped at 256 chars in client_user_agent', async () => {
+    process.env.MCP_TELEMETRY = 'true';
+    const mod = await import(`../api/mcp.ts?t=${Date.now()}`);
+    const captured = [];
+    const origLog = console.log;
+    console.log = (line) => captured.push(line);
+    const hugeUa = 'A'.repeat(32 * 1024);
+    try {
+      await mod.default(makeReq('POST', initBody(43), { 'user-agent': hugeUa }));
+    } finally {
+      console.log = origLog;
+    }
+    const ev = captured.filter((l) => l && typeof l === 'object' && !Array.isArray(l) && l.tag === 'mcp.tools_list_emitted');
+    assert.equal(ev[0].client_user_agent.length, 256, 'pathological UA must be sliced to 256 chars');
+  });
+
+  it('telemetry: circular _execute result + clean JMESPath projection stays 200 with bytes_pre_jmespath=-1 sentinel', async () => {
+    // Regression guard for the round-1 blocker fix at api/mcp.ts:3173-3184.
+    // Without the inner try/catch, the telemetry `JSON.stringify(result)`
+    // on a circular `result` throws, control jumps to the outer catch, the
+    // request becomes a 5xx + Pro-quota rollback — even though JMESPath
+    // successfully projected a clean subtree. The fix must:
+    //   (a) keep the response 200 / ok:true (telemetry must never bubble),
+    //   (b) emit `bytes_pre_jmespath: -1` (sentinel: measurement unavailable),
+    //   (c) emit `bytes_post_jmespath > 0` (projection succeeded).
+    // The sentinel is *the* observable that proves the inner catch fired.
+    process.env.MCP_TELEMETRY = 'true';
+    const freshMod = await import(`../api/mcp.ts?t=${Date.now()}`);
+    const tool = freshMod.__testing__.TOOL_REGISTRY.find((t) => t.name === 'get_commodity_geo');
+    assert.ok(tool && tool._execute, 'get_commodity_geo must exist with an _execute');
+    const originalExecute = tool._execute;
+    tool._execute = async () => {
+      const result = { sites: [{ id: 'X1', mineral: 'Gold' }], total: 1 };
+      result.self = result; // cycle — JSON.stringify(result) throws
+      return result;
+    };
+    const captured = [];
+    const origLog = console.log;
+    console.log = (line) => captured.push(line);
+    let resStatus, body;
+    try {
+      const res = await freshMod.default(makeReq('POST', {
+        jsonrpc: '2.0', id: 904, method: 'tools/call',
+        params: { name: 'get_commodity_geo', arguments: { jmespath: 'total' } },
+      }));
+      resStatus = res.status;
+      body = await res.json();
+    } finally {
+      console.log = origLog;
+      tool._execute = originalExecute;
+    }
+    assert.equal(resStatus, 200, 'circular result + clean JMESPath projection must still return HTTP 200');
+    assert.ok(body.result?.content, 'must return a successful JSON-RPC result (no -32603)');
+    assert.equal(body.result.content[0].text, '1', 'JMESPath `total` must extract the clean subtree');
+    const tc = captured.filter((l) => l && typeof l === 'object' && !Array.isArray(l) && l.tag === 'mcp.toolcall');
+    assert.equal(tc.length, 1, `expected exactly one mcp.toolcall line, got ${tc.length}`);
+    const ev = tc[0];
+    assert.equal(ev.ok, true, 'telemetry stringify failure must not flip ok to false');
+    assert.equal(ev.tool, 'get_commodity_geo');
+    assert.equal(ev.jmespath_used, true);
+    assert.equal(ev.jmespath_failed, null);
+    assert.equal(ev.bytes_pre_jmespath, -1, 'circular result must surface bytes_pre_jmespath: -1 sentinel');
+    assert.ok(ev.bytes_post_jmespath > 0, 'bytes_post_jmespath must reflect the projected size (> 0)');
+  });
+
+  // --- Budget (PR-B: outputBudgetBytes) ---
+
+  it('budget: tools/call within budget returns normal response', async () => {
+    // Small payload well within the 128 KB cache-tool budget
+    const stocks = { quotes: [{ symbol: 'AAPL', price: 100 }] };
+    mockCacheKeys(
+      { 'market:stocks-bootstrap:v1': stocks, 'market:crypto:v1': { quotes: [] } },
+      { 'seed-meta:market:stocks': { fetchedAt: Date.now() - 60_000, recordCount: 1 } },
+    );
+    const out = await callTool('get_market_data', {});
+    assert.ok(out.data, 'normal response must contain data');
+    assert.equal(out._budget_exceeded, undefined, 'within-budget response must not contain _budget_exceeded');
+  });
+
+  it('budget: tools/call exceeding budget returns _budget_exceeded envelope', async () => {
+    // Generate a payload that exceeds the 128 KB cache-tool budget.
+    // Each quote entry is ~80 bytes; 3000 entries ≈ 240 KB in the stocks
+    // slice alone, comfortably above 128 KB after JSON serialisation.
+    // Pass limit: 0 to bypass the DEFAULT_LIST_LIMIT (30) cap.
+    const hugeQuotes = Array.from({ length: 3000 }, (_, i) => ({
+      symbol: `SYM${String(i).padStart(4, '0')}`,
+      price: i + 1,
+      change: 0.01 * i,
+      volume: 1000000 + i,
+    }));
+    mockCacheKeys(
+      { 'market:stocks-bootstrap:v1': { quotes: hugeQuotes }, 'market:crypto:v1': { quotes: [] } },
+      { 'seed-meta:market:stocks': { fetchedAt: Date.now() - 60_000, recordCount: hugeQuotes.length } },
+    );
+    const out = await callTool('get_market_data', { limit: 0 });
+    assert.equal(out._budget_exceeded, true, 'oversized response must return _budget_exceeded envelope');
+    assert.equal(typeof out.budget_bytes, 'number', 'envelope must include budget_bytes');
+    assert.equal(typeof out.actual_bytes, 'number', 'envelope must include actual_bytes');
+    assert.ok(out.actual_bytes > out.budget_bytes, 'actual_bytes must exceed budget_bytes');
+    assert.equal(typeof out.hint, 'string', 'envelope must include a hint string');
+  });
+
+  it('budget: telemetry includes budget_exceeded field', async () => {
+    process.env.MCP_TELEMETRY = 'true';
+    const captured = [];
+    const origLog = console.log;
+    console.log = (line) => captured.push(line);
+
+    // Small payload — within budget
+    mockCacheKeys(
+      { 'market:stocks-bootstrap:v1': { quotes: [{ symbol: 'AAPL', price: 100 }] }, 'market:crypto:v1': { quotes: [] } },
+      { 'seed-meta:market:stocks': { fetchedAt: Date.now() - 60_000, recordCount: 1 } },
+    );
+    const res = await handler(makeReq('POST', {
+      jsonrpc: '2.0', id: 800, method: 'tools/call',
+      params: { name: 'get_market_data', arguments: {} },
+    }));
+    console.log = origLog;
+    assert.equal(res.status, 200);
+
+    const tc = captured.filter((l) => l && typeof l === 'object' && !Array.isArray(l) && l.tag === 'mcp.toolcall');
+    assert.equal(tc.length, 1, `expected exactly one mcp.toolcall line, got ${tc.length}`);
+    assert.equal(tc[0].budget_exceeded, false, 'within-budget call must emit budget_exceeded: false');
+  });
+
+  it('budget: telemetry emits budget_exceeded=true when budget is exceeded', async () => {
+    process.env.MCP_TELEMETRY = 'true';
+    process.env.UPSTASH_REDIS_REST_URL = 'https://fake.upstash.io';
+    process.env.UPSTASH_REDIS_REST_TOKEN = 'fake_token';
+    const captured = [];
+    const origLog = console.log;
+    console.log = (line) => captured.push(line);
+
+    // Large payload that exceeds the 128 KB cache-tool budget
+    const hugeQuotes = Array.from({ length: 3000 }, (_, i) => ({
+      symbol: `SYM${String(i).padStart(4, '0')}`,
+      price: i + 1,
+      change: 0.01 * i,
+      volume: 1000000 + i,
+    }));
+    mockCacheKeys(
+      { 'market:stocks-bootstrap:v1': { quotes: hugeQuotes }, 'market:crypto:v1': { quotes: [] } },
+      { 'seed-meta:market:stocks': { fetchedAt: Date.now() - 60_000, recordCount: hugeQuotes.length } },
+    );
+    const freshMod = await import(`../api/mcp.ts?t=${Date.now()}`);
+    const res = await freshMod.default(makeReq('POST', {
+      jsonrpc: '2.0', id: 801, method: 'tools/call',
+      params: { name: 'get_market_data', arguments: { limit: 0 } },
+    }));
+    console.log = origLog;
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    const out = JSON.parse(body.result.content[0].text);
+    assert.equal(out._budget_exceeded, true, 'sanity: response is the budget-exceeded envelope');
+
+    const tc = captured.filter((l) => l && typeof l === 'object' && !Array.isArray(l) && l.tag === 'mcp.toolcall');
+    assert.equal(tc.length, 1, `expected exactly one mcp.toolcall line, got ${tc.length}`);
+    assert.equal(tc[0].budget_exceeded, true, 'over-budget call must emit budget_exceeded: true');
+    assert.equal(tc[0].ok, true, 'budget-exceeded is a successful dispatch, not an error');
+  });
+
+  it('budget: every TOOL_REGISTRY entry declares a positive integer _outputBudgetBytes', async () => {
+    const mod = await import(`../api/mcp.ts?t=${Date.now()}`);
+    const registry = mod.__testing__.TOOL_REGISTRY;
+    assert.ok(Array.isArray(registry) && registry.length > 0, 'TOOL_REGISTRY must be a non-empty array');
+    for (const tool of registry) {
+      assert.equal(
+        typeof tool._outputBudgetBytes,
+        'number',
+        `tool "${tool.name}" must declare _outputBudgetBytes as a number`,
+      );
+      assert.ok(
+        Number.isInteger(tool._outputBudgetBytes) && tool._outputBudgetBytes > 0,
+        `tool "${tool.name}" must declare a positive integer _outputBudgetBytes (got ${tool._outputBudgetBytes})`,
+      );
+    }
+  });
+
+  it('get_market_data: symbols filter narrows quote arrays across asset slices', async () => {
+    const stocks = { quotes: [{ symbol: 'AAPL', price: 100 }, { symbol: 'MSFT', price: 200 }] };
+    const crypto = { quotes: [{ symbol: 'BTC', price: 50000 }] };
+    mockCacheKeys(
+      { 'market:stocks-bootstrap:v1': stocks, 'market:crypto:v1': crypto },
+      { 'seed-meta:market:stocks': { fetchedAt: Date.now() - 60_000, recordCount: 3 } },
+    );
+    const out = await callTool('get_market_data', { symbols: ['AAPL'] });
+    assert.equal(out.data['stocks-bootstrap'].quotes.length, 1, 'symbols filter drops MSFT');
+    assert.equal(out.data['stocks-bootstrap'].quotes[0].symbol, 'AAPL');
+    assert.equal(out.data.crypto.quotes.length, 0, 'BTC absent from symbols → crypto quotes emptied');
+  });
+
+  it('get_market_data: asset_class selects only the requested dataset slices', async () => {
+    const stocks = { quotes: [{ symbol: 'AAPL' }] };
+    const crypto = { quotes: [{ symbol: 'BTC' }] };
+    mockCacheKeys(
+      { 'market:stocks-bootstrap:v1': stocks, 'market:crypto:v1': crypto },
+      { 'seed-meta:market:stocks': { fetchedAt: Date.now() - 60_000, recordCount: 2 } },
+    );
+    const out = await callTool('get_market_data', { asset_class: ['crypto'] });
+    assert.ok(out.data.crypto, 'asset_class crypto → crypto slice kept');
+    assert.ok(!('stocks-bootstrap' in out.data), 'asset_class crypto → stocks slice dropped');
+  });
+
+  it('get_country_macro: countries filter narrows the ISO2-keyed maps', async () => {
+    const macro = { countries: { US: { inflationPct: 3 }, DE: { inflationPct: 2 }, CN: { inflationPct: 1 } }, seededAt: 1 };
+    const meta = {
+      'seed-meta:economic:imf-macro': { fetchedAt: Date.now() - 60_000, recordCount: 3 },
+      'seed-meta:economic:imf-growth': { fetchedAt: Date.now() - 60_000, recordCount: 0 },
+      'seed-meta:economic:imf-labor': { fetchedAt: Date.now() - 60_000, recordCount: 0 },
+      'seed-meta:economic:imf-external': { fetchedAt: Date.now() - 60_000, recordCount: 0 },
+    };
+    mockCacheKeys({ 'economic:imf:macro:v2': macro }, meta);
+    const filtered = await callTool('get_country_macro', { countries: ['US', 'DE'] });
+    assert.deepEqual(
+      Object.keys(filtered.data.macro.countries).sort(),
+      ['DE', 'US'],
+      'only the requested ISO2 keys are kept (case-insensitive)',
+    );
+
+    mockCacheKeys({ 'economic:imf:macro:v2': macro }, meta);
+    const full = await callTool('get_country_macro', {});
+    assert.equal(Object.keys(full.data.macro.countries).length, 3, 'no args → all countries retained');
+  });
+
+  it('get_energy_intelligence: country filter matches the gas-storage string[] payload', async () => {
+    // Regression: energy:gas-storage:v1:_countries is a string[] of ISO2 codes,
+    // NOT an array of {iso2} objects. A filter that reads c.iso2 drops everything.
+    mockCacheKeys(
+      { 'energy:gas-storage:v1:_countries': ['DE', 'FR', 'NL'] },
+      { 'seed-meta:energy:gas-storage-countries': { fetchedAt: Date.now() - 60_000, recordCount: 3 } },
+    );
+    const out = await callTool('get_energy_intelligence', { dataset: ['gas-storage'], country: 'DE' });
+    assert.deepEqual(out.data._countries, ['DE'], 'gas-storage _countries is a string[] — filter must match the string itself');
+  });
+
+  it('get_tariff_trends: alpha-2 country filter resolves to alpha-3 national-debt entries', async () => {
+    // Regression: national-debt entries are keyed by ISO alpha-3 (iso3:"USA").
+    // The country param is alpha-2 (consistent with the rest of the tool), so
+    // country:"US" must still match iso3:"USA".
+    mockCacheKeys(
+      { 'economic:national-debt:v1': { entries: [{ iso3: 'USA', debtUsd: 2 }, { iso3: 'DEU', debtUsd: 1 }], seededAt: 1 } },
+      { 'seed-meta:economic:national-debt': { fetchedAt: Date.now() - 60_000, recordCount: 2 } },
+    );
+    const out = await callTool('get_tariff_trends', { dataset: ['national-debt'], country: 'US' });
+    assert.equal(out.data['national-debt'].entries.length, 1, 'alpha-2 "US" must match iso3 "USA"');
+    assert.equal(out.data['national-debt'].entries[0].iso3, 'USA');
+  });
+
+  it('executeTool: a throwing _postFilter falls back to the PRISTINE unfiltered data', async () => {
+    // P1 (Greptile): the helpers narrow `data` in place. executeTool hands the
+    // filter a structuredClone, so a mid-filter throw — even one that has
+    // already mutated its argument — must leave the returned payload complete.
+    process.env.UPSTASH_REDIS_REST_URL = 'https://fake.upstash.io';
+    process.env.UPSTASH_REDIS_REST_TOKEN = 'fake_token';
+    mockCacheKeys(
+      { 'fake:key:v1': { value: 1 } },
+      { 'seed-meta:fake': { fetchedAt: Date.now() - 60_000, recordCount: 1 } },
+    );
+    const freshMod = await import(`../api/mcp.ts?t=${Date.now()}`);
+    const throwingTool = {
+      name: 'fake_throwing_tool',
+      description: 'test seam',
+      inputSchema: { type: 'object', properties: {}, required: [] },
+      _cacheKeys: ['fake:key:v1'],
+      _seedMetaKey: 'seed-meta:fake',
+      _maxStaleMin: 60,
+      _apiPaths: [],
+      _postFilter: (data) => {
+        data.mutated = true; // mutate the clone, then blow up mid-filter
+        throw new Error('boom');
+      },
+    };
+    const result = await freshMod.executeTool(throwingTool, { anything: true });
+    assert.deepEqual(result.data, { key: { value: 1 } }, 'throw → full unfiltered payload, no partial narrowing leaked');
+    assert.ok(!('mutated' in result.data), '_postFilter mutation must not leak through the structuredClone boundary');
+  });
+
+  // --- default-cap + summary mode (issue #3678) ---
+
+  it('tools/list: cache tools advertise the universal `summary` flag (issue #3678)', async () => {
+    const res = await handler(makeReq('POST', { jsonrpc: '2.0', id: 800, method: 'tools/list', params: {} }));
+    const body = await res.json();
+    const byName = Object.fromEntries(body.result.tools.map((t) => [t.name, t]));
+    for (const name of ['get_market_data', 'get_conflict_events', 'get_country_macro', 'get_chokepoint_status']) {
+      assert.ok(byName[name].inputSchema.properties.summary, `${name} must advertise summary`);
+      assert.equal(byName[name].inputSchema.properties.summary.type, 'boolean');
+    }
+    // RPC tools have bespoke shapes — should NOT carry the generic summary flag.
+    assert.ok(!byName.get_world_brief.inputSchema.properties.summary, 'RPC tools should not carry the cache-tool summary flag');
+  });
+
+  it('default cap: omitting limit caps each list to DEFAULT_LIST_LIMIT (=30)', async () => {
+    // Build a 50-event conflict payload; default cap is 30.
+    const ucdp = { events: Array.from({ length: 50 }, (_, i) => ({ id: i, country: 'X', deathsBest: 1 })) };
+    mockCacheKeys(
+      { 'conflict:ucdp-events:v1': ucdp },
+      { 'seed-meta:conflict:ucdp-events': { fetchedAt: Date.now() - 60_000, recordCount: 50 } },
+    );
+    const out = await callTool('get_conflict_events', {});
+    assert.equal(out.data['ucdp-events'].events.length, 30, 'omitting limit must apply the default cap of 30');
+    assert.equal(out.data['ucdp-events'].events[0].id, 0, 'cap takes the natural array order (newest-first per seeder)');
+  });
+
+  it('default cap: get_market_data caps quote arrays at DEFAULT_LIST_LIMIT (issue #3678 example)', async () => {
+    // Regression: the issue specifically named get_market_data as a large unfiltered
+    // response. The tool must cap each per-class array (stocks/commodities/crypto/
+    // sectors/etf-flows/gulf) like every other list-bearing cache tool.
+    const stocks = { quotes: Array.from({ length: 50 }, (_, i) => ({ symbol: `T${i}`, price: i })) };
+    mockCacheKeys(
+      { 'market:stocks-bootstrap:v1': stocks },
+      { 'seed-meta:market:stocks': { fetchedAt: Date.now() - 60_000, recordCount: 50 } },
+    );
+    const out = await callTool('get_market_data', {});
+    assert.equal(out.data['stocks-bootstrap'].quotes.length, 30, 'no-args call must apply the default cap of 30');
+
+    mockCacheKeys(
+      { 'market:stocks-bootstrap:v1': stocks },
+      { 'seed-meta:market:stocks': { fetchedAt: Date.now() - 60_000, recordCount: 50 } },
+    );
+    const full = await callTool('get_market_data', { limit: 0 });
+    assert.equal(full.data['stocks-bootstrap'].quotes.length, 50, 'limit: 0 must opt out to the full quote list');
+  });
+
+  it('default cap: get_energy_intelligence caps crisis-policies + other list slices', async () => {
+    // Regression: dataset:['crisis-policies'] with 50 policies must come back as 30.
+    const policies = { policies: Array.from({ length: 50 }, (_, i) => ({ id: i, country: 'X' })) };
+    mockCacheKeys(
+      { 'energy:crisis-policies:v1': policies },
+      { 'seed-meta:energy:crisis-policies': { fetchedAt: Date.now() - 60_000, recordCount: 50 } },
+    );
+    const out = await callTool('get_energy_intelligence', { dataset: ['crisis-policies'] });
+    assert.equal(out.data['crisis-policies'].policies.length, 30, 'no-args call must apply the default cap of 30');
+
+    mockCacheKeys(
+      { 'energy:crisis-policies:v1': policies },
+      { 'seed-meta:energy:crisis-policies': { fetchedAt: Date.now() - 60_000, recordCount: 50 } },
+    );
+    const full = await callTool('get_energy_intelligence', { dataset: ['crisis-policies'], limit: 0 });
+    assert.equal(full.data['crisis-policies'].policies.length, 50, 'limit: 0 must opt out');
+  });
+
+  it('default cap: get_military_posture caps the theaters array', async () => {
+    const theater_posture = { theaters: Array.from({ length: 40 }, (_, i) => ({ theater: `t${i}`, postureLevel: 'normal' })) };
+    mockCacheKeys(
+      { 'theater_posture:sebuf:stale:v1': theater_posture },
+      { 'seed-meta:intelligence:risk-scores': { fetchedAt: Date.now() - 60_000, recordCount: 40 } },
+    );
+    const out = await callTool('get_military_posture', {});
+    assert.equal(out.data.theater_posture.theaters.length, 30, 'no-args must cap theaters to 30');
+  });
+
+  it('default cap: get_chokepoint_status caps the chokepoints array', async () => {
+    const baselines = { source: 'x', referenceYear: 2023, updatedAt: '', chokepoints: Array.from({ length: 40 }, (_, i) => ({ id: `c${i}`, relayId: `c${i}_strait`, name: `Chokepoint ${i}` })) };
+    mockCacheKeys(
+      { 'energy:chokepoint-baselines:v1': baselines },
+      { 'seed-meta:energy:chokepoint-baselines': { fetchedAt: Date.now() - 60_000, recordCount: 40 } },
+    );
+    const out = await callTool('get_chokepoint_status', { dataset: ['chokepoint-baselines'] });
+    assert.equal(out.data['chokepoint-baselines'].chokepoints.length, 30, 'no-args must cap chokepoints to 30');
+  });
+
+  it('default cap: limit: 0 opts out and returns the full list', async () => {
+    const ucdp = { events: Array.from({ length: 50 }, (_, i) => ({ id: i, country: 'X', deathsBest: 1 })) };
+    mockCacheKeys(
+      { 'conflict:ucdp-events:v1': ucdp },
+      { 'seed-meta:conflict:ucdp-events': { fetchedAt: Date.now() - 60_000, recordCount: 50 } },
+    );
+    const out = await callTool('get_conflict_events', { limit: 0 });
+    assert.equal(out.data['ucdp-events'].events.length, 50, 'limit: 0 must opt out of the default cap and return the full list');
+  });
+
+  // --- limit on country/EU/displacement tools ---
+  //
+  // Five tools — get_country_macro, get_eu_housing_cycle,
+  // get_eu_quarterly_gov_debt, get_eu_industrial_production,
+  // get_displacement_data — return per-country payloads that can exceed the
+  // per-tool output budget on default args. The IMF/Eurostat tools cap their
+  // keyed-object country maps via `capNestedMap`; displacement caps arrays.
+  // `limit: 0` is the customer-facing opt-out and always returns the full
+  // payload.
+
+  function makeCountryMap(prefix, n) {
+    return Object.fromEntries(Array.from({ length: n }, (_, i) => [`${prefix}${i}`, { value: i }]));
+  }
+
+  it('limit: get_country_macro default args → caps every IMF dataset to 30', async () => {
+    // Mock all four IMF cache keys with 60 countries each so the test
+    // actually verifies the `for (const label of ['macro','growth','labor',
+    // 'external'])` capNestedMap loop, not just the macro label.
+    const payload = { countries: makeCountryMap('C', 60) };
+    const meta = {
+      'seed-meta:economic:imf-macro': { fetchedAt: Date.now() - 60_000, recordCount: 60 },
+      'seed-meta:economic:imf-growth': { fetchedAt: Date.now() - 60_000, recordCount: 60 },
+      'seed-meta:economic:imf-labor': { fetchedAt: Date.now() - 60_000, recordCount: 60 },
+      'seed-meta:economic:imf-external': { fetchedAt: Date.now() - 60_000, recordCount: 60 },
+    };
+    mockCacheKeys({
+      'economic:imf:macro:v2': payload,
+      'economic:imf:growth:v1': payload,
+      'economic:imf:labor:v1': payload,
+      'economic:imf:external:v1': payload,
+    }, meta);
+    const out = await callTool('get_country_macro', {});
+    for (const label of ['macro', 'growth', 'labor', 'external']) {
+      assert.equal(Object.keys(out.data[label].countries).length, 30,
+        `default args → ${label}.countries capped to DEFAULT_LIST_LIMIT (30)`);
+    }
+  });
+
+  it('limit: get_country_macro countries+limit → countries filter wins, limit ignored', async () => {
+    // Design choice pinned: when countries[] is provided, the early-return
+    // path takes effect and `limit` is silently a no-op. Schema description
+    // says "when no countries filter is supplied" — this regression test
+    // pins that contract so a future "should limit further-narrow a
+    // countries result" rewrite trips the test instead of breaking callers.
+    const payload = { countries: makeCountryMap('C', 60) };
+    const meta = {
+      'seed-meta:economic:imf-macro': { fetchedAt: Date.now() - 60_000, recordCount: 60 },
+      'seed-meta:economic:imf-growth': { fetchedAt: Date.now() - 60_000, recordCount: 0 },
+      'seed-meta:economic:imf-labor': { fetchedAt: Date.now() - 60_000, recordCount: 0 },
+      'seed-meta:economic:imf-external': { fetchedAt: Date.now() - 60_000, recordCount: 0 },
+    };
+    mockCacheKeys({ 'economic:imf:macro:v2': payload }, meta);
+    const out = await callTool('get_country_macro', { countries: ['C0', 'C1', 'C2', 'C3', 'C4'], limit: 1 });
+    assert.equal(Object.keys(out.data.macro.countries).length, 5,
+      'countries filter takes precedence; limit is ignored when countries is supplied');
+  });
+
+  it('limit: get_country_macro limit:0 → full payload', async () => {
+    const macro = { countries: makeCountryMap('C', 60) };
+    const meta = {
+      'seed-meta:economic:imf-macro': { fetchedAt: Date.now() - 60_000, recordCount: 60 },
+      'seed-meta:economic:imf-growth': { fetchedAt: Date.now() - 60_000, recordCount: 0 },
+      'seed-meta:economic:imf-labor': { fetchedAt: Date.now() - 60_000, recordCount: 0 },
+      'seed-meta:economic:imf-external': { fetchedAt: Date.now() - 60_000, recordCount: 0 },
+    };
+    mockCacheKeys({ 'economic:imf:macro:v2': macro }, meta);
+    const out = await callTool('get_country_macro', { limit: 0 });
+    assert.equal(Object.keys(out.data.macro.countries).length, 60,
+      'limit: 0 is the customer-facing opt-out and returns the full payload');
+  });
+
+  it('limit: get_eu_housing_cycle default args → cap to 30, limit:0 → full', async () => {
+    const hp = { countries: makeCountryMap('EU', 40) };
+    const meta = { 'seed-meta:economic:eurostat-house-prices': { fetchedAt: Date.now() - 60_000, recordCount: 40 } };
+
+    mockCacheKeys({ 'economic:eurostat:house-prices:v1': hp }, meta);
+    const capped = await callTool('get_eu_housing_cycle', {});
+    assert.equal(Object.keys(capped.data['house-prices'].countries).length, 30, 'default args → cap to 30');
+
+    mockCacheKeys({ 'economic:eurostat:house-prices:v1': hp }, meta);
+    const optOut = await callTool('get_eu_housing_cycle', { limit: 0 });
+    assert.equal(Object.keys(optOut.data['house-prices'].countries).length, 40, 'limit: 0 → full payload');
+  });
+
+  it('limit: get_eu_quarterly_gov_debt default args → cap to 30, limit:0 → full', async () => {
+    const gd = { countries: makeCountryMap('EU', 40) };
+    const meta = { 'seed-meta:economic:eurostat-gov-debt-q': { fetchedAt: Date.now() - 60_000, recordCount: 40 } };
+
+    mockCacheKeys({ 'economic:eurostat:gov-debt-q:v1': gd }, meta);
+    const capped = await callTool('get_eu_quarterly_gov_debt', {});
+    assert.equal(Object.keys(capped.data['gov-debt-q'].countries).length, 30, 'default args → cap to 30');
+
+    mockCacheKeys({ 'economic:eurostat:gov-debt-q:v1': gd }, meta);
+    const optOut = await callTool('get_eu_quarterly_gov_debt', { limit: 0 });
+    assert.equal(Object.keys(optOut.data['gov-debt-q'].countries).length, 40, 'limit: 0 → full payload');
+  });
+
+  it('limit: get_eu_industrial_production default args → cap to 30, limit:0 → full', async () => {
+    const ip = { countries: makeCountryMap('EU', 40) };
+    const meta = { 'seed-meta:economic:eurostat-industrial-production': { fetchedAt: Date.now() - 60_000, recordCount: 40 } };
+
+    mockCacheKeys({ 'economic:eurostat:industrial-production:v1': ip }, meta);
+    const capped = await callTool('get_eu_industrial_production', {});
+    assert.equal(Object.keys(capped.data['industrial-production'].countries).length, 30, 'default args → cap to 30');
+
+    mockCacheKeys({ 'economic:eurostat:industrial-production:v1': ip }, meta);
+    const optOut = await callTool('get_eu_industrial_production', { limit: 0 });
+    assert.equal(Object.keys(optOut.data['industrial-production'].countries).length, 40, 'limit: 0 → full payload');
+  });
+
+  it('limit: get_displacement_data default args → ≤30 items, limit:0 → full payload', async () => {
+    const currentYear = new Date().getUTCFullYear();
+    const summary = {
+      countries: Array.from({ length: 60 }, (_, i) => ({ iso3: `C${i}`, refugees: i, idps: i })),
+      topFlows: Array.from({ length: 60 }, (_, i) => ({ originCode: `O${i}`, asylumCode: `A${i}`, count: i })),
+    };
+    const dataKey = `displacement:summary:v1:${currentYear}`;
+    const meta = { 'seed-meta:displacement:summary': { fetchedAt: Date.now() - 60_000, recordCount: 60 } };
+
+    mockCacheKeys({ [dataKey]: summary }, meta);
+    const def = await callTool('get_displacement_data', {});
+    assert.equal(def.data.summary.countries.length, 30, 'default args → countries capped to 30');
+    assert.equal(def.data.summary.topFlows.length, 30, 'default args → topFlows capped to 30');
+
+    mockCacheKeys({ [dataKey]: summary }, meta);
+    const full = await callTool('get_displacement_data', { limit: 0 });
+    assert.equal(full.data.summary.countries.length, 60, 'limit: 0 → full countries array');
+    assert.equal(full.data.summary.topFlows.length, 60, 'limit: 0 → full topFlows array');
+  });
+
+  it('summary mode: collapses arrays to {count, sample} and large entity maps to {count, sample_keys}', async () => {
+    // Mix: an array payload + a 10-country IMF map (well above SUMMARY_MAP_THRESHOLD=5).
+    const macro = {
+      countries: Object.fromEntries(Array.from({ length: 10 }, (_, i) => [`C${i}`, { inflationPct: i }])),
+      seededAt: 12345,
+    };
+    mockCacheKeys(
+      { 'economic:imf:macro:v2': macro },
+      {
+        'seed-meta:economic:imf-macro': { fetchedAt: Date.now() - 60_000, recordCount: 10 },
+        'seed-meta:economic:imf-growth': { fetchedAt: Date.now() - 60_000, recordCount: 0 },
+        'seed-meta:economic:imf-labor': { fetchedAt: Date.now() - 60_000, recordCount: 0 },
+        'seed-meta:economic:imf-external': { fetchedAt: Date.now() - 60_000, recordCount: 0 },
+      },
+    );
+    const out = await callTool('get_country_macro', { summary: true });
+    // data.macro is a typed payload {countries, seededAt}. Its `countries` map has 10 keys → summarized.
+    assert.equal(out.data.macro.countries.count, 10, 'large entity map → count');
+    assert.equal(out.data.macro.countries.sample_keys.length, 3, 'sample_keys capped at 3');
+    assert.equal(out.data.macro.seededAt, 12345, 'scalar fields pass through summarisation');
+  });
+
+  it('summary mode: composes with filters — counts reflect post-filter result', async () => {
+    const ucdp = {
+      events: [
+        ...Array.from({ length: 10 }, (_, i) => ({ id: i, country: 'Syria', deathsBest: 5 })),
+        ...Array.from({ length: 5 }, (_, i) => ({ id: 100 + i, country: 'Iran', deathsBest: 3 })),
+      ],
+    };
+    mockCacheKeys(
+      { 'conflict:ucdp-events:v1': ucdp },
+      { 'seed-meta:conflict:ucdp-events': { fetchedAt: Date.now() - 60_000, recordCount: 15 } },
+    );
+    const out = await callTool('get_conflict_events', { country: 'syria', summary: true, limit: 0 });
+    assert.equal(out.data['ucdp-events'].events.count, 10, 'summary count reflects the country filter (only Syria events)');
+    assert.equal(out.data['ucdp-events'].events.sample.length, 3, 'summary sample capped at 3');
   });
 
   // --- get_displacement_data (U1: Tier 1 regression) ---
@@ -1373,16 +2189,28 @@ describe('api/mcp.ts — PRO MCP Server', () => {
   // --- get_maritime_activity ---
 
   it('get_maritime_activity returns zones and disruptions for valid country code', async () => {
+    // Fixture mirrors the REAL wire shape of the generated sebuf handler:
+    // camelCase keys + nested `location` objects. The original fixture used
+    // snake_case (which the wire never produces), so the tool's misread of
+    // density_zones/snapshot_at passed the suite while returning total_zones=0
+    // in production — WORLDMONITOR-T8. Items outside the AE bbox (+3° pad)
+    // must be filtered out tool-side; the inner fetch must carry NO bbox
+    // query (the handler 400s any dimension >10°, and 67 COUNTRY_BBOXES
+    // exceed that).
+    let innerUrl = null;
     globalThis.fetch = async (url) => {
       if (url.toString().includes('/api/maritime/v1/get-vessel-snapshot')) {
+        innerUrl = url.toString();
         return new Response(JSON.stringify({
           snapshot: {
-            snapshot_at: 1711620000000,
-            density_zones: [
-              { name: 'Strait of Hormuz', intensity: 82, ships_per_day: 45, delta_pct: 3.2, note: '' },
+            snapshotAt: 1711620000000,
+            densityZones: [
+              { name: 'Strait of Hormuz', location: { latitude: 26.6, longitude: 56.3 }, intensity: 82, shipsPerDay: 45, deltaPct: 3.2, note: '' },
+              { name: 'Zone 50,4 North Sea', location: { latitude: 51, longitude: 5 }, intensity: 1, shipsPerDay: 114240, deltaPct: 0, note: 'High traffic area' },
             ],
             disruptions: [
-              { name: 'Gulf AIS Gap', type: 'AIS_DISRUPTION_TYPE_GAP_SPIKE', severity: 'AIS_DISRUPTION_SEVERITY_ELEVATED', dark_ships: 3, vessel_count: 12, region: 'Persian Gulf', description: 'Elevated dark-ship activity' },
+              { name: 'Gulf AIS Gap', type: 'AIS_DISRUPTION_TYPE_GAP_SPIKE', severity: 'AIS_DISRUPTION_SEVERITY_ELEVATED', location: { latitude: 25.5, longitude: 54.0 }, darkShips: 3, vesselCount: 12, region: 'Persian Gulf', description: 'Elevated dark-ship activity' },
+              { name: 'Taiwan Strait', type: 'AIS_DISRUPTION_TYPE_CHOKEPOINT_CONGESTION', severity: 'AIS_DISRUPTION_SEVERITY_LOW', location: { latitude: 24.5, longitude: 119.5 }, darkShips: 0, vesselCount: 17, region: 'Taiwan Strait', description: 'Congestion' },
             ],
           },
         }), { status: 200, headers: { 'Content-Type': 'application/json' } });
@@ -1398,11 +2226,101 @@ describe('api/mcp.ts — PRO MCP Server', () => {
     const body = await res.json();
     const data = JSON.parse(body.result.content[0].text);
     assert.equal(data.country_code, 'AE');
-    assert.equal(data.total_zones, 1);
-    assert.equal(data.total_disruptions, 1);
+    assert.ok(innerUrl !== null, 'inner vessel-snapshot fetch must happen');
+    assert.ok(!/sw_lat|ne_lat/.test(innerUrl), 'inner fetch must NOT send a bbox (handler caps at 10°/side)');
+    assert.equal(data.total_zones, 1, 'North Sea zone must be filtered out of AE results');
+    assert.equal(data.total_disruptions, 1, 'Taiwan Strait must be filtered out of AE results');
     assert.equal(data.density_zones[0].name, 'Strait of Hormuz');
+    assert.equal(data.density_zones[0].ships_per_day, 45, 'camelCase wire field must map to snake_case output');
     assert.equal(data.disruptions[0].dark_ships, 3);
+    assert.equal(data.snapshot_at, new Date(1711620000000).toISOString(), 'snapshotAt wire field must populate snapshot_at');
     assert.ok(data.bounding_box?.sw_lat !== undefined, 'bounding_box must be present');
+  });
+
+  it('get_maritime_activity keeps dateline-adjacent results when the pad crosses ±180 (FJ)', async () => {
+    // FJ bbox is [-18.25, 177.34, -16.15, 180]: the +3° pad pushes the east
+    // edge to 183, so a point at -179 sits just across the dateline and MUST
+    // match (it is 1-4° away), while a genuinely distant Pacific point must
+    // not. The original filter only treated sw_lon > ne_lon as wrapped and
+    // silently dropped the -179 point.
+    globalThis.fetch = async (url) => {
+      if (url.toString().includes('/api/maritime/v1/get-vessel-snapshot')) {
+        return new Response(JSON.stringify({
+          snapshot: {
+            snapshotAt: 1711620000000,
+            densityZones: [
+              { name: 'Across the dateline', location: { latitude: -17.5, longitude: -179 }, intensity: 10, shipsPerDay: 20, deltaPct: 0, note: '' },
+              { name: 'West of Fiji in-box', location: { latitude: -17.0, longitude: 178.0 }, intensity: 5, shipsPerDay: 10, deltaPct: 0, note: '' },
+              { name: 'Far Pacific', location: { latitude: -17.5, longitude: -150 }, intensity: 3, shipsPerDay: 5, deltaPct: 0, note: '' },
+            ],
+            disruptions: [],
+          },
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      return originalFetch(url);
+    };
+
+    const res = await handler(makeReq('POST', {
+      jsonrpc: '2.0', id: 23, method: 'tools/call',
+      params: { name: 'get_maritime_activity', arguments: { country_code: 'FJ' } },
+    }));
+    const body = await res.json();
+    const data = JSON.parse(body.result.content[0].text);
+    const names = data.density_zones.map((z) => z.name).sort();
+    assert.deepEqual(names, ['Across the dateline', 'West of Fiji in-box'], 'dateline-adjacent point must match; far-Pacific point must not');
+  });
+
+  it('get_maritime_activity matches every longitude for full-span bboxes (AQ stored as -180..180)', async () => {
+    globalThis.fetch = async (url) => {
+      if (url.toString().includes('/api/maritime/v1/get-vessel-snapshot')) {
+        return new Response(JSON.stringify({
+          snapshot: {
+            snapshotAt: 1711620000000,
+            densityZones: [
+              { name: 'Drake Passage', location: { latitude: -65, longitude: -62 }, intensity: 4, shipsPerDay: 8, deltaPct: 0, note: '' },
+              { name: 'Ross Sea', location: { latitude: -75, longitude: 175 }, intensity: 1, shipsPerDay: 1, deltaPct: 0, note: '' },
+            ],
+            disruptions: [],
+          },
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      return originalFetch(url);
+    };
+
+    const res = await handler(makeReq('POST', {
+      jsonrpc: '2.0', id: 24, method: 'tools/call',
+      params: { name: 'get_maritime_activity', arguments: { country_code: 'AQ' } },
+    }));
+    const body = await res.json();
+    const data = JSON.parse(body.result.content[0].text);
+    assert.equal(data.total_zones, 2, 'a full-circle longitude span must not collapse under pad normalization');
+  });
+
+  it('get_maritime_activity works for countries whose bbox exceeds the 10° handler cap (e.g. JP)', async () => {
+    globalThis.fetch = async (url) => {
+      if (url.toString().includes('/api/maritime/v1/get-vessel-snapshot')) {
+        return new Response(JSON.stringify({
+          snapshot: {
+            snapshotAt: 1711620000000,
+            densityZones: [
+              { name: 'Tokyo Bay', location: { latitude: 35.4, longitude: 139.8 }, intensity: 60, shipsPerDay: 500, deltaPct: 1, note: '' },
+            ],
+            disruptions: [],
+          },
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      return originalFetch(url);
+    };
+
+    const res = await handler(makeReq('POST', {
+      jsonrpc: '2.0', id: 22, method: 'tools/call',
+      params: { name: 'get_maritime_activity', arguments: { country_code: 'JP' } },
+    }));
+    const body = await res.json();
+    assert.equal(body.error, undefined, 'JP (14°×16° bbox) must not error');
+    const data = JSON.parse(body.result.content[0].text);
+    assert.equal(data.total_zones, 1);
+    assert.equal(data.density_zones[0].name, 'Tokyo Bay');
   });
 
   it('get_maritime_activity returns error for unknown country code', async () => {
@@ -1455,88 +2373,9 @@ describe('api/mcp.ts — PRO MCP Server', () => {
 // ===========================================================================
 // U7 — Pro-path: McpAuthContext, INCR-first daily quota, internal-HMAC tool fetches
 // ===========================================================================
-
-const PRO_USER_ID = 'user_pro_xyz';
-const PRO_TOKEN_ID = 'k57mcptokenid';
-const PRO_BEARER = 'pro-bearer-uuid';
-const HMAC_SECRET = 'test-secret-mcp-internal-32-bytes-1234';
-
-/** Create a mock pipeline impl over an in-memory map for the daily counter. */
-function makePipelineMock({ initialCount = 0, throwOnIncr = false, decrFails = false } = {}) {
-  const store = new Map();
-  // Pre-seed via INCR-equivalent so newCount math lines up.
-  if (initialCount > 0) store.set('seed', initialCount);
-  let counter = initialCount;
-  const ops = [];
-  const pipeline = async (commands) => {
-    ops.push(commands);
-    if (throwOnIncr && commands.some((c) => c[0] === 'INCR')) {
-      throw new Error('redis pipeline failed');
-    }
-    if (decrFails && commands.some((c) => c[0] === 'DECR')) {
-      throw new Error('redis decr failed');
-    }
-    const out = [];
-    for (const cmd of commands) {
-      if (cmd[0] === 'INCR') {
-        counter += 1;
-        out.push({ result: counter });
-      } else if (cmd[0] === 'DECR') {
-        counter = Math.max(0, counter - 1);
-        out.push({ result: counter });
-      } else if (cmd[0] === 'EXPIRE') {
-        out.push({ result: 1 });
-      } else {
-        out.push({ result: null });
-      }
-    }
-    return out;
-  };
-  return {
-    pipeline,
-    ops,
-    get count() { return counter; },
-  };
-}
-
-function makeProDeps(overrides = {}) {
-  const pipe = makePipelineMock(overrides.pipelineOpts ?? {});
-  return {
-    deps: {
-      resolveBearerToContext: overrides.resolveBearerToContext ?? (async (token) => {
-        if (token === PRO_BEARER) return { kind: 'pro', userId: PRO_USER_ID, mcpTokenId: PRO_TOKEN_ID };
-        return null;
-      }),
-      validateProMcpToken: overrides.validateProMcpToken ?? (async (id) => {
-        if (id === PRO_TOKEN_ID) return { userId: PRO_USER_ID };
-        return null;
-      }),
-      getEntitlements: overrides.getEntitlements ?? (async () => ({
-        planKey: 'pro',
-        features: { tier: 1, mcpAccess: true },
-        validUntil: Date.now() + 86_400_000,
-      })),
-      redisPipeline: pipe.pipeline,
-    },
-    pipe,
-  };
-}
-
-function proReq(method = 'POST', body = null, headers = {}) {
-  return new Request(BASE_URL, {
-    method,
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${PRO_BEARER}`,
-      ...headers,
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-}
-
-function callBody(toolName, args = {}, id = 100) {
-  return { jsonrpc: '2.0', id, method: 'tools/call', params: { name: toolName, arguments: args } };
-}
+// Pro-path fixtures (PRO_USER_ID, makePipelineMock, makeProDeps, proReq,
+// callBody) live in tests/helpers/mcp-pro-deps.mjs so the concurrent-quota
+// and per-tool contract suites can share them.
 
 describe('api/mcp.ts — U7 Pro-path', () => {
   let mcpHandler;
@@ -1785,12 +2624,61 @@ describe('api/mcp.ts — U7 Pro-path', () => {
     assert.equal(pipe.count, 1, 'cache-only tool incremented quota');
   });
 
+  it('v1.5.0: describe_tool for Pro user is EXEMPT from the INCR/DECR daily-quota path (metadata-only)', async () => {
+    const { deps, pipe } = makeProDeps();
+    process.env.UPSTASH_REDIS_REST_URL = 'https://stub.upstash';
+    process.env.UPSTASH_REDIS_REST_TOKEN = 'stub';
+    globalThis.fetch = async () => new Response(JSON.stringify({ result: JSON.stringify({ ok: 1 }) }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    // describe_tool is the v1.5.0 metadata escape hatch. SERVER_INSTRUCTIONS
+    // actively encourages calling it while choosing tools, so it must NOT
+    // consume daily quota — otherwise a Pro user at the 50/day cap can't
+    // even fetch tool definitions. Rate limit (60/min) still applies.
+    const res = await mcpHandler(proReq('POST', callBody('describe_tool', { tool_name: 'get_market_data' })), deps);
+    assert.equal(res.status, 200);
+    assert.equal(pipe.count, 0, 'describe_tool MUST NOT increment the Pro daily quota');
+  });
+
+  it('telemetry: Pro-path tools/call AND initialize emit raw user_id === PRO_USER_ID (un-hashed)', async () => {
+    // Pro context carries a real Clerk userId — it is an internal ID, not
+    // secret material, so the log-safe principal is the raw userId itself
+    // (matches the REST gateway's customer_id convention). This locks in
+    // the Pro branch of principalIdForLog against future regressions to
+    // hashing/redacting/aliasing.
+    process.env.MCP_TELEMETRY = 'true';
+    process.env.UPSTASH_REDIS_REST_URL = 'https://stub.upstash';
+    process.env.UPSTASH_REDIS_REST_TOKEN = 'stub';
+    const { deps } = makeProDeps();
+    globalThis.fetch = async () => new Response(JSON.stringify({ result: JSON.stringify({ ok: 1 }) }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+
+    const captured = [];
+    const origLog = console.log;
+    console.log = (line) => captured.push(line);
+    try {
+      const initRes = await mcpHandler(proReq('POST', initBody(700)), deps);
+      assert.equal(initRes.status, 200, 'initialize must succeed for Pro');
+      const callRes = await mcpHandler(proReq('POST', callBody('get_market_data', {}, 701)), deps);
+      assert.equal(callRes.status, 200, 'tools/call must succeed for Pro');
+    } finally {
+      console.log = origLog;
+    }
+
+    const init = captured.filter((l) => l && typeof l === 'object' && !Array.isArray(l) && l.tag === 'mcp.tools_list_emitted');
+    assert.equal(init.length, 1, `expected exactly one mcp.tools_list_emitted line, got ${init.length}`);
+    assert.equal(init[0].auth_kind, 'pro');
+    assert.equal(init[0].user_id, PRO_USER_ID, 'initialize user_id MUST be the raw Clerk userId on the Pro path');
+
+    const tc = captured.filter((l) => l && typeof l === 'object' && !Array.isArray(l) && l.tag === 'mcp.toolcall');
+    assert.equal(tc.length, 1, `expected exactly one mcp.toolcall line, got ${tc.length}`);
+    assert.equal(tc[0].auth_kind, 'pro');
+    assert.equal(tc[0].user_id, PRO_USER_ID, 'tools/call user_id MUST be the raw Clerk userId on the Pro path');
+  });
+
   it('integration: signed header for /api/news/v1/list-feed-digest cannot be replayed against /api/intelligence/v1/deduct-situation', async () => {
     const { signInternalMcpRequest, hmacSha256Base64Url, canonicalQueryString, sha256Hex, buildHmacPayload } = await import(`../server/_shared/mcp-internal-hmac.ts?t=${Date.now()}`);
     // Sign for digest endpoint.
     const signed = await signInternalMcpRequest({
       method: 'GET',
-      url: 'https://worldmonitor.app/api/news/v1/list-feed-digest?lang=en&variant=geo',
+      url: 'https://worldmonitor.app/api/news/v1/list-feed-digest?lang=en&variant=full',
       body: null,
       userId: PRO_USER_ID,
       secret: HMAC_SECRET,

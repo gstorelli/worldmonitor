@@ -113,12 +113,21 @@ import {
 import type { GulfInvestment } from '@/types';
 import { resolveTradeRouteSegments, TRADE_ROUTES as TRADE_ROUTES_LIST, type TradeRouteSegment, type TradeRouteStatus } from '@/config/trade-routes';
 import type { ScenarioVisualState } from '@/config/scenario-templates';
-import { getLayersForVariant, resolveLayerLabel, bindLayerSearch, type MapVariant } from '@/config/map-layer-definitions';
+import {
+  getLayersForVariant,
+  resolveLayerLabel,
+  bindLayerSearch,
+  getLayerExplanation,
+  hasCuratedLayerExplanation,
+  type MapVariant,
+} from '@/config/map-layer-definitions';
+import { renderLayerExplanationCard } from '@/utils/layer-explanation-card';
 import { getAuthState, subscribeAuthState } from '@/services/auth-state';
 import { onEntitlementChange } from '@/services/entitlements';
 import { hasPremiumAccess } from '@/services/panel-gating';
 import { trackGateHit } from '@/services/analytics';
 import { MapPopup, type PopupType } from './MapPopup';
+import { renderMilitaryVesselTooltipHtml } from './deckgl-tooltip-renderers';
 import type { GetChokepointStatusResponse } from '@/services/supply-chain';
 import {
   updateHotspotEscalation,
@@ -128,6 +137,7 @@ import {
   setGeoAlertGetter,
 } from '@/services/hotspot-escalation';
 import { getCountryScore } from '@/services/country-instability';
+import { getCachedCountryScoreValue } from '@/services/cached-risk-scores';
 import { getAlertsNearLocation } from '@/services/geo-convergence';
 import type { PositiveGeoEvent } from '@/services/positive-events-geo';
 import type { KindnessPoint } from '@/services/kindness-data';
@@ -141,12 +151,25 @@ import type { ResilienceRankingItem } from '@/services/resilience';
 import {
   RESILIENCE_CHOROPLETH_COLORS,
   buildResilienceChoroplethMap,
+  formatResilienceChoroplethLevel,
   normalizeExclusiveChoropleths,
 } from './resilience-choropleth-utils';
+import { formatResilienceServerLevel } from './resilience-widget-utils';
 
 import { isAllowedPreviewUrl } from '@/utils/imagery-preview';
 const { fetchWebcamImage, pinWebcam, isPinned } = { fetchWebcamImage: async (_id: any) => ({ thumbnailUrl: '', playerUrl: '', title: '' } as any), pinWebcam: (_id: any) => {}, isPinned: (_id: any) => false };
 import type { WebcamEntry, WebcamCluster } from '@/generated/client/worldmonitor/webcam/v1/service_client';
+import { setTrustedHtml, trustedHtml } from '@/utils/dom-utils';
+import {
+  createCountryClickGestureTracker,
+  finishCountryClickGesture,
+  markCountryClickDrag,
+  refreshCountryClickDragSuppression,
+  shouldSuppressCountryClick,
+  startCountryClickGesture,
+  updateCountryClickGestureDrag,
+  type CountryClickGestureTracker,
+} from './map-interaction-guard';
 
 export type TimeRange = '1h' | '6h' | '24h' | '48h' | '7d' | 'all';
 export type DeckMapView = 'global' | 'america' | 'mena' | 'eu' | 'asia' | 'latam' | 'africa' | 'oceania';
@@ -406,6 +429,63 @@ const TRADE_GC_INTERPOLATION_POINTS = 20;
 const CHOKEPOINT_PULSE_FREQ = 0.01;
 const CHOKEPOINT_PULSE_AMP = 0.3;
 
+// Process-wide guard so the window error listener for the deck.gl/maplibre
+// interleaved-mode render race is installed exactly once even if a hot-reload
+// or recreateWithFallback rebuilds the map.
+let __deckInterleavedRaceFilterInstalled = false;
+
+const DECK_INTERLEAVED_RACE_MESSAGE_RE = /Cannot read properties of null \(reading 'id'\)|null is not an object \(evaluating '[\w.]+\.id'\)/;
+const DECK_INTERLEAVED_RACE_SOURCE_RE = /(?:^|[/(])deck-stack-[A-Za-z0-9_-]+\.js/;
+
+/**
+ * Swallow the well-known deck.gl 9.x + maplibre-gl 5.x interleaved-mode race:
+ *
+ *   Uncaught TypeError: Cannot read properties of null (reading 'id')
+ *     at DeckRenderer._drawLayers (deck-stack-*.js)
+ *     at LayerManager.renderLayers
+ *     at MapLibre painter.renderLayer (maplibre-*.js)
+ *
+ * Trigger: setProps({layers}) → deck _resolveLayers calls maplibre.removeLayer
+ * for a layer that's being swapped → maplibre schedules a triggerRepaint that
+ * fires the next frame → that repaint runs deck's `render()` via maplibre's
+ * custom-layer hook → deck iterates the layer list and hits a layer that was
+ * finalized between resolveLayers and renderLayers.
+ *
+ * MapboxOverlay's own onError is bypassed because maplibre — not deck — owns
+ * the render-loop callstack here (deck doesn't see the throw, so onError is
+ * never invoked). The next frame renders cleanly with no user-visible
+ * artifact, so swallowing here is safe.
+ *
+ * Sentry's beforeSend in main.ts already filters this exact pattern for
+ * telemetry, but the browser still logs "Uncaught TypeError" to the console
+ * — this listener suppresses that.
+ *
+ * Narrow on BOTH the message shape AND deck-stack chunk evidence so an
+ * unrelated null-id crash in first-party code still surfaces. Some browsers
+ * surface the exception through Sentry's rAF wrapper, so ev.filename can point
+ * at sentry-*.js while ev.error.stack still contains deck-stack-*.js.
+ */
+function installDeckInterleavedRaceFilter(): void {
+  if (__deckInterleavedRaceFilterInstalled) return;
+  __deckInterleavedRaceFilterInstalled = true;
+  window.addEventListener('error', (ev) => {
+    const msg = ev.error?.message ?? ev.message ?? '';
+    const file = ev.filename ?? '';
+    const stack = typeof ev.error?.stack === 'string' ? ev.error.stack : '';
+    const source = `${file}\n${stack}`;
+    if (
+      DECK_INTERLEAVED_RACE_MESSAGE_RE.test(msg)
+      && DECK_INTERLEAVED_RACE_SOURCE_RE.test(source)
+    ) {
+      ev.preventDefault();
+      ev.stopImmediatePropagation();
+      if (import.meta.env.DEV) {
+        console.warn('[DeckGLMap] swallowed interleaved-mode render race (deck.gl/maplibre)');
+      }
+    }
+  }, { capture: true });
+}
+
 export class DeckGLMap {
   private static readonly MAX_CLUSTER_LEAVES = 200;
 
@@ -512,6 +592,47 @@ export class DeckGLMap {
   private onTimeRangeChange?: (range: TimeRange) => void;
   private onCountryClick?: (country: CountryClickPayload) => void;
   private onMapContextMenu?: (payload: { lat: number; lon: number; screenX: number; screenY: number; countryCode?: string; countryName?: string }) => void;
+  private readonly countryClickGesture: CountryClickGestureTracker = createCountryClickGestureTracker();
+  private readonly handleCountryClickPointerDown = (e: PointerEvent): void => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    if (e.isPrimary === false) return;
+    startCountryClickGesture(this.countryClickGesture, { x: e.clientX, y: e.clientY });
+  };
+  private readonly handleCountryClickPointerMove = (e: PointerEvent): void => {
+    if (e.isPrimary === false) return;
+    updateCountryClickGestureDrag(this.countryClickGesture, { x: e.clientX, y: e.clientY });
+  };
+  private readonly handleCountryClickPointerEnd = (): void => {
+    finishCountryClickGesture(this.countryClickGesture);
+  };
+  private readonly markCountryDragGesture = (): void => {
+    markCountryClickDrag(this.countryClickGesture);
+  };
+  private readonly refreshCountryDragSuppression = (): void => {
+    refreshCountryClickDragSuppression(this.countryClickGesture);
+  };
+  private attachMapLibreInteractionHandlers(): void {
+    if (!this.maplibreMap) return;
+    const canvas = this.maplibreMap.getCanvas();
+    canvas.addEventListener('contextmenu', this.handleContextMenu);
+    canvas.addEventListener('pointerdown', this.handleCountryClickPointerDown);
+    canvas.addEventListener('pointermove', this.handleCountryClickPointerMove);
+    canvas.addEventListener('pointerup', this.handleCountryClickPointerEnd);
+    canvas.addEventListener('pointercancel', this.handleCountryClickPointerEnd);
+    this.maplibreMap.on('dragstart', this.markCountryDragGesture);
+    this.maplibreMap.on('dragend', this.refreshCountryDragSuppression);
+  }
+  private detachMapLibreInteractionHandlers(): void {
+    if (!this.maplibreMap) return;
+    const canvas = this.maplibreMap.getCanvas();
+    this.maplibreMap.off('dragstart', this.markCountryDragGesture);
+    this.maplibreMap.off('dragend', this.refreshCountryDragSuppression);
+    canvas.removeEventListener('contextmenu', this.handleContextMenu);
+    canvas.removeEventListener('pointerdown', this.handleCountryClickPointerDown);
+    canvas.removeEventListener('pointermove', this.handleCountryClickPointerMove);
+    canvas.removeEventListener('pointerup', this.handleCountryClickPointerEnd);
+    canvas.removeEventListener('pointercancel', this.handleCountryClickPointerEnd);
+  }
   private readonly handleContextMenu = (e: MouseEvent): void => {
     e.preventDefault();
     if (!this.onMapContextMenu || !this.maplibreMap) return;
@@ -787,9 +908,9 @@ export class DeckGLMap {
 
     const attribution = document.createElement('div');
     attribution.className = 'map-attribution';
-    attribution.innerHTML = isHappyVariant
+    setTrustedHtml(attribution, trustedHtml(isHappyVariant
       ? '© <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a> © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>'
-      : '© <a href="https://protomaps.com" target="_blank" rel="noopener">Protomaps</a> © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>';
+      : '© <a href="https://protomaps.com" target="_blank" rel="noopener">Protomaps</a> © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>', "legacy direct innerHTML migration"));
     wrapper.appendChild(attribution);
 
     this.container.appendChild(wrapper);
@@ -814,7 +935,7 @@ export class DeckGLMap {
     if (!isHappyVariant && typeof primaryStyle === 'string' && !primaryStyle.includes('pmtiles')) {
       this.usedFallbackStyle = true;
       const attr = this.container.querySelector('.map-attribution');
-      if (attr) attr.innerHTML = '© <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>';
+      if (attr) setTrustedHtml(attr, trustedHtml('© <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>', "legacy direct innerHTML migration"));
     }
 
     const basemapEl = document.getElementById('deckgl-basemap');
@@ -845,7 +966,8 @@ export class DeckGLMap {
       const fallback = isLightMapTheme(initialMapTheme) ? FALLBACK_LIGHT_STYLE : FALLBACK_DARK_STYLE;
       console.warn(`[DeckGLMap] Primary basemap failed, recreating with fallback: ${fallback}`);
       const attr = this.container.querySelector('.map-attribution');
-      if (attr) attr.innerHTML = '© <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>';
+      if (attr) setTrustedHtml(attr, trustedHtml('© <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>', "legacy direct innerHTML migration"));
+      this.detachMapLibreInteractionHandlers();
       this.maplibreMap?.remove();
       const fallbackEl = document.getElementById('deckgl-basemap');
       if (!fallbackEl) return;
@@ -868,6 +990,7 @@ export class DeckGLMap {
           : {}),
       });
       this.maplibreMap.on('load', () => {
+        this.attachMapLibreInteractionHandlers();
         localizeMapLabels(this.maplibreMap);
         this.initDeck();
         this.loadCountryBoundaries();
@@ -939,11 +1062,13 @@ export class DeckGLMap {
       }
     });
 
-    this.maplibreMap.getCanvas().addEventListener('contextmenu', this.handleContextMenu);
+    this.attachMapLibreInteractionHandlers();
   }
 
   private initDeck(): void {
     if (!this.maplibreMap) return;
+
+    installDeckInterleavedRaceFilter();
 
     this.deckOverlay = new MapboxOverlay({
       interleaved: true,
@@ -1551,9 +1676,12 @@ export class DeckGLMap {
 
     // Pipelines layer — Redis-backed evidence registry (seed-pipelines-{gas,oil}.mjs),
     // colored by derived publicBadge. Available on every variant that toggles
-    // `pipelines: true`. The legacy static `PIPELINES` fallback was retired in
-    // the gap #3B rollout (plan §R/#3 decision B); createPipelinesLayer is kept
-    // in this file as a dead-code reference until the next cleanup pass.
+    // `pipelines: true`. createEnergyPipelinesLayer falls back to the legacy
+    // static `PIPELINES` layer (createPipelinesLayer below) when the bootstrap
+    // hasn't hydrated yet, so the static layer is a real fallback — not dead
+    // code despite an earlier comment claiming it was retired in the gap #3B
+    // rollout. Removing createPipelinesLayer would leave the map blank on
+    // cold loads / variant switches before the first hydrate.
     if (mapLayers.pipelines) {
       layers.push(this.createEnergyPipelinesLayer());
     } else {
@@ -2584,12 +2712,18 @@ export class DeckGLMap {
         if (d.severity === 'severe') return 15000;
         if (d.severity === 'major') return 12000;
         if (d.severity === 'moderate') return 10000;
+        // 'unknown' = no telemetry (#3707). Keep the marker visible but
+        // small so it doesn't compete with real alerts.
+        if (d.severity === 'unknown') return 6000;
         return 8000;
       },
       getFillColor: (d) => {
         if (d.severity === 'severe') return [255, 50, 50, 200] as [number, number, number, number];
         if (d.severity === 'major') return [255, 150, 0, 200] as [number, number, number, number];
         if (d.severity === 'moderate') return [255, 200, 100, 180] as [number, number, number, number];
+        // 'unknown' renders desaturated grey — distinct from the lighter grey
+        // used for 'normal' so users can tell "no data" from "healthy".
+        if (d.severity === 'unknown') return [120, 120, 130, 120] as [number, number, number, number];
         return [180, 180, 180, 150] as [number, number, number, number];
       },
       radiusMinPixels: 4,
@@ -4252,7 +4386,7 @@ export class DeckGLMap {
       case 'earthquakes-layer':
         return { html: `<div class="deckgl-tooltip"><strong>M${(obj.magnitude || 0).toFixed(1)} ${t('components.deckgl.tooltip.earthquake')}</strong><br/>${text(obj.place)}</div>` };
       case 'military-vessels-layer':
-        return { html: `<div class="deckgl-tooltip"><strong>${text(obj.name)}</strong><br/>${text(obj.operatorCountry)}</div>` };
+        return { html: renderMilitaryVesselTooltipHtml(obj, t) };
       case 'military-flights-layer':
         return { html: `<div class="deckgl-tooltip"><strong>${text(obj.callsign || obj.registration || t('components.deckgl.tooltip.militaryAircraft'))}</strong><br/>${text(obj.type)}</div>` };
       case 'military-vessel-clusters-layer':
@@ -4479,8 +4613,15 @@ export class DeckGLMap {
         }
         const [red, green, blue] = RESILIENCE_CHOROPLETH_COLORS[resilienceEntry.level];
         const levelColor = `rgb(${red}, ${green}, ${blue})`;
+        const visualBand = formatResilienceChoroplethLevel(resilienceEntry.level);
+        const serverLevel = formatResilienceServerLevel(resilienceEntry.serverLevel);
+        const confidenceNote = resilienceEntry.lowConfidence
+          ? '<br/><span style="opacity:.7">Low confidence</span>'
+          : resilienceEntry.outsideHeadlineRanking
+            ? '<br/><span style="opacity:.7">Outside headline ranking</span>'
+            : '';
         return {
-          html: `<div class="deckgl-tooltip"><strong>${text(resilienceName)}</strong><br/>Resilience: <span style="color:${levelColor};font-weight:600">${resilienceEntry.overallScore.toFixed(1)}/100</span><br/><span style="text-transform:capitalize;opacity:.7">${text(resilienceEntry.serverLevel)}</span>${resilienceEntry.lowConfidence ? '<br/><span style="opacity:.7">Low confidence</span>' : ''}</div>`,
+          html: `<div class="deckgl-tooltip"><strong>${text(resilienceName)}</strong><br/>Resilience: <span style="color:${levelColor};font-weight:600">${resilienceEntry.overallScore.toFixed(1)}/100</span><br/><span style="text-transform:capitalize;opacity:.7">Visual band: ${text(visualBand)}</span><br/><span style="text-transform:capitalize;opacity:.7">API level: ${text(serverLevel)}</span>${confidenceNote}</div>`,
         };
       }
       case 'species-recovery-layer': {
@@ -4537,6 +4678,7 @@ export class DeckGLMap {
     const isChoropleth = info.layer?.id ? DeckGLMap.CHOROPLETH_LAYER_IDS.has(info.layer.id) : false;
     if (!info.object || isChoropleth) {
       if (info.coordinate && this.onCountryClick) {
+        if (this.shouldSuppressCountryClickAfterDrag()) return;
         const [lon, lat] = info.coordinate as [number, number];
         let country: { code: string; name: string } | null = null;
         if (isChoropleth && info.object?.properties) {
@@ -4909,7 +5051,7 @@ export class DeckGLMap {
   private createControls(): void {
     const controls = document.createElement('div');
     controls.className = 'map-controls deckgl-controls';
-    controls.innerHTML = `
+    setTrustedHtml(controls, trustedHtml(`
       <div class="zoom-controls">
         <button class="map-btn zoom-in" title="${t('components.deckgl.zoomIn')}">+</button>
         <button class="map-btn zoom-out" title="${t('components.deckgl.zoomOut')}">-</button>
@@ -4927,7 +5069,7 @@ export class DeckGLMap {
           <option value="oceania">${t('components.deckgl.views.oceania')}</option>
         </select>
       </div>
-    `;
+    `, "legacy direct innerHTML migration"));
 
     this.container.appendChild(controls);
 
@@ -4957,7 +5099,7 @@ export class DeckGLMap {
   private createTimeSlider(): void {
     const slider = document.createElement('div');
     slider.className = 'time-slider deckgl-time-slider';
-    slider.innerHTML = `
+    setTrustedHtml(slider, trustedHtml(`
       <div class="time-options">
         <button class="time-btn ${this.state.timeRange === '1h' ? 'active' : ''}" data-range="1h">1h</button>
         <button class="time-btn ${this.state.timeRange === '6h' ? 'active' : ''}" data-range="6h">6h</button>
@@ -4966,7 +5108,7 @@ export class DeckGLMap {
         <button class="time-btn ${this.state.timeRange === '7d' ? 'active' : ''}" data-range="7d">7d</button>
         <button class="time-btn ${this.state.timeRange === 'all' ? 'active' : ''}" data-range="all">${t('components.deckgl.timeAll')}</button>
       </div>
-    `;
+    `, "legacy direct innerHTML migration"));
 
     this.container.appendChild(slider);
 
@@ -4998,9 +5140,11 @@ export class DeckGLMap {
       label: resolveLayerLabel(def, t),
       icon: def.icon,
       premium: def.premium,
+      explainLabel: escapeHtml(`Explain ${resolveLayerLabel(def, t)} layer`),
+      hasExplanation: hasCuratedLayerExplanation(def.key),
     }));
 
-    toggles.innerHTML = `
+    setTrustedHtml(toggles, trustedHtml(`
       <div class="toggle-header">
         <span>${t('components.deckgl.layersTitle')}</span>
         <button class="layer-help-btn" title="${t('components.deckgl.layerGuide')}">?</button>
@@ -5008,18 +5152,21 @@ export class DeckGLMap {
       </div>
       <input type="text" class="layer-search" placeholder="${t('components.deckgl.layerSearch')}" autocomplete="off" spellcheck="false" />
       <div class="toggle-list" style="max-height: 32vh; overflow-y: auto; scrollbar-width: thin;">
-        ${layerConfig.map(({ key, label, icon, premium }) => {
+        ${layerConfig.map(({ key, label, icon, premium, explainLabel, hasExplanation }) => {
           const isLocked = premium === 'locked' && !premiumUnlocked;
           const isEnhanced = premium === 'enhanced' && !premiumUnlocked;
           return `
-          <label class="layer-toggle${isLocked ? ' layer-toggle-locked' : ''}" data-layer="${key}">
-            <input type="checkbox" ${this.state.layers[key as keyof MapLayers] ? 'checked' : ''}${isLocked ? ' disabled' : ''}>
-            <span class="toggle-icon">${icon}</span>
-            <span class="toggle-label">${label}${isLocked ? ' \uD83D\uDD12' : ''}${isEnhanced ? ' <span class="layer-pro-badge">PRO</span>' : ''}</span>
-          </label>`;
+          <div class="layer-toggle-row" data-layer="${key}">
+            <label class="layer-toggle${isLocked ? ' layer-toggle-locked' : ''}" data-layer="${key}">
+              <input type="checkbox" ${this.state.layers[key as keyof MapLayers] ? 'checked' : ''}${isLocked ? ' disabled' : ''}>
+              <span class="toggle-icon">${icon}</span>
+              <span class="toggle-label">${label}${isLocked ? ' \uD83D\uDD12' : ''}${isEnhanced ? ' <span class="layer-pro-badge">PRO</span>' : ''}</span>
+            </label>
+            <button type="button" class="layer-explain-btn${hasExplanation ? ' has-layer-explanation' : ''}" data-layer="${key}" aria-label="${explainLabel}" title="${explainLabel}">i</button>
+          </div>`;
         }).join('')}
       </div>
-    `;
+    `, "legacy direct innerHTML migration"));
 
     const authorBadge = document.createElement('div');
     authorBadge.className = 'map-author-badge';
@@ -5093,6 +5240,15 @@ export class DeckGLMap {
     });
     this.enforceLayerLimit();
 
+    toggles.querySelectorAll('.layer-explain-btn').forEach(button => {
+      button.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const layer = (button as HTMLElement).getAttribute('data-layer') as keyof MapLayers | null;
+        if (layer) this.showLayerExplanation(layer);
+      });
+    });
+
     // Help button
     const helpBtn = toggles.querySelector('.layer-help-btn');
     helpBtn?.addEventListener('click', () => this.showLayerHelp());
@@ -5116,8 +5272,40 @@ export class DeckGLMap {
     collapseBtn?.addEventListener('click', () => {
       toggleList?.classList.toggle('collapsed');
       if (searchEl) searchEl.style.display = toggleList?.classList.contains('collapsed') ? 'none' : '';
-      if (collapseBtn) collapseBtn.innerHTML = toggleList?.classList.contains('collapsed') ? '&#9654;' : '&#9660;';
+      if (collapseBtn) setTrustedHtml(collapseBtn, trustedHtml(toggleList?.classList.contains('collapsed') ? '&#9654;' : '&#9660;', "legacy direct innerHTML migration"));
     });
+  }
+
+  private showLayerExplanation(layer: keyof MapLayers): void {
+    const existing = this.container.querySelector('.layer-explanation-popup') as HTMLElement | null;
+    if (existing?.dataset.layer === layer) {
+      existing.remove();
+      this.container.querySelector(`.layer-explain-btn[data-layer="${layer}"]`)?.classList.remove('active');
+      return;
+    }
+    existing?.remove();
+    this.container.querySelector('.layer-help-popup')?.remove();
+    this.container.querySelectorAll('.layer-explain-btn.active').forEach(btn => btn.classList.remove('active'));
+
+    const def = getLayersForVariant((SITE_VARIANT || 'full') as MapVariant, 'flat').find(item => item.key === layer);
+    const layerLabel = def ? resolveLayerLabel(def, t) : String(layer);
+    const explanation = getLayerExplanation(layer);
+    const popup = document.createElement('div');
+    popup.className = 'layer-explanation-popup';
+    popup.dataset.layer = layer;
+    setTrustedHtml(popup, trustedHtml(
+      renderLayerExplanationCard(layerLabel, explanation),
+      "static layer explanation metadata",
+    ));
+
+    const closePopup = (): void => {
+      popup.remove();
+      this.container.querySelector(`.layer-explain-btn[data-layer="${layer}"]`)?.classList.remove('active');
+    };
+
+    popup.querySelector('.layer-explanation-close')?.addEventListener('click', closePopup);
+    this.container.appendChild(popup);
+    this.container.querySelector(`.layer-explain-btn[data-layer="${layer}"]`)?.classList.add('active');
   }
 
   /** Show layer help popup explaining each layer */
@@ -5127,6 +5315,8 @@ export class DeckGLMap {
       existing.remove();
       return;
     }
+    this.container.querySelector('.layer-explanation-popup')?.remove();
+    this.container.querySelectorAll('.layer-explain-btn.active').forEach(btn => btn.classList.remove('active'));
 
     const popup = document.createElement('div');
     popup.className = 'layer-help-popup';
@@ -5252,11 +5442,11 @@ export class DeckGLMap {
       </div>
     `;
 
-    popup.innerHTML = SITE_VARIANT === 'tech'
+    setTrustedHtml(popup, trustedHtml(SITE_VARIANT === 'tech'
       ? techHelpContent
       : SITE_VARIANT === 'finance'
         ? financeHelpContent
-        : fullHelpContent;
+        : fullHelpContent, "legacy direct innerHTML migration"));
 
     popup.querySelector('.layer-help-close')?.addEventListener('click', () => popup.remove());
 
@@ -5368,17 +5558,17 @@ export class DeckGLMap {
               ...resilienceLegendItems,
             ];
 
-    legend.innerHTML = `
+    setTrustedHtml(legend, trustedHtml(`
       <span class="legend-label-title">${t('components.deckgl.legend.title')}</span>
       ${legendItems.map(({ shape, label, layerKey }) => `<span class="legend-item" data-layer="${layerKey}">${shape}<span class="legend-label">${label}</span></span>`).join('')}
-    `;
+    `, "legacy direct innerHTML migration"));
 
     // CII choropleth gradient legend (shown when layer is active)
     const ciiLegend = document.createElement('div');
     ciiLegend.className = 'cii-choropleth-legend';
     ciiLegend.id = 'ciiChoroplethLegend';
     ciiLegend.style.display = this.state.layers.ciiChoropleth ? 'block' : 'none';
-    ciiLegend.innerHTML = `
+    setTrustedHtml(ciiLegend, trustedHtml(`
       <span class="legend-label-title" style="font-size:9px;letter-spacing:0.5px;">CII SCALE</span>
       <div style="display:flex;align-items:center;gap:2px;margin-top:2px;">
         <div style="width:100%;height:8px;border-radius:3px;background:linear-gradient(to right,#28b33e,#dcc030,#e87425,#dc2626,#7f1d1d);"></div>
@@ -5386,7 +5576,7 @@ export class DeckGLMap {
       <div style="display:flex;justify-content:space-between;font-size:8px;opacity:0.7;margin-top:1px;">
         <span>0</span><span>31</span><span>51</span><span>66</span><span>81</span><span>100</span>
       </div>
-    `;
+    `, "legacy direct innerHTML migration"));
     legend.appendChild(ciiLegend);
 
     this.container.appendChild(legend);
@@ -6542,7 +6732,7 @@ export class DeckGLMap {
   }
 
   public initEscalationGetters(): void {
-    setCIIGetter(getCountryScore);
+    setCIIGetter((code) => getCachedCountryScoreValue(code) ?? getCountryScore(code));
     setGeoAlertGetter(getAlertsNearLocation);
   }
 
@@ -6554,7 +6744,11 @@ export class DeckGLMap {
     const togglesEl = this.container.querySelector('.deckgl-layer-toggles');
     if (!togglesEl) return;
     const activeCount = Array.from(togglesEl.querySelectorAll<HTMLInputElement>('.layer-toggle input'))
-      .filter(i => (i.closest('.layer-toggle') as HTMLElement)?.style.display !== 'none')
+      .filter(i => {
+        const toggle = i.closest('.layer-toggle') as HTMLElement | null;
+        const row = i.closest('.layer-toggle-row') as HTMLElement | null;
+        return toggle?.style.display !== 'none' && row?.style.display !== 'none';
+      })
       .filter(i => i.checked).length;
     const increasing = activeCount > this.lastActiveLayerCount;
     this.lastActiveLayerCount = activeCount;
@@ -6570,7 +6764,9 @@ export class DeckGLMap {
   public hideLayerToggle(layer: keyof MapLayers): void {
     const toggle = this.container.querySelector(`.layer-toggle[data-layer="${layer}"]`);
     if (toggle) {
-      (toggle as HTMLElement).style.display = 'none';
+      const row = toggle.closest('.layer-toggle-row') as HTMLElement | null;
+      const target = (row ?? toggle) as HTMLElement;
+      target.style.display = 'none';
       toggle.setAttribute('data-layer-hidden', '');
     }
   }
@@ -6818,6 +7014,10 @@ export class DeckGLMap {
   }
 
   // --- Country click + highlight ---
+
+  private shouldSuppressCountryClickAfterDrag(): boolean {
+    return shouldSuppressCountryClick(this.countryClickGesture);
+  }
 
   public setOnCountryClick(cb: (country: CountryClickPayload) => void): void {
     this.onCountryClick = cb;
@@ -7188,9 +7388,9 @@ export class DeckGLMap {
 
     this.deckOverlay?.finalize();
     this.deckOverlay = null;
-    this.maplibreMap?.getCanvas().removeEventListener('contextmenu', this.handleContextMenu);
+    this.detachMapLibreInteractionHandlers();
     this.maplibreMap?.remove();
     this.maplibreMap = null;
-    this.container.innerHTML = '';
+    setTrustedHtml(this.container, trustedHtml('', "legacy direct innerHTML migration"));
   }
 }

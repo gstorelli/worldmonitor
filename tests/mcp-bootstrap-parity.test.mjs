@@ -15,6 +15,7 @@ import assert from 'node:assert/strict';
 
 import { __testing__ as healthTesting } from '../api/health.js';
 import { __testing__ as mcpTesting } from '../api/mcp.ts';
+import { CII_RISK_SCORE_CACHE_KEYS } from '../api/_cii-risk-cache-keys.js';
 
 const { BOOTSTRAP_KEYS, STANDALONE_KEYS } = healthTesting;
 const { TOOL_REGISTRY } = mcpTesting;
@@ -45,6 +46,8 @@ const EXCLUDED_FROM_MCP = new Map([
     'intermediate: data flows through transit-summaries:v1 (matches api/health.js:461 ON_DEMAND_KEYS rationale; explicitly NOT bundled into get_chokepoint_status to avoid duplicate exposure).'],
   ['military:forecast-inputs:stale:v1',
     'intermediate: seed-to-seed pipeline key, only populated after seed-military-flights runs (matches api/health.js:463 ON_DEMAND_KEYS rationale).'],
+  ['intelligence:military-cii:v1',
+    'intermediate: per-country military-presence aggregate (own/foreign flights+vessels, AIS disruption buckets) read by server/worldmonitor/intelligence/v1/get-risk-scores.ts to feed the CII Security component; surfaces transitively via the country-risk score returned by get_country_risk. Not a queryable MCP slice on its own.'],
 
   // ===========================================================================
   // Cascade-mirror fallbacks (live/stale/backup of a sibling already exposed)
@@ -53,8 +56,8 @@ const EXCLUDED_FROM_MCP = new Map([
     'cascade-mirror: live counterpart of theater_posture:sebuf:stale:v1 (covered by get_military_posture). CASCADE_GROUPS theaterPosture entry.'],
   ['theater-posture:sebuf:backup:v1',
     'cascade-mirror: backup counterpart of theater_posture:sebuf:stale:v1 (covered by get_military_posture). CASCADE_GROUPS theaterPosture entry.'],
-  ['risk:scores:sebuf:v1',
-    'cascade-mirror: live counterpart of risk:scores:sebuf:stale:v1 (covered by get_conflict_events).'],
+  [CII_RISK_SCORE_CACHE_KEYS.live,
+    `cascade-mirror: live counterpart of ${CII_RISK_SCORE_CACHE_KEYS.stale} (covered by get_conflict_events).`],
   ['military:flights:v1',
     'cascade-mirror: live counterpart of military:flights:stale:v1 — deferred to a future expanded military tool (no current tool exposes either variant).'],
   ['military:flights:stale:v1',
@@ -68,13 +71,13 @@ const EXCLUDED_FROM_MCP = new Map([
   ['positive-events:geo:v1',
     'cascade-mirror: live counterpart of positive_events:geo-bootstrap:v1 (covered by get_positive_events).'],
   ['aviation:delays:faa:v1',
-    'cascade-mirror: RPC variant of aviation:delays-bootstrap:v1 (covered by get_aviation_status). Same seed-meta key (seed-meta:aviation:faa).'],
+    'cascade-mirror: RPC variant of aviation:delays-bootstrap:v2 (covered by get_aviation_status). Same seed-meta key (seed-meta:aviation:faa).'],
   ['cyber:threats:v2',
     'cascade-mirror: RPC variant of cyber:threats-bootstrap:v2 (covered by get_cyber_threats). Same seed-meta key (seed-meta:cyber:threats).'],
   ['aviation:delays:intl:v3',
-    'cascade-mirror: international delays sibling of aviation:delays-bootstrap:v1 (covered by get_aviation_status) — deferred to a future expanded aviation tool that exposes the intl variant directly.'],
+    'cascade-mirror: international delays sibling of aviation:delays-bootstrap:v2 (covered by get_aviation_status) — deferred to a future expanded aviation tool that exposes the intl variant directly.'],
   ['aviation:notam:closures:v2',
-    'cascade-mirror: NOTAM closures sibling of aviation:delays-bootstrap:v1 (covered by get_aviation_status) — deferred to a future expanded aviation tool that exposes NOTAMs directly.'],
+    'cascade-mirror: NOTAM closures sibling of aviation:delays-bootstrap:v2 (covered by get_aviation_status) — deferred to a future expanded aviation tool that exposes NOTAMs directly.'],
   ['supply_chain:portwatch:v1',
     'cascade-mirror: PortWatch aggregate; per-port detail (supply_chain:portwatch-ports:v1:_countries) is the canonical key already exposed via get_chokepoint_status.'],
 
@@ -105,7 +108,7 @@ const EXCLUDED_FROM_MCP = new Map([
     'on-demand: RPC cache populated only after first user query — deferred to a future temporal-analysis tool.'],
   ['news:threat:summary:v1',
     'on-demand: relay-classify-only, written only when classify produces country matches (matches api/health.js:468 ON_DEMAND_KEYS rationale). Underlying news inputs already exposed via get_news_intelligence.'],
-  ['resilience:ranking:v18',
+  ['resilience:ranking:v25',
     'on-demand: RPC cache populated after Pro ranking requests (matches api/health.js:469 ON_DEMAND_KEYS rationale). Deferred to a future resilience tool.'],
   ['forecast:simulation-package:latest',
     'on-demand: written by writeSimulationPackage after deep forecast runs (matches api/health.js:466 ON_DEMAND_KEYS rationale). Internal pipeline artifact, not a queryable slice.'],
@@ -113,22 +116,24 @@ const EXCLUDED_FROM_MCP = new Map([
     'on-demand: written by writeSimulationOutcome after simulation runs (matches api/health.js:467 ON_DEMAND_KEYS rationale). Internal pipeline artifact, not a queryable slice.'],
 
   // ===========================================================================
-  // Recovery pillar (stub seeders, not yet deployed) — per api/health.js:470-471
+  // Recovery pillar scorer inputs — no dedicated recovery-data MCP tool yet.
   // ===========================================================================
   ['resilience:recovery:fiscal-space:v1',
-    'deferred: recovery pillar stub seeder, not yet deployed (api/health.js:470-471 ON_DEMAND_KEYS). Future resilience tool will expose recovery dimensions.'],
+    'deferred: recovery pillar scorer input. Future resilience tool will expose recovery dimensions.'],
   ['resilience:recovery:reserve-adequacy:v1',
-    'deferred: recovery pillar stub seeder, not yet deployed (api/health.js:470-471).'],
+    'deferred: recovery pillar scorer input. Future resilience tool will expose recovery dimensions.'],
   ['resilience:recovery:external-debt:v1',
-    'deferred: recovery pillar stub seeder, not yet deployed (api/health.js:470-471).'],
+    'deferred: recovery pillar scorer input. Future resilience tool will expose recovery dimensions.'],
   ['resilience:recovery:import-hhi:v1',
-    'deferred: recovery pillar stub seeder, not yet deployed (api/health.js:470-471).'],
-  ['resilience:recovery:fuel-stocks:v1',
-    'deferred: recovery pillar stub seeder, not yet deployed (api/health.js:470-471).'],
+    'deferred: strict seeded recovery pillar scorer input. Future resilience tool will expose recovery dimensions.'],
+  // resilience:recovery:fuel-stocks:v1 exclusion removed alongside PR #3764
+  // (api/health.js probe removal). The seeder still runs and writes the key
+  // but scoreFuelStockDays does not read it, so the key is no longer in
+  // STANDALONE_KEYS and an MCP exclusion would be a dead entry.
   ['resilience:recovery:reexport-share:v1',
-    'deferred: recovery pillar stub seeder, not yet deployed.'],
+    'deferred: recovery pillar scorer input. Future resilience tool will expose recovery dimensions.'],
   ['resilience:recovery:sovereign-wealth:v1',
-    'deferred: recovery pillar stub seeder, not yet deployed.'],
+    'deferred: recovery pillar scorer input. Future resilience tool will expose recovery dimensions.'],
 
   // ===========================================================================
   // Deferred follow-up tools (explicit gaps named in the plan or related domain)
@@ -153,16 +158,18 @@ const EXCLUDED_FROM_MCP = new Map([
     'deferred to a future region-aware intelligence tool.'],
   ['intelligence:market-implications:v1',
     'deferred: LLM-generated narrative composite; underlying inputs already exposed via existing data tools. A future LLM-narrative tool would bundle this.'],
+  ['webcam:cameras:active',
+    'deferred: Windy webcam active-version pointer for app map markers. A future webcam MCP tool would expose decoded camera entries, not the raw Redis pointer.'],
   ['supply_chain:hormuz_tracker:v1',
     'deferred: specialized Strait-of-Hormuz tracker; broader chokepoint coverage via get_chokepoint_status. Hormuz-specific tool deferred.'],
   ['thermal:escalation:v1',
     'deferred to a future conflict-escalation tool.'],
   ['resilience:static:index:v1',
-    'deferred to a future resilience tool (paired with resilience:ranking:v18).'],
+    'deferred to a future resilience tool (paired with resilience:ranking:v25).'],
   ['resilience:static:fao',
     'deferred to a future resilience tool (FAO Phase 3+ aggregate, paired with resilience:static:index:v1).'],
-  ['resilience:intervals:v2:US',
-    'deferred to a future resilience tool (uncertainty intervals on top of resilience:ranking:v18).'],
+  ['resilience:intervals:v9:US',
+    'deferred to a future resilience tool (formula-tagged sensitivity bands on top of resilience:ranking:v25).'],
   ['resilience:low-carbon-generation:v1',
     'deferred to a future resilience tool. Companion data to fossil-electricity-share (already exposed via get_energy_intelligence).'],
   ['resilience:power-losses:v1',
@@ -287,6 +294,8 @@ const EXCLUDED_FROM_MCP = new Map([
     'operational: relay loop heartbeat — covered by /api/health, not a user-facing data slice for MCP.'],
   ['relay:heartbeat:climate-news',
     'operational: relay loop heartbeat — covered by /api/health, not a user-facing data slice for MCP.'],
+  ['digest:last-run',
+    'operational: digest-notifications cron heartbeat — covered by /api/health, not a user-facing data slice for MCP.'],
 ]);
 
 // -----------------------------------------------------------------------------
