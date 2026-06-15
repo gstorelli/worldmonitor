@@ -1,0 +1,14 @@
+# Netlify configuration
+#
+# Build command and publish directory are configured in the Netlify UI.
+# This file scopes the secrets scanner so it does not flag non-secret
+# public configuration values.
+
+[build.environment]
+  # VITE_VARIANT is a public, build-time variant selector (e.g. "full",
+  # "tech", "finance"). Vite inlines all VITE_*-prefixed variables into the
+  # client bundle by design, so it is never a secret. Its value is a common
+  # word that legitimately appears across docs, workflows, and markup
+  # (e.g. "full documentation", the CSS token "auto-fill"), producing false
+  # positives in secrets scanning. Exclude the key from the scanner.
+  SECRETS_SCAN_OMIT_KEYS = "VITE_VARIANT"
