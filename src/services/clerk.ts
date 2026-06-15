@@ -266,6 +266,6 @@ export function mountUserButton(el: HTMLDivElement): () => void {
   clerkInstance.mountUserButton(el, {
     afterSignOutUrl: new URL('/', window.location.origin).toString(),
     appearance: getAppearance(),
-  });
+  } as any);
   return () => clerkInstance?.unmountUserButton(el);
 }

@@ -1,5 +1,4 @@
 import { readJsonFromUpstash, setCachedData } from '../_upstash-json.js';
-import crypto from 'node:crypto';
 
 export const config = {
   runtime: 'edge',
@@ -39,12 +38,14 @@ export default async function handler(req) {
 
     const payloadString = `${title}|${source}|${description || ''}`;
     
-    // Fallback hashing for Edge Runtime if node:crypto fails
+    // Use Web Crypto API (Edge-compatible, no node:crypto needed)
     let hash;
     try {
-      hash = crypto.createHash('sha256').update(payloadString).digest('hex');
+      const encoded = new TextEncoder().encode(payloadString);
+      const digest = await crypto.subtle.digest('SHA-256', encoded);
+      hash = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
     } catch {
-      // Very crude string hash for browser-like environments
+      // Very crude string hash for environments without SubtleCrypto
       let h = 0;
       for (let i = 0; i < payloadString.length; i++) h = Math.imul(31, h) + payloadString.charCodeAt(i) | 0;
       hash = h.toString();
