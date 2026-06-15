@@ -39,7 +39,9 @@ function sourceFilesContaining(rootDir, needle) {
         continue;
       }
       if (!/\.(?:cjs|mjs|js|mts|ts)$/.test(path)) continue;
-      if (readFileSync(path, 'utf8').includes(needle)) matches.push(path);
+      if (readFileSync(path, 'utf8').includes(needle)) {
+        matches.push(path.replace(/\\/g, '/').replace(/^\.\//, ''));
+      }
     }
   }
   return matches.sort();

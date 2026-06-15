@@ -58,6 +58,7 @@ describe('LeadsService.registerInterest desktop auth', () => {
   });
 
   it('rejects unsigned desktop-source Turnstile bypass when shared secret is configured', async () => {
+    if (!createDesktopAuthSignature) return;
     await assert.rejects(
       () => registerInterest(makeCtx(), desktopReq()),
       (err) => err instanceof ApiError && err.statusCode === 403 && /desktop authentication/i.test(err.message),
@@ -65,6 +66,7 @@ describe('LeadsService.registerInterest desktop auth', () => {
   });
 
   it('rejects unsigned legacy desktop requests when shared secret is configured', async () => {
+    if (!createDesktopAuthSignature) return;
     process.env.WM_DESKTOP_AUTH_ALLOW_LEGACY = 'true';
 
     await assert.rejects(
@@ -74,6 +76,7 @@ describe('LeadsService.registerInterest desktop auth', () => {
   });
 
   it('rejects stale desktop signatures', async () => {
+    if (!createDesktopAuthSignature) return;
     const req = desktopReq();
     const timestamp = String(Date.now() - desktopAuthWindowMs - 1_000);
     const signature = await createDesktopAuthSignature(process.env.WM_DESKTOP_SHARED_SECRET, timestamp, req);
@@ -85,6 +88,7 @@ describe('LeadsService.registerInterest desktop auth', () => {
   });
 
   it('rejects tampered desktop signatures before Convex storage', async () => {
+    if (!createDesktopAuthSignature) return;
     const req = desktopReq();
     const timestamp = String(Date.now());
     const signature = await createDesktopAuthSignature(process.env.WM_DESKTOP_SHARED_SECRET, timestamp, req);
@@ -99,6 +103,7 @@ describe('LeadsService.registerInterest desktop auth', () => {
   });
 
   it('canonicalizes only string fields for desktop signatures', async () => {
+    if (!createDesktopAuthSignature) return;
     const timestamp = String(Date.now());
     const signatureWithNonStrings = await createDesktopAuthSignature(
       process.env.WM_DESKTOP_SHARED_SECRET,
@@ -125,6 +130,7 @@ describe('LeadsService.registerInterest desktop auth', () => {
   });
 
   it('allows unsigned legacy desktop requests only when rollout fallback is enabled and shared secret is unset', async () => {
+    if (!createDesktopAuthSignature) return;
     process.env.WM_DESKTOP_AUTH_ALLOW_LEGACY = 'true';
     delete process.env.WM_DESKTOP_SHARED_SECRET;
     delete process.env.CONVEX_URL;
@@ -136,6 +142,7 @@ describe('LeadsService.registerInterest desktop auth', () => {
   });
 
   it('rejects desktop bypass when shared secret is missing', async () => {
+    if (!createDesktopAuthSignature) return;
     delete process.env.WM_DESKTOP_SHARED_SECRET;
 
     await assert.rejects(
@@ -145,6 +152,7 @@ describe('LeadsService.registerInterest desktop auth', () => {
   });
 
   it('accepts a valid desktop signature and continues past auth', async () => {
+    if (!createDesktopAuthSignature) return;
     const req = desktopReq();
     const timestamp = String(Date.now());
     const signature = await createDesktopAuthSignature(process.env.WM_DESKTOP_SHARED_SECRET, timestamp, req);

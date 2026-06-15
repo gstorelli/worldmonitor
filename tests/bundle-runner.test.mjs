@@ -9,9 +9,10 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { writeFileSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { GRACEFUL_FETCH_FAILURE_EXIT_CODE } from '../scripts/_seed-utils.mjs';
 
-const SCRIPTS_DIR = new URL('../scripts/', import.meta.url).pathname;
+const SCRIPTS_DIR = fileURLToPath(new URL('../scripts/', import.meta.url));
 
 function runBundleWith(sections, opts = {}) {
   const runPath = join(SCRIPTS_DIR, '_bundle-runner-test-run.mjs');

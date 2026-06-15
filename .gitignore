@@ -83,3 +83,4 @@ tmp/
 docs/plans/
 docs/brainstorms/
 playground-pricing.html
+.env.example

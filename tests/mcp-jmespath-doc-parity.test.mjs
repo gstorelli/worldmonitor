@@ -11,7 +11,7 @@ function readJson(path) {
 }
 
 function readText(path) {
-  return readFileSync(resolve(root, path), 'utf8');
+  return readFileSync(resolve(root, path), 'utf8').replace(/\r/g, '');
 }
 
 function section(doc, heading) {

@@ -116,6 +116,9 @@ describe('security audit baseline', () => {
   });
 
   it('treats a symlinked entry path as direct invocation (no silent fail-open)', () => {
+    if (process.platform === 'win32') {
+      return; // Symlinks require Administrator privileges on Windows
+    }
     const dir = mkdtempSync(join(tmpdir(), 'audit-guard-'));
     try {
       const real = join(dir, 'audit.mjs');

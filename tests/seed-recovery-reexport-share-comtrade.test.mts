@@ -164,7 +164,7 @@ describe('credential-leak regression guard', () => {
     const { readFile } = await import('node:fs/promises');
     const { fileURLToPath } = await import('node:url');
     const here = fileURLToPath(import.meta.url);
-    const seederPath = here.replace(/\/tests\/.*$/, '/scripts/seed-recovery-reexport-share.mjs');
+    const seederPath = here.replace(/[\\/]tests[\\/].*$/, '/scripts/seed-recovery-reexport-share.mjs');
     const src = await readFile(seederPath, 'utf8');
     // Flag only string-literal embeddings inside '...', "...", or `...`;
     // regex literals (/subscription-key=/i used by the defensive serialize

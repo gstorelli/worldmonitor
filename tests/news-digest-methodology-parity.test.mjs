@@ -6,10 +6,18 @@
 // API clients rely on, without trying to parse every sentence in the doc.
 
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync as originalReadFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, it } from 'node:test';
+
+const readFileSync = (path, options) => {
+  const content = originalReadFileSync(path, options);
+  if (typeof content === 'string') {
+    return content.replace(/\r/g, '');
+  }
+  return content;
+};
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, '..');

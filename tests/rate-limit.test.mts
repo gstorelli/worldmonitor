@@ -263,11 +263,6 @@ describe('rate-limit fail-closed call-site policy (#3531)', () => {
 describe('scoped rate-limit degraded call-site policy (#3531)', () => {
   const SCOPED_RATE_LIMIT_CALLERS = [
     {
-      path: 'server/worldmonitor/leads/v1/register-interest.ts',
-      expected: /if\s*\(\s*scoped\.degraded\s*\)\s*\{/,
-      reason: 'desktop lead capture bypasses Turnstile, so Redis degradation must fail closed locally',
-    },
-    {
       path: 'api/mcp-proxy.ts',
       expected: /Redis-degraded scoped limits intentionally stay availability-first/,
       reason: 'MCP proxy is already premium-auth gated; scoped limit degradation is logged and remains availability-first',

@@ -89,53 +89,54 @@ const RESILIENCE_PROTO_PATH = resolve(here, '../proto/worldmonitor/resilience/v1
 const RESILIENCE_OPENAPI_YAML_PATH = resolve(here, '../docs/api/ResilienceService.openapi.yaml');
 const RESILIENCE_OPENAPI_JSON_PATH = resolve(here, '../docs/api/ResilienceService.openapi.json');
 const BUNDLED_OPENAPI_YAML_PATH = resolve(here, '../docs/api/worldmonitor.openapi.yaml');
-const docText = readFileSync(DOC_PATH, 'utf8');
-const sharedText = readFileSync(resolve(here, '../server/worldmonitor/resilience/v1/_shared.ts'), 'utf8');
-const dimensionScorerText = readFileSync(resolve(here, '../server/worldmonitor/resilience/v1/_dimension-scorers.ts'), 'utf8');
-const indicatorSourceCatalogText = readFileSync(INDICATOR_SOURCE_CATALOG_PATH, 'utf8');
-const seedScoreScriptText = readFileSync(SEED_SCORE_SCRIPT_PATH, 'utf8');
-const staticSeedScriptText = readFileSync(STATIC_SEED_SCRIPT_PATH, 'utf8');
-const healthApiText = readFileSync(HEALTH_API_PATH, 'utf8');
+const readTextFile = (path: string) => readFileSync(path, 'utf8').replace(/\r/g, '');
+const docText = readTextFile(DOC_PATH);
+const sharedText = readTextFile(resolve(here, '../server/worldmonitor/resilience/v1/_shared.ts'));
+const dimensionScorerText = readTextFile(resolve(here, '../server/worldmonitor/resilience/v1/_dimension-scorers.ts'));
+const indicatorSourceCatalogText = readTextFile(INDICATOR_SOURCE_CATALOG_PATH);
+const seedScoreScriptText = readTextFile(SEED_SCORE_SCRIPT_PATH);
+const staticSeedScriptText = readTextFile(STATIC_SEED_SCRIPT_PATH);
+const healthApiText = readTextFile(HEALTH_API_PATH);
 const CURRENT_DIMENSION_COUNT_SURFACES = [
   { label: 'methodology doc', path: DOC_PATH, text: docText },
   {
     label: 'documentation intro',
     path: DOCUMENTATION_PATH,
-    text: readFileSync(DOCUMENTATION_PATH, 'utf8'),
+    text: readTextFile(DOCUMENTATION_PATH),
   },
   {
     label: 'features page',
     path: FEATURES_PATH,
-    text: readFileSync(FEATURES_PATH, 'utf8'),
+    text: readTextFile(FEATURES_PATH),
   },
 ];
 const GENERATED_OPENAPI_SURFACES = [
   {
     label: 'ResilienceService OpenAPI YAML',
     path: RESILIENCE_OPENAPI_YAML_PATH,
-    text: readFileSync(RESILIENCE_OPENAPI_YAML_PATH, 'utf8'),
+    text: readTextFile(RESILIENCE_OPENAPI_YAML_PATH),
   },
   {
     label: 'ResilienceService OpenAPI JSON',
     path: RESILIENCE_OPENAPI_JSON_PATH,
-    text: readFileSync(RESILIENCE_OPENAPI_JSON_PATH, 'utf8'),
+    text: readTextFile(RESILIENCE_OPENAPI_JSON_PATH),
   },
   {
     label: 'bundled OpenAPI YAML',
     path: BUNDLED_OPENAPI_YAML_PATH,
-    text: readFileSync(BUNDLED_OPENAPI_YAML_PATH, 'utf8'),
+    text: readTextFile(BUNDLED_OPENAPI_YAML_PATH),
   },
 ];
 const HEADLINE_ELIGIBLE_CONTRACT_SURFACES = [
   {
     label: 'GetResilienceScore proto',
     path: RESILIENCE_SCORE_PROTO_PATH,
-    text: readFileSync(RESILIENCE_SCORE_PROTO_PATH, 'utf8'),
+    text: readTextFile(RESILIENCE_SCORE_PROTO_PATH),
   },
   {
     label: 'Resilience shared proto',
     path: RESILIENCE_PROTO_PATH,
-    text: readFileSync(RESILIENCE_PROTO_PATH, 'utf8'),
+    text: readTextFile(RESILIENCE_PROTO_PATH),
   },
   ...GENERATED_OPENAPI_SURFACES,
 ];

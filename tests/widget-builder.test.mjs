@@ -1323,7 +1323,7 @@ describe('PRO widget — store and sanitizer', () => {
   });
 
   it('widget sandbox behavior accepts Vercel previews and blocks spoofed parents', () => {
-    const script = sandbox.match(/<script>\n([\s\S]*)\n<\/script>/)?.[1];
+    const script = sandbox.replace(/\r\n/g, '\n').match(/<script>\n([\s\S]*)\n<\/script>/)?.[1];
     assert.ok(script, 'sandbox inline script not found');
 
     function runSandbox(referrer) {

@@ -27,7 +27,7 @@ import { fileURLToPath } from 'node:url';
 import { execSync } from 'node:child_process';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const MAKEFILE = readFileSync(resolve(__dirname, '../Makefile'), 'utf-8');
+const MAKEFILE = readFileSync(resolve(__dirname, '../Makefile'), 'utf-8').replace(/\r/g, '');
 
 function extractGenerateRecipe() {
   // Match `generate:` through the next blank line or non-indented line.
@@ -113,7 +113,7 @@ describe('Makefile generate target — plugin path resolution', () => {
     // plugin (e.g. a future protoc-gen-*), the guard must grow too —
     // otherwise the new binary can silently fall through to a stale
     // PATH copy.
-    const BUF_GEN = readFileSync(resolve(__dirname, '../proto/buf.gen.yaml'), 'utf-8');
+    const BUF_GEN = readFileSync(resolve(__dirname, '../proto/buf.gen.yaml'), 'utf-8').replace(/\r/g, '');
     const declared = new Set();
     for (const m of BUF_GEN.matchAll(/^\s*-\s*local:\s*(\S+)\s*$/gm)) {
       declared.add(m[1]);
@@ -180,7 +180,7 @@ describe('Makefile generate target — plugin path resolution', () => {
     // The hook MUST guard the prepend on "buf is not already on PATH"
     // so the prepend only fires as a fallback when buf has no other
     // candidate.
-    const HOOK = readFileSync(resolve(__dirname, '../.husky/pre-push'), 'utf-8');
+    const HOOK = readFileSync(resolve(__dirname, '../.husky/pre-push'), 'utf-8').replace(/\r/g, '');
     // Locate the proto-freshness block by its echo line.
     const start = HOOK.indexOf('Running proto freshness check');
     assert.ok(start >= 0, 'pre-push hook must contain the proto-freshness block');
@@ -206,7 +206,7 @@ describe('Makefile generate target — plugin path resolution', () => {
     );
   });
 
-  test('path expansion succeeds on current machine', () => {
+  test('path expansion succeeds on current machine', { skip: process.platform === 'win32' }, () => {
     // The shell expression is syntactically correct and resolves to
     // an existing directory on this runner. Catches obvious typos
     // (e.g. mismatched parens, wrong subshell syntax) at test time

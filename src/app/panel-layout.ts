@@ -115,7 +115,7 @@ import { CustomWidgetPanel } from '@/components/CustomWidgetPanel';
 import { openWidgetChatModal } from '@/components/WidgetChatModal';
 import { loadWidgets, saveWidget } from '@/services/widget-store';
 import type { CustomWidgetSpec } from '@/services/widget-store';
-import { destroyEntitlementSubscription } from '@/services/entitlements';
+import { destroyEntitlementSubscription, onEntitlementChange } from '@/services/entitlements';
 import { McpDataPanel } from '@/components/McpDataPanel';
 import { openMcpConnectModal } from '@/components/McpConnectModal';
 import { loadMcpPanels, saveMcpPanel } from '@/services/mcp-store';
@@ -149,6 +149,8 @@ export class PanelLayoutManager implements AppModule {
   private unsubscribeAuth: (() => void) | null = null;
   private boundWidgetCreatorHandler: ((e: Event) => void) | null = null;
   private scheduledLoadAllRaf: number | null = null;
+  private proBlockUnsubscribe: (() => void) | null = null;
+  private proBlockEntitlementUnsubscribe: (() => void) | null = null;
 
   constructor(ctx: AppContext, callbacks: PanelLayoutManagerCallbacks) {
     this.ctx = ctx;
@@ -186,6 +188,10 @@ export class PanelLayoutManager implements AppModule {
     this.applyTimeRangeFilterDebounced.cancel();
     this.unsubscribeAuth?.();
     this.unsubscribeAuth = null;
+    this.proBlockUnsubscribe?.();
+    this.proBlockUnsubscribe = null;
+    this.proBlockEntitlementUnsubscribe?.();
+    this.proBlockEntitlementUnsubscribe = null;
     if (this.boundWidgetCreatorHandler) {
       this.ctx.container.removeEventListener('wm:open-widget-creator', this.boundWidgetCreatorHandler);
       this.boundWidgetCreatorHandler = null;
@@ -1418,9 +1424,15 @@ export class PanelLayoutManager implements AppModule {
     // shape PR #3505 chased on the server side, repeated here on the client.
     //
     const proBlocks = [proBlock, mcpBlock];
-    for (const block of proBlocks) {
-      block.style.display = '';
-    }
+    const applyProBlockGating = (isPro: boolean) => {
+      for (const block of proBlocks) {
+        block.style.display = isPro ? '' : 'none';
+      }
+    };
+    const reapply = () => applyProBlockGating(hasPremiumAccess(getAuthState()));
+    reapply();
+    this.proBlockUnsubscribe = subscribeAuthState(reapply);
+    this.proBlockEntitlementUnsubscribe = onEntitlementChange(reapply);
 
     const bottomGrid = document.getElementById('mapBottomGrid');
     if (bottomGrid) {
