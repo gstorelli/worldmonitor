@@ -5,10 +5,19 @@
 # public configuration values.
 
 [build.environment]
-  # VITE_VARIANT is a public, build-time variant selector (e.g. "full",
-  # "tech", "finance"). Vite inlines all VITE_*-prefixed variables into the
-  # client bundle by design, so it is never a secret. Its value is a common
-  # word that legitimately appears across docs, workflows, and markup
-  # (e.g. "full documentation", the CSS token "auto-fill"), producing false
-  # positives in secrets scanning. Exclude the key from the scanner.
-  SECRETS_SCAN_OMIT_KEYS = "VITE_VARIANT"
+  # The keys below are NON-SECRET configuration whose values are ubiquitous
+  # English/config words ("full", "auto", "true", "false"). Netlify's secrets
+  # scanner matches env-var values literally against repo files, so these
+  # short common words match ordinary prose, CSS tokens, code, and tests all
+  # over the tree (LICENSE, README, docs, e2e specs, index.html, lockfiles),
+  # producing pure false positives. None of these are credentials:
+  #   VITE_VARIANT                  public build-time variant selector ("full");
+  #                                 all VITE_* vars are inlined into the client
+  #                                 bundle by design, so they are never secret.
+  #   VITE_CLOUD_PREFS_ENABLED      public client feature flag (boolean).
+  #   VITE_FOLLOW_COUNTRIES_ENABLED public client feature flag (boolean).
+  #   CLOUDFLARE_R2_REGION          public R2 region value ("auto").
+  #   TELEGRAM_CHANNEL_SET          non-secret boolean config flag.
+  #   I_UNDERSTAND_THIS_DISABLES_AUTH non-secret self-hosting toggle (boolean).
+  # Real credentials (API keys, tokens) are unaffected and remain scanned.
+  SECRETS_SCAN_OMIT_KEYS = "VITE_VARIANT,VITE_CLOUD_PREFS_ENABLED,VITE_FOLLOW_COUNTRIES_ENABLED,CLOUDFLARE_R2_REGION,TELEGRAM_CHANNEL_SET,I_UNDERSTAND_THIS_DISABLES_AUTH"
