@@ -21,3 +21,8 @@
   #   I_UNDERSTAND_THIS_DISABLES_AUTH non-secret self-hosting toggle (boolean).
   # Real credentials (API keys, tokens) are unaffected and remain scanned.
   SECRETS_SCAN_OMIT_KEYS = "VITE_VARIANT,VITE_CLOUD_PREFS_ENABLED,VITE_FOLLOW_COUNTRIES_ENABLED,CLOUDFLARE_R2_REGION,TELEGRAM_CHANNEL_SET,I_UNDERSTAND_THIS_DISABLES_AUTH"
+
+[redirects]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
