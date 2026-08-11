@@ -484,6 +484,16 @@ Sul VPS (stesso set di comandi del workflow):
 ./scripts/deploy.sh /srv/worldmonitor
 ```
 
+### Troubleshooting del deploy
+
+| Sintomo | Causa probabile | Fix |
+|---------|-----------------|-----|
+| `503 Service Unavailable` sul dominio | Il proxy `nginx-proxy` non trova il container `worldmonitor` sulla rete esterna (container giù o rete mancante) | `docker network create nginx-proxy`; poi `./scripts/deploy.sh` |
+| Workflow "Deploy to Contabo VPS" fallisce allo step SSH | Host key non registrata, chiave errata o secrets mancanti | Verifica `SERVER_HOST`/`SERVER_USER`/`SSH_PRIVATE_KEY`/`DEPLOY_PATH` in GitHub Secrets; il workflow usa `host_key_checking: false` |
+| `docker: 'compose' is not a docker command` | Host con solo Compose v1 | Installare il plugin v2 (`apt install docker-compose-v2`), oppure usare `docker-compose` (lo script prova entrambi) |
+| `error while interpolating ... REDIS_TOKEN` | `.env` senza valori Redis | Non più bloccante: cala su default locali; in produzione però imposta `REDIS_PASSWORD`/`REDIS_TOKEN` |
+| HTTPS senza certificato | acme-companion non ha ancora emesso il certificato per `risksentinel.opencyber.org` | Attendi l'emissione (DNS già puntato alla VPS); verifica `docker compose logs nginx-proxy`/`acme-companion` |
+
 ### Integrazione n8n MCP
 
 Il workspace MCP del progetto è configurato in [`.mcp/n8n-mcp.json`](.mcp/n8n-mcp.json)

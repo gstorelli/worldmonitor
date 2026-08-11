@@ -17,28 +17,71 @@ jobs:
   deploy:
     name: Pull & rebuild on VPS
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - name: SSH deploy
+        # host_key_checking is disabled so first-time deploys work without
+        # pre-seeding known_hosts; the VPS is private and key-authenticated.
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.SERVER_PORT || 22 }}
-          command_timeout: 40m
+          host_key_checking: false
+          command_timeout: 50m
           script: |
             set -e
-            cd ${{ secrets.DEPLOY_PATH }}
+            DEPLOY_PATH="${{ secrets.DEPLOY_PATH }}"
+            REPO_URL="git@github.com:gstorelli/worldmonitor.git"
+
+            echo "==> tooling check"
+            docker --version || { echo "ERROR: docker missing on VPS"; exit 1; }
+            if docker compose version >/dev/null 2>&1; then COMPOSE="docker compose"; COMPOSE_COMMAND="compose"
+            elif command -v docker-compose >/dev/null 2>&1; then COMPOSE="docker-compose"; COMPOSE_COMMAND=""
+            else echo "ERROR: neither 'docker compose' (v2) nor 'docker-compose' found"; exit 1; fi
+            echo "using: ${COMPOSE}"
+
+            echo "==> bootstrap checkout (first deploy clones)"
+            if [ ! -d "${DEPLOY_PATH}/.git" ]; then
+              mkdir -p "$(dirname "${DEPLOY_PATH}")"
+              git clone "${REPO_URL}" "${DEPLOY_PATH}"
+            fi
+            cd "${DEPLOY_PATH}"
+            git remote set-url origin "${REPO_URL}" || true
+
+            echo "==> ensure external proxy network (idempotent)"
+            docker network inspect nginx-proxy >/dev/null 2>&1 || docker network create nginx-proxy
 
             echo "==> git pull origin main"
-            git pull origin main
+            git fetch origin
+            git pull --ff-only origin main
 
-            echo "==> docker compose up -d --build"
-            docker compose up -d --build
+            echo "==> compose up -d --build"
+            ${COMPOSE} up -d --build
 
             echo "==> prune dangling images"
             docker image prune -f
 
+            echo "==> health gate (container internal 8080)"
+            ok=0
+            for i in $(seq 1 18); do
+              if docker exec worldmonitor wget -qO- http://127.0.0.1:8080/api/version >/dev/null 2>&1 \
+                 || docker exec worldmonitor node -e "fetch('http://127.0.0.1:8080/api/version').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" >/dev/null 2>&1; then
+                echo "health OK (attempt ${i})"
+                ok=1
+                break
+              fi
+              echo "waiting for worldmonitor... (${i}/18)"
+              sleep 10
+            done
+            if [ "${ok}" != "1" ]; then
+              echo "ERROR: worldmonitor did not become healthy after deploy"
+              ${COMPOSE} ps
+              ${COMPOSE} logs --tail=50 worldmonitor || true
+              exit 1
+            fi
+
+            echo "==> stack status"
+            ${COMPOSE} ps
             echo "==> deploy complete: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-            docker compose ps
