@@ -7,8 +7,12 @@ if [ "$VERCEL_GIT_COMMIT_REF" = "main" ] && [ -n "$VERCEL_GIT_PREVIOUS_SHA" ]; t
   git cat-file -e "$VERCEL_GIT_PREVIOUS_SHA" 2>/dev/null && {
     WEB_CHANGES=$(git diff --name-only "$VERCEL_GIT_PREVIOUS_SHA" HEAD -- \
       'src/' 'api/' 'server/' 'shared/' 'public/' 'blog-site/' 'pro-test/' 'proto/' 'convex/' \
+      'CHANGELOG.md' 'docs/snapshots/' \
+      'scripts/build-crawlable-corpus.mjs' 'scripts/build-research-reports.mjs' \
+      'scripts/build-sitemap.mjs' 'scripts/discover-content-corpus-pages.mjs' \
+      'scripts/crawlable-live-tools.mjs' 'scripts/vercel-ignore.sh' \
       'package.json' 'package-lock.json' 'vite.config.ts' 'tsconfig.json' \
-      'tsconfig.api.json' 'vercel.json' 'middleware.ts' | head -1)
+      'tsconfig.api.json' 'vercel.json' 'middleware.ts' 'index.html' | head -1)
     [ -z "$WEB_CHANGES" ] && echo "Skipping: no web-relevant changes on main" && exit 0
   }
   exit 1
@@ -61,6 +65,14 @@ git diff --name-only "$COMPARE_SHA" HEAD -- \
   'pro-test/' \
   'proto/' \
   'convex/' \
+  'CHANGELOG.md' \
+  'docs/snapshots/' \
+  'scripts/build-crawlable-corpus.mjs' \
+  'scripts/build-research-reports.mjs' \
+  'scripts/build-sitemap.mjs' \
+  'scripts/discover-content-corpus-pages.mjs' \
+  'scripts/crawlable-live-tools.mjs' \
+  'scripts/vercel-ignore.sh' \
   'package.json' \
   'package-lock.json' \
   'vite.config.ts' \
@@ -68,6 +80,7 @@ git diff --name-only "$COMPARE_SHA" HEAD -- \
   'tsconfig.api.json' \
   'vercel.json' \
   'middleware.ts' \
+  'index.html' \
   | grep -q . && exit 1
 
 # Nothing web-relevant changed, skip the build

@@ -10,6 +10,8 @@
  *     subscriberId / secret format (wh_ + 24 hex / 64 hex), 30-day TTL
  *     atomic pipeline (SET + SADD + EXPIRE).
  *   - listWebhooks: PRO gate, owner-filter isolation, `secret` never in response.
+ *   - deliverWebhook: delivery-time DNS re-resolution blocks private/reserved
+ *     addresses before fetch to prevent DNS rebinding SSRF.
  */
 
 import { strict as assert } from 'node:assert';
@@ -17,6 +19,7 @@ import { describe, it, beforeEach, afterEach } from 'node:test';
 
 const originalFetch = globalThis.fetch;
 const originalEnv = { ...process.env };
+const TEST_RESOLVER_KEY = Symbol.for('worldmonitor.shippingV2.resolveWebhookHostnameForTest');
 
 function makeCtx(headers = {}) {
   const req = new Request('https://worldmonitor.app/api/v2/shipping/route-intelligence', {
@@ -34,22 +37,34 @@ let routeIntelligence;
 let registerWebhook;
 let listWebhooks;
 let webhookShared;
+let deliverShippingV2Webhook;
+let WebhookDeliverySsrfError;
 let ValidationError;
 let ApiError;
+
+function stubChokepointStatus(value) {
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    result: value == null ? null : JSON.stringify(value),
+  }), { status: 200 });
+}
 
 describe('ShippingV2Service handlers', () => {
   beforeEach(async () => {
     process.env.WORLDMONITOR_VALID_KEYS = 'pro-test-key';
     process.env.UPSTASH_REDIS_REST_URL = 'https://fake-upstash.example';
     process.env.UPSTASH_REDIS_REST_TOKEN = 'fake-token';
+    Reflect.set(globalThis, TEST_RESOLVER_KEY, async () => ['93.184.216.34']);
 
     const riMod = await import('../server/worldmonitor/shipping/v2/route-intelligence.ts');
     const rwMod = await import('../server/worldmonitor/shipping/v2/register-webhook.ts');
     const lwMod = await import('../server/worldmonitor/shipping/v2/list-webhooks.ts');
+    const dwMod = await import('../server/worldmonitor/shipping/v2/deliver-webhook.ts');
     webhookShared = await import('../server/worldmonitor/shipping/v2/webhook-shared.ts');
     routeIntelligence = riMod.routeIntelligence;
     registerWebhook = rwMod.registerWebhook;
     listWebhooks = lwMod.listWebhooks;
+    deliverShippingV2Webhook = dwMod.deliverShippingV2Webhook;
+    WebhookDeliverySsrfError = dwMod.WebhookDeliverySsrfError;
     const gen = await import('../src/generated/server/worldmonitor/shipping/v2/service_server.ts');
     ValidationError = gen.ValidationError;
     ApiError = gen.ApiError;
@@ -57,6 +72,7 @@ describe('ShippingV2Service handlers', () => {
 
   afterEach(() => {
     globalThis.fetch = originalFetch;
+    Reflect.deleteProperty(globalThis, TEST_RESOLVER_KEY);
     Object.keys(process.env).forEach((k) => {
       if (!(k in originalEnv)) delete process.env[k];
     });
@@ -73,7 +89,7 @@ describe('ShippingV2Service handlers', () => {
 
     it('rejects malformed fromIso2 with ValidationError', async () => {
       // Stub redis GET for CHOKEPOINT_STATUS_KEY so the handler never panics.
-      globalThis.fetch = async () => new Response(JSON.stringify({ result: null }), { status: 200 });
+      stubChokepointStatus(null);
       // 'usa' uppercases to 'USA' (3 chars) — regex `^[A-Z]{2}$` rejects.
       await assert.rejects(
         () => routeIntelligence(proCtx(), { fromIso2: 'usa', toIso2: 'NL', cargoType: '', hs2: '' }),
@@ -82,7 +98,10 @@ describe('ShippingV2Service handlers', () => {
     });
 
     it('preserves partner wire shape with ISO-8601 fetchedAt and camelCase fields', async () => {
-      globalThis.fetch = async () => new Response(JSON.stringify({ result: null }), { status: 200 });
+      stubChokepointStatus({
+        chokepoints: [{ id: 'suez', disruptionScore: 12, warRiskTier: 'WAR_RISK_TIER_ELEVATED' }],
+        upstreamUnavailable: false,
+      });
       const before = Date.now();
       const res = await routeIntelligence(proCtx(), {
         fromIso2: 'AE',
@@ -110,8 +129,40 @@ describe('ShippingV2Service handlers', () => {
       assert.ok(parsedTs >= before && parsedTs <= after, 'fetchedAt within request window');
     });
 
+    it('marks the route snapshot degraded when chokepoint status is unavailable', async () => {
+      stubChokepointStatus(null);
+      const res = await routeIntelligence(proCtx(), {
+        fromIso2: 'AE',
+        toIso2: 'NL',
+        cargoType: 'tanker',
+        hs2: '27',
+      });
+
+      assert.notEqual(res.primaryRouteId, '', 'static route lookup still found a route');
+      assert.equal(res.fetchedAt, '', 'fetchedAt follows the upstream status miss');
+    });
+
+    it('does not mark a no-route country pair degraded when chokepoint status is available', async () => {
+      stubChokepointStatus({
+        chokepoints: [{ id: 'suez', disruptionScore: 12, warRiskTier: 'WAR_RISK_TIER_ELEVATED' }],
+        upstreamUnavailable: false,
+      });
+      const res = await routeIntelligence(proCtx(), {
+        fromIso2: 'ZZ',
+        toIso2: 'NL',
+        cargoType: 'tanker',
+        hs2: '27',
+      });
+
+      assert.equal(res.primaryRouteId, '');
+      assert.match(res.fetchedAt, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/);
+    });
+
     it('defaults hs2 to "27" when blank or all non-digits', async () => {
-      globalThis.fetch = async () => new Response(JSON.stringify({ result: null }), { status: 200 });
+      stubChokepointStatus({
+        chokepoints: [{ id: 'suez', disruptionScore: 12, warRiskTier: 'WAR_RISK_TIER_ELEVATED' }],
+        upstreamUnavailable: false,
+      });
       const res1 = await routeIntelligence(proCtx(), { fromIso2: 'AE', toIso2: 'NL', cargoType: '', hs2: '' });
       const res2 = await routeIntelligence(proCtx(), { fromIso2: 'AE', toIso2: 'NL', cargoType: '', hs2: 'abc' });
       assert.equal(res1.hs2, '27');
@@ -119,7 +170,10 @@ describe('ShippingV2Service handlers', () => {
     });
 
     it('coerces unknown cargoType to container', async () => {
-      globalThis.fetch = async () => new Response(JSON.stringify({ result: null }), { status: 200 });
+      stubChokepointStatus({
+        chokepoints: [{ id: 'suez', disruptionScore: 12, warRiskTier: 'WAR_RISK_TIER_ELEVATED' }],
+        upstreamUnavailable: false,
+      });
       const res = await routeIntelligence(proCtx(), {
         fromIso2: 'AE',
         toIso2: 'NL',
@@ -152,7 +206,7 @@ describe('ShippingV2Service handlers', () => {
       // webhooks. Must fire before any premium check.
       await assert.rejects(
         () => registerWebhook(makeCtx(), {
-          callbackUrl: 'https://hooks.example.com/wm',
+          callbackUrl: 'https://93.184.216.34/wm',
           chokepointIds: [],
           alertThreshold: 50,
         }),
@@ -199,7 +253,7 @@ describe('ShippingV2Service handlers', () => {
     it('rejects unknown chokepointIds', async () => {
       await assert.rejects(
         () => registerWebhook(proCtx(), {
-          callbackUrl: 'https://hooks.example.com/wm',
+          callbackUrl: 'https://93.184.216.34/wm',
           chokepointIds: ['not_a_real_chokepoint'],
           alertThreshold: 50,
         }),
@@ -214,7 +268,7 @@ describe('ShippingV2Service handlers', () => {
     it('rejects alertThreshold > 100 with ValidationError', async () => {
       await assert.rejects(
         () => registerWebhook(proCtx(), {
-          callbackUrl: 'https://hooks.example.com/wm',
+          callbackUrl: 'https://93.184.216.34/wm',
           chokepointIds: [],
           alertThreshold: 9999,
         }),
@@ -225,7 +279,7 @@ describe('ShippingV2Service handlers', () => {
     it('rejects alertThreshold < 0 with ValidationError', async () => {
       await assert.rejects(
         () => registerWebhook(proCtx(), {
-          callbackUrl: 'https://hooks.example.com/wm',
+          callbackUrl: 'https://93.184.216.34/wm',
           chokepointIds: [],
           alertThreshold: -1,
         }),
@@ -236,7 +290,7 @@ describe('ShippingV2Service handlers', () => {
     it('happy path returns wh_-prefixed subscriberId and 64-char hex secret; issues SET + SADD + EXPIRE pipeline with 30-day TTL', async () => {
       const calls = stubRedisOk();
       const res = await registerWebhook(proCtx(), {
-        callbackUrl: 'https://hooks.example.com/wm',
+        callbackUrl: 'https://93.184.216.34/wm',
         chokepointIds: [],
         alertThreshold: 60,
       });
@@ -264,7 +318,7 @@ describe('ShippingV2Service handlers', () => {
     it('alertThreshold omitted (undefined) applies the legacy default of 50', async () => {
       const calls = stubRedisOk();
       await registerWebhook(proCtx(), {
-        callbackUrl: 'https://hooks.example.com/wm',
+        callbackUrl: 'https://93.184.216.34/wm',
         chokepointIds: [],
         // alertThreshold omitted — proto3 `optional int32` arrives as undefined
       });
@@ -279,7 +333,7 @@ describe('ShippingV2Service handlers', () => {
       // intent to receive every disruption.
       const calls = stubRedisOk();
       await registerWebhook(proCtx(), {
-        callbackUrl: 'https://hooks.example.com/wm',
+        callbackUrl: 'https://93.184.216.34/wm',
         chokepointIds: [],
         alertThreshold: 0,
       });
@@ -290,7 +344,7 @@ describe('ShippingV2Service handlers', () => {
     it('empty chokepointIds subscribes to the full CHOKEPOINT_REGISTRY', async () => {
       const calls = stubRedisOk();
       await registerWebhook(proCtx(), {
-        callbackUrl: 'https://hooks.example.com/wm',
+        callbackUrl: 'https://93.184.216.34/wm',
         chokepointIds: [],
         alertThreshold: 50,
       });
@@ -381,6 +435,118 @@ describe('ShippingV2Service handlers', () => {
       assert.equal(summary.subscriberId, record.subscriberId);
       assert.equal(summary.callbackUrl, record.callbackUrl);
       assert.ok(!('secret' in summary), '`secret` must never appear in ListWebhooks response');
+    });
+  });
+
+  describe('deliverWebhook', () => {
+    function makeRecord(callbackUrl = 'https://hooks.example.com/wm') {
+      return {
+        subscriberId: 'wh_abc123456789012345678901',
+        ownerTag: 'owner',
+        callbackUrl,
+        chokepointIds: ['hormuz_strait'],
+        alertThreshold: 60,
+        createdAt: '2026-04-01T00:00:00.000Z',
+        active: true,
+        secret: 'a'.repeat(64),
+      };
+    }
+
+    const payload = {
+      subscriberId: 'wh_abc123456789012345678901',
+      chokepointId: 'hormuz_strait',
+      score: 74,
+      alertThreshold: 60,
+      triggeredAt: '2026-04-19T12:03:00Z',
+      reason: 'ais_congestion_spike',
+      details: { source: 'test' },
+    };
+
+    it('re-resolves callbackUrl immediately before send and blocks private rebinding without fetching', async () => {
+      let fetched = false;
+      await assert.rejects(
+        () => deliverShippingV2Webhook(makeRecord(), payload, {
+          resolveHostname: async (hostname) => {
+            assert.equal(hostname, 'hooks.example.com');
+            return ['10.0.0.9'];
+          },
+          fetchImpl: async () => {
+            fetched = true;
+            return new Response('should not send', { status: 200 });
+          },
+        }),
+        (err) => err instanceof WebhookDeliverySsrfError && /private\/reserved/.test(err.message),
+      );
+      assert.equal(fetched, false, 'delivery fetch must not run after private DNS answer');
+    });
+
+    it('blocks reserved/documentation ranges returned by delivery-time DNS', async () => {
+      let fetched = false;
+      await assert.rejects(
+        () => deliverShippingV2Webhook(makeRecord(), payload, {
+          resolveHostname: async () => ['203.0.113.10'],
+          fetchImpl: async () => {
+            fetched = true;
+            return new Response('should not send', { status: 200 });
+          },
+        }),
+        (err) => err instanceof WebhookDeliverySsrfError && /203\.0\.113\.10/.test(err.message),
+      );
+      assert.equal(fetched, false, 'delivery fetch must not run after reserved DNS answer');
+    });
+
+    it('blocks mixed DNS answers if any address is private or reserved', async () => {
+      await assert.rejects(
+        () => deliverShippingV2Webhook(makeRecord(), payload, {
+          resolveHostname: async () => ['93.184.216.34', '169.254.169.254'],
+          fetchImpl: async () => new Response('should not send', { status: 200 }),
+        }),
+        (err) => err instanceof WebhookDeliverySsrfError && /169\.254\.169\.254/.test(err.message),
+      );
+    });
+
+    it('sends only after a public delivery-time DNS answer and includes delivery headers', async () => {
+      const seen = {};
+      const result = await deliverShippingV2Webhook(makeRecord(), payload, {
+        deliveryId: 'whd_test_delivery',
+        resolveHostname: async () => ['93.184.216.34'],
+        fetchImpl: async (url, init) => {
+          seen.url = String(url);
+          seen.method = init.method;
+          seen.headers = init.headers;
+          seen.body = init.body;
+          return new Response('ok', { status: 202 });
+        },
+      });
+
+      assert.deepEqual(result, { status: 202, ok: true, resolvedAddresses: ['93.184.216.34'] });
+      assert.equal(seen.url, 'https://hooks.example.com/wm');
+      assert.equal(seen.method, 'POST');
+      assert.equal(seen.headers['content-type'], 'application/json');
+      assert.equal(seen.headers['user-agent'], 'WorldMonitor-ShippingV2-Webhooks/1.0');
+      assert.equal(seen.headers['x-wm-delivery-id'], 'whd_test_delivery');
+      assert.equal(seen.headers['x-wm-event'], 'chokepoint.disruption');
+      assert.match(seen.headers['x-wm-signature'], /^sha256=[0-9a-f]{64}$/);
+      assert.equal(seen.body, JSON.stringify(payload));
+    });
+  });
+
+  describe('registerWebhook DNS validation', () => {
+    it('rejects private DNS answers before registration persists a callback URL', async () => {
+      await assert.rejects(
+        () => webhookShared.assertCallbackUrlRegistrationSafe(
+          'https://hooks.example.com/wm',
+          async () => ['93.184.216.34', '169.254.169.254'],
+        ),
+        /private\/reserved/,
+      );
+    });
+
+    it('accepts a public IP literal without performing a DNS lookup', async () => {
+      await assert.doesNotReject(() => webhookShared.assertCallbackUrlRegistrationSafe(
+        'https://93.184.216.34/wm',
+        async () => { throw new Error('public IP literals must not require DNS'); },
+      ));
     });
   });
 });

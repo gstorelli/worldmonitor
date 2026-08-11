@@ -19,17 +19,18 @@
 // stuck Hormuz tracker must not freeze the whole executive overview.
 
 import { Panel } from './Panel';
-import { escapeHtml } from '@/utils/sanitize';
-import { getRpcBaseUrl } from '@/services/rpc-client';
+import { escapeHtml, unsafeRawHtml } from '@/utils/sanitize';
+import { createLazyClient, getRpcBaseUrl, rpcFetch } from '@/services/rpc-client';
 import { fetchHormuzTracker, type HormuzTrackerData } from '@/services/hormuz-tracker';
 import { getEuGasStorageData } from '@/services/economic';
 import { fetchCommodityQuotes } from '@/services/market';
-import { SupplyChainServiceClient } from '@/generated/client/worldmonitor/supply_chain/v1/service_client';
-import { buildOverviewState, type OverviewState } from './_energy-risk-overview-state';
 
-const supplyChain = new SupplyChainServiceClient(getRpcBaseUrl(), {
-  fetch: (...args: Parameters<typeof fetch>) => globalThis.fetch(...args),
-});
+import { buildOverviewState, type OverviewState } from './_energy-risk-overview-state';
+import { SupplyChainServiceClient } from '@/services/generated-rpc-clients';
+
+const getSupplyChainClient = createLazyClient(() => new SupplyChainServiceClient(getRpcBaseUrl(), {
+  fetch: rpcFetch,
+}));
 
 const BRENT_SYMBOL = 'BZ=F';
 const BRENT_META = [{ symbol: BRENT_SYMBOL, name: 'Brent Crude', display: 'BRENT' }];
@@ -38,9 +39,13 @@ const BRENT_META = [{ symbol: BRENT_SYMBOL, name: 'Brent Crude', display: 'BRENT
 // via VITE_HORMUZ_CRISIS_START_DATE so the date can be re-pinned without a
 // redeploy when the editorial framing shifts.
 const DEFAULT_CRISIS_START_DATE = '2026-02-23';
-const CRISIS_START_DATE: string =
-  (import.meta.env?.VITE_HORMUZ_CRISIS_START_DATE as string | undefined) ||
-  DEFAULT_CRISIS_START_DATE;
+const CRISIS_START_DATE: string = (() => {
+  try {
+    return import.meta.env.VITE_HORMUZ_CRISIS_START_DATE || DEFAULT_CRISIS_START_DATE;
+  } catch {
+    return DEFAULT_CRISIS_START_DATE;
+  }
+})();
 const CRISIS_START_MS = Date.parse(`${CRISIS_START_DATE}T00:00:00Z`);
 
 // Map Hormuz status enum → severity color. Values come from
@@ -111,7 +116,7 @@ export class EnergyRiskOverviewPanel extends Panel {
       // a Greptile P2 finding (over-fetch); buildOverviewState's count
       // calculation handles either response (the redundant client-side
       // filter remains as defense-in-depth in the state builder).
-      supplyChain.listEnergyDisruptions({ assetId: '', assetType: '', ongoingOnly: true }),
+      getSupplyChainClient().listEnergyDisruptions({ assetId: '', assetType: '', ongoingOnly: true }),
     ]);
     this.state = buildOverviewState(hormuz, euGas, brent, disruptions, Date.now());
 
@@ -139,7 +144,7 @@ export class EnergyRiskOverviewPanel extends Panel {
         ${this.renderCrisisDayTile()}
       </div>
     `;
-    this.setContent(html);
+    this.setSafeContent(unsafeRawHtml(html, 'legacy Panel.setContent() migration'));
   }
 
   private renderHormuzTile(): string {
@@ -266,19 +271,19 @@ const RISK_OVERVIEW_CSS = `
     justify-content: center;
   }
   .ero-tile__label {
-    font-size: 10px;
+    font-size: calc(10px * var(--wm-panel-effective-scale, 1));
     text-transform: uppercase;
     letter-spacing: 0.04em;
     color: rgba(255, 255, 255, 0.55);
     margin-bottom: 4px;
   }
   .ero-tile__value {
-    font-size: 18px;
+    font-size: calc(18px * var(--wm-panel-effective-scale, 1));
     font-weight: 600;
     line-height: 1.1;
   }
   .ero-tile__sub {
-    font-size: 12px;
+    font-size: calc(12px * var(--wm-panel-effective-scale, 1));
     margin-top: 2px;
   }
 `;

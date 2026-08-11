@@ -43,8 +43,12 @@ const HEADING_TO_DIMENSION: Readonly<Record<string, ResilienceDimensionId>> = {
   'Energy': 'energy',
   'Governance': 'governanceInstitutional',
   'Social Cohesion': 'socialCohesion',
-  'Border Security': 'borderSecurity',
+  // #3737 — methodology doc heading relabeled from 'Border Security' to match
+  // what the scorer actually measures. Internal id `borderSecurity` retained
+  // for proto / cache-key stability.
+  'Conflict & Displacement': 'borderSecurity',
   'Information & Cognitive': 'informationCognitive',
+  Education: 'education',
   'Health & Public Service': 'healthPublicService',
   'Food & Water': 'foodWater',
   'Fiscal Space': 'fiscalSpace',
@@ -78,6 +82,55 @@ function extractH4Headings(source: string): string[] {
     headings.push(match[1]);
   }
   return headings;
+}
+
+function splitActiveMethodologyClaims(source: string): string[] {
+  return source
+    .split(/(?:\r?\n){2,}/)
+    .flatMap((block) => block.trim().startsWith('|') ? block.split(/\r?\n/) : [block])
+    .map((claim) => claim.trim())
+    .filter(Boolean);
+}
+
+function splitClaimSegments(claim: string): string[] {
+  return claim
+    .split(/\r?\n|(?<=[.!?])\s+/)
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+}
+
+function isOfacRetirementExplanation(claim: string): boolean {
+  const sanctionsPattern = /\bOFAC\b|\bsanctionCount\b|\bsanctions?\b/i;
+  const retirementPattern = /\b(?:dropped|removed|retired|replaces?|rejected)\b|\bno longer read\b/i;
+  const rationalePattern = /\b(?:conflated|penaliz(?:ed|ing)|not a country-resilience indicator|liability metric)\b/i;
+  const relevantSegments = splitClaimSegments(claim).filter((segment) =>
+    sanctionsPattern.test(segment)
+  );
+
+  return relevantSegments.length > 0 && relevantSegments.every((segment) =>
+    retirementPattern.test(segment) ||
+    rationalePattern.test(segment) ||
+    /Renamed from "Trade & Sanctions"/i.test(segment)
+  );
+}
+
+/**
+ * #6459 — `financialSystemExposure` now carries a genuine, ACTIVE sanctions
+ * input: a post-blend cap for jurisdictions under a comprehensive or
+ * government-wide Western blocking programme. Prose describing that construct
+ * is legitimate current methodology, not resurrected OFAC-domicile scoring, so
+ * the generic-`sanctions` rule below has to admit it.
+ *
+ * The exemption is deliberately narrow in two ways. It requires the claim to
+ * NAME the comprehensive-embargo cap, so an ordinary "we score sanctions"
+ * sentence still trips the rule. And it never admits `OFAC`, `sanctionCount`
+ * or `sanctions:country-counts:v1` — the retired-signal test keys on those
+ * independently and stays strict, so this cannot become a back door for the
+ * signal the rule was written to keep out.
+ */
+function isComprehensiveEmbargoCapClaim(claim: string): boolean {
+  if (/\bOFAC\b|\bsanctionCount\b|sanctions:country-counts:v1/i.test(claim)) return false;
+  return /comprehensive[- ]embargo cap/i.test(claim);
 }
 
 describe('resilience methodology doc linter (T1.8)', () => {
@@ -157,6 +210,159 @@ describe('resilience methodology doc linter (T1.8)', () => {
       registryNotMapped,
       [],
       `RESILIENCE_DIMENSION_ORDER contains dimensions that are not in HEADING_TO_DIMENSION: ${registryNotMapped.join(', ')}`,
+    );
+  });
+
+  it('does not describe shipped source-failure and score-interval features as future work', () => {
+    assert.doesNotMatch(
+      source,
+      /The `source-failure` class is reserved for the runtime path/i,
+      'The methodology must not preserve the old source-failure placeholder paragraph.',
+    );
+    assert.doesNotMatch(
+      source,
+      /that wiring lands with a later Phase 1 task/i,
+      'The methodology must not claim source-failure re-tagging is future work; the scorer aggregation path is wired.',
+    );
+    assert.doesNotMatch(
+      source,
+      /not yet represented in the table above/i,
+      'The methodology must not claim the source-failure table entry is missing.',
+    );
+    assert.doesNotMatch(
+      source,
+      /widget does not render (?:them|the overall score interval) yet/i,
+      'The methodology must not claim the widget omits score sensitivity bands; it renders the overall [p05-p95] range.',
+    );
+    assert.match(
+      source,
+      /seed-meta:resilience:static\.failedDatasets[\s\S]{0,160}re-tags affected imputed dimensions as `source-failure`/i,
+      'The methodology should document the live failedDatasets to source-failure re-tagging path.',
+    );
+    assert.match(
+      source,
+      /widget renders the overall `\[p05\u2013p95\]` range/i,
+      'The methodology should document that the widget renders the overall score sensitivity band.',
+    );
+  });
+
+  it('does not use stale PR0 current-state language before the changelog', () => {
+    const changelogIndex = source.indexOf('\n## Changelog');
+    assert.notEqual(changelogIndex, -1, 'Methodology doc should have a Changelog section.');
+    const currentStateSource = source.slice(0, changelogIndex);
+
+    assert.doesNotMatch(
+      currentStateSource,
+      /This PR \(the diagnostic freeze\)/i,
+      'Current methodology prose must not describe the document as the PR0 diagnostic freeze.',
+    );
+    assert.doesNotMatch(
+      currentStateSource,
+      /Published rankings today reflect the pre-repair scorer/i,
+      'Current methodology prose must not claim published rankings are pre-repair.',
+    );
+    assert.doesNotMatch(
+      currentStateSource,
+      /At the time of writing \(PR 0 shipping\)/i,
+      'Current methodology prose must not preserve stale PR0 timestamp language.',
+    );
+    assert.doesNotMatch(
+      currentStateSource,
+      /Until PR 1[\u2013-]PR 3 land/i,
+      'Current methodology prose must not describe already-landed repairs as future work.',
+    );
+    assert.doesNotMatch(
+      currentStateSource,
+      /energy`? v2[\s\S]{0,300}(?:default off|default-off|staged separately|until the flag flips)/i,
+      'Current methodology prose must not describe active energy v2 as default-off or still staged.',
+    );
+    assert.match(
+      currentStateSource,
+      /constructVersions\.energy=`?"v2"`?/i,
+      'Current methodology prose should document that live runtime reports energy v2 active.',
+    );
+  });
+
+  it('does not present OFAC or sanctionCount as active scoring inputs', () => {
+    const claims = splitActiveMethodologyClaims(source);
+    const offenders = claims.filter((claim) =>
+      /\bOFAC\b|\bsanctionCount\b|sanctions:country-counts:v1/i.test(claim) &&
+      !isOfacRetirementExplanation(claim)
+    );
+
+    assert.deepEqual(
+      offenders,
+      [],
+      'OFAC/sanctionCount may appear only in explicit dropped/removed/retired/replacement explanations, not as active methodology prose.',
+    );
+  });
+
+  it('requires OFAC/sanctions retirement wording to be local to the matching sentence or line', () => {
+    assert.equal(
+      isOfacRetirementExplanation(
+        'The energy construct replaces the legacy scorer. `sanctionCount` is now refreshed daily.',
+      ),
+      false,
+      'A retirement verb in a neighboring sentence must not exempt an active sanctionCount claim.',
+    );
+
+    assert.equal(
+      isOfacRetirementExplanation(
+        'The OFAC `sanctionCount` component was dropped because it was not a country-resilience indicator.',
+      ),
+      true,
+      'A same-sentence OFAC/sanctionCount retirement explanation should remain allowed.',
+    );
+
+    assert.equal(
+      isOfacRetirementExplanation(
+        'The `financialSystemExposure` dimension replaces the dropped OFAC-domicile signal with structural sanctions exposure.',
+      ),
+      true,
+      'A same-sentence replacement explanation should remain allowed.',
+    );
+  });
+
+  it('does not present generic sanctions signals as active current methodology before the changelog', () => {
+    const changelogIndex = source.indexOf('\n## Changelog');
+    assert.notEqual(changelogIndex, -1, 'Methodology doc should have a Changelog section.');
+    const currentStateSource = source.slice(0, changelogIndex);
+    const offenders = splitActiveMethodologyClaims(currentStateSource).filter((claim) =>
+      /\bsanctions?\b/i.test(claim) &&
+      !isOfacRetirementExplanation(claim) &&
+      !isComprehensiveEmbargoCapClaim(claim)
+    );
+
+    assert.deepEqual(
+      offenders,
+      [],
+      'Current methodology prose must not describe sanctions as an active scoring signal unless the claim is explicitly a retirement/replacement explanation or the #6459 comprehensive-embargo cap.',
+    );
+  });
+
+  it('the comprehensive-embargo-cap exemption cannot readmit the retired OFAC signal', () => {
+    // The exemption added in #6459 is the only way an active-sanctions claim
+    // can pass. Pin its edges so a later widening has to be deliberate.
+    assert.equal(
+      isComprehensiveEmbargoCapClaim(
+        '**Comprehensive-embargo cap**: jurisdictions under a comprehensive blocking programme are capped at 15; FATF assesses AML/CFT deficiency rather than sanctions.',
+      ),
+      true,
+      'prose describing the comprehensive-embargo cap is legitimate current methodology',
+    );
+
+    assert.equal(
+      isComprehensiveEmbargoCapClaim(
+        'The comprehensive-embargo cap uses the OFAC `sanctionCount` seed to decide membership.',
+      ),
+      false,
+      'naming the cap must not launder the retired OFAC-domicile count back into active methodology',
+    );
+
+    assert.equal(
+      isComprehensiveEmbargoCapClaim('Sanctions exposure is scored as an active signal.'),
+      false,
+      'a generic active-sanctions claim must still trip the rule',
     );
   });
 });

@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+import { createRequire } from 'node:module';
+
 import {
   acquireLockSafely,
   extendExistingTtl,
@@ -9,8 +11,23 @@ import {
   releaseLock,
 } from './_seed-utils.mjs';
 import { unwrapEnvelope } from './_seed-envelope-source.mjs';
+import {
+  DEMAND_CHANGE_BASIS,
+  DEMAND_CHANGE_UNIT,
+  DEMAND_CHANGE_LOOKBACK_MONTHS,
+  MAX_DEMAND_CHANGE_PERCENT,
+  MAX_DEMAND_CHANGE_PRODUCTS,
+  MIN_DEMAND_CHANGE_PRODUCTS,
+  monthIndex,
+  monthPeriodEnd,
+  shiftMonth,
+} from './shared/jodi-demand-change.mjs';
 
 loadEnvFile(import.meta.url);
+const require = createRequire(import.meta.url);
+const UN_TO_ISO2 = require('./shared/un-to-iso2.json');
+const COMTRADE_REPORTER_OVERRIDES = require('./shared/comtrade-reporter-overrides.json');
+const JODI_MEASUREMENT_FIELDS = require('./shared/jodi-measurement-fields.json');
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -23,17 +40,15 @@ const LOCK_DOMAIN = 'energy:spine';
 const LOCK_TTL_MS = 20 * 60 * 1000; // 20 min (pipeline write of 200+ countries)
 const MIN_COVERAGE_RATIO = 0.80; // abort if new spine < 80% of previous country count
 
-// Countries with Comtrade reporter codes for shock model inputs.
-// Only these 6 reporters are seeded in comtrade:flows; must stay in sync with
-// compute-energy-shock.ts ISO2_TO_COMTRADE.
-const ISO2_TO_COMTRADE = {
-  US: '842',
-  CN: '156',
-  RU: '643',
-  IR: '364',
-  IN: '699',
-  TW: '490',
-};
+const ISO2_TO_UN = Object.fromEntries(Object.entries(UN_TO_ISO2).map(([unCode, iso2]) => [iso2, unCode]));
+
+// Only these reporters are seeded in comtrade:flows for spine shock inputs.
+// Reporter codes still resolve from shared Comtrade metadata so non-M49 facts
+// such as IN/TW cannot drift into a separate inline map.
+const SHOCK_INPUT_REPORTERS = ['US', 'CN', 'RU', 'IR', 'IN', 'TW'];
+const ISO2_TO_COMTRADE = Object.freeze(Object.fromEntries(
+  SHOCK_INPUT_REPORTERS.map((iso2) => [iso2, COMTRADE_REPORTER_OVERRIDES[iso2] ?? ISO2_TO_UN[iso2]]),
+));
 
 // Chokepoints supported by the shock model for comtrade-mapped countries.
 const SHOCK_CHOKEPOINTS = ['hormuz', 'malacca', 'suez', 'babelm'];
@@ -126,17 +141,38 @@ function checkIeaAvailability(ieaStocks) {
     (ieaStocks.daysOfCover != null && ieaStocks.anomaly !== true);
 }
 
+function readPath(value, path) {
+  return path.split('.').reduce((current, part) => {
+    if (current == null || typeof current !== 'object') return undefined;
+    return current[part];
+  }, value);
+}
+
+function hasFiniteMeasurementAtPaths(value, paths) {
+  return paths.some((path) => Number.isFinite(readPath(value, path)));
+}
+
+function checkJodiOilAvailability(jodiOil) {
+  if (!jodiOil) return false;
+  return hasFiniteMeasurementAtPaths(jodiOil, JODI_MEASUREMENT_FIELDS.oil);
+}
+
+function checkJodiGasAvailability(jodiGas) {
+  if (!jodiGas) return false;
+  return hasFiniteMeasurementAtPaths(jodiGas, JODI_MEASUREMENT_FIELDS.gas);
+}
+
 function buildOilFields(jodiOil, ieaStocks, hasIeaStocks) {
   return {
-    crudeImportsKbd: jodiOil ? (jodiOil.crude?.importsKbd ?? 0) : 0,
-    gasolineDemandKbd: jodiOil ? (jodiOil.gasoline?.demandKbd ?? 0) : 0,
-    gasolineImportsKbd: jodiOil ? (jodiOil.gasoline?.importsKbd ?? 0) : 0,
-    dieselDemandKbd: jodiOil ? (jodiOil.diesel?.demandKbd ?? 0) : 0,
-    dieselImportsKbd: jodiOil ? (jodiOil.diesel?.importsKbd ?? 0) : 0,
-    jetDemandKbd: jodiOil ? (jodiOil.jet?.demandKbd ?? 0) : 0,
-    jetImportsKbd: jodiOil ? (jodiOil.jet?.importsKbd ?? 0) : 0,
-    lpgDemandKbd: jodiOil ? (jodiOil.lpg?.demandKbd ?? 0) : 0,
-    lpgImportsKbd: jodiOil ? (jodiOil.lpg?.importsKbd ?? 0) : 0,
+    crudeImportsKbd: jodiOil?.crude?.importsKbd ?? null,
+    gasolineDemandKbd: jodiOil?.gasoline?.demandKbd ?? null,
+    gasolineImportsKbd: jodiOil?.gasoline?.importsKbd ?? null,
+    dieselDemandKbd: jodiOil?.diesel?.demandKbd ?? null,
+    dieselImportsKbd: jodiOil?.diesel?.importsKbd ?? null,
+    jetDemandKbd: jodiOil?.jet?.demandKbd ?? null,
+    jetImportsKbd: jodiOil?.jet?.importsKbd ?? null,
+    lpgDemandKbd: jodiOil?.lpg?.demandKbd ?? null,
+    lpgImportsKbd: jodiOil?.lpg?.importsKbd ?? null,
     daysOfCover: hasIeaStocks ? (ieaStocks.daysOfCover ?? 0) : 0,
     netExporter: ieaStocks?.netExporter === true,
     belowObligation: ieaStocks?.belowObligation === true,
@@ -144,12 +180,12 @@ function buildOilFields(jodiOil, ieaStocks, hasIeaStocks) {
 }
 
 function buildGasFields(jodiGas) {
-  if (!jodiGas) return { lngImportsTj: 0, pipeImportsTj: 0, totalDemandTj: 0, lngShareOfImports: 0 };
+  if (!jodiGas) return { lngImportsTj: null, pipeImportsTj: null, totalDemandTj: null, lngShareOfImports: null };
   return {
-    lngImportsTj: jodiGas.lngImportsTj ?? 0,
-    pipeImportsTj: jodiGas.pipeImportsTj ?? 0,
-    totalDemandTj: jodiGas.totalDemandTj ?? 0,
-    lngShareOfImports: jodiGas.lngShareOfImports ?? 0,
+    lngImportsTj: jodiGas.lngImportsTj ?? null,
+    pipeImportsTj: jodiGas.pipeImportsTj ?? null,
+    totalDemandTj: jodiGas.totalDemandTj ?? null,
+    lngShareOfImports: jodiGas.lngShareOfImports ?? null,
   };
 }
 
@@ -165,6 +201,101 @@ function buildMixFields(mix) {
     solarShare: mix.solarShare ?? 0,
     hydroShare: mix.hydroShare ?? 0,
     importShare: mix.importShare ?? 0,
+  };
+}
+
+function finiteNumber(value) {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function isoInstant(value) {
+  return typeof value === 'string' && Number.isFinite(Date.parse(value)) ? value : null;
+}
+
+function observationMonth(value) {
+  return typeof value === 'string' && monthIndex(value) !== null ? value : null;
+}
+
+/**
+ * Project an upstream JODI oil demand change onto the spine.
+ *
+ * Every field is validated, and the year-over-year basis is pinned here so a
+ * seasonal (or otherwise non-comparable) upstream basis can never reach the
+ * activity nowcast as if it were the reviewed one. Returns null — never a zero
+ * or a neutral value — whenever the change is not fully published.
+ */
+export function buildDemandChangeEntry(jodiOil) {
+  const change = jodiOil?.demandChange;
+  if (change == null || typeof change !== 'object' || Array.isArray(change)) return null;
+  if (change.basis !== DEMAND_CHANGE_BASIS) return null;
+
+  const dataMonth = observationMonth(jodiOil?.dataMonth);
+  const percentChange = finiteNumber(change.percentChange);
+  const periodEnd = isoInstant(change.periodEnd);
+  const priorPeriodEnd = isoInstant(change.priorPeriodEnd);
+  const observationPeriod = observationMonth(change.observationPeriod);
+  const priorObservationPeriod = observationMonth(change.priorObservationPeriod);
+  const products = Array.isArray(change.products)
+    ? [...new Set(change.products
+      .filter(product => typeof product === 'string' && product.trim().length > 0)
+      .map(product => product.trim()))].sort()
+    : [];
+  const currentDemandKbd = finiteNumber(change.currentDemandKbd);
+  const priorDemandKbd = finiteNumber(change.priorDemandKbd);
+  const expectedPriorObservationPeriod = dataMonth === null
+    ? null
+    : shiftMonth(dataMonth, -DEMAND_CHANGE_LOOKBACK_MONTHS);
+  const expectedPeriodEnd = monthPeriodEnd(observationPeriod);
+  const expectedPriorPeriodEnd = monthPeriodEnd(priorObservationPeriod);
+  const expectedPercentChange = currentDemandKbd !== null && priorDemandKbd !== null && priorDemandKbd > 0
+    ? ((currentDemandKbd - priorDemandKbd) / priorDemandKbd) * 100
+    : null;
+  const percentTolerance = expectedPercentChange === null
+    ? null
+    : 1e-9 * Math.max(1, Math.abs(expectedPercentChange), Math.abs(percentChange ?? 0));
+  if (
+    dataMonth === null
+    || percentChange === null
+    || change.unit !== DEMAND_CHANGE_UNIT
+    || currentDemandKbd === null
+    || currentDemandKbd < 0
+    || priorDemandKbd === null
+    || priorDemandKbd <= 0
+    || periodEnd === null
+    || priorPeriodEnd === null
+    || observationPeriod === null
+    || priorObservationPeriod === null
+    || observationPeriod !== dataMonth
+    || priorObservationPeriod !== expectedPriorObservationPeriod
+    || expectedPeriodEnd === null
+    || expectedPriorPeriodEnd === null
+    || Date.parse(periodEnd) !== Date.parse(expectedPeriodEnd)
+    || Date.parse(priorPeriodEnd) !== Date.parse(expectedPriorPeriodEnd)
+    || products.length < MIN_DEMAND_CHANGE_PRODUCTS
+    || products.length > MAX_DEMAND_CHANGE_PRODUCTS
+    || expectedPercentChange === null
+    || Math.abs(expectedPercentChange - percentChange) > percentTolerance
+    || Math.abs(percentChange) > MAX_DEMAND_CHANGE_PERCENT
+    || Date.parse(priorPeriodEnd) >= Date.parse(periodEnd)
+    // Corroborate the basis label with the arithmetic: a payload claiming
+    // year-over-year while spanning some other distance is not the reviewed
+    // comparison, whatever it calls itself.
+    || monthIndex(observationPeriod) - monthIndex(priorObservationPeriod)
+      !== DEMAND_CHANGE_LOOKBACK_MONTHS
+  ) return null;
+
+  return {
+    basis: DEMAND_CHANGE_BASIS,
+    observationPeriod,
+    priorObservationPeriod,
+    periodEnd,
+    priorPeriodEnd,
+    unit: DEMAND_CHANGE_UNIT,
+    products,
+    productCount: products.length,
+    currentDemandKbd,
+    priorDemandKbd,
+    percentChange,
   };
 }
 
@@ -193,10 +324,16 @@ export function buildSpineEntry(iso2, { mix, jodiOil, jodiGas, ieaStocks, ember 
   }
 
   const hasMix = mix != null;
-  const hasJodiOil = jodiOil != null;
-  const hasJodiGas = jodiGas != null;
+  const hasJodiOil = checkJodiOilAvailability(jodiOil);
+  const hasJodiGas = checkJodiGasAvailability(jodiGas);
   const hasIeaStocks = checkIeaAvailability(ieaStocks);
   const hasEmber = ember != null && typeof ember.fossilShare === 'number';
+  const demandChange = buildDemandChangeEntry(jodiOil);
+  // The period the demand series covers, published whether or not a change was
+  // observed for it. A consumer needs this to tell "the change for this month
+  // is not due yet" from "this month is due and nothing was published" — the
+  // family's latest coverage timestamp answers neither question.
+  const demandPeriodEnd = monthPeriodEnd(observationMonth(jodiOil?.dataMonth));
 
   const comtradeCode = ISO2_TO_COMTRADE[iso2] ?? null;
 
@@ -204,7 +341,9 @@ export function buildSpineEntry(iso2, { mix, jodiOil, jodiGas, ieaStocks, ember 
     countryCode: iso2,
     updatedAt: new Date().toISOString(),
     sources: buildSourceTimestamps(mix, jodiOil, jodiGas, ieaStocks, ember),
-    coverage: { hasMix, hasJodiOil, hasJodiGas, hasIeaStocks, hasEmber, hasSprPolicy: sprPolicy != null && sprPolicy.regime !== 'unknown' },
+    coverage: { hasMix, hasJodiOil, hasJodiGas, hasIeaStocks, hasEmber, hasDemandChange: demandChange !== null, hasSprPolicy: sprPolicy != null && sprPolicy.regime !== 'unknown' },
+    demandPeriodEnd,
+    demandChange,
     oil: buildOilFields(jodiOil, ieaStocks, hasIeaStocks),
     gas: buildGasFields(jodiGas),
     mix: buildMixFields(hasMix ? mix : null),
@@ -402,8 +541,16 @@ export async function main() {
 }
 
 if (process.argv[1]?.endsWith('seed-energy-spine.mjs')) {
-  main().catch(err => {
-    console.error(err);
-    process.exit(1);
-  });
+  // Terminal success marker. Emitted from .then() so it can ONLY print after main() has fully
+  // resolved — a throw anywhere inside, including a late publish step, skips it. Any marker
+  // written INSIDE main() would print before later work and could vouch for a run that then
+  // died (exactly how #6092 stayed invisible). Format mirrors runSeed() so the crash
+  // diagnostic recognises it; without it a clean run is indistinguishable from a silent death.
+  const __runStartedAt = Date.now();
+  main()
+    .then(() => console.log(`\n=== Done (${Date.now() - __runStartedAt}ms) ===`))
+    .catch(err => {
+      console.error(err);
+      process.exit(1);
+    });
 }

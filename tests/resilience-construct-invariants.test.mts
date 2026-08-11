@@ -26,6 +26,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import {
+  computeImportHhiCertaintyCoverage,
   scoreImportConcentration,
   scoreExternalDebtCoverage,
   scoreSovereignFiscalBuffer,
@@ -40,9 +41,9 @@ function makeReader(keyValueMap: Record<string, unknown>): ResilienceSeedReader 
 }
 
 describe('construct invariants — importConcentration', () => {
-  async function scoreWith(hhi: number) {
+  async function scoreWith(hhi: number, year?: number) {
     return scoreImportConcentration(TEST_ISO2, makeReader({
-      'resilience:recovery:import-hhi:v1': { countries: { [TEST_ISO2]: { hhi } } },
+      'resilience:recovery:import-hhi:v1': { countries: { [TEST_ISO2]: { hhi, year } } },
     }));
   }
 
@@ -64,6 +65,41 @@ describe('construct invariants — importConcentration', () => {
     // Current scorer: hhi×10000 normalised against (0, 5000). 0.5×10000 = 5000 → 0.
     const r = await scoreWith(0.5);
     assert.ok(Math.abs(r.score - 0) < 1, `expected ~0 at HHI=0.5 under current goalpost, got ${r.score}`);
+  });
+
+  it('normal 4-year Comtrade source years stay full coverage', async () => {
+    assert.equal(computeImportHhiCertaintyCoverage(2022, 2026), 1);
+    const freshSourceYear = new Date().getFullYear() - 3;
+    const r = await scoreWith(0.2, freshSourceYear);
+    assert.equal(r.coverage, 1);
+    assert.equal(r.observedWeight, 1);
+    assert.equal(r.imputationClass, null);
+  });
+
+  it('stale import-HHI fallback source years derate coverage without changing the HHI score', async () => {
+    assert.equal(computeImportHhiCertaintyCoverage(2021, 2026), 0.8);
+    assert.equal(computeImportHhiCertaintyCoverage(2020, 2026), 0.6);
+    assert.equal(computeImportHhiCertaintyCoverage(2018, 2026), 0.3);
+    const freshSourceYear = new Date().getFullYear() - 3;
+    const fresh = await scoreWith(0.2, freshSourceYear);
+    const stale = await scoreWith(0.2, 2018);
+    assert.equal(stale.score, fresh.score);
+    assert.equal(stale.coverage, 0.3);
+    assert.equal(stale.observedWeight, 1);
+    assert.equal(stale.imputationClass, null);
+  });
+
+  it('missing import-HHI source years derate coverage without changing the HHI score', async () => {
+    assert.equal(computeImportHhiCertaintyCoverage(undefined, 2026), 0.3);
+    assert.equal(computeImportHhiCertaintyCoverage(null, 2026), 0.3);
+    assert.equal(computeImportHhiCertaintyCoverage(Number.NaN, 2026), 0.3);
+    const freshSourceYear = new Date().getFullYear() - 3;
+    const fresh = await scoreWith(0.2, freshSourceYear);
+    const missingYear = await scoreWith(0.2);
+    assert.equal(missingYear.score, fresh.score);
+    assert.equal(missingYear.coverage, 0.3);
+    assert.equal(missingYear.observedWeight, 1);
+    assert.equal(missingYear.imputationClass, null);
   });
 });
 
@@ -216,6 +252,66 @@ describe('construct invariants — sovereignFiscalBuffer (saturating transform)'
       }),
       false,
       'Path 2 with completeness=0 (data outage on SWF country) MUST NOT be excluded — operator must see the low-confidence signal',
+    );
+  });
+});
+
+describe('isExcludedFromConfidenceMean — education dark branch', () => {
+  // Mirrors the NOT_APPLICABLE positive/negative pair above. The negative case
+  // is the one that matters: the discriminator is the TRIPLE zero, not
+  // coverage===0 alone. A country that genuinely carries the construct but has
+  // a data outage must still drag confidence down so an operator notices —
+  // if this branch matched on coverage alone it would silently hide outages.
+  it('excludes the flag-dark triple-zero shape', () => {
+    assert.equal(
+      isExcludedFromConfidenceMean({
+        id: 'education',
+        coverage: 0,
+        observedWeight: 0,
+        imputedWeight: 0,
+      }),
+      true,
+      'flag-dark education must leave the confidence mean',
+    );
+  });
+
+  it('does NOT exclude a real outage on the same dimension', () => {
+    // source-failure path: coverage 0 but imputedWeight 1. Must stay counted.
+    assert.equal(
+      isExcludedFromConfidenceMean({
+        id: 'education',
+        coverage: 0,
+        observedWeight: 0,
+        imputedWeight: 1,
+      }),
+      false,
+      'a real education outage must still drag confidence down',
+    );
+  });
+
+  it('does NOT exclude an observed-but-zero-coverage reading', () => {
+    assert.equal(
+      isExcludedFromConfidenceMean({
+        id: 'education',
+        coverage: 0,
+        observedWeight: 1,
+        imputedWeight: 0,
+      }),
+      false,
+      'observed data derated to zero coverage is an outage, not a dark dim',
+    );
+  });
+
+  it('does NOT exclude a scoring education dimension once the flag is on', () => {
+    assert.equal(
+      isExcludedFromConfidenceMean({
+        id: 'education',
+        coverage: 0.92,
+        observedWeight: 0.92,
+        imputedWeight: 0.08,
+      }),
+      false,
+      'a live education dim must rejoin the confidence mean automatically',
     );
   });
 });

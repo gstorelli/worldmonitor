@@ -63,7 +63,7 @@ export const RESILIENCE_COHORTS: readonly ResilienceCohort[] = [
     label: 'Nuclear-heavy generation mix',
     definition:
       'Countries where nuclear supplied ≥ 15% of electricity generation in the most recent reporting year. Validates that the new lowCarbonGenerationShare indicator correctly rewards firm low-carbon generation (PR 1 §3.3).',
-    source: 'IAEA PRIS (Power Reactor Information System) + World Bank EG.ELC.NUCL.ZS. Curated 2026-04-22.',
+    source: 'IAEA PRIS (Power Reactor Information System) + OWID nuclear_share_elec. Curated 2026-04-22.',
     countryCodes: [
       'FR', 'SK', 'UA', 'HU', 'BE', 'BG', 'SI',  // Central/Eastern Europe heavy adopters
       'CZ', 'FI', 'SE', 'CH',                     // Western/Northern EU adopters
@@ -98,6 +98,20 @@ export const RESILIENCE_COHORTS: readonly ResilienceCohort[] = [
       'MV',                                              // Indian Ocean
       'MU', 'SC', 'CV',                                  // Africa-adjacent
       'BB', 'TT', 'JM', 'LC', 'VC', 'GD',                // Caribbean
+    ],
+  },
+  {
+    id: 'sanctions-isolated',
+    label: 'Sanctions-isolated jurisdictions',
+    definition:
+      'Jurisdictions subject to a comprehensive or government-wide Western blocking programme, whose banking systems are severed from USD/EUR correspondent clearing as a realized fact rather than a forecast. This is the cohort `docs/methodology/financial-system-exposure.md` § "Sanctions-isolated jurisdiction sanity check" names as the construct activation anchor: every member must score < 20 on `financialSystemExposure`, because maximal realized severance is the worst possible reading of that construct, not the best.',
+    source:
+      'US OFAC comprehensive/territory-wide and government-wide blocking programmes (31 CFR 500-599 + the EO series) cross-checked against EU Council consolidated restrictive measures. Membership is the eight jurisdictions enumerated in the financial-system-exposure methodology anchor. Curated 2026-08-11.',
+    countryCodes: [
+      'RU', 'BY',        // Post-2022 coordinated G7/EU financial severance
+      'IR', 'KP',        // Long-standing comprehensive programmes (also FATF black)
+      'CU', 'VE',        // Western-hemisphere comprehensive / government-wide blocking
+      'LY', 'MM',        // Government-wide asset freezes (MM also FATF black)
     ],
   },
   {

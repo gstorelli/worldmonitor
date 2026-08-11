@@ -6,6 +6,12 @@ import { escapeHtml } from '@/utils/sanitize';
 import { widgetAgentHealthUrl, widgetAgentUrl } from '@/utils/proxy';
 import { wrapWidgetHtml, wrapProWidgetHtml } from '@/utils/widget-sanitizer';
 import { track } from '@/services/analytics';
+import { reportEntitlementDesync } from '@/services/entitlement-desync-telemetry';
+import { classifyPremiumDenial, type ClientEntitlementBelief } from '@/services/premium-denial';
+import { readClientEntitlementBelief } from '@/services/panel-gating';
+import { getAuthState } from '@/services/auth-state';
+import { setTrustedHtml, trustedHtml } from '@/utils/dom-utils';
+
 
 interface WidgetChatOptions {
   mode: 'create' | 'modify';
@@ -53,6 +59,22 @@ interface BuiltAuthHeaders {
   usedTesterKey: boolean;
 }
 
+function reportWidgetEntitlementDesync(
+  status: number,
+  payload: WidgetAgentHealth | null,
+  usedTesterKey: boolean,
+  requestBelief: ClientEntitlementBelief,
+  requestUserId: string | null,
+): void {
+  if (usedTesterKey || (getAuthState().user?.id ?? null) !== requestUserId) return;
+  const verdict = classifyPremiumDenial({
+    status,
+    errorCode: payload?.error ?? null,
+    belief: requestBelief,
+  });
+  if (verdict === 'entitlement_desync') reportEntitlementDesync('widget-chat');
+}
+
 async function buildWidgetAuthHeaders(isPro: boolean): Promise<BuiltAuthHeaders> {
   const testerKey = getBrowserTesterKey();
   const widgetKey = getWidgetAgentKey();
@@ -86,7 +108,7 @@ export function openWidgetChatModal(options: WidgetChatOptions): void {
   const titleText = isModify ? t('widgets.modifyTitle') : t('widgets.chatTitle');
   const proBadgeHtml = isPro ? `<span class="widget-pro-badge">${escapeHtml(t('widgets.proBadge'))}</span>` : '';
 
-  modal.innerHTML = `
+  setTrustedHtml(modal, trustedHtml(`
     <div class="modal-header">
       <span class="modal-title">${escapeHtml(titleText)}${proBadgeHtml}</span>
       <button class="modal-close" aria-label="${escapeHtml(t('common.close'))}">\u2715</button>
@@ -112,7 +134,7 @@ export function openWidgetChatModal(options: WidgetChatOptions): void {
       <div class="widget-chat-footer-status"></div>
       <button class="widget-chat-action-btn" disabled>${isModify ? t('widgets.applyChanges') : t('widgets.addToDashboard')}</button>
     </div>
-  `;
+  `, "legacy direct innerHTML migration"));
 
   overlay.appendChild(modal);
   document.body.appendChild(overlay);
@@ -169,12 +191,22 @@ export function openWidgetChatModal(options: WidgetChatOptions): void {
     setReadinessState(readinessEl, 'checking', t('widgets.checkingConnection'));
     try {
       const auth = await buildWidgetAuthHeaders(isPro);
+      const requestAuthState = getAuthState();
+      const requestUserId = requestAuthState.user?.id ?? null;
+      const requestBelief = readClientEntitlementBelief(requestAuthState);
       const res = await fetch(widgetAgentHealthUrl(), { headers: auth.headers });
       let payload: WidgetAgentHealth | null = null;
       try { payload = await res.json() as WidgetAgentHealth; } catch { /* ignore */ }
 
       if (!res.ok) {
-        const message = resolvePreflightMessage(res.status, payload, isPro, auth.usedTesterKey);
+        const message = resolvePreflightMessage(
+          res.status,
+          payload,
+          isPro,
+          auth.usedTesterKey,
+          requestBelief,
+          requestUserId,
+        );
         preflightReady = false;
         setReadinessState(readinessEl, 'error', message);
         setFooterStatus(footerStatusEl, message, 'error');
@@ -250,6 +282,9 @@ export function openWidgetChatModal(options: WidgetChatOptions): void {
 
     try {
       const auth = await buildWidgetAuthHeaders(isPro);
+      const requestAuthState = getAuthState();
+      const requestUserId = requestAuthState.user?.id ?? null;
+      const requestBelief = readClientEntitlementBelief(requestAuthState);
       const reqHeaders: Record<string, string> = {
         'Content-Type': 'application/json',
         ...auth.headers,
@@ -262,7 +297,19 @@ export function openWidgetChatModal(options: WidgetChatOptions): void {
         body,
       });
 
-      if (!res.ok || !res.body) {
+      if (!res.ok) {
+        let payload: WidgetAgentHealth | null = null;
+        try { payload = await res.json() as WidgetAgentHealth; } catch { /* ignore */ }
+        reportWidgetEntitlementDesync(
+          res.status,
+          payload,
+          auth.usedTesterKey,
+          requestBelief,
+          requestUserId,
+        );
+        throw new Error(t('widgets.serverError', { status: res.status }));
+      }
+      if (!res.body) {
         throw new Error(t('widgets.serverError', { status: res.status }));
       }
 
@@ -272,7 +319,7 @@ export function openWidgetChatModal(options: WidgetChatOptions): void {
       const statusEl = appendMessage(messagesEl, 'assistant', '');
       const radarEl = document.createElement('span');
       radarEl.className = 'widget-chat-radar';
-      radarEl.innerHTML = '<span class="panel-loading-radar"><span class="panel-radar-sweep"></span><span class="panel-radar-dot"></span></span>';
+      setTrustedHtml(radarEl, trustedHtml('<span class="panel-loading-radar"><span class="panel-radar-sweep"></span><span class="panel-radar-dot"></span></span>', "legacy direct innerHTML migration"));
       statusEl.appendChild(radarEl);
 
       const reader = res.body.getReader();
@@ -381,7 +428,7 @@ export function closeWidgetChatModal(): void {
 }
 
 function renderExampleChips(container: HTMLElement, inputEl: HTMLTextAreaElement, isPro: boolean): void {
-  container.innerHTML = '';
+  setTrustedHtml(container, trustedHtml('', "legacy direct innerHTML migration"));
   const keys = isPro ? PRO_EXAMPLE_PROMPT_KEYS : EXAMPLE_PROMPT_KEYS;
   for (const key of keys) {
     const btn = document.createElement('button');
@@ -401,12 +448,17 @@ function resolvePreflightMessage(
   payload: WidgetAgentHealth | null,
   isPro: boolean,
   usedTesterKey: boolean,
+  requestBelief: ClientEntitlementBelief,
+  requestUserId: string | null,
 ): string {
   if (status === 403) {
     // Tester-key path: tell the operator to update the wm-*-key they actually have.
     if (usedTesterKey) return isPro ? t('widgets.preflightInvalidProKey') : t('widgets.preflightInvalidKey');
-    // Clerk-auth path: split on isPro.
-    //   isPro=true  — the modal believes the user is Pro; a 403 means either
+    reportWidgetEntitlementDesync(status, payload, usedTesterKey, requestBelief, requestUserId);
+    // Clerk-auth copy stays keyed to the requested widget tier. Telemetry above
+    // separately classifies the account belief so the two concepts cannot be
+    // conflated.
+    //   isPro=true  — the modal requested a Pro widget; a 403 means either
     //                 (a) they just upgraded (entitlement still propagating)
     //                 or (b) the entitlement service is degraded. Tell them to
     //                 refresh / contact support.
@@ -435,7 +487,7 @@ function renderPreviewState(container: HTMLElement, phase: PreviewPhase, detail 
   const copy = detail || getPreviewCopy(phase);
   const isError = phase === 'error';
 
-  container.innerHTML = `
+  setTrustedHtml(container, trustedHtml(`
     <div class="widget-chat-preview-state is-${phase}">
       <div class="widget-chat-preview-head">
         <div>
@@ -460,7 +512,7 @@ function renderPreviewState(container: HTMLElement, phase: PreviewPhase, detail 
         </div>
       `}
     </div>
-  `;
+  `, "legacy direct innerHTML migration"));
 }
 
 function renderPreviewHtml(
@@ -475,7 +527,7 @@ function renderPreviewHtml(
     ? wrapProWidgetHtml(html)
     : wrapWidgetHtml(html, 'wm-widget-shell-preview');
 
-  container.innerHTML = `
+  setTrustedHtml(container, trustedHtml(`
     <div class="widget-chat-preview-frame">
       <div class="widget-chat-preview-head">
         <div>
@@ -489,7 +541,7 @@ function renderPreviewHtml(
         ${rendered}
       </div>
     </div>
-  `;
+  `, "legacy direct innerHTML migration"));
 }
 
 function getPhaseLabel(phase: PreviewPhase): string {

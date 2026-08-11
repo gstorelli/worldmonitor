@@ -42,6 +42,7 @@ export const EIA_REGIONS = [
   { region: 'NYISO', respondent: 'NYIS',  name: 'New York' },
   { region: 'ERCO',  respondent: 'ERCO',  name: 'Texas (ERCOT)' },
   { region: 'SPP',   respondent: 'SWPP',  name: 'Southwest' },
+  { region: 'ISNE',  respondent: 'ISNE',  name: 'New England' },
 ];
 
 // ── Date helpers ─────────────────────────────────────────────────────────────
@@ -175,12 +176,14 @@ async function fetchAllEntsoE(token, today, yesterday) {
 
 // ── EIA-930 fetcher ───────────────────────────────────────────────────────────
 
-async function fetchEiaRegion(region, apiKey, today) {
+export async function fetchEiaRegion(region, apiKey, today) {
   const dateStr = isoDate(today);
   const params = new URLSearchParams({
+    frequency: 'hourly',
     'data[]': 'value',
     'facets[respondent][]': region.respondent,
-    start: isoDate(new Date(Date.now() - 2 * 24 * 3600 * 1000)),
+    'facets[type][]': 'D',
+    start: isoDate(new Date(today.getTime() - 2 * 24 * 3600 * 1000)),
     end: dateStr,
     'sort[0][column]': 'period',
     'sort[0][direction]': 'desc',
@@ -365,8 +368,16 @@ export async function main() {
 }
 
 if (process.argv[1]?.endsWith('seed-electricity-prices.mjs')) {
-  main().catch((err) => {
-    console.error(err);
-    process.exit(1);
-  });
+  // Terminal success marker. Emitted from .then() so it can ONLY print after main() has fully
+  // resolved — a throw anywhere inside, including a late publish step, skips it. Any marker
+  // written INSIDE main() would print before later work and could vouch for a run that then
+  // died (exactly how #6092 stayed invisible). Format mirrors runSeed() so the crash
+  // diagnostic recognises it; without it a clean run is indistinguishable from a silent death.
+  const __runStartedAt = Date.now();
+  main()
+    .then(() => console.log(`\n=== Done (${Date.now() - __runStartedAt}ms) ===`))
+    .catch((err) => {
+      console.error(err);
+      process.exit(1);
+    });
 }

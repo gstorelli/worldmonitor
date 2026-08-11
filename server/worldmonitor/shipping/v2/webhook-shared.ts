@@ -1,27 +1,13 @@
 import { CHOKEPOINT_REGISTRY } from '../../../_shared/chokepoint-registry';
+import { isBlockedResolvedAddress } from '../../../_shared/ip-address-classification';
 
 export const WEBHOOK_TTL = 86400 * 30; // 30 days
 export const VALID_CHOKEPOINT_IDS = new Set(CHOKEPOINT_REGISTRY.map(c => c.id));
 
-// Private IP ranges + known cloud metadata hostnames blocked at registration.
-//
-// DNS rebinding is NOT mitigated by isBlockedCallbackUrl below — the Vercel
-// Edge runtime can't resolve hostnames before the request goes out. Defense
-// against a hostname that returns a public IP at registration time and a
-// private IP later (or different IPs per resolution) MUST happen in the
-// delivery worker that actually POSTs to the callback URL:
-//
-//   1. Re-validate the URL with isBlockedCallbackUrl right before each send.
-//   2. Resolve the hostname to its current IP via dns.promises.lookup
-//      (Node runtime — Edge can't do this).
-//   3. Verify the resolved IP is not in PRIVATE_HOSTNAME_PATTERNS or
-//      BLOCKED_METADATA_HOSTNAMES.
-//   4. Issue the fetch using the resolved IP with the Host header preserved
-//      so TLS still validates against the original hostname.
-//
-// As of the #3242 followup audit, no delivery worker for shipping/v2 webhooks
-// exists in this repo — tracked in issue #3288. Anyone landing delivery code
-// MUST import the patterns + sets above and apply steps 1–3 before each send.
+// Private IP ranges + known cloud metadata hostnames blocked at registration
+// and again immediately before webhook delivery. Registration-time checks are
+// not sufficient because a callback hostname can later rebind to internal
+// infrastructure.
 export const PRIVATE_HOSTNAME_PATTERNS = [
   /^localhost$/i,
   /^127\.\d+\.\d+\.\d+$/,
@@ -47,6 +33,23 @@ export const BLOCKED_METADATA_HOSTNAMES = new Set([
   'link-local.s3.amazonaws.com',
 ]);
 
+const DNS_RESOLUTION_TIMEOUT_MS = 3_000;
+const DNS_JSON_ENDPOINT = 'https://cloudflare-dns.com/dns-query';
+const TEST_RESOLVER_KEY = Symbol.for('worldmonitor.shippingV2.resolveWebhookHostnameForTest');
+
+type ResolveHostname = (hostname: string) => Promise<string[]>;
+
+function isIpLiteral(hostname: string): boolean {
+  return hostname.includes(':') || /^(?:\d{1,3}\.){3}\d{1,3}$/.test(hostname);
+}
+
+function getResolveHostnameForTest(): ResolveHostname | undefined {
+  const candidate = Reflect.get(globalThis, TEST_RESOLVER_KEY);
+  return typeof candidate === 'function' ? candidate as ResolveHostname : undefined;
+}
+
+export { isBlockedResolvedAddress };
+
 export function isBlockedCallbackUrl(rawUrl: string): string | null {
   let parsed: URL;
   try {
@@ -65,6 +68,10 @@ export function isBlockedCallbackUrl(rawUrl: string): string | null {
     return 'callbackUrl hostname is a blocked metadata endpoint';
   }
 
+  if (isBlockedResolvedAddress(hostname)) {
+    return `callbackUrl resolves to a private/reserved address: ${hostname}`;
+  }
+
   for (const pattern of PRIVATE_HOSTNAME_PATTERNS) {
     if (pattern.test(hostname)) {
       return `callbackUrl resolves to a private/reserved address: ${hostname}`;
@@ -72,6 +79,59 @@ export function isBlockedCallbackUrl(rawUrl: string): string | null {
   }
 
   return null;
+}
+
+async function defaultResolveHostname(hostname: string): Promise<string[]> {
+  const resolveHostnameForTest = getResolveHostnameForTest();
+  if (resolveHostnameForTest) return resolveHostnameForTest(hostname);
+
+  const resolveRecordType = async (recordType: 'A' | 'AAAA'): Promise<string[]> => {
+    const url = new URL(DNS_JSON_ENDPOINT);
+    url.searchParams.set('name', hostname);
+    url.searchParams.set('type', recordType);
+    const response = await fetch(url, {
+      headers: {
+        Accept: 'application/dns-json',
+        'User-Agent': 'WorldMonitor-ShippingV2-Webhooks/1.0',
+      },
+      signal: AbortSignal.timeout(DNS_RESOLUTION_TIMEOUT_MS),
+    });
+    if (!response.ok) throw new Error(`DNS ${recordType} lookup failed: HTTP ${response.status}`);
+    const data = await response.json() as { Status?: number; Answer?: Array<{ type?: number; data?: string }> };
+    if (data.Status !== 0) throw new Error(`DNS ${recordType} lookup failed: status ${data.Status}`);
+    const expectedType = recordType === 'A' ? 1 : 28;
+    return (data.Answer ?? [])
+      .filter(answer => answer.type === expectedType && typeof answer.data === 'string')
+      .map(answer => answer.data!);
+  };
+  const records = await Promise.all([resolveRecordType('A'), resolveRecordType('AAAA')]);
+  return records.flat();
+}
+
+/**
+ * Validate the current DNS answer before storing a webhook. Delivery makes the
+ * same check immediately before send and pins the resulting socket, which
+ * keeps this fail-fast check from becoming the only SSRF control.
+ */
+export async function assertCallbackUrlRegistrationSafe(
+  callbackUrl: string,
+  resolveHostname: ResolveHostname = defaultResolveHostname,
+): Promise<void> {
+  const staticError = isBlockedCallbackUrl(callbackUrl);
+  if (staticError) throw new Error(staticError);
+
+  const hostname = new URL(callbackUrl).hostname.toLowerCase();
+  if (isIpLiteral(hostname)) return;
+  let resolvedAddresses: string[];
+  try {
+    resolvedAddresses = await resolveHostname(hostname);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`callbackUrl DNS resolution failed: ${message}`);
+  }
+  if (!resolvedAddresses.length) throw new Error('callbackUrl DNS resolution returned no addresses');
+  const blocked = resolvedAddresses.find(isBlockedResolvedAddress);
+  if (blocked) throw new Error('callbackUrl resolves to a private/reserved address');
 }
 
 export async function generateSecret(): Promise<string> {

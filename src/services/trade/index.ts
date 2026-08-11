@@ -9,25 +9,11 @@ import { getCurrentClerkUser } from '@/services/clerk';
 import { hasPremiumAccess } from '@/services/panel-gating';
 import { onEntitlementChange } from '@/services/entitlements';
 import { IS_EMBEDDED_PREVIEW } from '@/utils/embedded-preview';
-import {
-  TradeServiceClient,
-  type GetTradeRestrictionsResponse,
-  type GetTariffTrendsResponse,
-  type GetTradeFlowsResponse,
-  type GetTradeBarriersResponse,
-  type GetCustomsRevenueResponse,
-  type ListComtradeFlowsResponse,
-  type ComtradeFlowRecord,
-  type TradeRestriction,
-  type TariffDataPoint,
-  type EffectiveTariffRate,
-  type TradeFlowRecord,
-  type TradeBarrier,
-  type CustomsRevenueMonth,
-} from '@/generated/client/worldmonitor/trade/v1/service_client';
+import type { GetTradeRestrictionsResponse, GetTariffTrendsResponse, GetTradeFlowsResponse, GetTradeBarriersResponse, GetCustomsRevenueResponse, ListComtradeFlowsResponse, ComtradeFlowRecord, TradeRestriction, TariffDataPoint, EffectiveTariffRate, TradeFlowRecord, TradeBarrier, CustomsRevenueMonth } from '@/generated/client/worldmonitor/trade/v1/service_client';
 import { createCircuitBreaker } from '@/utils';
 import { isFeatureAvailable } from '../runtime-config';
 import { getHydratedData } from '@/services/bootstrap';
+import { TradeServiceClient } from '@/services/generated-rpc-clients';
 
 // Re-export types for consumers
 export type { TradeRestriction, TariffDataPoint, EffectiveTariffRate, TradeFlowRecord, TradeBarrier, CustomsRevenueMonth, ComtradeFlowRecord };
@@ -126,8 +112,19 @@ onEntitlementChange(() => {
 });
 
 const emptyRestrictions: GetTradeRestrictionsResponse = { restrictions: [], fetchedAt: '', upstreamUnavailable: false };
-const emptyTariffs: GetTariffTrendsResponse = { datapoints: [], fetchedAt: '', upstreamUnavailable: false };
-const emptyFlows: GetTradeFlowsResponse = { flows: [], fetchedAt: '', upstreamUnavailable: false };
+// The client-side empty is a local degrade (feature off, breaker open, thrown
+// request), not a server verdict, so it carries the UNSPECIFIED zero value.
+// Only the handler names an actual coverage gap or fault.
+const emptyTariffs: GetTariffTrendsResponse = {
+  datapoints: [], fetchedAt: '', upstreamUnavailable: false,
+  unavailableReason: 'TARIFF_TREND_UNAVAILABLE_REASON_UNSPECIFIED',
+  coverageStartYear: 0, coverageEndYear: 0,
+};
+const emptyFlows: GetTradeFlowsResponse = {
+  flows: [], fetchedAt: '', upstreamUnavailable: false,
+  unavailableReason: 'TRADE_FLOW_UNAVAILABLE_REASON_UNSPECIFIED',
+  coverageStartYear: 0, coverageEndYear: 0,
+};
 const emptyBarriers: GetTradeBarriersResponse = { barriers: [], fetchedAt: '', upstreamUnavailable: false };
 const emptyRevenue: GetCustomsRevenueResponse = { months: [], fetchedAt: '', upstreamUnavailable: false };
 const emptyComtrade: ListComtradeFlowsResponse = { flows: [], fetchedAt: '', upstreamUnavailable: false };

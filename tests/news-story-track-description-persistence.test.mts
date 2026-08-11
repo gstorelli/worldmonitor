@@ -11,9 +11,18 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { __testing__ } from '../server/worldmonitor/news/v1/list-feed-digest';
+import { shouldDropOpinionTrack } from '../scripts/lib/digest-opinion-track-filter.mjs';
 
-const { buildStoryTrackHsetFields } = __testing__;
+const {
+  buildStoryTrackHsetFields,
+  computeEntityCorroborationSignals,
+  parseRssXml,
+  promoteDiplomacySeverity,
+} = __testing__;
 
 function baseItem(overrides: Record<string, unknown> = {}) {
   return {
@@ -23,13 +32,17 @@ function baseItem(overrides: Record<string, unknown> = {}) {
     publishedAt: 1_745_000_000_000,
     isAlert: false,
     level: 'medium' as const,
-    category: 'world',
+    category: 'general',
     confidence: 0.9,
     classSource: 'keyword' as const,
     importanceScore: 42,
     corroborationCount: 1,
+    entityCorroborationCount: 0,
     lang: 'en',
     description: '',
+    isOpinion: false,
+    isFeelGood: false,
+    isEphemeralLiveCoverage: false,
     ...overrides,
   };
 }
@@ -54,6 +67,154 @@ describe('buildStoryTrackHsetFields — story:track:v1 HSET contract', () => {
     assert.ok(m.has('link'));
     assert.ok(m.has('severity'));
     assert.ok(m.has('lang'));
+  });
+
+  it('writes isOpinion as "1" / "0" — stamps the non-event brief verdict on the row (F3)', () => {
+    // The brief's read path (buildDigest) excludes isOpinion="1" rows.
+    // Written unconditionally for the same shared-row reason as
+    // `description`: a stale "1" from an earlier mention must be
+    // overwritten by the current mention's verdict.
+    const opinionItem = baseItem({ isOpinion: true });
+    assert.strictEqual(fieldsToMap(buildStoryTrackHsetFields(opinionItem, '1745000000000', 42)).get('isOpinion'), '1');
+    const newsItem = baseItem({ isOpinion: false });
+    assert.strictEqual(fieldsToMap(buildStoryTrackHsetFields(newsItem, '1745000000000', 42)).get('isOpinion'), '0');
+    // Missing field (old cached ParsedItem rows pre-dating the parser
+    // change) → falsy → "0", never the literal "undefined".
+    const legacyItem = baseItem();
+    delete (legacyItem as Record<string, unknown>).isOpinion;
+    assert.strictEqual(
+      fieldsToMap(buildStoryTrackHsetFields(legacyItem as Parameters<typeof buildStoryTrackHsetFields>[0], '1745000000000', 42)).get('isOpinion'),
+      '0',
+    );
+  });
+
+  it('carries the DW historical-explainer verdict from RSS parsing into the HSET shape', () => {
+    const result = parseRssXml(
+      `<?xml version="1.0"?><rss><channel><item>
+        <title>How Turkey's 2016 coup attempt changed the country for good</title>
+        <link>https://amp.dw.com/en/how-turkeys-2016-coup-attempt-changed-the-country-for-good/a-77955154</link>
+        <pubDate>Tue, 14 Jul 2026 12:00:00 GMT</pubDate>
+        <description>DW examines the lasting political effects of the failed coup attempt in Turkey.</description>
+      </item></channel></rss>`,
+      { url: 'https://amp.dw.com/rss', name: 'DW News', lang: 'en' },
+      'full',
+    );
+    assert.ok(result, 'RSS parser should return a parse result');
+    const item = result.items[0];
+    assert.ok(item, 'RSS parser should retain the dated item');
+    assert.strictEqual(item.isOpinion, true);
+    const persisted = fieldsToMap(buildStoryTrackHsetFields(item, '1784030400000', 42));
+    assert.strictEqual(persisted.get('isOpinion'), '1');
+    assert.strictEqual(
+      shouldDropOpinionTrack(Object.fromEntries(persisted)),
+      true,
+      'the stamped RSS record must be excluded by the digest read-path policy',
+    );
+  });
+
+  it('carries the Al Jazeera duration-led retrospective verdict from RSS into the digest filter', () => {
+    const result = parseRssXml(
+      `<?xml version="1.0"?><rss><channel><item>
+        <title>10 years on from Turkiye’s failed coup attempt on Erdogan</title>
+        <link>https://www.aljazeera.com/video/newsfeed/2026/7/15/10-years-on-from-turkiyes-failed-coup-attempt-on-erdogan?traffic_source=rss</link>
+        <pubDate>Wed, 15 Jul 2026 20:35:09 +0000</pubDate>
+        <description>10 years on from Turkiye’s coup attempt to overthrow President Erdogan, the country remains divided over its legacy.</description>
+      </item></channel></rss>`,
+      { url: 'https://www.aljazeera.com/xml/rss/all.xml', name: 'Al Jazeera', lang: 'en' },
+      'full',
+    );
+    assert.ok(result, 'RSS parser should return a parse result');
+    const item = result.items[0];
+    assert.ok(item, 'RSS parser should retain the dated item');
+    assert.strictEqual(item.isOpinion, true);
+    const persisted = fieldsToMap(buildStoryTrackHsetFields(item, '1784147709000', 42));
+    assert.strictEqual(persisted.get('isOpinion'), '1');
+    assert.strictEqual(
+      shouldDropOpinionTrack(Object.fromEntries(persisted)),
+      true,
+      'the stamped anniversary retrospective must be excluded before severity bucketing',
+    );
+  });
+
+  it('writes isFeelGood as "1" / "0" — stamps the feel-good verdict on the row (Veterans-warplanes anchor)', () => {
+    // Sibling to isOpinion stamp. buildDigest excludes isFeelGood="1"
+    // rows. Same shared-row semantics: stale "1" from an earlier
+    // mention must be overwritten by the current mention's verdict.
+    const feelGoodItem = baseItem({ isFeelGood: true });
+    assert.strictEqual(fieldsToMap(buildStoryTrackHsetFields(feelGoodItem, '1745000000000', 42)).get('isFeelGood'), '1');
+    const newsItem = baseItem({ isFeelGood: false });
+    assert.strictEqual(fieldsToMap(buildStoryTrackHsetFields(newsItem, '1745000000000', 42)).get('isFeelGood'), '0');
+    // Missing field on the ParsedItem → falsy → "0". This is
+    // buildStoryTrackHsetFields' own fallback behavior. The
+    // cache-leakage failure mode this could ENABLE (cached pre-PR
+    // ParseResult with isFeelGood-less items writing '0' onto fresh
+    // story:track:v1 rows, defeating buildDigest's residue catch) is
+    // closed by the rss:feed:v4 cache-prefix bump in fetchAndParseRss —
+    // see test "rss:feed cache prefix is v5" below.
+    // After the bump, no cached pre-PR ParseResult can reach this code
+    // path: every cache miss forces a fresh parseRssXml run that
+    // stamps isFeelGood correctly. Genuinely-pre-existing story:track:v1
+    // rows (written before this PR shipped) have no isFeelGood field
+    // at all, and buildDigest's stampMissing check (typeof !== 'string'
+    // || length === 0) picks those up via the residue catch.
+    const legacyItem = baseItem();
+    delete (legacyItem as Record<string, unknown>).isFeelGood;
+    assert.strictEqual(
+      fieldsToMap(buildStoryTrackHsetFields(legacyItem as Parameters<typeof buildStoryTrackHsetFields>[0], '1745000000000', 42)).get('isFeelGood'),
+      '0',
+    );
+  });
+
+  it('writes isEphemeralLiveCoverage as "1" / "0" — stamps expiring live-programming teasers', () => {
+    const liveItem = baseItem({ isEphemeralLiveCoverage: true });
+    assert.strictEqual(
+      fieldsToMap(buildStoryTrackHsetFields(liveItem, '1745000000000', 42)).get('isEphemeralLiveCoverage'),
+      '1',
+    );
+    const durableItem = baseItem({ isEphemeralLiveCoverage: false });
+    assert.strictEqual(
+      fieldsToMap(buildStoryTrackHsetFields(durableItem, '1745000000000', 42)).get('isEphemeralLiveCoverage'),
+      '0',
+    );
+    const legacyItem = baseItem();
+    delete (legacyItem as Record<string, unknown>).isEphemeralLiveCoverage;
+    assert.strictEqual(
+      fieldsToMap(buildStoryTrackHsetFields(legacyItem as Parameters<typeof buildStoryTrackHsetFields>[0], '1745000000000', 42)).get('isEphemeralLiveCoverage'),
+      '0',
+    );
+  });
+
+  it('T1: writes category as the canonical EventCategory string (Veterans threads-card fix)', () => {
+    // PR #3697 exposed that buildStoryTrackHsetFields did not persist
+    // `category`, so the brief composer always saw the 'General' default
+    // for every story. This test locks the persistence going forward:
+    // category is written as the canonical lowercase EventCategory value
+    // (display capitalization happens once in shared/brief-filter.js at
+    // envelope build, not here). See plan
+    // docs/plans/2026-05-17-002-fix-persist-story-track-category-plan.md.
+    const conflictItem = baseItem({ category: 'conflict' });
+    assert.strictEqual(fieldsToMap(buildStoryTrackHsetFields(conflictItem, '1745000000000', 42)).get('category'), 'conflict');
+    const healthItem = baseItem({ category: 'health' });
+    assert.strictEqual(fieldsToMap(buildStoryTrackHsetFields(healthItem, '1745000000000', 42)).get('category'), 'health');
+    const techItem = baseItem({ category: 'tech' });
+    assert.strictEqual(fieldsToMap(buildStoryTrackHsetFields(techItem, '1745000000000', 42)).get('category'), 'tech');
+  });
+
+  it('T2-T4: defensive write — missing / non-string upstream category becomes empty string, never literal "undefined"', () => {
+    // The fallback chain is: missing here → '' on Redis →
+    // shared/brief-filter.js:365's `asTrimmedString(raw.category) || 'General'`
+    // converts back to 'General' for graceful degradation. The
+    // critical contract is that NO literal 'undefined' or '42' string
+    // ever reaches Redis from a malformed upstream value.
+    //
+    // T2: baseItem default fixture ('general') round-trips unchanged.
+    assert.strictEqual(fieldsToMap(buildStoryTrackHsetFields(baseItem(), '1745000000000', 42)).get('category'), 'general');
+    // T3: explicit `undefined` override → defensive empty string.
+    const undefItem = baseItem({ category: undefined });
+    assert.strictEqual(fieldsToMap(buildStoryTrackHsetFields(undefItem as Parameters<typeof buildStoryTrackHsetFields>[0], '1745000000000', 42)).get('category'), '');
+    // T4: non-string upstream value → defensive empty string (no '42').
+    const nonStringItem = baseItem({ category: 42 });
+    assert.strictEqual(fieldsToMap(buildStoryTrackHsetFields(nonStringItem as Parameters<typeof buildStoryTrackHsetFields>[0], '1745000000000', 42)).get('category'), '');
   });
 
   it('writes an empty-string description when the current mention has no body — overwrites any prior mention body', () => {
@@ -96,6 +257,138 @@ describe('buildStoryTrackHsetFields — story:track:v1 HSET contract', () => {
     assert.strictEqual(m.get('link'), 'https://x.example/a');
     assert.strictEqual(m.get('severity'), 'high');
     assert.strictEqual(m.get('lang'), 'fr');
+  });
+
+  it('persists promoted flashpoint-diplomacy severity so high-sensitivity digests can include it', () => {
+    const promoted = promoteDiplomacySeverity(
+      'medium',
+      'US and Iran close deal to ease Hormuz tensions',
+      3,
+    );
+    assert.strictEqual(promoted, 'high');
+
+    const item = baseItem({
+      title: 'US and Iran close deal to ease Hormuz tensions',
+      level: promoted,
+      isAlert: true,
+      category: 'diplomacy',
+      source: 'Reuters',
+      entityCorroborationCount: 5,
+    });
+    const fields = buildStoryTrackHsetFields(item, '1745000000001', 99);
+    const m = fieldsToMap(fields);
+    assert.strictEqual(m.get('severity'), 'high');
+    assert.strictEqual(m.get('entityCorroborationCount'), '5');
+  });
+
+  it('does not promote generic business deals or under-corroborated diplomacy titles', () => {
+    assert.strictEqual(
+      promoteDiplomacySeverity('medium', 'Apple closes deal for new supplier contract', 3),
+      'medium',
+    );
+    assert.strictEqual(
+      promoteDiplomacySeverity('medium', 'US and Iran close deal to ease Hormuz tensions', 2),
+      'medium',
+    );
+    assert.strictEqual(
+      promoteDiplomacySeverity('critical', 'US and Iran close deal to ease Hormuz tensions', 3),
+      'critical',
+    );
+    assert.strictEqual(
+      promoteDiplomacySeverity('info', 'This day in history: US and Iran close deal to ease Hormuz tensions', 3),
+      'info',
+    );
+  });
+
+  it('counts tier-1/2 entity corroboration separately from lower-tier sources', () => {
+    const now = 1_745_000_000_000;
+    const items = [
+      baseItem({
+        source: 'Reuters',
+        title: 'US and Iran close deal to ease Hormuz tensions',
+        titleHash: 'h-reuters',
+        publishedAt: now,
+      }),
+      baseItem({
+        source: 'AP News',
+        title: 'Iran deal could calm oil markets after Hormuz alarm',
+        titleHash: 'h-ap',
+        publishedAt: now,
+      }),
+      baseItem({
+        source: 'Axios',
+        title: 'US-Iran deal averts immediate Hormuz disruption',
+        titleHash: 'h-axios',
+        publishedAt: now,
+      }),
+      baseItem({
+        source: 'Hacker News',
+        title: 'Iran deal discussions draw online attention',
+        titleHash: 'h-hn',
+        publishedAt: now,
+      }),
+    ];
+
+    const signals = computeEntityCorroborationSignals(
+      items as Array<Parameters<typeof computeEntityCorroborationSignals>[0][number]>,
+      now,
+    );
+    assert.deepStrictEqual(signals.get('h-reuters'), {
+      sourceCount: 4,
+      tier12SourceCount: 3,
+    });
+    assert.deepStrictEqual(signals.get('h-hn'), {
+      sourceCount: 4,
+      tier12SourceCount: 3,
+    });
+  });
+
+  it('#6428: counts publisher families, so one newsroom cannot corroborate itself', () => {
+    const now = 1_745_000_000_000;
+    const oneWire = [
+      baseItem({
+        source: 'Reuters World',
+        title: 'US and Iran close deal to ease Hormuz tensions',
+        titleHash: 'h-world',
+        publishedAt: now,
+      }),
+      baseItem({
+        source: 'Reuters US',
+        title: 'Iran deal could calm oil markets after Hormuz alarm',
+        titleHash: 'h-us',
+        publishedAt: now,
+      }),
+      baseItem({
+        source: 'Reuters Business',
+        title: 'US-Iran deal averts immediate Hormuz disruption',
+        titleHash: 'h-business',
+        publishedAt: now,
+      }),
+    ];
+
+    const signals = computeEntityCorroborationSignals(
+      oneWire as Array<Parameters<typeof computeEntityCorroborationSignals>[0][number]>,
+      now,
+    );
+    assert.strictEqual(
+      signals.get('h-world'),
+      undefined,
+      'a bucket carried by a single publisher must emit no corroboration signal',
+    );
+
+    // Premise check: identical titles under three real publishers still do.
+    const distinct = oneWire.map((item, i) => ({
+      ...item,
+      source: ['Reuters World', 'BBC World', 'Al Jazeera'][i]!,
+    }));
+    const distinctSignals = computeEntityCorroborationSignals(
+      distinct as Array<Parameters<typeof computeEntityCorroborationSignals>[0][number]>,
+      now,
+    );
+    assert.deepStrictEqual(distinctSignals.get('h-world'), {
+      sourceCount: 3,
+      tier12SourceCount: 3,
+    });
   });
 
   it('round-trips Unicode / newlines cleanly', () => {
@@ -147,5 +440,40 @@ describe('buildStoryTrackHsetFields — story:track:v1 HSET contract', () => {
     assert.strictEqual(fieldsToMap(t0Fields).get('description'), 'Feed A body from T0: Mojtaba Khamenei, 56, wounded in attack.');
     assert.strictEqual(fieldsToMap(t1Fields).get('description'), '', 'T1 body-less mention must emit empty description, overwriting T0');
     assert.strictEqual(fieldsToMap(t2Fields).get('description'), 'Feed C body from T2: Leader reported in stable condition.');
+  });
+});
+
+describe('fetchAndParseRss — cache prefix invalidation contract', () => {
+  it('rss:feed cache prefix is v8 (duration-led historical-explainer stamp), not v4/v5/v6/v7', () => {
+    // Pre-PR ParsedItems cached at rss:feed:v4 lack the
+    // isEphemeralLiveCoverage field. If a cache hit returned one of those,
+    // the falsy-coerce in
+    // buildStoryTrackHsetFields would stamp '0' onto the row, and
+    // buildDigest's stampMissing check (`typeof !== 'string' || length === 0`)
+    // would treat '0' as a genuine "not ephemeral-live" verdict — defeating
+    // the residue catch for the 1h healthy-cache rollout window. The v5
+    // prefix invalidates every pre-PR entry; cold reads on the first
+    // post-deploy cron tick force fresh parseRssXml runs that stamp
+    // isEphemeralLiveCoverage correctly. This test locks the cutover so a future
+    // refactor cannot silently revert to v4.
+    const __dirname = dirname(fileURLToPath(import.meta.url));
+    const src = readFileSync(
+      resolve(__dirname, '..', 'server', 'worldmonitor', 'news', 'v1', 'list-feed-digest.ts'),
+      'utf-8',
+    );
+    // v7→v8: duration-led historical explainers now receive the same stable
+    // ingest stamp. Digest reads trust explicit stamps, so warm v7 rows must
+    // not retain a pre-rule "0" verdict for a cache TTL.
+    assert.ok(
+      src.includes("`rss:feed:v8:${variant}:${feed.url}`"),
+      'rss:feed cache key must use v8 prefix — see comment above the cacheKey assignment in fetchAndParseRss',
+    );
+    assert.ok(
+      !src.includes("`rss:feed:v7:${variant}:${feed.url}`") &&
+        !src.includes("`rss:feed:v6:${variant}:${feed.url}`") &&
+        !src.includes("`rss:feed:v5:${variant}:${feed.url}`") &&
+        !src.includes("`rss:feed:v4:${variant}:${feed.url}`"),
+      'must NOT leave a residual v4/v5/v6/v7 cacheKey assignment — would silently revert the cutover',
+    );
   });
 });

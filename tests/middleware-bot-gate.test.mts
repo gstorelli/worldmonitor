@@ -37,15 +37,42 @@ const LEGACY_DATE_ONLY_CAROUSEL_PATH = '/api/brief/carousel/user_abc/2026-04-19/
 const OTHER_API_PATH = '/api/notifications';
 const MALFORMED_CAROUSEL_PATH = '/api/brief/carousel/admin/dashboard';
 
-function call(pathOrUrl: string, ua: string): Response | void {
+function call(pathOrUrl: string, ua: string, headers: Record<string, string> = {}): Response | void {
   const url = pathOrUrl.startsWith('http')
     ? pathOrUrl
     : `https://www.worldmonitor.app${pathOrUrl}`;
   const req = new Request(url, {
-    headers: ua ? { 'user-agent': ua } : {},
+    headers: {
+      ...(ua ? { 'user-agent': ua } : {}),
+      ...headers,
+    },
   });
   return middleware(req) as Response | void;
 }
+
+describe('middleware bot gate / keyed API clients', () => {
+  const KEYED_API_PATH = '/api/forecast/v1/get-forecast-scorecard';
+  const USER_API_KEY = `wm_${'a'.repeat(40)}`;
+  const ENTERPRISE_API_KEY = `wm_${'b'.repeat(48)}`;
+
+  it('passes a 40-hex user API key through when curl would otherwise be blocked', () => {
+    const res = call(KEYED_API_PATH, GENERIC_CURL_UA, { 'x-worldmonitor-key': USER_API_KEY });
+    assert.equal(res, undefined, 'the gateway, not the UA gate, must validate a well-shaped user key');
+  });
+
+  it('passes a 48-hex enterprise API key through when curl would otherwise be blocked', () => {
+    const res = call(KEYED_API_PATH, GENERIC_CURL_UA, { 'x-worldmonitor-key': ENTERPRISE_API_KEY });
+    assert.equal(res, undefined, 'the gateway, not the UA gate, must validate a well-shaped enterprise key');
+  });
+
+  it('still blocks malformed and overlong wm_ keys with a curl UA', () => {
+    for (const apiKey of [`wm_${'c'.repeat(39)}`, `wm_${'d'.repeat(65)}`, 'wm_not-hex']) {
+      const res = call(KEYED_API_PATH, GENERIC_CURL_UA, { 'x-worldmonitor-key': apiKey });
+      assert.ok(res instanceof Response, `${apiKey} must not bypass the UA gate`);
+      assert.equal(res.status, 403);
+    }
+  });
+});
 
 describe('middleware bot gate / carousel allowlist', () => {
   it('passes TelegramBot through on the carousel route (the PR #3196 fix)', () => {
@@ -163,6 +190,8 @@ describe('middleware PUBLIC_API_PATHS — secret-authed internal endpoints bypas
     '/api/health',
     '/api/seed-contract-probe',
     '/api/internal/brief-why-matters',
+    '/api/llms.txt',
+    '/api/product-catalog',
   ];
 
   for (const path of ALLOWED_PATHS) {
@@ -194,4 +223,143 @@ describe('middleware PUBLIC_API_PATHS — secret-authed internal endpoints bypas
       });
     }
   }
+});
+
+// ── /api/llms.txt agent-discovery bypass ─────────────────────────────────────
+// The section-level llms.txt for the developer/API surface lives at
+// public/api/llms.txt, so it is served under the /api/* namespace where the
+// middleware's BOT_UA gate 403s crawlers. AI crawlers are the entire audience
+// for an llms.txt, so the bypass must let them through — otherwise the file is
+// published but unreadable by the agents it exists to serve.
+
+describe('middleware /api/llms.txt — AI crawlers reach the agent-discovery file', () => {
+  const CRAWLER_UAS = [
+    { label: 'ClaudeBot', ua: 'Mozilla/5.0 (compatible; ClaudeBot/1.0; +claudebot@anthropic.com)' },
+    { label: 'GPTBot', ua: 'Mozilla/5.0 (compatible; GPTBot/1.1; +https://openai.com/gptbot)' },
+    { label: 'PerplexityBot', ua: 'Mozilla/5.0 (compatible; PerplexityBot/1.0; +https://perplexity.ai/perplexitybot)' },
+    { label: 'CCBot', ua: 'CCBot/2.0 (https://commoncrawl.org/faq/)' },
+    { label: 'generic scraper', ua: GENERIC_SCRAPER_UA },
+    { label: 'empty UA', ua: '' },
+  ];
+
+  for (const { label, ua } of CRAWLER_UAS) {
+    it(`passes ${label} through to /api/llms.txt`, () => {
+      const res = call('/api/llms.txt', ua);
+      assert.equal(res, undefined, '/api/llms.txt must pass through the bot gate for AI crawlers');
+    });
+  }
+
+  it('still 403s a crawler on a sibling /api path (bypass is exact, not a prefix)', () => {
+    const res = call('/api/llms', 'CCBot/2.0 (https://commoncrawl.org/faq/)');
+    assert.ok(res instanceof Response);
+    assert.equal(res.status, 403);
+  });
+});
+
+// ── /api/product-catalog public-pricing bypass ──────────────────────────────
+// The keyless read-only pricing catalog is advertised as service-meta in
+// /.well-known/api-catalog; agents evaluating the product are its primary
+// audience. An agent-journey run (#4854) hit the UA gate here and concluded
+// the endpoint did not exist. DELETE (cache purge) stays protected by the
+// endpoint's own auth — the middleware bypass only skips UA filtering.
+
+describe('middleware /api/product-catalog — agents reach the public pricing catalog', () => {
+  const CRAWLER_UAS = [
+    { label: 'ClaudeBot', ua: 'Mozilla/5.0 (compatible; ClaudeBot/1.0; +claudebot@anthropic.com)' },
+    { label: 'GPTBot', ua: 'Mozilla/5.0 (compatible; GPTBot/1.1; +https://openai.com/gptbot)' },
+    { label: 'python-requests', ua: 'python-requests/2.31' },
+    { label: 'empty UA', ua: '' },
+  ];
+
+  for (const { label, ua } of CRAWLER_UAS) {
+    it(`passes ${label} through to /api/product-catalog`, () => {
+      const res = call('/api/product-catalog', ua);
+      assert.equal(res, undefined, '/api/product-catalog must pass through the bot gate; it is a public discovery surface');
+    });
+  }
+
+  it('still 403s a crawler on a sibling /api path (bypass is exact, not a prefix)', () => {
+    const res = call('/api/product', 'CCBot/2.0 (https://commoncrawl.org/faq/)');
+    assert.ok(res instanceof Response);
+    assert.equal(res.status, 403);
+  });
+});
+
+// ── /mcp variant-subdomain canonicalization ──────────────────────────────────
+// The MCP endpoint's canonical URL is apex (`https://worldmonitor.app/mcp`).
+// GET/HEAD requests from variant subdomains are redirected there so discovery
+// signals don't fragment across tech/finance/etc. POST/OPTIONS continue to the
+// /api/mcp rewrite unchanged so MCP clients configured against a variant host
+// still handshake correctly.
+
+describe('middleware /mcp — variant subdomains redirect to apex, POST stays', () => {
+  it('redirects GET /mcp from tech.worldmonitor.app to apex', () => {
+    const res = call('https://tech.worldmonitor.app/mcp', CHROME_UA);
+    assert.ok(res instanceof Response);
+    assert.equal(res.status, 308);
+    assert.equal(res.headers.get('location'), 'https://worldmonitor.app/mcp');
+  });
+
+  it('redirects HEAD /mcp from finance.worldmonitor.app to apex', () => {
+    const req = new Request('https://finance.worldmonitor.app/mcp', { method: 'HEAD' });
+    const res = middleware(req) as Response | void;
+    assert.ok(res instanceof Response);
+    assert.equal(res.status, 308);
+    assert.equal(res.headers.get('location'), 'https://worldmonitor.app/mcp');
+  });
+
+  it('redirects /mcp from every variant subdomain', () => {
+    for (const host of ['tech', 'finance', 'commodity', 'happy', 'energy']) {
+      const res = call(`https://${host}.worldmonitor.app/mcp`, CHROME_UA);
+      assert.ok(res instanceof Response, `${host} must redirect`);
+      assert.equal(res.status, 308, `${host} redirect status`);
+      assert.equal(res.headers.get('location'), 'https://worldmonitor.app/mcp', `${host} redirect location`);
+    }
+  });
+
+  it('does NOT redirect GET /mcp from apex or www', () => {
+    assert.equal(call('https://worldmonitor.app/mcp', CHROME_UA), undefined);
+    assert.equal(call('https://www.worldmonitor.app/mcp', CHROME_UA), undefined);
+  });
+
+  it('does NOT redirect POST /mcp from a variant subdomain (MCP handshake)', () => {
+    const req = new Request('https://tech.worldmonitor.app/mcp', {
+      method: 'POST',
+      headers: { 'user-agent': CHROME_UA, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: {} }),
+    });
+    const res = middleware(req) as Response | void;
+    assert.equal(res, undefined, 'POST /mcp must fall through to the /api/mcp rewrite');
+  });
+
+  it('does NOT redirect OPTIONS /mcp from a variant subdomain', () => {
+    const req = new Request('https://tech.worldmonitor.app/mcp', {
+      method: 'OPTIONS',
+      headers: { 'user-agent': CHROME_UA },
+    });
+    const res = middleware(req) as Response | void;
+    assert.equal(res, undefined, 'OPTIONS /mcp must fall through to the /api/mcp rewrite');
+  });
+
+  it('does NOT redirect variant transport GETs with SSE or replay headers', () => {
+    const mixedCaseSse = new Request('https://tech.worldmonitor.app/mcp', {
+      headers: { Accept: 'Text/Event-Stream' },
+    });
+    assert.equal(middleware(mixedCaseSse), undefined, 'mixed-case SSE Accept must fall through to the transport');
+
+    const replay = new Request('https://tech.worldmonitor.app/mcp', {
+      headers: { Accept: 'application/json', 'Last-Event-ID': 'stream:0' },
+    });
+    assert.equal(middleware(replay), undefined, 'Last-Event-ID replay must stay on the session host');
+  });
+
+  it('redirects when SSE is explicitly unacceptable', () => {
+    const req = new Request('https://tech.worldmonitor.app/mcp', {
+      headers: { Accept: 'text/event-stream;q=0, text/html' },
+    });
+    const res = middleware(req) as Response | void;
+    assert.ok(res instanceof Response);
+    assert.equal(res.status, 308);
+    assert.equal(res.headers.get('location'), 'https://worldmonitor.app/mcp');
+  });
 });

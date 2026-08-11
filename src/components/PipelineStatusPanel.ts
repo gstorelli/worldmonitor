@@ -1,8 +1,8 @@
 import { Panel } from './Panel';
-import { escapeHtml, sanitizeUrl } from '@/utils/sanitize';
-import { getRpcBaseUrl } from '@/services/rpc-client';
+import { escapeHtml, sanitizeUrl, unsafeRawHtml } from '@/utils/sanitize';
+import { createLazyClient, getRpcBaseUrl, rpcFetch } from '@/services/rpc-client';
 import { attributionFooterHtml, ATTRIBUTION_FOOTER_CSS } from '@/utils/attribution-footer';
-import { SupplyChainServiceClient } from '@/generated/client/worldmonitor/supply_chain/v1/service_client';
+
 import type {
   ListPipelinesResponse,
   PipelineEntry,
@@ -21,10 +21,11 @@ import {
   setCachedPipelineRegistries,
   type RawPipelineRegistry,
 } from '@/shared/pipeline-registry-store';
+import { SupplyChainServiceClient } from '@/services/generated-rpc-clients';
 
-const client = new SupplyChainServiceClient(getRpcBaseUrl(), {
-  fetch: (...args: Parameters<typeof fetch>) => globalThis.fetch(...args),
-});
+const getSupplyChainClient = createLazyClient(() => new SupplyChainServiceClient(getRpcBaseUrl(), {
+  fetch: rpcFetch,
+}));
 
 // Shape of the raw Redis registry hydrated by bootstrap. This mirrors
 // scripts/data/pipelines-{gas,oil}.json verbatim — the seeder does NOT
@@ -224,7 +225,7 @@ export class PipelineStatusPanel extends Panel {
         // classifierVersion + updatedAt into the shared store so the map's
         // next re-render uses the newer stamps too — prevents map/panel
         // drift during rollouts.
-        void client.listPipelines({ commodityType: '' }).then(live => {
+        void getSupplyChainClient().listPipelines({ commodityType: '' }).then(live => {
           if (!this.element?.isConnected || !live?.pipelines?.length) return;
           this.data = live;
           this.render();
@@ -242,7 +243,7 @@ export class PipelineStatusPanel extends Panel {
         return;
       }
 
-      const live = await client.listPipelines({ commodityType: '' });
+      const live = await getSupplyChainClient().listPipelines({ commodityType: '' });
       if (!this.element?.isConnected) return;
       if (live.upstreamUnavailable || !live.pipelines?.length) {
         this.showError('Pipeline registry unavailable', () => void this.fetchData());
@@ -272,8 +273,8 @@ export class PipelineStatusPanel extends Panel {
     this.render();
     try {
       const [d, events] = await Promise.all([
-        client.getPipelineDetail({ pipelineId }),
-        client.listEnergyDisruptions({ assetId: pipelineId, assetType: 'pipeline', ongoingOnly: false }),
+        getSupplyChainClient().getPipelineDetail({ pipelineId }),
+        getSupplyChainClient().listEnergyDisruptions({ assetId: pipelineId, assetType: 'pipeline', ongoingOnly: false }),
       ]);
       if (!this.element?.isConnected || this.selectedId !== pipelineId) return;
       this.detail = d;
@@ -356,7 +357,7 @@ export class PipelineStatusPanel extends Panel {
 
     const drawer = this.selectedId ? this.renderDrawer() : '';
 
-    this.setContent(`
+    this.setSafeContent(unsafeRawHtml(`
       <div class="pp-wrap">
         <table class="pp-table">
           <thead>
@@ -374,26 +375,26 @@ export class PipelineStatusPanel extends Panel {
       </div>
       ${ATTRIBUTION_FOOTER_CSS}
       <style>
-        .pp-wrap { position: relative; font-size: 11px; }
+        .pp-wrap { position: relative; font-size: calc(11px * var(--wm-panel-effective-scale, 1)); }
         .pp-table { width: 100%; border-collapse: collapse; }
-        .pp-table th { text-align: left; font-size: 9px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-dim, #888); padding: 4px 6px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+        .pp-table th { text-align: left; font-size: calc(9px * var(--wm-panel-effective-scale, 1)); text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-dim, #888); padding: 4px 6px; border-bottom: 1px solid rgba(255,255,255,0.08); }
         .pp-table td { padding: 6px; border-bottom: 1px solid rgba(255,255,255,0.04); }
         .pp-table tr.pp-row { cursor: pointer; }
         .pp-table tr.pp-row:hover td { background: rgba(255,255,255,0.03); }
         .pp-name { font-weight: 600; color: var(--text, #eee); }
-        .pp-sub  { font-size: 9px; color: var(--text-dim, #888); text-transform: uppercase; letter-spacing: 0.04em; }
-        .pp-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 9px; font-weight: 700; color: #fff; text-transform: uppercase; letter-spacing: 0.04em; }
+        .pp-sub  { font-size: calc(9px * var(--wm-panel-effective-scale, 1)); color: var(--text-dim, #888); text-transform: uppercase; letter-spacing: 0.04em; }
+        .pp-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: calc(9px * var(--wm-panel-effective-scale, 1)); font-weight: 700; color: #fff; text-transform: uppercase; letter-spacing: 0.04em; }
         .pp-drawer { position: absolute; inset: 0; background: var(--panel-bg, #0f1218); padding: 12px; overflow-y: auto; border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; }
-        .pp-drawer-close { position: absolute; top: 8px; right: 10px; background: transparent; border: 0; color: var(--text-dim, #888); cursor: pointer; font-size: 14px; }
-        .pp-drawer h3 { margin: 0 0 6px 0; font-size: 13px; color: var(--text, #eee); }
-        .pp-drawer .pp-kv { display: grid; grid-template-columns: 120px 1fr; gap: 4px 10px; font-size: 10px; margin-bottom: 10px; }
-        .pp-drawer .pp-kv-key { color: var(--text-dim, #888); text-transform: uppercase; letter-spacing: 0.04em; font-size: 9px; padding-top: 2px; }
+        .pp-drawer-close { position: absolute; top: 8px; right: 10px; background: transparent; border: 0; color: var(--text-dim, #888); cursor: pointer; font-size: calc(14px * var(--wm-panel-effective-scale, 1)); }
+        .pp-drawer h3 { margin: 0 0 6px 0; font-size: calc(13px * var(--wm-panel-effective-scale, 1)); color: var(--text, #eee); }
+        .pp-drawer .pp-kv { display: grid; grid-template-columns: 120px 1fr; gap: 4px 10px; font-size: calc(10px * var(--wm-panel-effective-scale, 1)); margin-bottom: 10px; }
+        .pp-drawer .pp-kv-key { color: var(--text-dim, #888); text-transform: uppercase; letter-spacing: 0.04em; font-size: calc(9px * var(--wm-panel-effective-scale, 1)); padding-top: 2px; }
         .pp-evidence { margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.06); }
-        .pp-ev-item { font-size: 10px; color: var(--text, #eee); margin-bottom: 6px; }
+        .pp-ev-item { font-size: calc(10px * var(--wm-panel-effective-scale, 1)); color: var(--text, #eee); margin-bottom: 6px; }
         .pp-ev-item a { color: #4ade80; text-decoration: none; }
         .pp-ev-item a:hover { text-decoration: underline; }
       </style>
-    `);
+    `, 'legacy Panel.setContent() migration'));
 
     const table = this.element?.querySelector('.pp-table') as HTMLTableElement | null;
     table?.querySelectorAll<HTMLTableRowElement>('tr.pp-row').forEach(tr => {

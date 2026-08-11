@@ -1,12 +1,13 @@
 import { Panel } from './Panel';
 import { t } from '@/services/i18n';
-import { escapeHtml } from '@/utils/sanitize';
+import { escapeHtml, unsafeRawHtml } from '@/utils/sanitize';
 import { getHydratedData } from '@/services/bootstrap';
-import { getRpcBaseUrl } from '@/services/rpc-client';
-import { EconomicServiceClient } from '@/generated/client/worldmonitor/economic/v1/service_client';
-import type { GetFaoFoodPriceIndexResponse, FaoFoodPricePoint } from '@/generated/client/worldmonitor/economic/v1/service_client';
+import { createLazyClient, getRpcBaseUrl, rpcFetch } from '@/services/rpc-client';
 
-const client = new EconomicServiceClient(getRpcBaseUrl(), { fetch: (...args: Parameters<typeof fetch>) => globalThis.fetch(...args) });
+import type { GetFaoFoodPriceIndexResponse, FaoFoodPricePoint } from '@/generated/client/worldmonitor/economic/v1/service_client';
+import { EconomicServiceClient } from '@/services/generated-rpc-clients';
+
+const getEconomicClient = createLazyClient(() => new EconomicServiceClient(getRpcBaseUrl(), { fetch: rpcFetch }));
 
 const SVG_W = 480;
 const SVG_H = 140;
@@ -68,7 +69,7 @@ function buildChart(points: FaoFoodPricePoint[]): string {
     const y = yPos(v, yMin, yMax);
     return `
       <line x1="${ML}" y1="${y.toFixed(1)}" x2="${SVG_W - MR}" y2="${y.toFixed(1)}" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
-      <text x="${(ML - 3).toFixed(0)}" y="${y.toFixed(1)}" text-anchor="end" fill="rgba(255,255,255,0.35)" font-size="8" dominant-baseline="middle">${v.toFixed(0)}</text>`;
+      <text x="${(ML - 3).toFixed(0)}" y="${y.toFixed(1)}" text-anchor="end" fill="rgba(255,255,255,0.35)" style="font-size:calc(8px * var(--wm-panel-effective-scale, 1))" dominant-baseline="middle">${v.toFixed(0)}</text>`;
   }).join('');
 
   // X-axis labels (show every 3rd month to avoid crowding)
@@ -76,7 +77,7 @@ function buildChart(points: FaoFoodPricePoint[]): string {
     if (i % 3 !== 0 && i !== points.length - 1) return '';
     const x = xPos(i, points.length);
     const label = p.date;
-    return `<text x="${x.toFixed(1)}" y="${SVG_H - MB + 12}" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-size="7">${escapeHtml(label)}</text>`;
+    return `<text x="${x.toFixed(1)}" y="${SVG_H - MB + 12}" text-anchor="middle" fill="rgba(255,255,255,0.4)" style="font-size:calc(7px * var(--wm-panel-effective-scale, 1))">${escapeHtml(label)}</text>`;
   }).join('');
 
   // Series lines
@@ -106,13 +107,13 @@ export class FaoFoodPriceIndexPanel extends Panel {
       if (hydrated?.points?.length) {
         if (!this.element?.isConnected) return;
         this.renderChart(hydrated);
-        void client.getFaoFoodPriceIndex({}).then(data => {
+        void getEconomicClient().getFaoFoodPriceIndex({}).then(data => {
           if (!this.element?.isConnected || !data.points?.length) return;
           this.renderChart(data);
         }).catch(() => {});
         return;
       }
-      const data = await client.getFaoFoodPriceIndex({});
+      const data = await getEconomicClient().getFaoFoodPriceIndex({});
       if (!this.element?.isConnected) return;
       this.renderChart(data);
     } catch (err) {
@@ -151,6 +152,6 @@ export class FaoFoodPriceIndexPanel extends Panel {
     const legend = `<div class="fao-legend">${buildLegend()}</div>`;
     const base = `<div class="fao-base-note">${escapeHtml(t('components.faoFoodPriceIndex.baseNote'))}</div>`;
 
-    this.setContent(`<div class="fao-food-price-index-panel">${headline}${chart}${legend}${base}</div>`);
+    this.setSafeContent(unsafeRawHtml(`<div class="fao-food-price-index-panel">${headline}${chart}${legend}${base}</div>`, 'legacy Panel.setContent() migration'));
   }
 }

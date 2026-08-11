@@ -15,6 +15,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import vm from 'node:vm';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, '..');
@@ -120,6 +121,51 @@ describe('widget-agent relay — security', () => {
     assert.ok(
       relay.includes('analyze-stock') && relay.includes('summarize-article'),
       'Blocklist must explicitly exclude inference-only paths',
+    );
+  });
+
+  it('SSRF guard — deduct-situation blocklist entry matches the real method name (#3740)', () => {
+    // Regression: blocklist previously had a one-char typo 'deduce-situation' that
+    // never matched the real /api/intelligence/v1/deduct-situation path, leaving an
+    // expensive LLM endpoint freely callable.
+    //
+    // A fully behavioral test (calling isWidgetEndpointAllowed() with the real URL)
+    // would catch a wider set of regressions than these structural assertions, but
+    // requires extracting the function from ais-relay.cjs into its own module —
+    // ais-relay.cjs starts an HTTP server unconditionally at module-load time, so
+    // it can't be required from a unit test without that refactor. The structural
+    // checks below catch the failure modes the audit explicitly named: the typo,
+    // the substring leaving the blocked-array, and a refactor away from the
+    // substring-match dispatch that re-opens the gap.
+
+    // 1. The correct entry is present (and the typo is gone).
+    assert.ok(
+      relay.includes("'deduct-situation'"),
+      "Blocklist must contain 'deduct-situation' (matches /api/intelligence/v1/deduct-situation)",
+    );
+    assert.ok(
+      !relay.includes("'deduce-situation'"),
+      "Blocklist must not contain the typo 'deduce-situation' — it never matches any real URL",
+    );
+
+    // 2. The entry lives inside the `blocked = [...]` array literal, not in some
+    //    comment that happens to mention the method name. This catches a regression
+    //    where the array is commented out or guarded by a falsy condition but the
+    //    string survives elsewhere in the file.
+    const blockedArrayMatch = relay.match(/const blocked = \[[\s\S]*?\];/);
+    assert.ok(blockedArrayMatch, "isWidgetEndpointAllowed must define `const blocked = [...]`");
+    assert.ok(
+      blockedArrayMatch[0].includes("'deduct-situation'"),
+      "'deduct-situation' must appear inside the blocked array literal, not just somewhere in the file",
+    );
+
+    // 3. The dispatch still uses substring matching (`endpoint.includes(b)`). A
+    //    refactor to exact equality (`endpoint === b`) would silently re-open the
+    //    gap because callers pass the full `/api/intelligence/v1/deduct-situation`
+    //    path, not the bare method name.
+    assert.ok(
+      /blocked\.some\([^)]*=>\s*endpoint\.includes\(/.test(relay),
+      "isWidgetEndpointAllowed must keep substring matching (`endpoint.includes(b)`); switching to `endpoint === b` would re-open the SSRF gap",
     );
   });
 
@@ -232,6 +278,7 @@ describe('widget-agent relay — security', () => {
 // ---------------------------------------------------------------------------
 describe('widget-store — constants and logic', () => {
   const store = src('src/services/widget-store.ts');
+  const browserKeySession = src('src/services/browser-key-session.ts');
 
   it('storage key is wm-custom-widgets', () => {
     assert.ok(
@@ -240,10 +287,23 @@ describe('widget-store — constants and logic', () => {
     );
   });
 
-  it('auth gate checks wm-widget-key localStorage entry', () => {
+  it('auth gate migrates wm-widget-key to an HttpOnly session instead of storing it', () => {
     assert.ok(
       store.includes("'wm-widget-key'"),
-      "Feature gate must check localStorage key 'wm-widget-key'",
+      "Feature gate must know the legacy 'wm-widget-key' name for migration",
+    );
+    assert.ok(
+      store.includes('migrateLegacyKeysToHttpOnlySession') &&
+        browserKeySession.includes('establishWmKeySession'),
+      'Widget key writes must go through the server session endpoint',
+    );
+    assert.ok(
+      !/localStorage\.setItem\(['"]wm-widget-key['"]/.test(store),
+      'wm-widget-key must not be written to localStorage',
+    );
+    assert.ok(
+      !/document\.cookie\s*=.*wm-widget-key.*encodeURIComponent\(.*key/s.test(store),
+      'wm-widget-key must not be written to a JS-readable cookie',
     );
   });
 
@@ -282,15 +342,15 @@ describe('widget-store — constants and logic', () => {
 
   it('deleteWidget cleans worldmonitor-panel-spans (aggregate map)', () => {
     assert.ok(
-      store.includes("'worldmonitor-panel-spans'"),
-      "deleteWidget must clean 'worldmonitor-panel-spans'",
+      store.includes('clearPanelSpanEntry(id)'),
+      'deleteWidget must clean row-span entries through the shared panel storage helper',
     );
   });
 
   it('deleteWidget cleans worldmonitor-panel-col-spans (aggregate map)', () => {
     assert.ok(
-      store.includes("'worldmonitor-panel-col-spans'"),
-      "deleteWidget must clean 'worldmonitor-panel-col-spans'",
+      store.includes('clearPanelColSpanEntry(id)'),
+      'deleteWidget must clean column-span entries through the shared panel storage helper',
     );
   });
 
@@ -479,6 +539,22 @@ describe('panel guardrails — cw- prefix handling', () => {
     assert.ok(
       events.includes('wm:widget-modify'),
       'Must listen for wm:widget-modify custom event',
+    );
+  });
+
+  it('shows an accessible save failure message when widget persistence rejects', () => {
+    assert.match(
+      events,
+      /failed to save widget[\s\S]{0,220}showToast\(t\('widgets\.saveFailed'\)\)/,
+      'Modifying a widget must surface a rejected save to the user',
+    );
+    const createFailureHandlers = layout.match(
+      /failed to add widget[\s\S]{0,220}showToast\(t\('widgets\.saveFailed'\)\)/g,
+    ) ?? [];
+    assert.equal(
+      createFailureHandlers.length,
+      2,
+      'Both widget create entry points must surface a rejected save to the user',
     );
   });
 
@@ -742,7 +818,6 @@ describe('i18n — widgets section completeness', () => {
   const en = JSON.parse(src('src/locales/en.json'));
 
   const REQUIRED_KEYS = [
-    'createWithAi',
     'confirmDelete',
     'chatTitle',
     'modifyTitle',
@@ -750,7 +825,6 @@ describe('i18n — widgets section completeness', () => {
     'addToDashboard',
     'applyChanges',
     'send',
-    'changeAccent',
     'modifyWithAi',
     'ready',
     'fetching',
@@ -763,6 +837,7 @@ describe('i18n — widgets section completeness', () => {
     'preflightInvalidKey',
     'preflightUnavailable',
     'preflightAiUnavailable',
+    'saveFailed',
     'readyToGenerate',
     'readyToApply',
     'modifyHint',
@@ -935,7 +1010,7 @@ describe('PRO widget — relay auth and configuration', () => {
       'getWidgetAgentProvidedProKey function must be defined',
     );
     // The PRO key comparison is near the 403 rejection — find it directly
-    const keyCompareIdx = relay.indexOf('providedProKey !== PRO_WIDGET_KEY');
+    const keyCompareIdx = relay.indexOf('!safeTokenEquals(providedProKey, PRO_WIDGET_KEY)');
     assert.ok(keyCompareIdx !== -1, 'PRO key comparison must be present');
     const region = relay.slice(keyCompareIdx, keyCompareIdx + 200);
     assert.ok(region.includes('403'), 'Wrong PRO key must return 403');
@@ -1009,6 +1084,7 @@ describe('PRO widget — relay auth and configuration', () => {
 describe('PRO widget — store and sanitizer', () => {
   const store = src('src/services/widget-store.ts');
   const san = src('src/utils/widget-sanitizer.ts');
+  const sandbox = src('public/wm-widget-sandbox.html');
 
   it('MAX_HTML_CHARS_PRO is 80000', () => {
     const match = store.match(/MAX_HTML_CHARS_PRO\s*=\s*([\d_]+)/);
@@ -1017,40 +1093,75 @@ describe('PRO widget — store and sanitizer', () => {
     assert.equal(val, 80000, 'MAX_HTML_CHARS_PRO must be 80,000');
   });
 
-  it('isProWidgetEnabled checks wm-pro-key localStorage key', () => {
+  it('PRO auth migrates wm-pro-key to an HttpOnly session instead of storing it', () => {
+    const browserKeySession = src('src/services/browser-key-session.ts');
     assert.ok(
       store.includes("'wm-pro-key'"),
-      "isProWidgetEnabled must check localStorage key 'wm-pro-key'",
+      "isProWidgetEnabled must know the legacy 'wm-pro-key' name for migration",
     );
     assert.ok(
       store.includes('isProWidgetEnabled'),
       'isProWidgetEnabled function must be exported',
     );
+    assert.ok(
+      store.includes('migrateLegacyKeysToHttpOnlySession') &&
+        browserKeySession.includes('establishWmKeySession'),
+      'PRO key writes must go through the server session endpoint',
+    );
+    assert.ok(
+      !/localStorage\.setItem\(['"]wm-pro-key['"]/.test(store),
+      'wm-pro-key must not be written to localStorage',
+    );
+    assert.ok(
+      !/document\.cookie\s*=.*wm-pro-key.*encodeURIComponent\(.*key/s.test(store),
+      'wm-pro-key must not be written to a JS-readable cookie',
+    );
   });
 
-  it('PRO HTML stored in separate wm-pro-html-{id} key', () => {
+  it('user identity migrates legacy wm-pro-key instead of reading localStorage directly', () => {
+    const identity = src('src/services/user-identity.ts');
+    assert.ok(
+      identity.includes('readLegacySessionKey') && identity.includes('migrateLegacyKeysToHttpOnlySession'),
+      'user-identity must route legacy wm-pro-key through the HttpOnly migration helper',
+    );
+    assert.ok(
+      !/localStorage\.getItem\(['"]wm-pro-key['"]/.test(identity),
+      'user-identity must not read wm-pro-key directly from localStorage',
+    );
+  });
+
+  it('legacy wm-pro-html-{id} key remains supported for old PRO widgets', () => {
     assert.ok(
       store.includes('wm-pro-html-'),
-      "PRO HTML must be stored in 'wm-pro-html-{id}' separate localStorage key",
+      "PRO HTML must still know the legacy 'wm-pro-html-{id}' localStorage key",
     );
   });
 
-  it('loadWidgets hydrates PRO HTML from separate key', () => {
-    const loadIdx = store.indexOf('function loadWidgets');
-    assert.ok(loadIdx !== -1, 'loadWidgets not found');
-    const loadBody = store.slice(loadIdx, loadIdx + 600);
+  it('loadWidgets can hydrate legacy PRO HTML from the side key', () => {
+    const loadIdx = store.indexOf('function materializeWidgets');
+    assert.ok(loadIdx !== -1, 'shared widget materializer not found');
+    const loadBody = store.slice(loadIdx, loadIdx + 2_000);
     assert.ok(
-      loadBody.includes('proHtml') || loadBody.includes('wm-pro-html'),
-      'loadWidgets must read PRO HTML from separate key',
+      /localStorage\.getItem\(proHtmlKey\(w\.id\)\)/.test(loadBody),
+      'loadWidgets must read legacy PRO HTML from the side key',
     );
   });
 
-  it("loadWidgets drops PRO entry when wm-pro-html-{id} is missing", () => {
-    const loadIdx = store.indexOf('function loadWidgets');
-    const loadBody = store.slice(loadIdx, loadIdx + 600);
+  it('loadWidgets treats canonical PRO HTML as primary before legacy side key', () => {
+    const loadIdx = store.indexOf('function materializeWidgets');
+    const loadBody = store.slice(loadIdx, loadIdx + 2_000);
     assert.ok(
-      loadBody.includes('continue') || loadBody.includes('skip'),
-      'loadWidgets must skip/drop PRO entries with missing HTML key',
+      loadBody.includes('storedHtml || sideKeyHtml'),
+      'loadWidgets must prefer canonical widget HTML before the legacy side key',
+    );
+  });
+
+  it('loadWidgets drops PRO entry only when no persisted HTML remains', () => {
+    const loadIdx = store.indexOf('function materializeWidgets');
+    const loadBody = store.slice(loadIdx, loadIdx + 2_000);
+    assert.ok(
+      loadBody.includes('if (!proHtml)') && loadBody.includes('continue'),
+      'loadWidgets must skip/drop PRO entries only when no HTML exists in either storage path',
     );
   });
 
@@ -1064,12 +1175,16 @@ describe('PRO widget — store and sanitizer', () => {
     );
   });
 
-  it('saveWidget for PRO rolls back HTML key if metadata write fails', () => {
+  it('saveWidget for PRO does not duplicate HTML into the legacy side key', () => {
     const saveIdx = store.indexOf('function saveWidget');
     const saveBody = store.slice(saveIdx, saveIdx + 800);
     assert.ok(
-      saveBody.includes('removeItem') || saveBody.includes('rollback'),
-      'saveWidget must rollback (removeItem) PRO HTML key if metadata write throws',
+      !saveBody.includes('localStorage.setItem(proHtmlKey'),
+      'saveWidget must not write duplicate PRO HTML to the legacy side key',
+    );
+    assert.ok(
+      saveBody.includes('localStorage.removeItem(proHtmlKey'),
+      'saveWidget should clean up legacy PRO HTML side keys after a canonical save',
     );
   });
 
@@ -1133,6 +1248,396 @@ describe('PRO widget — store and sanitizer', () => {
     assert.ok(
       !fnBody.includes('srcdoc'),
       'wrapProWidgetHtml must NOT use srcdoc — srcdoc inherits parent CSP',
+    );
+  });
+
+  it('PRO widget iframe uses nonce handshake before posting HTML', () => {
+    assert.ok(
+      san.includes('data-wm-token') && san.includes('wm-widget-ready'),
+      'parent must mint a per-widget token and wait for sandbox readiness',
+    );
+    assert.ok(
+      san.includes('event.source !== iframe.contentWindow'),
+      'parent must bind ready messages to the mounted iframe window',
+    );
+    assert.ok(
+      san.includes('event.data.id !== mounted.id')
+        && san.includes('event.data.token !== mounted.token'),
+      'parent must verify ready message id and token before sending HTML',
+    );
+    assert.ok(
+      sandbox.includes('e.source !== window.parent') && sandbox.includes('e.data.token !== widgetToken'),
+      'sandbox must only accept HTML from its parent with the expected token',
+    );
+  });
+
+  it('PRO widget postMessage targetOrigins match the opaque sandbox model', () => {
+    const parentDelivery = san.match(
+      /iframe\.contentWindow\?\.postMessage\(\s*\{[\s\S]*?type:\s*['"]wm-html['"][\s\S]*?\},\s*(['"])\*\1,\s*\)/,
+    );
+    assert.ok(
+      parentDelivery,
+      'parent-to-sandbox HTML delivery must use "*" because sandbox="allow-scripts" gives the iframe an opaque origin',
+    );
+    assert.ok(
+      san.includes('origin is opaque') && san.includes('per-widget id/token'),
+      'wildcard targetOrigin must be documented as required after source and nonce gating',
+    );
+
+    const readyDelivery = sandbox.match(
+      /window\.parent\.postMessage\(\s*\{[\s\S]*?type:\s*['"]wm-widget-ready['"][\s\S]*?\},\s*parentOrigin,\s*\)/,
+    );
+    assert.ok(
+      readyDelivery,
+      'sandbox-to-parent readiness must target the parsed parentOrigin, not a wildcard',
+    );
+    assert.ok(
+      !/window\.parent\.postMessage\(\s*\{[\s\S]*?type:\s*['"]wm-widget-ready['"][\s\S]*?\},\s*(['"])\*\1/.test(sandbox),
+      'sandbox readiness postMessage must not use wildcard targetOrigin',
+    );
+  });
+
+  it('widget sandbox allows approved Vercel previews and rejects lookalike origins', () => {
+    assert.ok(
+      sandbox.includes("url.hostname === 'worldmonitor.app'")
+        && sandbox.includes("url.hostname.endsWith('.worldmonitor.app')"),
+      'sandbox must parse hostname and allow the worldmonitor.app apex/subdomains only',
+    );
+    assert.ok(
+      !sandbox.includes("endsWith('worldmonitor.app')") && !sandbox.includes('endsWith("worldmonitor.app")'),
+      'sandbox must not use raw suffix checks that allow evilworldmonitor.app',
+    );
+    // The sandbox must source allowed Vercel team slugs from a single named
+    // list — keeps the security invariant (team-slug gating) visible and
+    // makes teammate-slug additions a one-line change rather than a regex
+    // rewrite that could accidentally widen the match.
+    const teamListMatch = sandbox.match(
+      /var\s+ALLOWED_VERCEL_TEAM_SLUGS\s*=\s*\[([^\]]*)\];/,
+    );
+    assert.ok(teamListMatch, 'sandbox must declare ALLOWED_VERCEL_TEAM_SLUGS as a literal array');
+    const slugs = teamListMatch[1]
+      .split(',')
+      .map((s) => s.trim().replace(/^['"]|['"]$/g, ''))
+      .filter(Boolean);
+    assert.ok(slugs.includes('eliewm'), 'project-owner team slug must remain in the allowlist');
+    for (const slug of slugs) {
+      assert.match(slug, /^[a-z0-9-]+$/, `team slug "${slug}" must be url-safe`);
+    }
+    // Reconstruct the actual match function and exercise it against the
+    // production slug list — this is what protects against regex drift
+    // when teammate slugs are added later. The team slug is the LAST hostname
+    // segment before .vercel.app (eliewm team scope); keep this shape in lock-
+    // step with isAllowedVercelPreview in public/wm-widget-sandbox.html.
+    const matchesAllowedTeam = (hostname) =>
+      slugs.some((team) =>
+        new RegExp('^worldmonitor-[a-z0-9-]+-' + team + '\\.vercel\\.app$').test(hostname),
+      );
+    assert.equal(matchesAllowedTeam('worldmonitor-git-feature-eliewm.vercel.app'), true);
+    assert.equal(matchesAllowedTeam('worldmonitor-abc123-eliewm.vercel.app'), true);
+    assert.equal(matchesAllowedTeam('worldmonitor-feature-attacker.vercel.app'), false);
+    assert.equal(matchesAllowedTeam('worldmonitor-git-feature-eliewm.vercel.app.evil.com'), false);
+    assert.equal(matchesAllowedTeam('worldmonitor-feature-xeliewm.vercel.app'), false);
+    assert.equal(matchesAllowedTeam('evilworldmonitor.app'), false);
+    // The retired personal scope (worldmonitor-*-elie-<hash>) must no longer match.
+    assert.equal(matchesAllowedTeam('worldmonitor-feature-elie-abc123.vercel.app'), false);
+    // A teammate slug added to the list must extend coverage WITHOUT
+    // matching look-alike teams whose slug merely starts with the same
+    // letters.
+    const withTeammate = ['eliewm', 'kieran'];
+    const matchesWithTeammate = (hostname) =>
+      withTeammate.some((team) =>
+        new RegExp('^worldmonitor-[a-z0-9-]+-' + team + '\\.vercel\\.app$').test(hostname),
+      );
+    assert.equal(matchesWithTeammate('worldmonitor-feature-kieran.vercel.app'), true);
+    assert.equal(matchesWithTeammate('worldmonitor-feature-kieranfake.vercel.app'), false);
+  });
+
+  it('widget sandbox behavior accepts Vercel previews and blocks spoofed parents', () => {
+    const script = sandbox.match(/<script>\r?\n([\s\S]*?)\r?\n<\/script>/)?.[1];
+    assert.ok(script, 'sandbox inline script not found');
+
+    function runSandbox(referrer) {
+      const readyMessages = [];
+      const writes = [];
+      const listeners = new Map();
+      const parent = {
+        postMessage(payload, targetOrigin) {
+          readyMessages.push({ payload, targetOrigin });
+        },
+      };
+      function FakeEventTarget() {}
+      FakeEventTarget.prototype.addEventListener = (type, listener) => {
+        listeners.set(type, listener);
+      };
+      function FakeEvent() {}
+      FakeEvent.prototype.stopImmediatePropagation = () => {};
+      const sandboxWindow = new FakeEventTarget();
+      sandboxWindow.location = { hash: '#id=wm-1&token=test-token' };
+      sandboxWindow.parent = parent;
+      const context = {
+        URL,
+        URLSearchParams,
+        Event: FakeEvent,
+        EventTarget: FakeEventTarget,
+        document: {
+          referrer,
+          open() {},
+          write(html) {
+            writes.push(html);
+          },
+          close() {},
+        },
+        window: sandboxWindow,
+      };
+      vm.runInNewContext(script, context);
+      const message = listeners.get('message');
+      assert.equal(typeof message, 'function', 'message listener must be registered');
+      return { parent, readyMessages, writes, message };
+    }
+
+    const allowed = runSandbox('https://worldmonitor-git-feature-eliewm.vercel.app/dashboard');
+    assert.equal(allowed.readyMessages.length, 1);
+    assert.equal(allowed.readyMessages[0].targetOrigin, 'https://worldmonitor-git-feature-eliewm.vercel.app');
+    assert.deepEqual(JSON.parse(JSON.stringify(allowed.readyMessages[0].payload)), {
+      type: 'wm-widget-ready',
+      id: 'wm-1',
+      token: 'test-token',
+    });
+    allowed.message({
+      data: { type: 'wm-html', id: 'wm-1', token: 'test-token', html: '<p>ok</p>' },
+      origin: 'https://worldmonitor-git-feature-eliewm.vercel.app',
+      source: allowed.parent,
+    });
+    assert.deepEqual(allowed.writes, ['<p>ok</p>']);
+    allowed.message({
+      data: { type: 'wm-html', id: 'wm-1', token: 'test-token', html: '<p>second</p>' },
+      origin: 'https://worldmonitor-git-feature-eliewm.vercel.app',
+      source: allowed.parent,
+    });
+    assert.deepEqual(allowed.writes, ['<p>ok</p>'], 'only the first accepted message may write');
+
+    const invalidMessages = [
+      {
+        data: { type: 'other', id: 'wm-1', token: 'test-token', html: '<p>bad type</p>' },
+        origin: 'https://worldmonitor.app',
+      },
+      {
+        data: { type: 'wm-html', id: 'wrong-id', token: 'test-token', html: '<p>bad id</p>' },
+        origin: 'https://worldmonitor.app',
+      },
+      {
+        data: { type: 'wm-html', id: 'wm-1', token: 'wrong-token', html: '<p>bad token</p>' },
+        origin: 'https://worldmonitor.app',
+      },
+    ];
+    for (const invalidMessage of invalidMessages) {
+      const rejected = runSandbox('https://worldmonitor.app/dashboard');
+      rejected.message({ ...invalidMessage, source: rejected.parent });
+      assert.deepEqual(rejected.writes, []);
+    }
+
+    const wrongSource = runSandbox('https://worldmonitor.app/dashboard');
+    wrongSource.message({
+      data: { type: 'wm-html', id: 'wm-1', token: 'test-token', html: '<p>bad source</p>' },
+      origin: 'https://worldmonitor.app',
+      source: {},
+    });
+    assert.deepEqual(wrongSource.writes, []);
+
+    const spoofed = runSandbox('https://worldmonitor-git-feature-eliewm.vercel.app.evil.com/');
+    assert.deepEqual(spoofed.readyMessages, []);
+    spoofed.message({
+      data: { type: 'wm-html', id: 'wm-1', token: 'test-token', html: '<p>bad</p>' },
+      origin: 'https://worldmonitor-git-feature-eliewm.vercel.app.evil.com',
+      source: spoofed.parent,
+    });
+    assert.deepEqual(spoofed.writes, []);
+  });
+
+  it('widget sandbox blocks beforeunload without breaking normal events before widget execution', () => {
+    const script = sandbox.match(/<script>\r?\n([\s\S]*?)\r?\n<\/script>/)?.[1];
+    assert.ok(script, 'sandbox inline script not found');
+
+    function FakeEvent(type) {
+      this.type = type;
+      this.immediatePropagationStopped = false;
+    }
+
+    FakeEvent.prototype.stopImmediatePropagation = function () {
+      this.immediatePropagationStopped = true;
+    };
+
+    function FakeEventTarget() {
+      this.listeners = new Map();
+    }
+
+    FakeEventTarget.prototype.addEventListener = function (type, listener, options) {
+      const entries = this.listeners.get(type) ?? [];
+      entries.push({ listener, options });
+      this.listeners.set(type, entries);
+    };
+
+    FakeEventTarget.prototype.dispatchEvent = function (event) {
+      const entries = [...(this.listeners.get(event.type) ?? [])];
+      for (const entry of entries) {
+        if (typeof entry.listener === 'function') {
+          entry.listener.call(this, event);
+        } else {
+          entry.listener.handleEvent.call(entry.listener, event);
+        }
+        if (event.immediatePropagationStopped) break;
+        if (entry.options?.once) {
+          const current = this.listeners.get(event.type) ?? [];
+          this.listeners.set(event.type, current.filter((candidate) => candidate !== entry));
+        }
+      }
+      return true;
+    };
+
+    const parent = { postMessage() {} };
+    const sandboxWindow = new FakeEventTarget();
+    sandboxWindow.location = { hash: '#id=wm-1&token=test-token' };
+    sandboxWindow.parent = parent;
+
+    let guardedAtWrite = false;
+    let vmContext;
+    const document = {
+      referrer: 'https://worldmonitor.app/dashboard',
+      open() {
+        // Real document.open() clears Window listeners. The guard must restore
+        // its stopper after this reset and before widget HTML begins parsing.
+        sandboxWindow.listeners.clear();
+      },
+      write(html) {
+        sandboxWindow.onbeforeunload = () => 'too late';
+        sandboxWindow.addEventListener('beforeunload', () => {
+          sandboxWindow.beforeUnloadCalls++;
+        });
+        guardedAtWrite = sandboxWindow.onbeforeunload === null
+          && (sandboxWindow.listeners.get('beforeunload')?.length ?? 0) === 1;
+
+        for (const match of html.matchAll(/<script>([\s\S]*?)<\/script>/gi)) {
+          vm.runInContext(match[1], vmContext);
+        }
+      },
+      close() {},
+    };
+
+    vmContext = vm.createContext({
+      URL,
+      URLSearchParams,
+      Event: FakeEvent,
+      EventTarget: FakeEventTarget,
+      document,
+      window: sandboxWindow,
+    });
+    vm.runInContext(script, vmContext);
+
+    const message = sandboxWindow.listeners.get('message')?.[0]?.listener;
+    assert.equal(typeof message, 'function', 'message listener must be registered');
+
+    const widgetHtml = `<script>
+window.beforeUnloadCalls = 0;
+window.clickCalls = 0;
+window.onbeforeunload = function () {
+  window.beforeUnloadCalls++;
+  return 'blocked';
+};
+window.addEventListener('beforeunload', function () {
+  window.beforeUnloadCalls++;
+});
+EventTarget.prototype.addEventListener.call(window, 'beforeunload', function () {
+  window.beforeUnloadCalls++;
+});
+window.addEventListener('click', {
+  handleEvent: function () {
+    window.clickCalls++;
+  }
+}, { once: true, passive: true });
+window.dispatchEvent(new Event('beforeunload'));
+window.dispatchEvent(new Event('click'));
+window.dispatchEvent(new Event('click'));
+</script>`;
+
+    assert.doesNotThrow(() => {
+      message.call(sandboxWindow, {
+        data: { type: 'wm-html', id: 'wm-1', token: 'test-token', html: widgetHtml },
+        origin: 'https://worldmonitor.app',
+        source: parent,
+      });
+    });
+
+    assert.equal(guardedAtWrite, true, 'beforeunload guard must be active when document.write starts');
+    assert.equal(sandboxWindow.onbeforeunload, null, 'onbeforeunload assignments must remain inert');
+    sandboxWindow.onbeforeunload = () => 'still blocked';
+    assert.equal(sandboxWindow.onbeforeunload, null, 'ordinary reassignment must not restore onbeforeunload');
+    assert.equal(sandboxWindow.beforeUnloadCalls, 0, 'the native stopper must block later beforeunload handlers');
+    assert.equal(sandboxWindow.clickCalls, 1, 'listener objects and normal event options must still work');
+  });
+
+  it('PRO widget message listener has AbortController cleanup wired to iframe removal', () => {
+    // P1 (greptile #3912): the global `message` listener registered by
+    // mountProWidget would otherwise retain a strong reference to the
+    // iframe (and its ~80 KB HTML payload) for the lifetime of the page,
+    // even after the iframe is removed from the DOM — a real leak in any
+    // dashboard session that adds/removes widgets repeatedly. The fix is
+    // an AbortController per iframe + a MutationObserver `removedNodes`
+    // pass that calls `unmountProWidget`, which aborts the listener and
+    // clears every per-iframe WeakMap entry.
+    assert.ok(
+      san.includes('iframeAbortStore') && san.includes('new AbortController()'),
+      'mountProWidget must create an AbortController per iframe and store it',
+    );
+    assert.ok(
+      san.includes("{ signal: controller.signal }"),
+      'message listener must be registered with the AbortController signal so abort() removes it',
+    );
+    assert.ok(
+      san.includes('function unmountProWidget') && san.includes('controller.abort')
+        || (san.includes('function unmountProWidget') && san.includes('iframeAbortStore.get(iframe)?.abort()')),
+      'unmountProWidget must abort the controller (tearing down the listener)',
+    );
+    assert.ok(
+      san.includes('iframeAbortStore.delete(iframe)')
+        && san.includes('iframeTokenStore.delete(iframe)')
+        && san.includes('iframeHtmlStore.delete(iframe)'),
+      'unmountProWidget must clear every per-iframe WeakMap entry to release the HTML payload',
+    );
+    assert.ok(
+      san.includes('mut.removedNodes') && san.includes('unmountProWidget'),
+      'MutationObserver must scan removedNodes and call unmountProWidget so the cleanup actually fires when widgets are removed',
+    );
+  });
+
+  it('PRO widget re-deliveries are rate-limited to bound document.write storms', () => {
+    // P2 (greptile #3912): a malicious widget that re-reads its token from
+    // window.location.hash and re-posts wm-widget-ready could trigger an
+    // unbounded document.write loop (parent responds → write replaces doc
+    // → new doc re-posts ready → parent responds again). Rate-limiting
+    // deliveries to once per second per iframe is the smallest fix that
+    // bounds the loop while preserving legitimate drag/drop re-navigation
+    // (which is human-paced and trivially clears the floor). Greptile's
+    // suggested verbatim fix (delete iframeTokenStore after first delivery)
+    // would break the documented re-navigation use case at the call site,
+    // so we keep the token alive and gate on time instead.
+    assert.ok(
+      san.includes('MIN_DELIVERY_INTERVAL_MS') && san.includes('iframeLastDeliveryMs'),
+      'must declare a per-iframe last-delivery timestamp store and a minimum interval',
+    );
+    const intervalMatch = san.match(/MIN_DELIVERY_INTERVAL_MS\s*=\s*(\d+)/);
+    assert.ok(intervalMatch, 'MIN_DELIVERY_INTERVAL_MS must be a numeric literal');
+    const interval = Number(intervalMatch[1]);
+    assert.ok(
+      interval >= 500 && interval <= 5000,
+      `MIN_DELIVERY_INTERVAL_MS must be between 500ms and 5s (got ${interval}) — too low fails to bound a loop, too high breaks drag/drop`,
+    );
+    assert.ok(
+      san.includes('now - last < MIN_DELIVERY_INTERVAL_MS'),
+      'message handler must return early when called within the throttle window',
+    );
+    assert.ok(
+      san.includes('iframeLastDeliveryMs.set(iframe, now)'),
+      'message handler must record the delivery time so the next call is throttled',
     );
   });
 
@@ -1591,7 +2096,9 @@ describe('WidgetChatModal — preflight 403 message branches on auth mode', () =
   it('resolvePreflightMessage takes usedTesterKey and branches Clerk path on isPro', () => {
     const fnIdx = modal.indexOf('function resolvePreflightMessage');
     assert.ok(fnIdx !== -1, 'resolvePreflightMessage not found');
-    const region = modal.slice(fnIdx, fnIdx + 1200);
+    const fnEnd = modal.indexOf('\nfunction setReadinessState', fnIdx);
+    assert.ok(fnEnd !== -1, 'resolvePreflightMessage boundary not found');
+    const region = modal.slice(fnIdx, fnEnd);
     assert.ok(
       region.includes('usedTesterKey'),
       'resolvePreflightMessage must take usedTesterKey to branch on auth mode',

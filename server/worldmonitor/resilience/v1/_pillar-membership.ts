@@ -1,5 +1,5 @@
 import type { ResilienceDomain } from '../../../../src/generated/server/worldmonitor/resilience/v1/service_server';
-import type { ResilienceDomainId } from './_dimension-scorers';
+import { isFlagDarkDimension, type ResilienceDomainId } from './_dimension-scorers';
 
 export type ResiliencePillarId = 'structural-readiness' | 'live-shock-exposure' | 'recovery-capacity';
 
@@ -29,6 +29,16 @@ export const PILLAR_ORDER: ResiliencePillarId[] = [
   'recovery-capacity',
 ];
 
+function averageDomainDimensionCoverage(domain: ResilienceDomain): number {
+  // A default-off construct is not part of the active scoring universe. Keep
+  // its triple-zero placeholder in the response schema, but do not let that
+  // placeholder change the domain's pillar influence. Real outages on the same
+  // dimension carry observed or imputed weight and remain in this mean.
+  const activeDimensions = domain.dimensions.filter((dimension) => !isFlagDarkDimension(dimension));
+  if (activeDimensions.length === 0) return 0;
+  return activeDimensions.reduce((sum, dim) => sum + dim.coverage, 0) / activeDimensions.length;
+}
+
 export function buildPillarList(
   domains: ResilienceDomain[],
   schemaV2Enabled: boolean,
@@ -38,17 +48,18 @@ export function buildPillarList(
     const memberDomains = domains.filter((d) =>
       PILLAR_DOMAINS[pillarId].includes(d.id as ResilienceDomainId),
     );
-    const totalCoverage = memberDomains.reduce((sum, d) => {
-      const dimCoverages = d.dimensions.map((dim) => dim.coverage);
-      return sum + (dimCoverages.length > 0 ? dimCoverages.reduce((a, b) => a + b, 0) / dimCoverages.length : 0);
+    const domainCoverages = memberDomains.map((domain) => ({
+      domain,
+      coverage: averageDomainDimensionCoverage(domain),
+    }));
+    const totalCoverage = domainCoverages.reduce((sum, item) => sum + item.coverage, 0);
+    const totalWeightedCoverage = domainCoverages.reduce((sum, item) => {
+      return sum + item.domain.weight * item.coverage;
     }, 0);
-    const pillarScore = totalCoverage > 0
-      ? memberDomains.reduce((sum, d) => {
-          const avgCoverage = d.dimensions.length > 0
-            ? d.dimensions.reduce((a, dim) => a + dim.coverage, 0) / d.dimensions.length
-            : 0;
-          return sum + d.score * avgCoverage;
-        }, 0) / totalCoverage
+    const pillarScore = totalWeightedCoverage > 0
+      ? domainCoverages.reduce((sum, item) => {
+          return sum + item.domain.score * item.domain.weight * item.coverage;
+        }, 0) / totalWeightedCoverage
       : 0;
     const pillarCoverage = memberDomains.length > 0
       ? totalCoverage / memberDomains.length

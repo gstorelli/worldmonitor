@@ -13,8 +13,10 @@ NOT being fixed.
 ## Displacement field-mapping (scoreSocialCohesion / scoreBorderSecurity / scoreStateContinuity)
 
 **Dimensions.** `socialCohesion` (weight 0.25 of the blend),
-`borderSecurity` (weight 0.35 of the blend), `stateContinuity`
-(weight 0.20 of the blend).
+`borderSecurity` / "Conflict & Displacement" (weight 0.35 of the
+blend; see #3737 — internal id is `borderSecurity` but the dimension
+measures armed conflict + displacement, not border infrastructure),
+`stateContinuity` (weight 0.20 of the blend).
 
 **Source.** UNHCR Population API
 (`https://api.unhcr.org/population/v1/population/`), written via
@@ -72,9 +74,9 @@ effectively dead code.** The scorer reads
 `_dimension-scorers.ts`. Intent (from the surrounding comments):
 
 - Primary (`hostTotal`): how many UNHCR-registered people this
-  country hosts → direct border-security signal.
+  country hosts → host-inflow displacement signal.
 - Fallback (`totalDisplaced`): how many of this country's people
-  are displaced → indirect border-security signal for
+  are displaced → origin-outflow displacement signal for
   origin-dominated countries.
 
 **Discovered during this audit**: the fallback **does not fire in
@@ -100,12 +102,16 @@ dim). The actual signal is never picked up. Turkey-pattern
 
 **Why not fixing this today.** A one-line change (`||` instead of
 `??`, or `hostTotal > 0 ? hostTotal : totalDisplaced`) would
-flip the borderSecurity score for ~6 high-outflow origin
-countries by a material amount — a methodology change, not a
-pure bug-fix. That belongs in a construct-decision PR with a
+flip the dimension score for ~6 high-outflow origin countries
+by a material amount — a methodology change, not a pure
+bug-fix. That belongs in a construct-decision PR with a
 cohort-audit snapshot before/after, not bundled into an audit
-doc PR. Opening a follow-up to decide: should borderSecurity
-reflect origin-outflow pressure, host-inflow pressure, or both?
+doc PR. Opening a follow-up to decide: should the dimension
+reflect origin-outflow displacement, host-inflow displacement,
+or both? (Separately, the dimension was relabeled to
+"Conflict & Displacement" in #3737 because it doesn't measure
+border infrastructure regardless of which displacement source
+fires.)
 
 **Test pin.** `tests/resilience-displacement-field-mapping.test.mts`
 pins the CURRENT behavior (Syria-pattern scores 100 on this
@@ -143,9 +149,6 @@ spot-check runs.
   lines 843 (`getCountryDisplacement`), 1383, 1412, 1765
 - UNHCR Population API schema:
   https://api.unhcr.org/docs/population.html
-- Plan reference:
-  `docs/plans/2026-04-24-002-fix-resilience-cohort-ranking-structural-audit-plan.md`
-  §PR 5.2
 
 ---
 
@@ -262,9 +265,6 @@ verifying.
   135 (`IMPUTE.ipcFood` constant)
 - WB indicator docs:
   https://data.worldbank.org/indicator/ER.H2O.FWST.ZS
-- Plan reference:
-  `docs/plans/2026-04-24-002-fix-resilience-cohort-ranking-structural-audit-plan.md`
-  §PR 5.3
 - Test regression guards:
   `tests/resilience-foodwater-field-mapping.test.mts`
 
@@ -272,7 +272,7 @@ verifying.
 
 ## tradeSanctions → tradePolicy: OFAC-domicile component dropped (Ship 1, 2026-04-25)
 
-**Status.** RESOLVED via plan 2026-04-25-004 Phase 1 (Ship 1). The
+**Status.** RESOLVED in the first release of this construct change. The
 construct question described below — "is OFAC-designated-party domicile
 count a country-resilience signal?" — was answered "no, drop it."
 
@@ -285,8 +285,7 @@ seeder `scripts/seed-sanctions-pressure.mjs` continues to write
 generation, ad-hoc analysis); only the resilience scorer's binding was
 removed.
 
-A separate `financialSystemExposure` dim is being added in plan Phase 2
-(Ship 2). It captures structural sanctions vulnerability via three
+A separate `financialSystemExposure` dim captures structural sanctions vulnerability via three
 signals — BIS Locational Banking Statistics by-parent cross-border
 claims, World Bank IDS short-term external debt as % of GNI, and FATF
 AML/CFT listing status — none of which conflate transit-hub corporate
@@ -303,20 +302,16 @@ gap vs Kuwait/Qatar in the 2026-04-24 cohort audit was almost entirely
 driven by Iran-evasion shell-company listings and Russian-asset SPVs.
 Penalizing the host jurisdiction for shell-entity behavior conflated
 financial-system openness with state policy and produced systematic
-false signals for hub economies. Plan 2026-04-25-004 chose the
-structurally cleanest fix — drop the component and rebuild via
+false signals for hub economies. The structurally cleanest fix was to drop
+the component and rebuild via
 audited cross-border banking + AML/CFT data — over the partial fixes
 that were considered (program-weight categorization, transit-hub
 exclusion lists).
 
-**Cross-reference.** Plan 2026-04-25-004
-(`docs/plans/2026-04-25-004-feat-financial-system-exposure-construct-plan.md`)
-Phase 1 ships the rename + drop; Phase 2 ships the
-`financialSystemExposure` dim. The earlier
-`docs/plans/2026-04-24-002-fix-resilience-cohort-ranking-structural-audit-plan.md`
-§PR 5.1 captured the original construct question and its three options
-(status quo / program-weight / transit-hub exclusion); plan
-2026-04-25-004 supersedes it with Option 4 (drop + rebuild).
+**Cross-reference.** The first release renamed `tradeSanctions` to
+`tradePolicy` and dropped the domicile component. The subsequent
+`financialSystemExposure` construct rebuilds the signal from audited
+cross-border banking and AML/CFT inputs instead.
 
 **Retired-but-not-deleted code.** `RESILIENCE_SANCTIONS_KEY` constant
 and `normalizeSanctionCount` helper in

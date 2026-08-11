@@ -10,7 +10,9 @@ import {
   ValidationError,
 } from '../../../../src/generated/server/worldmonitor/shipping/v2/service_server';
 
-import { isCallerPremium } from '../../../_shared/premium-check';
+import {
+  requirePremiumRpcAccess,
+} from '../../../_shared/premium-check';
 import { getCachedJson } from '../../../_shared/redis';
 import { CHOKEPOINT_STATUS_KEY } from '../../../_shared/cache-keys';
 import { BYPASS_CORRIDORS_BY_CHOKEPOINT, type CargoType } from '../../../_shared/bypass-corridors';
@@ -31,6 +33,7 @@ interface ChokepointStatusEntry {
 
 interface ChokepointStatusResponse {
   chokepoints?: ChokepointStatusEntry[];
+  upstreamUnavailable?: boolean;
 }
 
 const VALID_CARGO_TYPES = new Set(['container', 'tanker', 'bulk', 'roro']);
@@ -39,10 +42,7 @@ export async function routeIntelligence(
   ctx: ServerContext,
   req: RouteIntelligenceRequest,
 ): Promise<RouteIntelligenceResponse> {
-  const isPro = await isCallerPremium(ctx.request);
-  if (!isPro) {
-    throw new ApiError(403, 'PRO subscription required', '');
-  }
+  await requirePremiumRpcAccess(ctx.request, ApiError, 'PRO subscription required');
 
   const fromIso2 = (req.fromIso2 ?? '').trim().toUpperCase();
   const toIso2 = (req.toIso2 ?? '').trim().toUpperCase();
@@ -66,6 +66,10 @@ export async function routeIntelligence(
   const primaryRouteId = sharedRoutes[0] ?? fromCluster?.nearestRouteIds[0] ?? '';
 
   const statusRaw = (await getCachedJson(CHOKEPOINT_STATUS_KEY).catch(() => null)) as ChokepointStatusResponse | null;
+  const statusAvailable =
+    Array.isArray(statusRaw?.chokepoints) &&
+    statusRaw.chokepoints.length > 0 &&
+    statusRaw.upstreamUnavailable !== true;
   const statusMap = new Map<string, ChokepointStatusEntry>(
     (statusRaw?.chokepoints ?? []).map(cp => [cp.id, cp]),
   );
@@ -111,6 +115,6 @@ export async function routeIntelligence(
     bypassOptions,
     warRiskTier,
     disruptionScore,
-    fetchedAt: new Date().toISOString(),
+    fetchedAt: statusAvailable ? new Date().toISOString() : '',
   };
 }

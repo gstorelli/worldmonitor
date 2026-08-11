@@ -74,12 +74,14 @@
 //   }
 //
 // Countries WITHOUT an entry in the manifest are absent from this
-// payload. The scorer is expected to treat "no entry in payload" as
-// "no sovereign wealth fund" and score 0 with full coverage (plan
-// §3.4 "What happens to no-SWF countries"). This is substantively
-// different from IMPUTE fallback (which is "data-source-failed").
+// payload. When the payload exists, the scorer treats "no entry in
+// payload" as structurally not-applicable: score 0, coverage 0,
+// observedWeight 0, imputedWeight 0, imputationClass 'not-applicable'.
+// This is substantively different from the IMPUTE fallback for a
+// missing SWF seed key.
 
 import { loadEnvFile, CHROME_UA, runSeed, readSeedSnapshot, SHARED_FX_FALLBACKS, getSharedFxRates, getBundleRunStartedAtMs } from './_seed-utils.mjs';
+import { decodeHtmlEntities } from './_html-entities.mjs';
 import iso3ToIso2 from './shared/iso3-to-iso2.json' with { type: 'json' };
 import { groupFundsByCountry, loadSwfManifest } from './shared/swf-manifest-loader.mjs';
 
@@ -335,11 +337,15 @@ function stripHtmlInline(value) {
   // `302.0<sup>41</sup>` becomes `302.0 41` — otherwise the decimal
   // value and its trailing footnote ref get welded into `302.041`,
   // which the Assets regex then mis-parses as a single number.
-  return String(value || '')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&[#\w]+;/g, ' ')
+  // Entities decode through the shared single-pass decoder (exactly one
+  // level — `&amp;lt;` stays literal `&lt;`); `unknownEntity: 'blank'`
+  // preserves the old `&[#\w]+;` -> ' ' catch-all for unknown entities AND
+  // invalid numeric refs, so a malformed ref can't weld neighboring digits
+  // (`100&#999999999;200` -> `100 200`, never `100200`).
+  return decodeHtmlEntities(
+    String(value || '').replace(/<[^>]+>/g, ' '),
+    { unknownEntity: 'blank' },
+  )
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -810,8 +816,9 @@ export async function fetchSovereignWealth() {
       // WB `NE.IMP.GNFS.CD` missing for this country (transient outage
       // or a country with spotty WB coverage). Silently dropping would
       // let the downstream scorer interpret the absence as "no SWF" and
-      // score 0 with full coverage — substantively wrong. Log it
-      // loudly and surface via the unmatched list so the seed-meta
+      // exclude the dim as structurally not-applicable — substantively
+      // wrong for a manifest country whose import denominator is missing.
+      // Log it loudly and surface via the unmatched list so the seed-meta
       // observer can alert.
       console.warn(`[seed-sovereign-wealth] ${iso2} skipped: World Bank imports (${IMPORTS_INDICATOR}) missing — cannot compute rawMonths denominator`);
       for (const fund of funds) unmatched.push(`${fund.country}:${fund.fund} (no WB imports)`);
@@ -1083,9 +1090,10 @@ if (process.argv[1]?.endsWith('seed-sovereign-wealth.mjs')) {
     declareRecords,
     schemaVersion: 1,
     maxStaleMin: 86400,
-    // Empty payload is still acceptable while tiers 1/2 are stubbed
-    // and any transient Wikipedia outage occurs; downstream IMPUTE
-    // path handles it.
+    // Empty payload is publishable so seed-meta record_count=0 can
+    // surface total SWF coverage loss operationally. A present
+    // `{countries:{}}` payload is not IMPUTE downstream: scorer Path 3
+    // treats each country as structurally not-applicable.
     emptyDataIsFailure: false,
   }).catch((err) => {
     const _cause = err.cause ? ` (cause: ${err.cause.message || err.cause.code || err.cause})` : '';

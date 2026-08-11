@@ -20,6 +20,8 @@ import { aviationWatchlist } from '@/services/aviation/watchlist';
 import { escapeHtml, sanitizeUrl } from '@/utils/sanitize';
 import { t } from '@/services/i18n';
 import { Panel } from './Panel';
+import { setTrustedHtml, trustedHtml } from '@/utils/dom-utils';
+
 
 // ---- Helpers ----
 
@@ -29,6 +31,9 @@ const SEVERITY_COLOR: Record<FlightDelaySeverity, string> = {
     moderate: '#f97316',
     major: '#ef4444',
     severe: '#dc2626',
+    // 'unknown' = no telemetry. Render neutral grey so users don't read it
+    // as "healthy / green" (#3707).
+    unknown: '#9ca3af',
 };
 
 const STATUS_BADGE: Record<string, string> = {
@@ -117,7 +122,7 @@ export class AirlineIntelPanel extends Panel {
         this.liveIndicator = document.createElement('span');
         this.liveIndicator.className = 'live-badge';
         this.liveIndicator.textContent = '\u25CF LIVE';
-        this.liveIndicator.style.cssText = 'display:none;color:#22c55e;font-size:10px;font-weight:700;margin-left:8px;letter-spacing:0.5px;';
+        this.liveIndicator.style.cssText = 'display:none;color:#22c55e;font-size:calc(10px * var(--wm-panel-effective-scale, 1));font-weight:700;margin-left:8px;letter-spacing:0.5px;';
         this.header.querySelector('.panel-title')?.appendChild(this.liveIndicator);
 
         // Insert tab bar between header and content
@@ -170,10 +175,11 @@ export class AirlineIntelPanel extends Panel {
             }
         });
 
-        void this.refresh();
-
-        // Auto-refresh every 5 min — refresh() loads ops + active tab
-        this.refreshTimer = setInterval(() => void this.refresh(), 5 * 60_000);
+        this.runWhenConnected(() => {
+            void this.refresh();
+            // Auto-refresh every 5 min — refresh() loads ops + active tab
+            this.refreshTimer = setInterval(() => void this.refresh(), 5 * 60_000);
+        });
     }
 
     toggle(visible: boolean): void {
@@ -288,8 +294,13 @@ export class AirlineIntelPanel extends Panel {
     }
 
     private async refresh(): Promise<void> {
+        const shouldLoadActiveTab = this.activeTab !== 'prices';
+        if (!this.element.isConnected) {
+            this.runWhenConnected(() => { void this.refresh(); });
+            return;
+        }
         if (this.activeTab !== 'ops') void this.loadOps();
-        if (this.activeTab !== 'prices') void this.loadTab(this.activeTab);
+        if (shouldLoadActiveTab) void this.loadTab(this.activeTab);
     }
 
     private async loadOps(): Promise<void> {
@@ -359,7 +370,7 @@ export class AirlineIntelPanel extends Panel {
     }
 
     private renderLoading(): void {
-        this.content.innerHTML = `<div class="panel-loading">${t('common.loading')}</div>`;
+        setTrustedHtml(this.content, trustedHtml(`<div class="panel-loading">${t('common.loading')}</div>`, "legacy direct innerHTML migration"));
     }
 
     private renderTab(): void {
@@ -377,7 +388,7 @@ export class AirlineIntelPanel extends Panel {
     // ---- Ops tab ----
     private renderOps(): void {
         if (!this.opsData.length) {
-            this.content.innerHTML = `<div class="no-data">${t('components.airlineIntel.noOpsData')}</div>`;
+            setTrustedHtml(this.content, trustedHtml(`<div class="no-data">${t('components.airlineIntel.noOpsData')}</div>`, "legacy direct innerHTML migration"));
             return;
         }
         const rows = this.opsData.map(s => `
@@ -390,13 +401,13 @@ export class AirlineIntelPanel extends Panel {
         ${s.closureStatus ? '<div class="ops-closed">CLOSED</div>' : ''}
         ${s.notamFlags.length ? `<div class="ops-notam">⚠️ NOTAM</div>` : ''}
       </div>`).join('');
-        this.content.innerHTML = `<div class="ops-grid">${rows}</div>`;
+        setTrustedHtml(this.content, trustedHtml(`<div class="ops-grid">${rows}</div>`, "legacy direct innerHTML migration"));
     }
 
     // ---- Flights tab ----
     private renderFlights(): void {
         if (!this.flightsData.length) {
-            this.content.innerHTML = `<div class="no-data">${t('components.airlineIntel.noFlights')}</div>`;
+            setTrustedHtml(this.content, trustedHtml(`<div class="no-data">${t('components.airlineIntel.noFlights')}</div>`, "legacy direct innerHTML migration"));
             return;
         }
         const rows = this.flightsData.map(f => {
@@ -410,13 +421,13 @@ export class AirlineIntelPanel extends Panel {
           <div class="flight-status" style="color:${color}">${f.status}</div>
         </div>`;
         }).join('');
-        this.content.innerHTML = `<div class="flights-list">${rows}</div>`;
+        setTrustedHtml(this.content, trustedHtml(`<div class="flights-list">${rows}</div>`, "legacy direct innerHTML migration"));
     }
 
     // ---- Airlines tab ----
     private renderAirlines(): void {
         if (!this.carriersData.length) {
-            this.content.innerHTML = `<div class="no-data">${t('components.airlineIntel.noCarrierData')}</div>`;
+            setTrustedHtml(this.content, trustedHtml(`<div class="no-data">${t('components.airlineIntel.noCarrierData')}</div>`, "legacy direct innerHTML migration"));
             return;
         }
         const rows = this.carriersData.slice(0, 15).map(c => `
@@ -426,7 +437,7 @@ export class AirlineIntelPanel extends Panel {
         <div class="carrier-delay" style="color:${c.delayPct > 30 ? '#ef4444' : '#aaa'}">${c.delayPct.toFixed(1)}% delayed</div>
         <div class="carrier-cancel">${c.cancellationRate.toFixed(1)}% cxl</div>
       </div>`).join('');
-        this.content.innerHTML = `<div class="carriers-list">${rows}</div>`;
+        setTrustedHtml(this.content, trustedHtml(`<div class="carriers-list">${rows}</div>`, "legacy direct innerHTML migration"));
     }
 
     // ---- Tracking tab ----
@@ -441,7 +452,7 @@ export class AirlineIntelPanel extends Panel {
       </div>`;
 
         if (this.loading) {
-            this.content.innerHTML = `${searchBar}<div class="panel-loading">${t('common.loading')}</div>`;
+            setTrustedHtml(this.content, trustedHtml(`${searchBar}<div class="panel-loading">${t('common.loading')}</div>`, "legacy direct innerHTML migration"));
             return;
         }
 
@@ -459,16 +470,16 @@ export class AirlineIntelPanel extends Panel {
           <div class="track-flight-card" style="padding:8px 0;border-bottom:1px solid var(--border)">
             <div style="display:flex;gap:8px;align-items:baseline">
               <strong>${escapeHtml(f.flightNumber)}</strong>
-              <span style="color:#9ca3af;font-size:11px">${escapeHtml(f.carrier.name || f.carrier.iata)}</span>
-              <span style="color:${color};font-size:11px;margin-left:auto">${f.status}</span>
+              <span style="color:#9ca3af;font-size:calc(11px * var(--wm-panel-effective-scale, 1))">${escapeHtml(f.carrier.name || f.carrier.iata)}</span>
+              <span style="color:${color};font-size:calc(11px * var(--wm-panel-effective-scale, 1));margin-left:auto">${f.status}</span>
             </div>
-            <div style="font-size:12px;color:var(--text-dim)">${escapeHtml(f.origin.iata)} → ${escapeHtml(f.destination.iata)}${depStr ? ` · ${depStr}` : ''}${arrStr}</div>
-            ${f.aircraftType ? `<div style="font-size:11px;color:#6b7280">${escapeHtml(f.aircraftType)}</div>` : ''}
-            ${(f.gate || f.terminal) ? `<div style="font-size:11px;color:#6b7280">${f.gate ? `Gate ${escapeHtml(f.gate)}` : ''}${f.terminal ? `${f.gate ? ' · ' : ''}T${escapeHtml(f.terminal)}` : ''}</div>` : ''}
-            ${f.delayMinutes > 0 ? `<div style="color:#f97316;font-size:12px">+${f.delayMinutes}m delay</div>` : ''}
+            <div style="font-size:calc(12px * var(--wm-panel-effective-scale, 1));color:var(--text-dim)">${escapeHtml(f.origin.iata)} → ${escapeHtml(f.destination.iata)}${depStr ? ` · ${depStr}` : ''}${arrStr}</div>
+            ${f.aircraftType ? `<div style="font-size:calc(11px * var(--wm-panel-effective-scale, 1));color:#6b7280">${escapeHtml(f.aircraftType)}</div>` : ''}
+            ${(f.gate || f.terminal) ? `<div style="font-size:calc(11px * var(--wm-panel-effective-scale, 1));color:#6b7280">${f.gate ? `Gate ${escapeHtml(f.gate)}` : ''}${f.terminal ? `${f.gate ? ' · ' : ''}T${escapeHtml(f.terminal)}` : ''}</div>` : ''}
+            ${f.delayMinutes > 0 ? `<div style="color:#f97316;font-size:calc(12px * var(--wm-panel-effective-scale, 1))">+${f.delayMinutes}m delay</div>` : ''}
           </div>`;
             }).join('');
-            this.content.innerHTML = `${searchBar}<div>${rows}</div>`;
+            setTrustedHtml(this.content, trustedHtml(`${searchBar}<div>${rows}</div>`, "legacy direct innerHTML migration"));
             return;
         }
 
@@ -481,28 +492,28 @@ export class AirlineIntelPanel extends Panel {
           <div class="track-spd">${fmt(p.groundSpeedKts)} kts</div>
           <div class="track-pos">${p.lat.toFixed(2)}, ${p.lon.toFixed(2)}</div>
         </div>`).join('');
-            this.content.innerHTML = `${searchBar}<div class="tracking-list">${rows}</div>`;
+            setTrustedHtml(this.content, trustedHtml(`${searchBar}<div class="tracking-list">${rows}</div>`, "legacy direct innerHTML migration"));
             return;
         }
 
         const emptyMsg = this.trackingQuery
             ? `<div class="no-data">No results for <strong>${escapeHtml(this.trackingQuery)}</strong>.</div>`
             : `<div class="no-data">${t('components.airlineIntel.noTrackingData')}</div>`;
-        this.content.innerHTML = `${searchBar}${emptyMsg}`;
+        setTrustedHtml(this.content, trustedHtml(`${searchBar}${emptyMsg}`, "legacy direct innerHTML migration"));
     }
 
     // ---- News tab ----
     private renderNews(): void {
         if (!this.newsData.length) {
-            this.content.innerHTML = `<div class="no-data">${t('components.airlineIntel.noNews')}</div>`;
+            setTrustedHtml(this.content, trustedHtml(`<div class="no-data">${t('components.airlineIntel.noNews')}</div>`, "legacy direct innerHTML migration"));
             return;
         }
         const items = this.newsData.map(n => `
       <div class="news-item" style="padding:8px 0;border-bottom:1px solid var(--border,#2a2a2a)">
         <a href="${sanitizeUrl(n.url)}" target="_blank" rel="noopener" class="news-link">${escapeHtml(n.title)}</a>
-        <div class="news-meta" style="font-size:11px;color:var(--text-dim,#888);margin-top:2px">${escapeHtml(n.sourceName)} · ${n.publishedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+        <div class="news-meta" style="font-size:calc(11px * var(--wm-panel-effective-scale, 1));color:var(--text-dim,#888);margin-top:2px">${escapeHtml(n.sourceName)} · ${n.publishedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
       </div>`).join('');
-        this.content.innerHTML = `<div class="news-list" style="padding:0 4px">${items}</div>`;
+        setTrustedHtml(this.content, trustedHtml(`<div class="news-list" style="padding:0 4px">${items}</div>`, "legacy direct innerHTML migration"));
     }
 
     // ---- Prices tab ----
@@ -534,7 +545,7 @@ export class AirlineIntelPanel extends Panel {
           </select>
           <button id="priceSearchBtn" class="icon-btn" style="padding:4px 10px">${t('header.search')}</button>
         </div>
-        <div id="priceInlineErr" style="color:#ef4444;font-size:11px;min-height:14px"></div>`;
+        <div id="priceInlineErr" style="color:#ef4444;font-size:calc(11px * var(--wm-panel-effective-scale, 1));min-height:14px"></div>`;
 
             let body: string;
             if (this.googleFlightsData.length) {
@@ -566,7 +577,7 @@ export class AirlineIntelPanel extends Panel {
             } else {
                 body = `<div class="no-data">${escapeHtml(t('components.airlineIntel.enterRouteAndDate'))}</div>`;
             }
-            this.content.innerHTML = `${toggle}${form}${degradedBanner}${body}`;
+            setTrustedHtml(this.content, trustedHtml(`${toggle}${form}${degradedBanner}${body}`, "legacy direct innerHTML migration"));
         } else {
             const form = `
         <div class="price-controls">
@@ -575,10 +586,10 @@ export class AirlineIntelPanel extends Panel {
           <input id="datesToInput" class="price-input" placeholder="To" maxlength="3" value="${escapeHtml(this.pricesDest)}" style="width:54px">
           <input id="datesStartInput" class="price-input" type="date" value="${escapeHtml(this.datesStart || localDateStr())}" style="width:128px">
           <input id="datesEndInput" class="price-input" type="date" value="${escapeHtml(this.datesEnd)}" style="width:128px">
-          <label style="display:flex;align-items:center;gap:4px;font-size:12px">
+          <label style="display:flex;align-items:center;gap:4px;font-size:calc(12px * var(--wm-panel-effective-scale, 1))">
             <input id="datesRoundTripCheck" type="checkbox" ${this.datesRoundTrip ? 'checked' : ''}>${escapeHtml(t('components.airlineIntel.roundTrip'))}
           </label>
-          <label style="display:flex;align-items:center;gap:4px;font-size:12px">
+          <label style="display:flex;align-items:center;gap:4px;font-size:calc(12px * var(--wm-panel-effective-scale, 1))">
             ${escapeHtml(t('components.airlineIntel.tripDays'))}:
             <input id="datesTripDurInput" class="price-input" type="number" min="1" value="${this.datesTripDuration}" style="width:44px">
           </label>
@@ -590,7 +601,7 @@ export class AirlineIntelPanel extends Panel {
           </select>
           <button id="datesSearchBtn" class="icon-btn" style="padding:4px 10px">${t('header.search')}</button>
         </div>
-        <div id="datesInlineErr" style="color:#ef4444;font-size:11px;min-height:14px"></div>`;
+        <div id="datesInlineErr" style="color:#ef4444;font-size:calc(11px * var(--wm-panel-effective-scale, 1));min-height:14px"></div>`;
 
             let body: string;
             if (this.datesData.length) {
@@ -613,7 +624,7 @@ export class AirlineIntelPanel extends Panel {
             } else {
                 body = `<div class="no-data">${escapeHtml(t('components.airlineIntel.enterDateRange'))}</div>`;
             }
-            this.content.innerHTML = `${toggle}${form}${degradedBanner}${body}`;
+            setTrustedHtml(this.content, trustedHtml(`${toggle}${form}${degradedBanner}${body}`, "legacy direct innerHTML migration"));
         }
     }
 

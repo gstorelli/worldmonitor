@@ -13,6 +13,7 @@ export {
   canonicalizeSummaryInputs,
   buildSummaryCacheKey,
   buildSummaryCacheKey as getCacheKey,
+  selectUniqueHeadlinePairs,
 } from '../../../../src/utils/summary-cache-key';
 
 // ========================================================================
@@ -26,7 +27,6 @@ export { hashString };
 // Headline deduplication (used by SummarizeArticle)
 // ========================================================================
 
-// @ts-expect-error -- plain JS module, no .d.mts needed for this pure function
 export { deduplicateHeadlines } from './dedup.mjs';
 
 // ========================================================================

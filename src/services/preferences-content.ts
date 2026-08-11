@@ -6,6 +6,15 @@ import { getGlobeVisualPreset, setGlobeVisualPreset, GLOBE_VISUAL_PRESET_OPTIONS
 import type { StreamQuality } from '@/services/ai-flow-settings';
 import { getThemePreference, setThemePreference, type ThemePreference } from '@/utils/theme-manager';
 import { getFontFamily, setFontFamily, type FontFamily } from '@/services/font-settings';
+import {
+  FONT_SCALE_CHANGED_EVENT,
+  FONT_SCALE_STEPS,
+  fontScaleLabel,
+  getFontScale,
+  parseFontScale,
+  setFontScale,
+  type FontScaleChangedDetail,
+} from '@/services/font-scale-settings';
 import { escapeHtml } from '@/utils/sanitize';
 import { trackLanguageChange } from '@/services/analytics';
 import { exportSettings, importSettings, type ImportResult } from '@/utils/settings-persistence';
@@ -27,6 +36,8 @@ import {
   getActiveFrameworkForPanel,
   type AnalysisPanelId,
 } from '@/services/analysis-framework-store';
+import { setTrustedHtml, trustedHtml } from '@/utils/dom-utils';
+
 
 const DESKTOP_RELEASES_URL = 'https://github.com/koala73/worldmonitor/releases';
 
@@ -66,9 +77,9 @@ function renderMapThemeDropdown(container: HTMLElement, provider: MapProvider): 
   const select = container.querySelector<HTMLSelectElement>('#us-map-theme');
   if (!select) return;
   const currentTheme = getMapTheme(provider);
-  select.innerHTML = MAP_THEME_OPTIONS[provider]
+  setTrustedHtml(select, trustedHtml(MAP_THEME_OPTIONS[provider]
     .map(opt => `<option value="${opt.value}"${opt.value === currentTheme ? ' selected' : ''}>${escapeHtml(opt.label)}</option>`)
-    .join('');
+    .join(''), "legacy direct innerHTML migration"));
 }
 
 function updateSyncStatusUI(container: HTMLElement): void {
@@ -151,6 +162,22 @@ export function renderPreferences(host: PreferencesHost): PreferencesResult {
   ] as { value: FontFamily; label: string }[]) {
     const selected = opt.value === currentFont ? ' selected' : '';
     html += `<option value="${opt.value}"${selected}>${escapeHtml(opt.label)}</option>`;
+  }
+  html += `</select>`;
+
+  // Panel font scale. Fixed-geometry map chrome deliberately does not inherit
+  // this value; individual panel overrides live in Settings -> Panels.
+  const currentFontScale = getFontScale();
+  html += `<div class="ai-flow-toggle-row">
+    <div class="ai-flow-toggle-label-wrap">
+      <div class="ai-flow-toggle-label">${t('preferences.fontScale', { defaultValue: 'Panel text size' })}</div>
+      <div class="ai-flow-toggle-desc">${t('preferences.fontScaleDesc', { defaultValue: 'Sets panel text globally. A panel-specific value replaces this setting.' })}</div>
+    </div>
+  </div>`;
+  html += `<select class="unified-settings-select" id="us-font-scale">`;
+  for (const scale of FONT_SCALE_STEPS) {
+    const selected = scale === currentFontScale ? ' selected' : '';
+    html += `<option value="${scale}"${selected}>${fontScaleLabel(scale)}</option>`;
   }
   html += `</select>`;
 
@@ -279,7 +306,7 @@ export function renderPreferences(host: PreferencesHost): PreferencesResult {
 
   // Import button
   html += `<div class="fw-import-row">
-    <button type="button" class="settings-btn settings-btn-secondary fw-import-btn" id="fwImportBtn">${t('components.insights.analysisFrameworksImportBtn')}</button>
+    <button type="button" class="btn btn-secondary fw-import-btn" id="fwImportBtn">${t('components.insights.analysisFrameworksImportBtn')}</button>
   </div>`;
 
   // Import modal (hidden by default)
@@ -298,11 +325,11 @@ export function renderPreferences(host: PreferencesHost): PreferencesResult {
           <label class="fw-import-label">agentskills.io URL or ID</label>
           <input type="text" class="fw-import-input" id="fwAgentskillsUrl" placeholder="https://agentskills.io/skills/..." />
         </div>
-        <button type="button" class="settings-btn settings-btn-secondary" id="fwFetchBtn">Fetch</button>
+        <button type="button" class="btn btn-secondary" id="fwFetchBtn">Fetch</button>
         <div class="fw-import-preview" id="fwAgentskillsPreview" style="display:none">
           <div class="fw-import-preview-name" id="fwPreviewName"></div>
           <div class="fw-import-preview-desc" id="fwPreviewDesc"></div>
-          <button type="button" class="settings-btn settings-btn-primary fw-save-btn" id="fwAgentskillsSaveBtn">${t('components.insights.analysisFrameworksSaveToLibrary')}</button>
+          <button type="button" class="btn btn-primary fw-save-btn" id="fwAgentskillsSaveBtn">${t('components.insights.analysisFrameworksSaveToLibrary')}</button>
         </div>
         <div class="fw-import-error" id="fwAgentskillsError" style="display:none"></div>
       </div>
@@ -312,7 +339,7 @@ export function renderPreferences(host: PreferencesHost): PreferencesResult {
           <textarea class="fw-import-textarea" id="fwJsonInput" rows="6" placeholder='{ "name": "...", "instructions": "..." }'></textarea>
         </div>
         <div class="fw-import-error" id="fwJsonError" style="display:none"></div>
-        <button type="button" class="settings-btn settings-btn-primary fw-save-btn" id="fwJsonSaveBtn">${t('components.insights.analysisFrameworksSaveToLibrary')}</button>
+        <button type="button" class="btn btn-primary fw-save-btn" id="fwJsonSaveBtn">${t('components.insights.analysisFrameworksSaveToLibrary')}</button>
       </div>
     </div>
   </div>`;
@@ -371,7 +398,7 @@ export function renderPreferences(host: PreferencesHost): PreferencesResult {
         <span class="wm-sync-status-label" id="usSyncLabel">${SYNC_STATE_LABELS[syncState] ?? 'Unknown'}</span>
         <span class="wm-sync-status-time" id="usSyncTime">Last synced: ${escapeHtml(lastSyncStr)}</span>
       </div>
-      <button type="button" class="settings-btn settings-btn-secondary wm-sync-now-btn" id="usSyncNowBtn">Sync now</button>
+      <button type="button" class="btn btn-secondary wm-sync-now-btn" id="usSyncNowBtn">Sync now</button>
     </div>`;
     html += `</div></details>`;
   }
@@ -382,8 +409,8 @@ export function renderPreferences(host: PreferencesHost): PreferencesResult {
   html += `<div class="wm-pref-group-content">`;
   html += `
     <div class="us-data-mgmt">
-      <button type="button" class="settings-btn settings-btn-secondary" id="usExportBtn">${t('components.settings.exportSettings')}</button>
-      <button type="button" class="settings-btn settings-btn-secondary" id="usImportBtn">${t('components.settings.importSettings')}</button>
+      <button type="button" class="btn btn-secondary" id="usExportBtn">${t('components.settings.exportSettings')}</button>
+      <button type="button" class="btn btn-secondary" id="usImportBtn">${t('components.settings.importSettings')}</button>
       <input type="file" id="usImportInput" accept=".json" class="us-hidden-input" />
     </div>
     <div class="us-data-mgmt-toast" id="usDataMgmtToast"></div>
@@ -404,6 +431,12 @@ export function renderPreferences(host: PreferencesHost): PreferencesResult {
     attach(container: HTMLElement): () => void {
       const ac = new AbortController();
       const { signal } = ac;
+
+      window.addEventListener(FONT_SCALE_CHANGED_EVENT, (event) => {
+        const select = container.querySelector<HTMLSelectElement>('#us-font-scale');
+        const scale = (event as CustomEvent<FontScaleChangedDetail>).detail?.scale;
+        if (select && scale !== undefined) select.value = String(scale);
+      }, { signal });
 
       container.addEventListener('change', (e) => {
         const target = e.target as HTMLInputElement;
@@ -434,6 +467,11 @@ export function renderPreferences(host: PreferencesHost): PreferencesResult {
         }
         if (target.id === 'us-font-family') {
           setFontFamily(target.value as FontFamily);
+          return;
+        }
+        if (target.id === 'us-font-scale') {
+          const scale = parseFontScale(target.value);
+          if (scale !== undefined) setFontScale(scale);
           return;
         }
         if (target.id === 'us-map-provider') {
@@ -572,7 +610,7 @@ export function renderPreferences(host: PreferencesHost): PreferencesResult {
           }).catch((err: Error) => {
             if (err.name === 'AbortError') return;
             if (err.message === 'rate-limit') {
-              showImportError(errEl, 'Too many import requests. Try again in an hour.');
+              showImportError(errEl, 'Too many import requests. Try again in a minute.');
             } else {
               showImportError(errEl, 'Could not reach agentskills.io. Check your connection.');
             }
@@ -698,7 +736,7 @@ function renderFrameworkLibraryHtml(): string {
 
 function refreshFrameworkLibrary(container: HTMLElement): void {
   const list = container.querySelector('#fwLibraryList');
-  if (list) list.innerHTML = renderFrameworkLibraryHtml();
+  if (list) setTrustedHtml(list, trustedHtml(renderFrameworkLibraryHtml(), "legacy direct innerHTML migration"));
 }
 
 function showImportError(el: HTMLElement | null, msg: string): void {
@@ -717,9 +755,9 @@ function showToast(container: HTMLElement, msg: string, success: boolean): void 
   const toast = container.querySelector('#usDataMgmtToast');
   if (!toast) return;
   toast.className = `us-data-mgmt-toast ${success ? 'ok' : 'error'}`;
-  toast.innerHTML = success
+  setTrustedHtml(toast, trustedHtml(success
     ? `${escapeHtml(msg)} <a href="#" class="us-toast-reload">${t('components.settings.reloadNow')}</a>`
-    : escapeHtml(msg);
+    : escapeHtml(msg), "legacy direct innerHTML migration"));
   toast.querySelector('.us-toast-reload')?.addEventListener('click', (e) => {
     e.preventDefault();
     window.location.reload();

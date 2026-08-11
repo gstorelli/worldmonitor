@@ -8,6 +8,8 @@ export interface GetGivingSummaryRequest {
 
 export interface GetGivingSummaryResponse {
   summary?: GivingSummary;
+  fetchedAt: number;
+  dataAvailable: boolean;
 }
 
 export interface GivingSummary {
@@ -19,6 +21,10 @@ export interface GivingSummary {
   categories: CategoryBreakdown[];
   crypto?: CryptoGivingSummary;
   institutional?: InstitutionalGiving;
+  dataMode: string;
+  trendAvailable: boolean;
+  provenance: GivingProvenance[];
+  activityIndexAvailable: boolean;
 }
 
 export interface PlatformGiving {
@@ -54,6 +60,26 @@ export interface InstitutionalGiving {
   cafDataYear: number;
   candidGrantsTracked: number;
   dataLag: string;
+}
+
+export interface GivingProvenance {
+  subject: string;
+  sourceName: string;
+  sourceUrl: string;
+  referencePeriod: string;
+  sourcePublishedAt: string;
+  measurementBasis: string;
+  status: string;
+  coveredMetricPaths: string[];
+  includedInHighlightedAggregate: boolean;
+  reportedValue: number;
+  reportedUnit: string;
+  notes: string;
+  valueQualifier: string;
+  sourceLocator: string;
+  accessedAt: string;
+  denominator: string;
+  derivation: string;
 }
 
 export interface FieldViolation {

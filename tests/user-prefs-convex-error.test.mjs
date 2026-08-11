@@ -131,6 +131,40 @@ describe('extractConvexErrorKind — Convex client error → kind', () => {
     });
   });
 
+  describe('Convex platform worker saturation — WorkerOverloaded JSON body (WORLDMONITOR-PG)', () => {
+    it('detects SERVICE_UNAVAILABLE from the {"code":"WorkerOverloaded"} JSON shape', () => {
+      // Convex runtime surfaces
+      //   `{"code":"WorkerOverloaded","message":"There are no available
+      //     workers to process the request"}`
+      // when the deployment briefly has no free function workers. Same
+      // retry-with-backoff remediation as ServiceUnavailable/InternalServerError,
+      // so we map to SERVICE_UNAVAILABLE → 503 + Retry-After instead of a 500.
+      const err = new Error('{"code":"WorkerOverloaded","message":"There are no available workers to process the request"}');
+      assert.equal(extractConvexErrorKind(err, err.message), 'SERVICE_UNAVAILABLE');
+    });
+
+    it('does NOT match the loose phrase "no available workers" without the JSON code field', () => {
+      // Defensive: detector keys off the exact JSON shape, not free-form prose.
+      const err = new Error('the pool reported no available workers, backing off');
+      assert.equal(extractConvexErrorKind(err, err.message), null);
+    });
+
+    it('tolerates optional whitespace after the colon ("code": "WorkerOverloaded")', () => {
+      // The whole platform-code family is matched whitespace-tolerantly so a
+      // body re-serialized by an intermediary (`"code": "X"`) still classifies.
+      // Convex emits no-space today; this locks in the defensive behaviour.
+      const err = new Error('{"code": "WorkerOverloaded", "message": "There are no available workers to process the request"}');
+      assert.equal(extractConvexErrorKind(err, err.message), 'SERVICE_UNAVAILABLE');
+    });
+
+    it('structured-data path still wins over JSON-shape WorkerOverloaded (forward-compat)', () => {
+      const err = Object.assign(new Error('{"code":"WorkerOverloaded","message":"x"}'), {
+        data: { kind: 'CONFLICT' },
+      });
+      assert.equal(extractConvexErrorKind(err, err.message), 'CONFLICT');
+    });
+  });
+
   describe('Vercel edge transient — "Network connection lost." (WORLDMONITOR-QE)', () => {
     it('detects SERVICE_UNAVAILABLE from the exact "Network connection lost." shape', () => {
       // Vercel/Cloudflare edge runtime surface this when the upstream socket
@@ -162,6 +196,94 @@ describe('extractConvexErrorKind — Convex client error → kind', () => {
     });
   });
 
+  describe('Cloudflare edge error 520-527 fronting Convex (WORLDMONITOR-PG)', () => {
+    it('detects SERVICE_UNAVAILABLE from the "error code: 520" Cloudflare body', () => {
+      // Cloudflare returns a text/HTML body containing `error code: 52x` when
+      // the origin misbehaves; the Convex HTTP client surfaces it as
+      // `Error('error code: 520...')` with `.data === undefined`. Without this
+      // match it fell to the 'unknown' bucket at error level instead of
+      // 503 + Retry-After (WORLDMONITOR-PG: 10 events / 8 users).
+      const err = new Error('error code: 520');
+      assert.equal(extractConvexErrorKind(err, err.message), 'SERVICE_UNAVAILABLE');
+    });
+
+    it('matches the whole 520-527 Cloudflare range', () => {
+      for (const code of [520, 521, 522, 523, 524, 525, 526, 527]) {
+        const err = new Error(`<html><body>error code: ${code}</body></html>`);
+        assert.equal(
+          extractConvexErrorKind(err, err.message), 'SERVICE_UNAVAILABLE',
+          `expected SERVICE_UNAVAILABLE for Cloudflare ${code}`,
+        );
+      }
+    });
+
+    it('does NOT match non-Cloudflare codes (519/528/error code: 500)', () => {
+      // Defensive: only the real Cloudflare 520-527 range is transient-transport.
+      for (const code of [500, 503, 519, 528, 530]) {
+        const err = new Error(`error code: ${code}`);
+        assert.equal(
+          extractConvexErrorKind(err, err.message), null,
+          `expected null (no Cloudflare match) for code ${code}`,
+        );
+      }
+    });
+
+    it('structured-data path still wins over "error code: 52x" substring (forward-compat)', () => {
+      const err = Object.assign(new Error('error code: 522'), {
+        data: { kind: 'CONFLICT', actualSyncVersion: 3 },
+      });
+      assert.equal(extractConvexErrorKind(err, err.message), 'CONFLICT');
+    });
+  });
+
+  describe('Convex response-body JSON parse failure — truncated/corrupt body (WORLDMONITOR-YV)', () => {
+    it('detects SERVICE_UNAVAILABLE from a JSON.parse SyntaxError (truncated body)', () => {
+      // The Convex HTTP client's `response.json()` throws a raw SyntaxError
+      // when the response body is truncated mid-transfer (connection dropped
+      // after headers). `.data` is undefined — the request never yielded a
+      // parseable Convex response. Same transient retry-with-back-off
+      // remediation as the platform 503; without this match the catch fell
+      // to the 'unknown' bucket at error level and returned a hard 500
+      // (WORLDMONITOR-YV: `Unterminated string in JSON at position 12997`).
+      const err = new SyntaxError('Unterminated string in JSON at position 12997 (line 1 column 12998)');
+      assert.equal(extractConvexErrorKind(err, err.message), 'SERVICE_UNAVAILABLE');
+    });
+
+    it('covers the other V8 JSON.parse shapes (end-of-input, invalid-JSON snippet)', () => {
+      const shapes = [
+        'Unexpected end of JSON input',
+        `Unexpected token '<', "<html><bod"... is not valid JSON`,
+        'Expected \',\' or \'}\' after property value in JSON at position 42',
+      ];
+      for (const msg of shapes) {
+        const err = new SyntaxError(msg);
+        assert.equal(
+          extractConvexErrorKind(err, err.message), 'SERVICE_UNAVAILABLE',
+          `expected SERVICE_UNAVAILABLE for: ${msg}`,
+        );
+      }
+    });
+
+    it('does NOT match a plain Error whose message merely mentions JSON (name gate)', () => {
+      // The detector keys on err.name === 'SyntaxError' so free-form server
+      // prose about JSON is not mis-bucketed as a transport failure.
+      const err = new Error('Unterminated string in JSON at position 5');
+      assert.equal(extractConvexErrorKind(err, err.message), null);
+    });
+
+    it('does NOT match a SyntaxError without JSON in the message', () => {
+      const err = new SyntaxError('Invalid regular expression: missing /');
+      assert.equal(extractConvexErrorKind(err, err.message), null);
+    });
+
+    it('structured-data path still wins over a JSON-parse-shaped message (forward-compat)', () => {
+      const err = Object.assign(new SyntaxError('Unexpected end of JSON input'), {
+        data: { kind: 'CONFLICT' },
+      });
+      assert.equal(extractConvexErrorKind(err, err.message), 'CONFLICT');
+    });
+  });
+
   describe('legacy substring-match fallback (string-data ConvexError that arrived without errorData)', () => {
     it('matches CONFLICT in the message', () => {
       const err = new Error('CONFLICT');
@@ -178,13 +300,34 @@ describe('extractConvexErrorKind — Convex client error → kind', () => {
       assert.equal(extractConvexErrorKind(err, err.message), 'UNAUTHENTICATED');
     });
 
-    it('does NOT match a generic "Server Error" message (the bug pre-fix)', () => {
-      // This is the exact symptom the structured-data fix exists to address:
-      // Convex's `[Request ID: X] Server Error` wrapper used to bypass every
-      // catch branch in the edge handler. Confirm the fallback still returns
-      // null for it (so the caller treats it as a real 500).
-      const err = new Error('[Request ID: 9fee2a2bfa791253] Server Error');
-      assert.equal(extractConvexErrorKind(err, err.message), null);
+    it('maps opaque Convex request-id server errors to SERVICE_UNAVAILABLE', () => {
+      // Convex generic platform/internal 5xx wrapper carries no JSON `code`
+      // field, but it has the same transient retry profile as the classified
+      // platform 5xx shapes above. Map it to SERVICE_UNAVAILABLE so callers
+      // return 503 + Retry-After instead of a hard 500.
+      const hits = [
+        '[Request ID: 9fee2a2bfa791253] Server Error',
+        '[Request ID: ABCdef_123-456] Server Error',
+      ];
+      for (const msg of hits) {
+        const err = new Error(msg);
+        assert.equal(extractConvexErrorKind(err, err.message), 'SERVICE_UNAVAILABLE');
+      }
+    });
+
+    it('does NOT match partial or decorated request-id server error variants', () => {
+      const misses = [
+        '[Request ID: 9fee2a2bfa791253] Server Error: extra details',
+        'prefix [Request ID: 9fee2a2bfa791253] Server Error',
+        '[Request ID: ] Server Error',
+      ];
+      for (const msg of misses) {
+        const err = new Error(msg);
+        assert.equal(
+          extractConvexErrorKind(err, err.message), null,
+          `expected null for: ${msg}`,
+        );
+      }
     });
   });
 

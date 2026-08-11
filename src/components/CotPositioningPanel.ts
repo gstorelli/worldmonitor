@@ -1,7 +1,7 @@
 import type { MarketServiceClient } from '@/generated/client/worldmonitor/market/v1/service_client';
 import { Panel } from './Panel';
 import { t } from '@/services/i18n';
-import { escapeHtml } from '@/utils/sanitize';
+import { escapeHtml, unsafeRawHtml } from '@/utils/sanitize';
 
 let _client: MarketServiceClient | null = null;
 async function getMarketClient(): Promise<MarketServiceClient> {
@@ -38,7 +38,7 @@ function renderPositionBar(netPct: number, label: string): string {
   const sign = clamped >= 0 ? '+' : '';
   return `
     <div style="margin:3px 0">
-      <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text-dim);margin-bottom:2px">
+      <div style="display:flex;justify-content:space-between;font-size:calc(9px * var(--wm-panel-effective-scale, 1));color:var(--text-dim);margin-bottom:2px">
         <span>${escapeHtml(label)}</span>
         <span style="color:${color};font-weight:600">${sign}${clamped.toFixed(1)}%</span>
       </div>
@@ -58,8 +58,8 @@ function renderInstrument(item: CotInstrumentData): string {
   return `
     <div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.06)">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-        <span style="font-size:12px;font-weight:600">${escapeHtml(item.name)}</span>
-        <span style="font-size:9px;color:var(--text-dim)">${escapeHtml(item.code)}</span>
+        <span style="font-size:calc(12px * var(--wm-panel-effective-scale, 1));font-weight:600">${escapeHtml(item.name)}</span>
+        <span style="font-size:calc(9px * var(--wm-panel-effective-scale, 1));color:var(--text-dim)">${escapeHtml(item.code)}</span>
       </div>
       ${renderPositionBar(amNetPct, 'Asset Managers')}
       ${renderPositionBar(levNetPct, 'Leveraged Funds')}
@@ -94,13 +94,13 @@ export class CotPositioningPanel extends Panel {
   private render(instruments: CotInstrumentData[], reportDate: string): void {
     const rows = instruments.map(renderInstrument).join('');
     const dateFooter = reportDate
-      ? `<div style="font-size:9px;color:var(--text-dim);margin-top:8px;text-align:right">Report date: ${escapeHtml(reportDate)}</div>`
+      ? `<div style="font-size:calc(9px * var(--wm-panel-effective-scale, 1));color:var(--text-dim);margin-top:8px;text-align:right">Report date: ${escapeHtml(reportDate)}</div>`
       : '';
     const html = `
       <div style="padding:10px 14px">
         ${rows}
         ${dateFooter}
       </div>`;
-    this.setContent(html);
+    this.setSafeContent(unsafeRawHtml(html, 'legacy Panel.setContent() migration'));
   }
 }

@@ -1,13 +1,10 @@
-const TURNSTILE_VERIFY_URL = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
+// Keep this module's public helper surface for its lead-handler consumers, but
+// use the dependency-free canonical client-IP implementation. This preserves
+// Cloudflare transit-proof validation for the scoped rate-limit identity
+// instead of maintaining a divergent local copy (#5235, GHSA-c267).
+export { getClientIp } from './client-ip';
 
-export function getClientIp(request: Request): string {
-  return (
-    request.headers.get('x-real-ip') ||
-    request.headers.get('cf-connecting-ip') ||
-    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-    'unknown'
-  );
-}
+const TURNSTILE_VERIFY_URL = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
 
 export type TurnstileMissingSecretPolicy = 'allow' | 'allow-in-development' | 'deny';
 

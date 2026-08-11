@@ -37,12 +37,15 @@ Two event types in dataset `wm_api_usage`:
 | `auth_kind`        | `clerk_jwt` \| `user_api_key` \| `enterprise_api_key` \| `widget_key` \| `anon` | |
 | `tier`             | `0` free / `1` pro / `2` api / `3` enterprise | `0` if unknown                          |
 | `cache_tier`       | `fast` \| `medium` \| `slow` \| `slow-browser` \| `static` \| `daily` \| `no-store` | only on 200/304 |
-| `country`, `execution_region` | `"US"`, `"iad1"`               | Vercel-provided                              |
+| `ip`                 | `"203.0.113.7"`                         | Cloudflare client IP only when the edge-proof header is valid; otherwise Vercel's peer IP |
+| `country`            | `"US"`                                  | Cloudflare client country only when edge transit is proven; otherwise Vercel connection country |
+| `ip_city`, `ip_region` | `"Johannesburg"`, `"WC"`            | Vercel connection/edge geography, not verified client location |
+| `execution_region`   | `"iad1"`                                | Vercel execution region                      |
 | `execution_plane`  | `"vercel-edge"`                           |                                              |
 | `origin_kind`      | `api-key` \| `oauth` \| `browser-same-origin` \| `browser-cross-origin` \| `null` | derived from headers by `deriveOriginKind()` — `mcp` and `internal-cron` exist in the `OriginKind` type for upstream/future use but are not currently emitted on the request path |
 | `ua_hash`          | SHA-256 of the UA                         | hashed so PII doesn't land in Axiom          |
 | `sentry_trace_id`  | `"abc123…"`                               | join key into Sentry                         |
-| `reason`           | `ok` \| `origin_403` \| `rate_limit_429` \| `preflight` \| `auth_401` \| `auth_403` \| `tier_403` | `auth_*` distinguishes auth-rejection paths from genuine successes when filtering on `status` alone is ambiguous |
+| `reason`           | `ok` \| `origin_403` \| `rate_limit_429` \| `rate_limit_429_endpoint` \| `rate_limit_429_global` \| `rate_limit_429_direct_llm` \| `rate_limit_degraded` \| `preflight` \| `auth_401` \| `auth_403` \| `tier_403` | Scoped 429 reasons identify the rejecting limiter directly; `auth_*` distinguishes auth-rejection paths from genuine successes when filtering on `status` alone is ambiguous |
 
 ### `upstream` (one per outbound fetch from a request handler)
 
@@ -135,6 +138,25 @@ Vercel project setup:
    ```
 4. Redeploy. Axiom infers schema from the first events — no upfront schema
    work needed.
+
+### Plan-limit scanner configuration
+
+The paid-plan notification scanner reads usage from the same observability surfaces but is not on the request path. It runs as a Convex internal cron and writes only compact rollups/notices to Convex; raw request logs stay in Axiom and raw limiter counters stay in Redis.
+
+| Source | Env vars | Used for | Missing behavior |
+|--------|----------|----------|------------------|
+| Axiom query API | `AXIOM_QUERY_TOKEN` or `AXIOM_API_TOKEN` (`AXIOM_QUERY_URL` optional) | API daily requests and API sustained burst rollups from `wm_api_usage` | Scanner reports `missing_axiom_query_token`; it does not assume zero usage |
+| Upstash Redis | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | Existing Pro MCP daily counters | Scanner reports `missing_upstash_credentials`; it does not assume zero usage |
+| MCP limiter-hit telemetry | `mcp.rate_limit_hit` log event from `api/mcp/auth.ts` | MCP sustained burst notices | No notice is emitted without durable hit buckets |
+| Resend | `RESEND_API_KEY`, optional `PLAN_LIMIT_EMAIL_FROM` | Customer notification emails | Notice remains pending/failed; hard enforcement readiness stays blocked |
+
+Operators can inspect the hard-enforcement preflight with the internal Convex query:
+
+```sh
+npx convex run apiPlanLimitNotices:getEnforcementReadiness
+```
+
+Treat `ready: false` as a stop sign for paid-plan hard enforcement. The readiness report blocks on stale sources, failed or pending email, and self-serve upgrade gaps such as API Starter users who need API Business while API Business is not currently checkout-enabled.
 
 ### Failure modes (deploy-with-Axiom-down is safe)
 

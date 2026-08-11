@@ -12,20 +12,35 @@ import { cachedFetchJson, getCachedJson, setCachedJson, getCachedJsonBatch, runR
 import { markNoCacheResponse } from '../../../_shared/response-headers';
 import { sha256Hex } from '../../../_shared/hash';
 import { CHROME_UA } from '../../../_shared/constants';
-import { VARIANT_FEEDS, INTEL_SOURCES, type ServerFeed } from './_feeds';
+import {
+  isServerFeedReachableForLanguage,
+  orderServerFeedEntries,
+  VARIANT_FEEDS,
+  INTEL_SOURCES,
+  type ServerFeed,
+} from './_feeds';
 import { classifyByKeyword, hasHistoricalMarker, type ThreatLevel } from './_classifier';
+import { assignStoryIdentity, adoptExistingCanonical } from './dedup.mjs';
+import { classifyOpinion } from '../../../_shared/opinion-classifier.js';
+import { classifyFeelGood } from '../../../_shared/feelgood-classifier.js';
+import { classifyEphemeralLiveCoverage } from '../../../../shared/ephemeral-live-classifier.js';
+import { buildTickerDictionary, extractTickers } from '../../../../shared/ticker-extract.js';
+import stocksData from '../../../../shared/stocks.json';
 import { buildClassifyCacheKey } from '../../intelligence/v1/_shared';
 import { getSourceTier } from '../../../_shared/source-tiers';
 import {
   STORY_TRACK_KEY,
   STORY_SOURCES_KEY,
   STORY_PEAK_KEY,
+  STORY_ALIAS_KEY,
   DIGEST_ACCUMULATOR_KEY,
   STORY_TTL,
-  STORY_TRACK_KEY_PREFIX,
   DIGEST_ACCUMULATOR_TTL,
 } from '../../../_shared/cache-keys';
 import { getRelayBaseUrl, getRelayHeaders } from '../../../_shared/relay';
+import diplomacyKeywordsData from '../../../../shared/diplomacy-keywords.json';
+// #6428: entity corroboration must count publishers, not feed labels.
+import { MIN_CORROBORATING_PUBLISHERS, publisherFamilyFor } from '../../../../shared/publisher-families.js';
 
 const RSS_ACCEPT = 'application/rss+xml, application/xml, text/xml, */*';
 
@@ -34,8 +49,16 @@ const fallbackDigestCache = new Map<string, { data: ListFeedDigestResponse; ts: 
 const ITEMS_PER_FEED = 5;
 const MAX_ITEMS_PER_CATEGORY = 20;
 const FEED_TIMEOUT_MS = 8_000;
-const OVERALL_DEADLINE_MS = 25_000;
+// Vercel Edge functions have a 25s initial-response ceiling. The digest
+// must fail closed to the warmed in-isolate fallback before the platform does.
+const VERCEL_INITIAL_RESPONSE_LIMIT_MS = 25_000;
+const DIGEST_RESPONSE_TIMEOUT_MS = 14_000;
+const POST_FETCH_HEADROOM_MS = 15_000;
+const RESPONSE_GUARD_BAND_MS = 3_000;
+const OVERALL_DEADLINE_MS = VERCEL_INITIAL_RESPONSE_LIMIT_MS - POST_FETCH_HEADROOM_MS;
 const BATCH_CONCURRENCY = 20;
+
+type DigestFeedEntry = { category: string; feed: ServerFeed };
 
 // U3 — hard freshness floor (default 96h, env override NEWS_MAX_AGE_HOURS).
 // Items older than this are dropped before scoring. The 24h `recencyScore`
@@ -132,6 +155,23 @@ const SCORE_WEIGHTS = {
   recency: 0.1,
 } as const;
 
+const DIPLOMACY_KEYWORDS: readonly string[] = diplomacyKeywordsData.diplomacyKeywords;
+const FLASHPOINT_SCORING_KEYWORDS: readonly string[] = diplomacyKeywordsData.flashpointKeywords;
+// JSON imports type each pair as `string[]` (length not statically tracked).
+// The runtime shape is `[string, string]` — enforced by
+// tests/diplomacy-keywords-parity.test.mjs against the canonical JSON.
+const DIPLOMACY_FLASHPOINT_PAIRS: ReadonlyArray<readonly [string, string]> =
+  diplomacyKeywordsData.diplomacyFlashpointPairs as unknown as ReadonlyArray<readonly [string, string]>;
+
+// #4922a: compiled once — the company-name alternation regex is the
+// expensive part of ticker extraction.
+const TICKER_DICTIONARY = buildTickerDictionary(stocksData.symbols);
+
+const DIPLOMACY_FLASHPOINT_BOOST = 18;
+const ENTITY_CORROBORATION_SCORE_PER_SOURCE = 4;
+const ENTITY_CORROBORATION_WINDOW_MS = 24 * 60 * 60 * 1000;
+const DIPLOMACY_SEVERITY_PROMOTION_MIN_TIER12_SOURCES = 3;
+
 
 interface ParsedItem {
   source: string;
@@ -145,6 +185,7 @@ interface ParsedItem {
   classSource: 'keyword' | 'keyword-historical-downgrade' | 'llm';
   importanceScore: number;
   corroborationCount: number;
+  entityCorroborationCount: number;
   titleHash?: string;
   lang: string;
   // Cleaned RSS/Atom article description: HTML-stripped, entity-decoded,
@@ -152,6 +193,32 @@ interface ParsedItem {
   // absent, too short, or indistinguishable from the headline. Grounding input
   // for brief / whyMatters / SummarizeArticle LLMs.
   description: string;
+  // Non-event brief classification (classifyOpinion over title + link +
+  // description). Persisted on the legacy `isOpinion` story:track:v1 field
+  // so buildDigest can exclude op-ed/column and historical-explainer content
+  // — the brief is event-driven intelligence, not an editorial or look-back
+  // feed. See
+  // docs/plans/2026-05-14-001-…-plan.md (F3). story:track rows feed more
+  // than the brief, so this STAMPS rather than drops — only buildDigest
+  // filters on it.
+  isOpinion: boolean;
+  // Feel-good / lifestyle classification (classifyFeelGood over title +
+  // link + description). Sibling stamp to isOpinion — same persistence,
+  // same buildDigest read-path filter. The brief is event-driven; a
+  // vintage-warplane veterans' reunion in a 9,800-person town is not an
+  // event. See docs/plans/2026-05-17-001-fix-feelgood-lifestyle-filter-plan.md
+  // (Veterans-warplanes anchor case, May 17 0802 brief).
+  isFeelGood: boolean;
+  // Ephemeral live-programming classification. "WATCH LIVE: ..." and
+  // live briefing/hearing previews are not durable event stories for a
+  // delayed digest/brief, even when conflict vocabulary makes them score high.
+  // Stamped here and re-classified by buildDigest for pre-stamp residue.
+  isEphemeralLiveCoverage: boolean;
+  // #4922a: stock tickers extracted at parse time from title + description
+  // (cashtags + shared/stocks.json company names). Uppercase, deduped,
+  // ≤8 (proto NewsItem.tickers max_items=8). Optional so items rehydrated
+  // from pre-rollout cache rows stay valid; toProtoItem defaults to [].
+  tickers?: string[];
 }
 
 const MAX_DESCRIPTION_LEN = 400;
@@ -162,22 +229,91 @@ const DESCRIPTION_TAG_PRIORITY = {
   atom: ['summary', 'content'] as const,
 };
 
+interface ImportanceScoreContext {
+  title?: string;
+  classSource?: ParsedItem['classSource'] | string;
+  entityCorroborationCount?: number;
+}
+
+function normalizeScoringText(text: string): string {
+  return text.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+// Word-start containment in normalized text. Mirrors
+// shared/brief-filter.js:containsKeywordToken — prevents 'pact' inside
+// 'impact' (false positive) while still matching 'iran' inside
+// 'iranian' (demonym preserved). PR #3909 review (P2).
+function containsKeywordToken(text: string, kw: string): boolean {
+  if (!kw) return false;
+  const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(^|\\s)${escaped}`).test(text);
+}
+
+function hasAnySignal(text: string, keywords: readonly string[]): boolean {
+  return keywords.some((kw) => containsKeywordToken(text, kw));
+}
+
+function hasDiplomacyFlashpointSignal(title: string | undefined): boolean {
+  if (!title) return false;
+  const text = normalizeScoringText(title);
+  if (
+    DIPLOMACY_FLASHPOINT_PAIRS.some(([entity, action]) =>
+      containsKeywordToken(text, entity) && containsKeywordToken(text, action),
+    )
+  ) {
+    return true;
+  }
+  return hasAnySignal(text, DIPLOMACY_KEYWORDS) && hasAnySignal(text, FLASHPOINT_SCORING_KEYWORDS);
+}
+
+function promoteDiplomacySeverity(
+  level: ThreatLevel,
+  title: string | undefined,
+  tier12SourceCount: number,
+): ThreatLevel {
+  if (level === 'critical' || level === 'high') return level;
+  if (!title || hasHistoricalMarker(title)) return level;
+  const finite = Number.isFinite(tier12SourceCount) ? Number(tier12SourceCount) : 0;
+  if (
+    finite >= DIPLOMACY_SEVERITY_PROMOTION_MIN_TIER12_SOURCES &&
+    hasDiplomacyFlashpointSignal(title)
+  ) {
+    return 'high';
+  }
+  return level;
+}
+
+function diplomacyFlashpointBoost(title: string | undefined): number {
+  return hasDiplomacyFlashpointSignal(title) ? DIPLOMACY_FLASHPOINT_BOOST : 0;
+}
+
+function entityCorroborationScore(count: number | undefined): number {
+  const finite = Number.isFinite(count) ? Number(count) : 0;
+  return Math.min(Math.max(finite, 0), 5) * ENTITY_CORROBORATION_SCORE_PER_SOURCE;
+}
+
 function computeImportanceScore(
   level: ThreatLevel,
   source: string,
   corroborationCount: number,
   publishedAt: number,
+  context: ImportanceScoreContext = {},
 ): number {
   const tier = getSourceTier(source);
   const tierScore = tier === 1 ? 100 : tier === 2 ? 75 : tier === 3 ? 50 : 25;
   const corroborationScore = Math.min(corroborationCount, 5) * 20;
   const ageMs = Date.now() - publishedAt;
   const recencyScore = Math.max(0, 1 - ageMs / (24 * 60 * 60 * 1000)) * 100;
-  return Math.round(
+  const base = Math.round(
     SEVERITY_SCORES[level] * SCORE_WEIGHTS.severity +
     tierScore * SCORE_WEIGHTS.sourceTier +
     corroborationScore * SCORE_WEIGHTS.corroboration +
     recencyScore * SCORE_WEIGHTS.recency,
+  );
+  return Math.round(
+    base +
+    diplomacyFlashpointBoost(context.title) +
+    entityCorroborationScore(context.entityCorroborationCount),
   );
 }
 
@@ -266,6 +402,7 @@ interface ParseResult {
   items: ParsedItem[];
   parsedTotal: number;     // count of <item>/<entry> blocks attempted
   droppedUndated: number;  // count dropped because every recognized date tag was empty/unparseable/future
+  droppedFeedCap?: number; // #4920: items beyond ITEMS_PER_FEED, previously uncounted
 }
 
 // Cache TTLs: a successful parse (parsedTotal > 0) caches for an hour to
@@ -282,20 +419,33 @@ async function fetchAndParseRss(
   variant: string,
   signal: AbortSignal,
 ): Promise<ParseResult> {
-  // v3 cache shape: identical struct to v2 but a new prefix invalidates
-  // every pre-fix entry on deploy. Pre-fix v2 entries could be poisoned
-  // (non-RSS body cached at the long TTL via the old cachedFetchJson path
-  // — the bug this PR fixes). Their unprefixed v2 keys remain in Redis
-  // until they TTL-expire naturally over the next hour; v3 reads/writes
-  // ignore them. Without this prefix bump we'd need a runtime guard to
-  // distinguish "recently confirmed empty (honor short TTL)" from
-  // "old poisoned long-TTL entry" — and that runtime guard regressed
-  // throttling because every parsedTotal=0 read fell through to a live
-  // upstream fetch (PR #3556 review P1: short TTL never throttled).
-  const cacheKey = `rss:feed:v3:${variant}:${feed.url}`;
+  // v5 cache shape: identical struct to v4 but a new prefix invalidates
+  // every pre-fix entry on deploy. v4 entries cached pre-PR contain
+  // ParsedItems without the new isEphemeralLiveCoverage field. If a cache hit
+  // returned one of those, buildStoryTrackHsetFields would write
+  // `'isEphemeralLiveCoverage', undefined ? '1' : '0'` → '0' onto the
+  // story:track:v1 row, and buildDigest's stampMissing check would treat
+  // '0' as a genuine "not ephemeral live" verdict and skip the residue catch.
+  // Live-programming teasers could then silently slip through during the 1h
+  // healthy-cache rollout window. Bumping the prefix forces cold parseRssXml
+  // runs that stamp isEphemeralLiveCoverage correctly.
+  //
+  // (Same class of cache-prefix bump as v2→v3 and v3→v4, which this codebase
+  // already established as the correct cutover pattern for parsed-cache
+  // shape changes.)
+  // v5→v6 (#4920 review): ParseResult gained droppedFeedCap; warm v5 rows
+  // lack it and would undercount the coverage ledger for their whole TTL.
+  // v6→v7: ParsedItems now stamp historical explainers using their persisted
+  // publishedAt. Digest reads deliberately trust explicit isOpinion stamps,
+  // so warm v6 rows could retain an earlier "0" verdict for one cache TTL.
+  // Force a cold parse to stamp the stable ingest-time verdict immediately.
+  // v7→v8: extend the same exclusion policy to duration-led anniversary
+  // explainers ("10 years on from …"). Warm v7 rows already carry an
+  // authoritative isOpinion="0", so force another cold parse on rollout.
+  const cacheKey = `rss:feed:v8:${variant}:${feed.url}`;
 
   try {
-    // Read cache unconditionally — the v3 prefix guarantees pre-fix
+    // Read cache unconditionally — the v5 prefix guarantees pre-fix
     // poisoning can't reach this read, so we don't need a parsedTotal
     // bypass. Honoring cached zero-from-zero entries IS the throttle:
     // setCachedJson below writes them with CACHE_TTL_EMPTY_S, so the next
@@ -409,6 +559,10 @@ function parseRssXml(xml: string, feed: ServerFeed, variant: string): ParseResul
   const isAtom = matches.length === 0;
   if (isAtom) matches = [...xml.matchAll(entryRegex)];
 
+  // #4920 coverage ledger: items beyond the per-feed cap were previously
+  // dropped with no counter anywhere — fully invisible.
+  const droppedFeedCap = Math.max(0, matches.length - ITEMS_PER_FEED);
+
   for (const match of matches.slice(0, ITEMS_PER_FEED)) {
     const block = match[1]!;
 
@@ -464,8 +618,13 @@ function parseRssXml(xml: string, feed: ServerFeed, variant: string): ParseResul
       classSource: threat.source,
       importanceScore: 0,
       corroborationCount: 1,
+      entityCorroborationCount: 0,
       lang: feed.lang ?? 'en',
       description,
+      isOpinion: classifyOpinion({ title, link, description, publishedAt }),
+      isFeelGood: classifyFeelGood({ title, link, description }),
+      isEphemeralLiveCoverage: classifyEphemeralLiveCoverage({ title, link, description }),
+      tickers: extractTickers(`${title} ${description}`, TICKER_DICTIONARY),
     });
   }
 
@@ -502,7 +661,7 @@ function parseRssXml(xml: string, feed: ServerFeed, variant: string): ParseResul
   //     (default 120s) — the feed retries quickly instead of being pinned
   //     empty for the full 3600s TTL.
   if (parsedTotal === 0) return null;
-  return { items, parsedTotal, droppedUndated };
+  return { items, parsedTotal, droppedUndated, droppedFeedCap };
 }
 
 /**
@@ -599,15 +758,47 @@ function extractTag(xml: string, tag: string): string {
   return match ? decodeXmlEntities(match[1]!.trim()) : '';
 }
 
+/**
+ * `String.fromCodePoint` throws `RangeError` on anything outside the Unicode
+ * range, which would turn one malformed numeric reference into a failed feed
+ * parse. Drop those instead. `fromCharCode` is not usable here: it truncates to
+ * 16 bits, so `&#128512;` decoded to U+F600 (a private-use glyph) rather than 😀.
+ */
+function decodeNumericReference(codePoint: number): string {
+  return Number.isInteger(codePoint) && codePoint >= 0 && codePoint <= 0x10ffff
+    ? String.fromCodePoint(codePoint)
+    : '';
+}
+
 function decodeXmlEntities(s: string): string {
   return s
-    .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
     .replace(/&apos;/g, "'")
-    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
-    .replace(/&#x([0-9a-fA-F]+);/g, (_, n) => String.fromCharCode(parseInt(n, 16)));
+    .replace(/&#(\d+);/g, (_, n) => decodeNumericReference(Number(n)))
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, n) => decodeNumericReference(parseInt(n, 16)))
+    // `&amp;` MUST be decoded last. Decoding it first turns the escaped
+    // ampersand of `&amp;lt;` into a live `&`, which the very next replace then
+    // consumes as `&lt;` — one pass decoding twice.
+    .replace(/&amp;/g, '&');
+}
+
+/**
+ * Validates a raw `getCachedJsonBatch` hit at the trust boundary before any
+ * field reaches a typed `ParsedItem`. `level`/`category` on `ParsedItem` are
+ * declared `string`/`ThreatLevel`-derived, but the cache is Redis-backed JSON
+ * — an unrelated payload shape (stale schema, another feature's cache
+ * collision, hand-edited Redis value) parses fine as JSON while carrying a
+ * non-string, missing, or object/array `level`/`category`. Returns null
+ * unless BOTH fields are actually strings, so callers never need a
+ * downstream `typeof` guard before assigning onto `item.category`.
+ */
+function parseClassifyCacheHit(raw: unknown): { level: string; category: string } | null {
+  if (raw == null || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const { level, category } = raw as Record<string, unknown>;
+  if (typeof level !== 'string' || typeof category !== 'string') return null;
+  return { level, category };
 }
 
 async function enrichWithAiCache(items: ParsedItem[]): Promise<void> {
@@ -621,7 +812,7 @@ async function enrichWithAiCache(items: ParsedItem[]): Promise<void> {
   if (candidates.length === 0) return;
 
   // Use the canonical buildClassifyCacheKey from intelligence/v1/_shared
-  // so the cache prefix (currently classify:sebuf:v5:) lives in exactly
+  // so the cache prefix (currently classify:sebuf:v6:) lives in exactly
   // one place — bumping it again only requires touching _shared.ts and
   // the relay's independent .cjs helper. See U4 of the plan.
   const keyMap = new Map<string, ParsedItem[]>();
@@ -636,7 +827,15 @@ async function enrichWithAiCache(items: ParsedItem[]): Promise<void> {
   const cached = await getCachedJsonBatch(keys);
 
   for (const [key, relatedItems] of keyMap) {
-    const hit = cached.get(key) as { level?: string; category?: string } | undefined;
+    const hit = parseClassifyCacheHit(cached.get(key));
+    // `hit.level === '_skip'` is currently unreachable and kept only as
+    // defence-in-depth: both relay skip-writes emit `{ level: '_skip',
+    // timestamp }` with no `category` (scripts/ais-relay.cjs:3892, :3968),
+    // so the shape check above already rejects them and `!hit` catches them
+    // here. It stays because it is the correct guard the moment any writer
+    // starts pairing the sentinel with a category — do not read it as the
+    // operative skip check today. Locked by the `_skip` cases in
+    // tests/news-classify-cache-hit-validation.test.mts.
     if (!hit || hit.level === '_skip' || !hit.level || !hit.category) continue;
 
     for (const item of relatedItems) {
@@ -739,6 +938,78 @@ function normalizeTitle(title: string): string {
     .slice(0, 120);
 }
 
+function entityKeysForTitle(title: string): string[] {
+  const text = normalizeScoringText(title);
+  const keys: string[] = [];
+  for (const [entity, action] of DIPLOMACY_FLASHPOINT_PAIRS) {
+    if (containsKeywordToken(text, entity) && containsKeywordToken(text, action)) keys.push(`${entity}:${action}`);
+  }
+  if (
+    keys.length === 0 &&
+    hasAnySignal(text, DIPLOMACY_KEYWORDS) &&
+    hasAnySignal(text, FLASHPOINT_SCORING_KEYWORDS)
+  ) {
+    keys.push('generic:diplomacy-flashpoint');
+  }
+  return keys;
+}
+
+interface EntityCorroborationSignal {
+  sourceCount: number;
+  tier12SourceCount: number;
+}
+
+function computeEntityCorroborationSignals(
+  items: ParsedItem[],
+  nowMs = Date.now(),
+): Map<string, EntityCorroborationSignal> {
+  const buckets = new Map<string, { items: ParsedItem[]; sources: Set<string>; tier12Sources: Set<string> }>();
+  for (const item of items) {
+    if (!item.titleHash) continue;
+    if (!Number.isFinite(item.publishedAt) || nowMs - item.publishedAt > ENTITY_CORROBORATION_WINDOW_MS) continue;
+    for (const key of entityKeysForTitle(item.title)) {
+      let bucket = buckets.get(key);
+      if (!bucket) {
+        bucket = { items: [], sources: new Set(), tier12Sources: new Set() };
+        buckets.set(key, bucket);
+      }
+      bucket.items.push(item);
+      // #6428: bucket by publisher FAMILY. Keyed on the raw feed label, one
+      // newsroom's editions ("Reuters World" + "Reuters US") reached the
+      // >= 2 gate below on their own and manufactured an entity-corroboration
+      // signal that feeds importanceScore and the diplomacy severity
+      // promotion. The tier is a property of the LABEL, so a family joins
+      // tier12Sources when any of its labels is tier 1-2.
+      const family = publisherFamilyFor(item.source);
+      if (family) {
+        bucket.sources.add(family);
+        if (getSourceTier(item.source) <= 2) bucket.tier12Sources.add(family);
+      }
+    }
+  }
+
+  const signals = new Map<string, EntityCorroborationSignal>();
+  for (const bucket of buckets.values()) {
+    if (bucket.sources.size < MIN_CORROBORATING_PUBLISHERS) continue;
+    for (const item of bucket.items) {
+      const previous = signals.get(item.titleHash!);
+      signals.set(item.titleHash!, {
+        sourceCount: Math.max(previous?.sourceCount ?? 0, bucket.sources.size),
+        tier12SourceCount: Math.max(previous?.tier12SourceCount ?? 0, bucket.tier12Sources.size),
+      });
+    }
+  }
+  return signals;
+}
+
+function computeEntityCorroborationCounts(
+  items: ParsedItem[],
+  nowMs = Date.now(),
+): Map<string, number> {
+  const signals = computeEntityCorroborationSignals(items, nowMs);
+  return new Map([...signals].map(([hash, signal]) => [hash, signal.sourceCount]));
+}
+
 interface StoryTrack {
   firstSeen: number;
   lastSeen: number;
@@ -767,9 +1038,9 @@ async function readStoryTracks(titleHashes: string[]): Promise<Map<string, Story
   if (titleHashes.length === 0) return new Map();
   const fields = ['firstSeen', 'lastSeen', 'mentionCount', 'sourceCount', 'currentScore', 'peakScore'];
   const commands = titleHashes.map(h => [
-    'HMGET', `${STORY_TRACK_KEY_PREFIX}${h}`, ...fields,
+    'HMGET', STORY_TRACK_KEY(h), ...fields,
   ]);
-  const results = await runRedisPipeline(commands, true);
+  const results = await runRedisPipeline(commands);
   const map = new Map<string, StoryTrack>();
   for (let i = 0; i < titleHashes.length; i++) {
     const vals = results[i]?.result as string[] | null;
@@ -804,6 +1075,7 @@ function toProtoItem(item: ParsedItem, storyMeta?: ProtoStoryMeta): ProtoNewsIte
     },
     locationName: '',
     snippet: item.description ?? '',
+    tickers: item.tickers ?? [],
   };
 }
 
@@ -832,6 +1104,8 @@ export async function listFeedDigest(
         const totalItems = Object.values(result.categories).reduce((sum, b) => sum + b.items.length, 0);
         return totalItems > 0 ? result : null;
       },
+      120,
+      { timeoutMs: DIGEST_RESPONSE_TIMEOUT_MS },
     );
 
     if (fresh === null) {
@@ -890,14 +1164,79 @@ function buildStoryTrackHsetFields(
     // (treats as legacy row) instead of being mis-classified as a stale
     // row with a bogus timestamp.
     'publishedAt', Number.isFinite(item.publishedAt) ? String(item.publishedAt) : '',
+    // Entity-level cross-title corroboration count. Distinct from exact
+    // normalized-title sourceCount: this captures related flashpoint +
+    // diplomacy reports that do not collapse into the same story hash.
+    // The digest composer uses it as a narrow lead/card coherence signal.
+    'entityCorroborationCount', Number.isFinite(item.entityCorroborationCount)
+      ? String(item.entityCorroborationCount)
+      : '0',
+    // Non-event brief flag (classifyOpinion). '1' = op-ed/column or
+    // historical explainer, '0' = hard news. The legacy `isOpinion` field
+    // name remains for cache compatibility; buildDigest excludes '1' rows
+    // from the brief pool. Written unconditionally for the same
+    // shared-row reason as `description` above: story:track rows are
+    // collapsed by normalised-title hash, so a stale '1' from an earlier
+    // mention must be overwritten by the current mention's verdict.
+    // Pre-stamp rows (ingested before this shipped) have no field at
+    // all; buildDigest re-classifies those from title/link/description.
+    'isOpinion', item.isOpinion ? '1' : '0',
+    // Feel-good / lifestyle flag (classifyFeelGood). Sibling to
+    // isOpinion — same write semantics, same buildDigest read-path
+    // exclusion. Pre-stamp rows are re-classified by buildDigest from
+    // title/link/description (residue catch).
+    'isFeelGood', item.isFeelGood ? '1' : '0',
+    // Ephemeral live-programming flag (classifyEphemeralLiveCoverage).
+    // Same write semantics as the opinion/feel-good stamps: overwrite on
+    // every mention so a collapsed story row reflects the current headline
+    // verdict; buildDigest re-classifies pre-stamp rows for the TTL window.
+    'isEphemeralLiveCoverage', item.isEphemeralLiveCoverage ? '1' : '0',
+    // Event category (classifyByKeyword EventCategory enum, possibly
+    // overridden by enrichWithAiCache). Persisted so the brief's
+    // threads card + magazine story-page + public-thread fallback
+    // can display a meaningful per-story tag instead of defaulting
+    // to 'General' for every story. Defensive empty-string write on
+    // missing/non-string: shared/brief-filter.js:384's
+    // `asTrimmedString(raw.category) || 'General'` fallback converts
+    // empty back to 'General' for graceful degradation. See plan
+    // docs/plans/2026-05-17-002-fix-persist-story-track-category-plan.md.
+    'category', typeof item.category === 'string' ? item.category : '',
   ];
 }
 
-async function writeStoryTracking(items: ParsedItem[], variant: string, lang: string, hashes: string[]): Promise<void> {
+async function writeStoryTracking(items: ParsedItem[], variant: string, lang: string, hashes: string[], memberHashesByFinal?: Map<string, Set<string>>): Promise<void> {
   if (items.length === 0) return;
   const now = Date.now();
   const accKey = DIGEST_ACCUMULATOR_KEY(variant, lang);
 
+  // #4919/#4924: with fuzzy story identity, N same-cycle wording variants
+  // share one titleHash. Mutable per-story writes (mentionCount HINCRBY,
+  // HSET representative fields) must run ONCE per unique hash per cycle —
+  // per-item they would inflate mentionCount by N per cycle (a 6-variant
+  // story would skip DEVELOPING straight to SUSTAINED, since the read
+  // path treats mentionCount as +1/cycle) and let whichever member
+  // iterated last overwrite the representative fields nondeterministically.
+  // Representative = highest importanceScore, tie-break newest publishedAt
+  // then title — deterministic for a given batch. Per-MEMBER writes that
+  // are set-shaped stay per item: SADD source (distinct-source set is the
+  // point of corroboration) and ZADD peak GT (max is idempotent).
+  const representativeByHash = new Map<string, ParsedItem>();
+  for (let i = 0; i < items.length; i++) {
+    const hash = hashes[i]!;
+    const item = items[i]!;
+    const current = representativeByHash.get(hash);
+    if (
+      !current
+      || item.importanceScore > current.importanceScore
+      || (item.importanceScore === current.importanceScore && item.publishedAt > current.publishedAt)
+      || (item.importanceScore === current.importanceScore && item.publishedAt === current.publishedAt
+        && item.title < current.title)
+    ) {
+      representativeByHash.set(hash, item);
+    }
+  }
+
+  const writtenHashes = new Set<string>();
   for (let batchStart = 0; batchStart < items.length; batchStart += STORY_BATCH_SIZE) {
     const batch = items.slice(batchStart, batchStart + STORY_BATCH_SIZE);
     const commands: Array<Array<string | number>> = [];
@@ -912,18 +1251,35 @@ async function writeStoryTracking(items: ParsedItem[], variant: string, lang: st
       const nowStr = String(now);
       const ttl = STORY_TTL;
 
-      const hsetFields = buildStoryTrackHsetFields(item, nowStr, score);
+      if (!writtenHashes.has(hash)) {
+        writtenHashes.add(hash);
+        const representative = representativeByHash.get(hash) ?? item;
+        const hsetFields = buildStoryTrackHsetFields(representative, nowStr, representative.importanceScore);
+        commands.push(
+          ['HINCRBY', trackKey, 'mentionCount', '1'],
+          ['HSET', trackKey, ...hsetFields],
+          ['HSETNX', trackKey, 'firstSeen', nowStr],
+          ['EXPIRE', trackKey, ttl],
+          ['ZADD', accKey, nowStr, hash],
+        );
+        // #4924: alias rows for every member exact-title hash -> the FINAL
+        // (post-adoption) canonical, story-track TTL — next cycle's
+        // adoption source. Includes the canonical's own hash.
+        for (const memberHash of memberHashesByFinal?.get(hash) ?? []) {
+          commands.push(['SET', STORY_ALIAS_KEY(memberHash), hash, 'EX', ttl]);
+        }
+      }
 
       commands.push(
-        ['HINCRBY', trackKey, 'mentionCount', '1'],
-        ['HSET', trackKey, ...hsetFields],
-        ['HSETNX', trackKey, 'firstSeen', nowStr],
         ['ZADD', peakKey, 'GT', score, 'peak'],
         ['SADD', sourcesKey, item.source],
-        ['EXPIRE', trackKey, ttl],
+        // #4924 review P2 (TTL ordering): EXPIRE must follow the SADD/ZADD
+        // that CREATE these keys — EXPIRE on a missing key is a no-op, so
+        // the pre-block ordering left brand-new story:sources/story:peak
+        // keys persistent forever. Idempotent per member; kept adjacent to
+        // the creating writes so no future reorder can reopen the leak.
         ['EXPIRE', sourcesKey, ttl],
         ['EXPIRE', peakKey, ttl],
-        ['ZADD', accKey, nowStr, hash],
       );
     }
 
@@ -934,40 +1290,56 @@ async function writeStoryTracking(items: ParsedItem[], variant: string, lang: st
   await runRedisPipeline([['EXPIRE', accKey, DIGEST_ACCUMULATOR_TTL]]);
 }
 
-async function buildDigest(variant: string, lang: string): Promise<ListFeedDigestResponse> {
+function buildDigestFeedBatches(variant: string, lang: string): {
+  allEntries: DigestFeedEntry[];
+  batches: DigestFeedEntry[][];
+} {
   const feedsByCategory = VARIANT_FEEDS[variant] ?? {};
+  const allEntries: DigestFeedEntry[] = [];
+
+  for (const [category, feeds] of Object.entries(feedsByCategory)) {
+    const filtered = feeds.filter(f => isServerFeedReachableForLanguage(f, lang));
+    for (const feed of filtered) {
+      allEntries.push({ category, feed });
+    }
+  }
+
+  if (variant === 'full') {
+    const filteredIntel = INTEL_SOURCES.filter(f => isServerFeedReachableForLanguage(f, lang));
+    for (const feed of filteredIntel) {
+      allEntries.push({ category: 'intel', feed });
+    }
+  }
+
+  const orderedEntries = orderServerFeedEntries(allEntries);
+  const batches: DigestFeedEntry[][] = [];
+  for (let i = 0; i < orderedEntries.length; i += BATCH_CONCURRENCY) {
+    batches.push(orderedEntries.slice(i, i + BATCH_CONCURRENCY));
+  }
+  return { allEntries, batches };
+}
+
+async function buildDigest(variant: string, lang: string): Promise<ListFeedDigestResponse> {
   const feedStatuses: Record<string, string> = {};
+  // #4920 coverage ledger: count every silent drop gate so "how much did
+  // we NOT show" is a queryable number instead of a feeling.
+  const ledgerDrops = { perFeedCap: 0, undated: 0, freshnessFloor: 0, perCategoryCap: 0 };
   const categories: Record<string, CategoryBucket> = {};
 
   const deadlineController = new AbortController();
   const deadlineTimeout = setTimeout(() => deadlineController.abort(), OVERALL_DEADLINE_MS);
 
   try {
-    const allEntries: Array<{ category: string; feed: ServerFeed }> = [];
-
-    for (const [category, feeds] of Object.entries(feedsByCategory)) {
-      const filtered = feeds.filter(f => !f.lang || f.lang === lang);
-      for (const feed of filtered) {
-        allEntries.push({ category, feed });
-      }
-    }
-
-    if (variant === 'full') {
-      const filteredIntel = INTEL_SOURCES.filter(f => !f.lang || f.lang === lang);
-      for (const feed of filteredIntel) {
-        allEntries.push({ category: 'intel', feed });
-      }
-    }
+    const { allEntries, batches } = buildDigestFeedBatches(variant, lang);
 
     const results = new Map<string, ParsedItem[]>();
     // Track feeds that actually completed (with or without items) so we can
     // distinguish a genuine timeout (never ran) from a successful empty fetch.
     const completedFeeds = new Set<string>();
 
-    for (let i = 0; i < allEntries.length; i += BATCH_CONCURRENCY) {
+    for (const batch of batches) {
       if (deadlineController.signal.aborted) break;
 
-      const batch = allEntries.slice(i, i + BATCH_CONCURRENCY);
       const settled = await Promise.allSettled(
         batch.map(async ({ category, feed }) => {
           const result = await fetchAndParseRss(feed, variant, deadlineController.signal);
@@ -984,16 +1356,23 @@ async function buildDigest(variant: string, lang: string): Promise<ListFeedDiges
           } else if (result.droppedUndated > 0) {
             feedStatuses[feed.name] = 'partial-undated';
           }
-          return { category, items: result.items };
+          return {
+            category,
+            items: result.items,
+            droppedUndated: result.droppedUndated,
+            droppedFeedCap: result.droppedFeedCap ?? 0,
+          };
         }),
       );
 
       for (const result of settled) {
         if (result.status === 'fulfilled') {
-          const { category, items } = result.value;
+          const { category, items, droppedUndated, droppedFeedCap } = result.value;
           const existing = results.get(category) ?? [];
           existing.push(...items);
           results.set(category, existing);
+          ledgerDrops.undated += droppedUndated;
+          ledgerDrops.perFeedCap += droppedFeedCap;
         }
       }
     }
@@ -1005,7 +1384,7 @@ async function buildDigest(variant: string, lang: string): Promise<ListFeedDiges
     }
 
     // U3 — hard freshness floor. Drop items older than NEWS_MAX_AGE_HOURS
-    // (default 48h) BEFORE corroboration counting so a stale duplicate of a
+    // (default 96h) BEFORE corroboration counting so a stale duplicate of a
     // fresh story can't inflate the cluster's source count. Runs after parse
     // (where U2 already dropped undated items) so every item here carries a
     // real publishedAt. See R3.
@@ -1017,6 +1396,7 @@ async function buildDigest(variant: string, lang: string): Promise<ListFeedDiges
       droppedStaleTotal += items.length - fresh.length;
       results.set(category, fresh);
     }
+    ledgerDrops.freshnessFloor = droppedStaleTotal;
     if (droppedStaleTotal > 0) {
       console.warn(
         `[digest] freshness floor dropped ${droppedStaleTotal} stale items ` +
@@ -1027,19 +1407,64 @@ async function buildDigest(variant: string, lang: string): Promise<ListFeedDiges
     // Flatten ALL items before any truncation so cross-category corroboration is counted.
     const allItems = [...results.values()].flat();
 
-    // Compute sha256 title hashes and build corroboration map in one pass.
-    // Hashes are stored on each item for reuse as Redis story-tracking keys.
-    const corroborationMap = new Map<string, Set<string>>();
+    // #4919: fuzzy story identity. Items are clustered by the shared
+    // story-identity similarity (edit-tolerant: suffixes, truncations,
+    // qualifier swaps, reorders, morphology) and every cluster member
+    // shares one canonical titleHash + a cluster-wide corroboration
+    // count. The previous exact sha256(normalizeTitle) identity forked a
+    // story on ANY wording edit, so corroboration only counted verbatim
+    // wire syndication — deflating importanceScore's corroboration
+    // signal and the BREAKING/DEVELOPING phase tracker. Singleton
+    // clusters hash exactly as before, so story:track keys for
+    // uncorroborated stories are unchanged.
+    const identityByItem = await assignStoryIdentity(allItems, normalizeTitle, sha256Hex);
+
+    // #4924 review P1: adopt a LIVE canonical before assigning hashes.
+    // Alias rows (memberHash -> canonicalHash, story-track TTL) written by
+    // previous cycles let a cluster keep its story identity when the
+    // member that anchored the canonical drops out of the batch. One
+    // batched read for all member hashes; failures degrade to
+    // batch-derived canonicals (pre-adoption behavior).
+    const allMemberHashes = new Set<string>();
+    for (const identity of identityByItem.values()) {
+      for (const h of identity.memberTitleHashes ?? []) allMemberHashes.add(h);
+    }
+    const aliasTargetByHash = new Map<string, string>();
+    if (allMemberHashes.size > 0) {
+      const aliasHashes = [...allMemberHashes];
+      const aliasResults = await runRedisPipeline(aliasHashes.map((h) => ['GET', STORY_ALIAS_KEY(h)]));
+      for (let i = 0; i < aliasHashes.length; i++) {
+        const target = aliasResults[i]?.result;
+        if (typeof target === 'string' && target.length > 0) aliasTargetByHash.set(aliasHashes[i]!, target);
+      }
+    }
+
     await Promise.all(allItems.map(async (item) => {
-      const hash = await sha256Hex(normalizeTitle(item.title));
-      item.titleHash = hash;
-      const sources = corroborationMap.get(hash) ?? new Set<string>();
-      sources.add(item.source);
-      corroborationMap.set(hash, sources);
+      const identity = identityByItem.get(item);
+      if (identity) {
+        item.titleHash = adoptExistingCanonical(identity.memberTitleHashes, identity.titleHash, aliasTargetByHash);
+        item.corroborationCount = identity.corroborationCount;
+      } else {
+        // Defensive: assignStoryIdentity covers every input by
+        // construction; degrade to the pre-#4919 exact identity if not —
+        // and say so, or a future coverage-invariant break is invisible.
+        console.warn(
+          `[digest] story-identity coverage miss — exact-hash fallback for "${item.title.slice(0, 60)}"`,
+        );
+        item.titleHash = await sha256Hex(normalizeTitle(item.title));
+        item.corroborationCount = 1;
+      }
     }));
 
+    // Final(post-adoption) hash -> member exact-title hashes, consumed by
+    // writeStoryTracking to persist next cycle's alias rows.
+    const memberHashesByFinal = new Map<string, Set<string>>();
     for (const item of allItems) {
-      item.corroborationCount = corroborationMap.get(item.titleHash!)?.size ?? 1;
+      const identity = identityByItem.get(item);
+      if (!identity || !item.titleHash) continue;
+      let set = memberHashesByFinal.get(item.titleHash);
+      if (!set) { set = new Set(); memberHashesByFinal.set(item.titleHash, set); }
+      for (const h of identity.memberTitleHashes ?? []) set.add(h);
     }
 
     // Enrich ALL items with the AI classification cache BEFORE scoring so that
@@ -1047,10 +1472,52 @@ async function buildDigest(variant: string, lang: string): Promise<ListFeedDiges
     // discards items based on their true score.
     await enrichWithAiCache(allItems);
 
+    const entityCorroborationSignals = computeEntityCorroborationSignals(allItems);
+    let diplomacySignalCount = 0;
+    let entityCorroborationHitCount = 0;
+    let diplomacySeverityPromotionCount = 0;
+    let llmScoredCount = 0;
+    let keywordFallbackScoredCount = 0;
+
     // Compute importance score using final (post-enrichment) threat levels.
     for (const item of allItems) {
+      const entitySignal = entityCorroborationSignals.get(item.titleHash!);
+      item.entityCorroborationCount = entitySignal?.sourceCount ?? 0;
+      const promotedLevel = promoteDiplomacySeverity(
+        item.level,
+        item.title,
+        entitySignal?.tier12SourceCount ?? 0,
+      );
+      if (promotedLevel !== item.level) {
+        item.level = promotedLevel;
+        item.isAlert = true;
+        diplomacySeverityPromotionCount++;
+      }
+      const scoringCorroboration = Math.max(item.corroborationCount, item.entityCorroborationCount);
       item.importanceScore = computeImportanceScore(
-        item.level, item.source, item.corroborationCount, item.publishedAt,
+        item.level,
+        item.source,
+        scoringCorroboration,
+        item.publishedAt,
+        {
+          title: item.title,
+          classSource: item.classSource,
+          entityCorroborationCount: item.entityCorroborationCount,
+        },
+      );
+      if (hasDiplomacyFlashpointSignal(item.title)) diplomacySignalCount++;
+      if (item.entityCorroborationCount > 0) entityCorroborationHitCount++;
+      if (item.classSource === 'llm') llmScoredCount++;
+      else keywordFallbackScoredCount++;
+    }
+
+    if (diplomacySignalCount > 0 || entityCorroborationHitCount > 0) {
+      console.log(
+        `[digest] importance signals llm=${llmScoredCount} ` +
+          `keywordFallback=${keywordFallbackScoredCount} ` +
+          `diplomacy=${diplomacySignalCount} ` +
+          `entityCorroboration=${entityCorroborationHitCount} ` +
+          `diplomacySeverityPromotions=${diplomacySeverityPromotionCount}`,
       );
     }
 
@@ -1060,6 +1527,7 @@ async function buildDigest(variant: string, lang: string): Promise<ListFeedDiges
       items.sort((a, b) =>
         b.importanceScore - a.importanceScore || b.publishedAt - a.publishedAt,
       );
+      ledgerDrops.perCategoryCap += Math.max(0, items.length - MAX_ITEMS_PER_CATEGORY);
       slicedByCategory.set(category, items.slice(0, MAX_ITEMS_PER_CATEGORY));
     }
 
@@ -1076,7 +1544,7 @@ async function buildDigest(variant: string, lang: string): Promise<ListFeedDiges
     const storyTracks = await readStoryTracks(uniqueHashes).catch(() => new Map<string, StoryTrack>());
 
     // Write story tracking. Errors never fail the digest build.
-    await writeStoryTracking(allSliced, variant, lang, titleHashes).catch((err: unknown) =>
+    await writeStoryTracking(allSliced, variant, lang, titleHashes, memberHashesByFinal).catch((err: unknown) =>
       console.warn('[digest] story tracking write failed:', err),
     );
 
@@ -1084,7 +1552,8 @@ async function buildDigest(variant: string, lang: string): Promise<ListFeedDiges
       categories[category] = {
         items: sliced.map((item) => {
           const hash = item.titleHash!;
-          const sourceCount = corroborationMap.get(hash)?.size ?? 1;
+          // #4919: cluster-wide source count assigned by assignStoryIdentity.
+          const sourceCount = item.corroborationCount ?? 1;
           const stale = storyTracks.get(hash);
           // Merge stale state + this cycle's HINCRBY to get the current mentionCount.
           // New stories (stale = undefined) start at mentionCount=1 this cycle.
@@ -1109,6 +1578,32 @@ async function buildDigest(variant: string, lang: string): Promise<ListFeedDiges
       };
     }
 
+    // #4920: publish the coverage ledger — every gate's drop count plus
+    // what survived — as a side key. Best-effort: ledger failures never
+    // fail the digest. Read by ops tooling and the completeness reports;
+    // deliberately NOT part of the proto response (no schema change).
+    const distinctSources = new Set(allItems.map((item) => item.source)).size;
+    const ledger = {
+      v: 1,
+      generatedAt: Date.now(),
+      variant,
+      lang,
+      itemsIngested: allItems.length,
+      itemsServed: allSliced.length,
+      distinctSources,
+      drops: { ...ledgerDrops },
+    };
+    // Key-cardinality clamp: variant/lang are request-supplied — only write
+    // ledgers for known variants and well-formed 2-letter langs so a caller
+    // spraying arbitrary values cannot inflate the keyspace.
+    if (VARIANT_FEEDS[variant] && /^[a-z]{2}$/.test(lang)) {
+      // #4927 review P2: awaited — a fire-and-forget write can be killed
+      // when the response finishes before the side write lands.
+      await setCachedJson(`news:coverage-ledger:v1:${variant}:${lang}`, ledger, 7200).catch((err: unknown) =>
+        console.warn('[digest] coverage-ledger write failed:', err),
+      );
+    }
+
     return {
       categories,
       feedStatuses,
@@ -1121,13 +1616,27 @@ async function buildDigest(variant: string, lang: string): Promise<ListFeedDiges
 
 /** Internal exports for unit tests only — do not import in production code. */
 export const __testing__ = {
+  buildDigestFeedBatches,
   parseRssXml,
+  decodeXmlEntities,
   extractDescription,
   extractRawTagBody,
   extractFirstDateTag,
   buildStoryTrackHsetFields,
+  computeImportanceScore,
+  hasDiplomacyFlashpointSignal,
+  promoteDiplomacySeverity,
+  computeEntityCorroborationSignals,
+  computeEntityCorroborationCounts,
+  readStoryTracks,
   resolveMaxAgeMs,
   capLlmUpgrade,
+  parseClassifyCacheHit,
+  VERCEL_INITIAL_RESPONSE_LIMIT_MS,
+  DIGEST_RESPONSE_TIMEOUT_MS,
+  POST_FETCH_HEADROOM_MS,
+  RESPONSE_GUARD_BAND_MS,
+  OVERALL_DEADLINE_MS,
   MAX_DESCRIPTION_LEN,
   MIN_DESCRIPTION_LEN,
   FUTURE_DATE_TOLERANCE_MS,

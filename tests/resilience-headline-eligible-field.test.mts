@@ -11,11 +11,22 @@
 // score data) where the PR-6 gate could never pass anyway.
 
 import assert from 'node:assert/strict';
-import { describe, it } from 'node:test';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 
 import { buildRankingItem, ensureResilienceScoreCached, RESILIENCE_SCORE_CACHE_PREFIX } from '../server/worldmonitor/resilience/v1/_shared.ts';
 import { installRedis } from './helpers/fake-upstash-redis.mts';
 import { RESILIENCE_FIXTURES } from './helpers/resilience-fixtures.mts';
+
+const originalPillarCombine = process.env.RESILIENCE_PILLAR_COMBINE_ENABLED;
+
+beforeEach(() => {
+  process.env.RESILIENCE_PILLAR_COMBINE_ENABLED = 'false';
+});
+
+afterEach(() => {
+  if (originalPillarCombine == null) delete process.env.RESILIENCE_PILLAR_COMBINE_ENABLED;
+  else process.env.RESILIENCE_PILLAR_COMBINE_ENABLED = originalPillarCombine;
+});
 
 describe('headlineEligible field — Plan 2026-04-26-002 §U3 (PR 2)', () => {
   describe('buildRankingItem', () => {
@@ -157,7 +168,25 @@ describe('headlineEligible field — Plan 2026-04-26-002 §U3 (PR 2)', () => {
       //
       // Mutation-verified: removing `headlineEligible: true` from
       // buildResilienceScore's return object makes this test fail.
-      const { redis } = installRedis(RESILIENCE_FIXTURES);
+      const nowMs = Date.now();
+      const freshFixtures = {
+        ...RESILIENCE_FIXTURES,
+        'resilience:recovery:import-hhi:v1': {
+          ...(RESILIENCE_FIXTURES['resilience:recovery:import-hhi:v1'] as Record<string, unknown>),
+          countries: {
+            ...((RESILIENCE_FIXTURES['resilience:recovery:import-hhi:v1'] as { countries: Record<string, unknown> }).countries),
+            US: {
+              ...((RESILIENCE_FIXTURES['resilience:recovery:import-hhi:v1'] as { countries: Record<string, Record<string, unknown>> }).countries.US),
+              year: new Date(nowMs).getUTCFullYear(),
+            },
+          },
+        },
+        'seed-meta:resilience:static': {
+          ...(RESILIENCE_FIXTURES['seed-meta:resilience:static'] as Record<string, unknown>),
+          fetchedAt: nowMs,
+        },
+      };
+      const { redis } = installRedis(freshFixtures);
 
       const response = await ensureResilienceScoreCached('US');
 
@@ -166,6 +195,8 @@ describe('headlineEligible field — Plan 2026-04-26-002 §U3 (PR 2)', () => {
       // build).
       assert.equal(response.countryCode, 'US',
         'sanity: response must be for the requested country');
+      assert.equal(response.headlineEligible, true,
+        `PR-2 contract: US happy-path build remains headlineEligible=true (got ${response.headlineEligible})`);
 
       // Now the load-bearing assertion: read the RAW cache entry that
       // ensureResilienceScoreCached just wrote, before stripCacheMeta's

@@ -7,51 +7,19 @@
  * All data now flows through the EconomicServiceClient RPC.
  */
 
-import { getRpcBaseUrl } from '@/services/rpc-client';
+import { getRpcBaseUrl, getRpcErrorStatusCode } from '@/services/rpc-client';
 import { premiumFetch } from '@/services/premium-fetch';
-import {
-  EconomicServiceClient,
-  ApiError,
-  type GetFredSeriesResponse,
-  type GetFredSeriesBatchResponse,
-  type ListWorldBankIndicatorsResponse,
-  type WorldBankCountryData as ProtoWorldBankCountryData,
-  type GetEnergyPricesResponse,
-  type EnergyPrice as ProtoEnergyPrice,
-  type GetEnergyCapacityResponse,
-  type GetBisPolicyRatesResponse,
-  type GetBisExchangeRatesResponse,
-  type GetBisCreditResponse,
-  type BisPolicyRate,
-  type BisExchangeRate,
-  type BisCreditToGdp,
-  type GetNationalDebtResponse,
-  type NationalDebtEntry,
-  type GetBlsSeriesResponse,
-  type GetCrudeInventoriesResponse,
-  type CrudeInventoryWeek,
-  type GetNatGasStorageResponse,
-  type NatGasStorageWeek,
-  type GetEcbFxRatesResponse,
-  type EcbFxRate,
-  type GetEuGasStorageResponse,
-  type EuGasStorageHistoryEntry,
-  type GetEurostatCountryDataResponse,
-  type EurostatCountryEntry,
-  type GetOilStocksAnalysisResponse,
-  type OilStocksAnalysisMember,
-  type OilStocksRegionalSummary,
-  type OilStocksRegionalSummaryEurope,
-  type OilStocksRegionalSummaryAsiaPacific,
-  type OilStocksRegionalSummaryNorthAmerica,
-} from '@/generated/client/worldmonitor/economic/v1/service_client';
+import type { GetFredSeriesResponse, GetFredSeriesBatchResponse, ListWorldBankIndicatorsResponse, WorldBankCountryData as ProtoWorldBankCountryData, GetEnergyPricesResponse, EnergyPrice as ProtoEnergyPrice, GetEnergyCapacityResponse, GetBisPolicyRatesResponse, GetBisExchangeRatesResponse, GetBisCreditResponse, GetChinaMacroSnapshotResponse, BisPolicyRate, BisExchangeRate, BisCreditToGdp, GetNationalDebtResponse, NationalDebtEntry, GetBlsSeriesResponse, GetCrudeInventoriesResponse, CrudeInventoryWeek, GetNatGasStorageResponse, NatGasStorageWeek, GetEcbFxRatesResponse, EcbFxRate, GetEuGasStorageResponse, EuGasStorageHistoryEntry, GetEurostatCountryDataResponse, EurostatCountryEntry, GetOilStocksAnalysisResponse, OilStocksAnalysisMember, OilStocksRegionalSummary, OilStocksRegionalSummaryEurope, OilStocksRegionalSummaryAsiaPacific, OilStocksRegionalSummaryNorthAmerica } from '@/generated/client/worldmonitor/economic/v1/service_client';
 import { createCircuitBreaker } from '@/utils';
 import { getCSSColor } from '@/utils';
 import { isFeatureAvailable } from '../runtime-config';
 import { dataFreshness } from '../data-freshness';
-import { getHydratedData } from '@/services/bootstrap';
+import { ensureHydrated, getHydratedData } from '@/services/bootstrap';
+import { mergeCbrPolicyRate } from './cbr-policy-rate';
+import { degradedSources, toEurSpotRows, toFxStressRows, toRubQuoteRows, toUsdSpotRows, type FxPanelRows } from './fx-rates';
 import { toApiUrl } from '@/services/runtime';
 import { hasPremiumAccess } from '@/services/panel-gating';
+import { EconomicServiceClient } from '@/services/generated-rpc-clients';
 
 // ---- Client + Circuit Breakers ----
 
@@ -85,6 +53,7 @@ const capacityBreaker = createCircuitBreaker<GetEnergyCapacityResponse>({ name: 
 const bisPolicyBreaker = createCircuitBreaker<GetBisPolicyRatesResponse>({ name: 'BIS Policy', cacheTtlMs: 30 * 60 * 1000, persistCache: true });
 const bisEerBreaker = createCircuitBreaker<GetBisExchangeRatesResponse>({ name: 'BIS EER', cacheTtlMs: 30 * 60 * 1000, persistCache: true });
 const bisCreditBreaker = createCircuitBreaker<GetBisCreditResponse>({ name: 'BIS Credit', cacheTtlMs: 30 * 60 * 1000, persistCache: true });
+const chinaMacroBreaker = createCircuitBreaker<GetChinaMacroSnapshotResponse>({ name: 'China Macro Snapshot', cacheTtlMs: 30 * 60 * 1000, persistCache: true });
 
 const emptyBlsFallback: GetBlsSeriesResponse = { series: undefined };
 const blsBreaker = createCircuitBreaker<FredSeries[]>({ name: 'BLS Batch', cacheTtlMs: 15 * 60 * 1000, persistCache: true });
@@ -171,7 +140,7 @@ export async function fetchFredData(): Promise<FredSeries[]> {
       );
     } catch (err: unknown) {
       // 404 deploy-skew fallback: batch endpoint not yet deployed, use per-item calls
-      if (err instanceof ApiError && err.statusCode === 404) {
+      if (getRpcErrorStatusCode(err) === 404) {
         const items = await Promise.all(FRED_SERIES.map((c) =>
           client.getFredSeries({ seriesId: c.id, limit: 120 }, { signal: AbortSignal.timeout(20_000) })
             .catch(() => ({ series: undefined }) as GetFredSeriesResponse),
@@ -783,12 +752,60 @@ export interface BisData {
   fetchedAt: Date;
 }
 
+const emptyChinaMacroFallback: GetChinaMacroSnapshotResponse = {
+  countryCode: 'CN',
+  generatedAt: '',
+  status: 'unavailable',
+  launchReady: false,
+  contentObservationDate: '',
+  latestObservationDate: '',
+  indicators: [],
+  sourceDecisions: [],
+  releaseEvents: [],
+  unavailable: true,
+  schemaVersion: 2,
+  pillars: [],
+};
+
+export async function getChinaMacroSnapshotData(): Promise<GetChinaMacroSnapshotResponse> {
+  try {
+    return await chinaMacroBreaker.execute(
+      () => client.getChinaMacroSnapshot({}, { signal: AbortSignal.timeout(20_000) }),
+      emptyChinaMacroFallback,
+      { shouldCache: (r) => !r.unavailable && (r.indicators?.length ?? 0) > 0 },
+    );
+  } catch {
+    return emptyChinaMacroFallback;
+  }
+}
+
+export async function getBisCreditData(): Promise<GetBisCreditResponse> {
+  const hydrated = getHydratedData('bisCredit') as GetBisCreditResponse | undefined;
+  if (hydrated?.entries?.length) return hydrated;
+  try {
+    return await bisCreditBreaker.execute(
+      () => client.getBisCredit({}, { signal: AbortSignal.timeout(20_000) }),
+      emptyBisCreditFallback,
+      { shouldCache: (r) => (r.entries?.length ?? 0) > 0 },
+    );
+  } catch {
+    return emptyBisCreditFallback;
+  }
+}
+
 export async function fetchBisData(): Promise<BisData> {
   const empty: BisData = { policyRates: [], exchangeRates: [], creditToGdp: [], fetchedAt: new Date() };
 
   const hPolicy = getHydratedData('bisPolicy') as GetBisPolicyRatesResponse | undefined;
   const hEer = getHydratedData('bisExchange') as GetBisExchangeRatesResponse | undefined;
   const hCredit = getHydratedData('bisCredit') as GetBisCreditResponse | undefined;
+
+  // BIS WS_CBPOL has no Russia (scripts/seed-bis-data.mjs covers 12 banks and the
+  // CBR is not one), so the key rate comes from its own seeder and is appended to
+  // the same list. Deliberately not awaited alongside the BIS calls below: this
+  // is a supplementary row, and a slow or missing CBR key must never delay or
+  // fail the twelve rows that BIS does supply.
+  const cbrPayload = ensureHydrated('cbrRates').catch(() => undefined);
 
   try {
     const [policy, eer, credit] = await Promise.all([
@@ -797,7 +814,7 @@ export async function fetchBisData(): Promise<BisData> {
       hCredit?.entries?.length ? Promise.resolve(hCredit) : bisCreditBreaker.execute(() => client.getBisCredit({}, { signal: AbortSignal.timeout(20_000) }), emptyBisCreditFallback, { shouldCache: (r) => (r.entries?.length ?? 0) > 0 }),
     ]);
     return {
-      policyRates: policy.rates ?? [],
+      policyRates: mergeCbrPolicyRate(policy.rates, await cbrPayload),
       exchangeRates: eer.rates ?? [],
       creditToGdp: credit.entries ?? [],
       fetchedAt: new Date(),
@@ -829,6 +846,64 @@ export async function getEcbFxRatesData(): Promise<GetEcbFxRatesResponse> {
   } catch {
     return emptyEcbFxRatesFallback;
   }
+}
+
+// ========================================================================
+// FX panel (#6199)
+// ========================================================================
+
+export type { FxEurSpotRow, FxPanelRows, FxRubQuoteRow, FxSourceId, FxStressRow, FxUsdSpotRow } from './fx-rates';
+// Re-exported as a value: the CommoditiesPanel FX tab uses it too, so both
+// surfaces order the same ECB pairs from one definition (#6199).
+export { EUR_FX_ORDER, toEurSpotRows, toRubQuoteRows } from './fx-rates';
+
+/**
+ * Assemble the four payloads the FX panel renders.
+ *
+ * `fxYoy`, `sharedFxRates` and `cbrRates` are on-demand tier keys, so they
+ * arrive via `ensureHydrated` (the credential-less per-key bootstrap URL)
+ * rather than riding a tier every visitor downloads — the panel is opt-in, so
+ * most sessions never ask for any of them.
+ *
+ * A dead source must not blank its siblings, but the `.catch()` clauses below
+ * are NOT what delivers that — both readers already swallow their own errors
+ * (`ensureHydrated` returns undefined on fetch/timeout/parse failure;
+ * `getEcbFxRatesData` catches internally and returns its `unavailable: true`
+ * fallback), so neither can reject and the catches never fire. They are kept
+ * only so a future reader that starts throwing cannot take the whole load down
+ * inside `Promise.all`. `getEcbFxRatesData` is also safe to call when the
+ * CommoditiesPanel already did — it checks the hydration cache first and sits
+ * behind a 4h circuit-breaker cache.
+ *
+ * KNOWN LIMIT — read `degraded` as "returned nothing", not "was unreachable".
+ * Only the ECB path carries a real failure signal (`unavailable`), and it
+ * folds in naturally because an unavailable response yields zero rows. The
+ * three `ensureHydrated` keys have no such signal: undefined means transport
+ * failure and cache miss alike, so for them an empty result is *inferred* to
+ * be an outage. That inference is sound here only because none of the four has
+ * a plausible genuine empty — 45 currencies, 47 USD rates, 7 ECB pairs, 54 CBR
+ * pairs. Do not copy this shape to a source whose empty state is legitimate; fixing it
+ * properly means teaching `ensureHydrated` to distinguish miss from failure.
+ */
+export async function getFxPanelData(): Promise<FxPanelRows> {
+  const [stressPayload, usdPayload, ecb, rubPayload] = await Promise.all([
+    ensureHydrated('fxYoy').catch(() => undefined),
+    ensureHydrated('sharedFxRates').catch(() => undefined),
+    getEcbFxRatesData().catch(() => null),
+    ensureHydrated('cbrRates').catch(() => undefined),
+  ]);
+
+  const stress = toFxStressRows(stressPayload);
+  const usd = toUsdSpotRows(usdPayload);
+  const eur = ecb && !ecb.unavailable ? toEurSpotRows(ecb.rates) : [];
+  const rub = toRubQuoteRows(rubPayload);
+
+  // An empty source is reported, not silently dropped. `ensureHydrated` returns
+  // undefined for a transport failure and for a miss alike, so we cannot say
+  // which — but none of these four has a plausible genuine empty, so an empty
+  // one is a source that is down. The panel needs to know so it can say the
+  // table is missing and retry, instead of rendering as though it never existed.
+  return { stress, usd, eur, rub, degraded: degradedSources({ stress, usd, eur, rub }) };
 }
 
 // ========================================================================

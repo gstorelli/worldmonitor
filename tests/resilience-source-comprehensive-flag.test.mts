@@ -72,10 +72,10 @@ describe('source-comprehensiveness flag (Plan 2026-04-26-002 §U5)', () => {
       'fxDeviation',                // BIS EER ~64 economies
       'bisLbsXborderPctGdp',        // BIS LBS by-parent reporters
       'financialCenterRedundancy',  // BIS LBS by-parent reporters
-      'gasStorageStress',           // GIE AGSI+ EU+ subset
+      'euGasStorageStress',         // GIE AGSI+ EU+ subset
       'recoverySovereignWealthEffectiveMonths', // Wikipedia 8-fund manifest
       'recoveryFuelStockDays',      // RETIRED + IEA OECD-only
-      'shortTermExternalDebtPctGni', // WB IDS LMIC-only (~125 countries); HIC absence is NOT a stable-absence signal
+      'shortTermExternalDebtPctGni', // WB IDS borrower-only (~125 countries); row absence alone is NOT a stable signal
     ];
     for (const id of mustBeNonComprehensive) {
       assert.equal(isIndicatorComprehensive(id), false,

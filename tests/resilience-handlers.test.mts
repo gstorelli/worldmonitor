@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { afterEach, describe, it } from 'node:test';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 
 import { getResilienceScore } from '../server/worldmonitor/resilience/v1/get-resilience-score.ts';
 import {
@@ -13,6 +13,11 @@ const originalFetch = globalThis.fetch;
 const originalRedisUrl = process.env.UPSTASH_REDIS_REST_URL;
 const originalRedisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
 const originalVercelEnv = process.env.VERCEL_ENV;
+const originalPillarCombine = process.env.RESILIENCE_PILLAR_COMBINE_ENABLED;
+
+beforeEach(() => {
+  process.env.RESILIENCE_PILLAR_COMBINE_ENABLED = 'false';
+});
 
 afterEach(() => {
   globalThis.fetch = originalFetch;
@@ -22,6 +27,8 @@ afterEach(() => {
   else process.env.UPSTASH_REDIS_REST_TOKEN = originalRedisToken;
   if (originalVercelEnv == null) delete process.env.VERCEL_ENV;
   else process.env.VERCEL_ENV = originalVercelEnv;
+  if (originalPillarCombine == null) delete process.env.RESILIENCE_PILLAR_COMBINE_ENABLED;
+  else process.env.RESILIENCE_PILLAR_COMBINE_ENABLED = originalPillarCombine;
 });
 
 describe('resilience handlers', () => {
@@ -49,7 +56,8 @@ describe('resilience handlers', () => {
     // filtered out of confidence averages via RESILIENCE_RETIRED_DIMENSIONS.
     // Plan 2026-04-25-004 Phase 2: financialSystemExposure is the 20th
     // active dim (ships flag-gated dark; counted in the structural total).
-    assert.equal(response.domains.flatMap((domain) => domain.dimensions).length, 22);
+    // 21 active + 2 retired. +1 on 2026-08-10 for the flag-dark `education` dim.
+    assert.equal(response.domains.flatMap((domain) => domain.dimensions).length, 23);
     assert.ok(response.overallScore > 0 && response.overallScore <= 100);
     assert.equal(response.level, response.overallScore >= 70 ? 'high' : response.overallScore >= 40 ? 'medium' : 'low');
     assert.equal(response.trend, 'rising');
@@ -75,5 +83,34 @@ describe('resilience handlers', () => {
       countryCode: 'US',
     });
     assert.equal((sortedSets.get(`${RESILIENCE_HISTORY_KEY_PREFIX}US`) ?? []).length, history.length, 'cache hit must not append history');
+  });
+
+  it('collapses legacy same-day history members to one current member per date and formula', async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const todayScore = Number(today.replace(/-/g, ''));
+    process.env.UPSTASH_REDIS_REST_URL = 'https://redis.example';
+    process.env.UPSTASH_REDIS_REST_TOKEN = 'token';
+    delete process.env.VERCEL_ENV;
+
+    const { fetchImpl, sortedSets } = createRedisFetch(RESILIENCE_FIXTURES);
+    sortedSets.set(`${RESILIENCE_HISTORY_KEY_PREFIX}US`, [
+      { member: `${today}:40:d6`, score: todayScore },
+      { member: `${today}:41:d6`, score: todayScore },
+      { member: '2026-04-01:20:d6', score: 20260401 },
+    ]);
+    globalThis.fetch = fetchImpl;
+
+    await getResilienceScore({ request: new Request('https://example.com') } as never, {
+      countryCode: 'US',
+    });
+
+    const history = sortedSets.get(`${RESILIENCE_HISTORY_KEY_PREFIX}US`) ?? [];
+    const todaysEntries = history.filter((entry) => entry.member.startsWith(`${today}:`));
+    assert.equal(todaysEntries.length, 1, 'same-day history must have one member after append');
+    assert.equal(todaysEntries[0]?.member, `${today}:d6`, 'current member must be stable per date/formula, not per rounded score');
+    assert.ok(
+      (todaysEntries[0]?.score ?? 0) > todayScore && (todaysEntries[0]?.score ?? 0) < todayScore + 1,
+      'current history score should carry date ordering plus encoded score fraction',
+    );
   });
 });

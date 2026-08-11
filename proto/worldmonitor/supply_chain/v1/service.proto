@@ -20,14 +20,19 @@ import "worldmonitor/supply_chain/v1/list_pipelines.proto";
 import "worldmonitor/supply_chain/v1/list_storage_facilities.proto";
 import "worldmonitor/supply_chain/v1/list_fuel_shortages.proto";
 import "worldmonitor/supply_chain/v1/list_energy_disruptions.proto";
+import "worldmonitor/supply_chain/v1/get_china_corridor_control_towers.proto";
 
 service SupplyChainService {
   option (sebuf.http.service_config) = {base_path: "/api/supply-chain/v1"};
 
+  // GetShippingRates returns current container shipping-rate indices; upstream_unavailable is set when the source could not be reached.
   rpc GetShippingRates(GetShippingRatesRequest) returns (GetShippingRatesResponse) {
     option (sebuf.http.config) = {path: "/get-shipping-rates", method: HTTP_METHOD_GET};
   }
 
+  // GetChokepointStatus retrieves seeded chokepoint status. Empty chokepoints
+  // with upstream_unavailable=true means the seed snapshot is unavailable/
+  // degraded, not that there are confirmed zero chokepoints.
   rpc GetChokepointStatus(GetChokepointStatusRequest) returns (GetChokepointStatusResponse) {
     option (sebuf.http.config) = {path: "/get-chokepoint-status", method: HTTP_METHOD_GET};
   }
@@ -39,6 +44,7 @@ service SupplyChainService {
     option (sebuf.http.config) = {path: "/get-chokepoint-history", method: HTTP_METHOD_GET};
   }
 
+  // GetCriticalMinerals returns critical-minerals supply indicators; upstream_unavailable is set when the source could not be reached.
   rpc GetCriticalMinerals(GetCriticalMineralsRequest) returns (GetCriticalMineralsResponse) {
     option (sebuf.http.config) = {path: "/get-critical-minerals", method: HTTP_METHOD_GET};
   }
@@ -88,6 +94,7 @@ service SupplyChainService {
     option (sebuf.http.config) = {path: "/get-route-explorer-lane", method: HTTP_METHOD_GET};
   }
 
+  // GetRouteImpact returns route-level trade exposure: lane value, primary exporter concentration, strategic products, resilience score, dependency flags, and Comtrade provenance. PRO-gated.
   rpc GetRouteImpact(GetRouteImpactRequest) returns (GetRouteImpactResponse) {
     option (sebuf.http.config) = {path: "/get-route-impact", method: HTTP_METHOD_GET};
   }
@@ -140,5 +147,12 @@ service SupplyChainService {
   // full registry.
   rpc ListEnergyDisruptions(ListEnergyDisruptionsRequest) returns (ListEnergyDisruptionsResponse) {
     option (sebuf.http.config) = {path: "/list-energy-disruptions", method: HTTP_METHOD_GET};
+  }
+
+  // GetChinaCorridorControlTowers composes reviewed China logistics corridors
+  // from existing source caches. Conditions retain canonical provenance and
+  // explicit unavailable states; the response never emits a single risk score.
+  rpc GetChinaCorridorControlTowers(GetChinaCorridorControlTowersRequest) returns (GetChinaCorridorControlTowersResponse) {
+    option (sebuf.http.config) = {path: "/get-china-corridor-control-towers", method: HTTP_METHOD_GET};
   }
 }

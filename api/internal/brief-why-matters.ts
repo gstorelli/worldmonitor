@@ -34,7 +34,10 @@
  * and does not apply here.
  */
 
-export const config = { runtime: 'edge' };
+// Regions pinned (#4944 U7): both whyMatters paths reach OpenRouter — LLM
+// calls from restricted-region edge nodes fail with geo-keyed 403s. Mirrors
+// api/news/v1/[rpc].ts and api/intelligence/v1/[rpc].ts.
+export const config = { runtime: 'edge', regions: ['iad1', 'lhr1', 'fra1', 'sfo1'] };
 
 import { authenticateInternalRequest } from '../../server/_shared/internal-auth';
 import { normalizeCountryToIso2 } from '../../server/_shared/country-normalize';
@@ -43,14 +46,14 @@ import {
   buildAnalystWhyMattersPrompt,
   sanitizeStoryFields,
 } from '../../server/worldmonitor/intelligence/v1/brief-why-matters-prompt';
-import { callLlmReasoning } from '../../server/_shared/llm';
-// @ts-expect-error — JS module, no declaration file
+import { callLlm } from '../../server/_shared/llm';
 import { readRawJsonFromUpstash, setCachedData, redisPipeline } from '../_upstash-json.js';
 // @ts-expect-error — JS module, no declaration file
 import { captureSilentError } from '../_sentry-edge.js';
 import {
   buildWhyMattersUserPrompt,
   hashBriefStory,
+  hasTerminalPunctuation,
   parseWhyMatters,
   parseWhyMattersV2,
 } from '../../shared/brief-llm-core.js';
@@ -78,8 +81,11 @@ function readConfig(env: Record<string, string | undefined> = process.env as Rec
     invalidPrimaryRaw = rawPrimary;
   }
 
-  // SHADOW: default-on kill switch. Only exactly '0' disables.
-  const shadowEnabled = env.BRIEF_WHY_MATTERS_SHADOW !== '0';
+  // SHADOW: opt-in. Only exactly '1' enables. The original default-on
+  // rollout ran BOTH the analyst and gemini paths on every cache miss and
+  // silently kept doubling gemini spend after the comparison window ended
+  // (#4893) — a fresh deploy must never pay 2× unless someone asked for it.
+  const shadowEnabled = env.BRIEF_WHY_MATTERS_SHADOW === '1';
 
   // SAMPLE_PCT: default 100. Invalid/out-of-range → 100 + warn.
   const rawSample = env.BRIEF_WHY_MATTERS_SHADOW_SAMPLE_PCT;
@@ -109,6 +115,15 @@ function readConfig(env: Record<string, string | undefined> = process.env as Rec
 // ── TTLs ──────────────────────────────────────────────────────────────
 const WHY_MATTERS_TTL_SEC = 6 * 60 * 60; // 6h
 const SHADOW_TTL_SEC = 7 * 24 * 60 * 60; // 7d
+
+// whyMatters is a 1–2 sentence editorial blurb — the fast utility model, not
+// the reasoning tier. Pinning it here DECOUPLES the stage from
+// LLM_REASONING_MODEL: the U3 flip to deepseek-v4-pro dragged this stage onto
+// a 6–10s reasoning model (#4983); flash serves it at ~1.6–2.4s. openrouter
+// primary, groq-70B fallback if openrouter is down. Reasoning stays off
+// (callLlm default). Both whyMatters paths share this route.
+const WHY_MATTERS_PROVIDER_ORDER = ['openrouter', 'groq'];
+const WHY_MATTERS_MODEL_OVERRIDES = { openrouter: 'deepseek/deepseek-v4-flash' } as const;
 
 // ── Validation ────────────────────────────────────────────────────────
 const VALID_THREAT_LEVELS = new Set(['critical', 'high', 'medium', 'low']);
@@ -214,6 +229,12 @@ function validateStoryBody(raw: unknown): ValidationOk | ValidationErr {
 
 // ── LLM paths ─────────────────────────────────────────────────────────
 
+function rejectLengthLimitedCompletion(path: 'analyst' | 'gemini', finishReason: string | null): boolean {
+  if (finishReason !== 'length') return false;
+  console.warn(`[brief-why-matters] ${path} completion_reject reason=length`);
+  return true;
+}
+
 async function runAnalystPath(story: StoryPayload, iso2: string | null): Promise<string | null> {
   try {
     const context = await assembleBriefStoryContext({ iso2, category: story.category });
@@ -224,28 +245,45 @@ async function runAnalystPath(story: StoryPayload, iso2: string | null): Promise
     console.log(
       `[brief-why-matters] analyst gate policy=${policyLabel} category="${story.category}" promptLen=${user.length}`,
     );
-    const result = await callLlmReasoning({
+    const result = await callLlm({
       messages: [
         { role: 'system', content: system },
         { role: 'user', content: user },
       ],
-      // v2 prompt is 2–3 sentences / 40–70 words — roughly 3× v1's
-      // single-sentence output, so bump maxTokens proportionally.
+      // v2 prompt is 1–2 sentences / 25–40 words. maxTokens stays generous
+      // (well above the ~60 tokens a 40-word blurb needs) as deliberate
+      // headroom so a completion is never clipped mid-sentence (#5168).
       maxTokens: 260,
       temperature: 0.4,
       timeoutMs: 15_000,
-      // Provider is pinned via LLM_REASONING_PROVIDER env var (already
-      // set to 'openrouter' in prod). `callLlmReasoning` routes through
-      // the resolveProviderChain based on that env.
+      stage: 'brief-why-matters-analyst',
+      // Fast utility model (deepseek-v4-flash), reasoning off — see the
+      // WHY_MATTERS_* constants above. Decoupled from LLM_REASONING_MODEL.
+      providerOrder: WHY_MATTERS_PROVIDER_ORDER,
+      modelOverrides: WHY_MATTERS_MODEL_OVERRIDES,
+      // A provider's explicit token-limit signal is deterministic, so retry
+      // the next provider in-request. The parser remains post-call because
+      // parse rejection is ambiguous and should not trigger duplicate spend.
+      retryOnLengthLimit: true,
       // Note: no `validate` option. The post-call parseWhyMattersV2
       // check below handles rejection. Using validate inside
-      // callLlmReasoning would walk the provider chain on parse-reject,
+      // callLlm would walk the provider chain on parse-reject,
       // causing duplicate openrouter billings (see todo 245).
     });
     if (!result) return null;
+    if (rejectLengthLimitedCompletion('analyst', result.finishReason)) return null;
     // v2 parser accepts multi-sentence output + rejects preamble /
-    // leaked section labels. Analyst path ONLY — gemini path stays on v1.
-    return parseWhyMattersV2(result.content);
+    // leaked section labels and private forecast percentages. Keep public
+    // story grounding separate so sourced figures remain publishable.
+    // Analyst path ONLY — gemini path stays on v1.
+    return parseWhyMattersV2(result.content, {
+      publicStory: {
+        headline: story.headline,
+        description: story.description,
+        source: story.source,
+      },
+      privateForecasts: context.forecasts,
+    });
   } catch (err) {
     console.warn(`[brief-why-matters] analyst path failed: ${err instanceof Error ? err.message : String(err)}`);
     // Nested helper called outside the request's `ctx.waitUntil` chain
@@ -263,7 +301,7 @@ async function runGeminiPath(story: StoryPayload): Promise<string | null> {
     // defense-in-depth against prompt injection even under a valid
     // RELAY_SHARED_SECRET caller (consistent with the analyst path).
     const { system, user } = buildWhyMattersUserPrompt(sanitizeStoryFields(story));
-    const result = await callLlmReasoning({
+    const result = await callLlm({
       messages: [
         { role: 'system', content: system },
         { role: 'user', content: user },
@@ -271,13 +309,22 @@ async function runGeminiPath(story: StoryPayload): Promise<string | null> {
       maxTokens: 120,
       temperature: 0.4,
       timeoutMs: 10_000,
+      stage: 'brief-why-matters-gemini',
+      // Fast utility model (deepseek-v4-flash), reasoning off — see the
+      // WHY_MATTERS_* constants above. Decoupled from LLM_REASONING_MODEL.
+      providerOrder: WHY_MATTERS_PROVIDER_ORDER,
+      modelOverrides: WHY_MATTERS_MODEL_OVERRIDES,
+      // Match the analyst path: retry only deterministic token-limit signals,
+      // while leaving prose-shape validation outside the provider loop.
+      retryOnLengthLimit: true,
       // Note: no `validate` option. The post-call parseWhyMatters check
       // below handles rejection by returning null. Using validate inside
-      // callLlmReasoning would walk the provider chain on parse-reject,
+      // callLlm would walk the provider chain on parse-reject,
       // causing duplicate openrouter billings when only one provider is
       // configured in prod. See todo 245.
     });
     if (!result) return null;
+    if (rejectLengthLimitedCompletion('gemini', result.finishReason)) return null;
     return parseWhyMatters(result.content);
   } catch (err) {
     console.warn(`[brief-why-matters] gemini path failed: ${err instanceof Error ? err.message : String(err)}`);
@@ -298,6 +345,7 @@ function isEnvelope(v: unknown): v is WhyMattersEnvelope {
   const e = v as Record<string, unknown>;
   return (
     typeof e.whyMatters === 'string' &&
+    hasTerminalPunctuation(e.whyMatters) &&
     (e.producedBy === 'analyst' || e.producedBy === 'gemini') &&
     typeof e.at === 'string'
   );
@@ -376,22 +424,39 @@ export default async function handler(req: Request, ctx?: EdgeContext): Promise<
 
   // Cache identity.
   const hash = await hashBriefStory(story);
-  // v7: RSS-description grounding (2026-04-24). story:track:v1 now carries
+  // v10 (2026-07-10): responses now preserve the provider finish reason and
+  // reject `length` completions before parsing. v9 rows were written without
+  // that authoritative signal and may contain abbreviation-ending clips that
+  // look sentence-complete to punctuation heuristics, so they must not survive
+  // the deploy.
+  //
+  // v9 (2026-07-10): bumped from v8 alongside the analyst output-policy
+  // rollout. v8 rows may use the retired formulaic voice, the longer
+  // 40–70-word / 2–3-sentence length, or expose raw forecast probabilities,
+  // and cache hits bypass parseWhyMattersV2, so they must not survive the
+  // deploy.
+  //
+  // v8 (2026-05-14): bumped from v7 alongside the F6 date-grounding
+  // line appended to both whyMatters system prompts (analyst v2 and
+  // the gemini fallback). Every v7 row was produced from a prompt
+  // with no notion of "today" and may state a fabricated year — the
+  // exact bug F6 fixes. Serving v7 on a cache hit would keep shipping
+  // that fabrication for the 6h TTL, so v7 must not survive the
+  // deploy.
+  //
+  // v7: RSS-description grounding (2026-04-24). story:track:v1 carries
   // a cleaned RSS description that rides through buildWhyMattersUserPrompt
   // as the `description` field. Every v6 row was produced either without a
   // description or with the cleaned-headline placeholder; with real article
   // bodies arriving, the editorial voice and named-actor accuracy shift
-  // enough that v6 prose must be invalidated. hashBriefStory includes
-  // description in its hash material so identity naturally drifts too —
-  // this prefix bump is belt-and-braces for a clean cold-start on first
-  // tick after deploy.
+  // enough that v6 prose had to be invalidated.
   //
   // v6 history (kept for reference): category-gated context + prompt-level
-  // RELEVANCE RULE (2026-04-22) — those changes remain in v7.
-  const cacheKey = `brief:llm:whymatters:v7:${hash}`;
-  // Shadow v4→v5 for the same reason — a mid-rollout shadow record
-  // comparing v6 pre-grounding vs gemini is not useful once v7 is live.
-  const shadowKey = `brief:llm:whymatters:shadow:v5:${hash}`;
+  // RELEVANCE RULE (2026-04-22) — those changes remain in v8.
+  const cacheKey = `brief:llm:whymatters:v10:${hash}`;
+  // Shadow v6→v7 for the same reason: a pre-policy v6 record would mix
+  // retired and current analyst outputs in the seven-day evaluation cohort.
+  const shadowKey = `brief:llm:whymatters:shadow:v7:${hash}`;
 
   // Cache read. Any infrastructure failure → treat as miss (logged).
   let cached: WhyMattersEnvelope | null = null;

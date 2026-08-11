@@ -3,7 +3,7 @@
 /**
  * Consolidated aviation seeder. Writes four Redis keys from one cron tick:
  *
- *   aviation:delays:intl:v3      — AviationStack per-airport delay aggregates (51 intl)
+ *   aviation:delays:intl:v3      — AviationStack per-airport delay aggregates (56 intl)
  *   aviation:delays:faa:v1       — FAA ASWS XML delays (30 US)
  *   aviation:notam:closures:v2   — ICAO NOTAM closures (60 global)
  *   aviation:news::24:v1         — RSS news prewarmer (list-aviation-news.ts cache)
@@ -36,8 +36,18 @@ import {
   acquireLockSafely,
   releaseLock,
   getRedisCredentials,
+  readCanonicalValue,
 } from './_seed-utils.mjs';
+import notificationDedup from './shared/notification-dedup.cjs';
+import countryNameMap from './shared/country-name-to-iso2.cjs';
 import { unwrapEnvelope } from './_seed-envelope-source.mjs';
+
+const {
+  buildDedupMaterial,
+  classifySetNxResult,
+  recordDedupOutcome,
+} = notificationDedup;
+const { countryNameToIso2 } = countryNameMap;
 
 loadEnvFile(import.meta.url);
 
@@ -52,13 +62,39 @@ const NEWS_KEY         = 'aviation:news::24:v1';
 // list-airport-delays.ts — quiet user windows >30min would let it expire, tripping
 // EMPTY (CRIT) even with healthy upstream feeds. Now produced canonically by this
 // seeder; RPC keeps its write at the same TTL as a courtesy mid-tick refresh.
-const BOOTSTRAP_KEY = 'aviation:delays-bootstrap:v1';
+// #3707: bumped to v2 after the UNKNOWN-row coverage fix so post-deploy clients
+// don't briefly see pre-fix cached payloads that synthesise NORMAL rows for
+// uncovered airports.
+const BOOTSTRAP_KEY = 'aviation:delays-bootstrap:v2';
 
 const INTL_TTL      = 10_800; // 3h — survives ~5 consecutive missed 30min cron ticks
 const FAA_TTL       = 7_200;  // 2h
 const NOTAM_TTL     = 7_200;  // 2h
 const NEWS_TTL      = 2_400;  // 40min
 const BOOTSTRAP_TTL = 7_200;  // 2h — matches FAA/NOTAM; survives ~4 missed cron ticks
+
+function nonNegativeEnv(name, fallback, max = Number.POSITIVE_INFINITY) {
+  const value = process.env[name]?.trim();
+  if (!value) return fallback;
+  const raw = Number(value);
+  return Number.isFinite(raw) && raw >= 0 ? Math.min(raw, max) : fallback;
+}
+
+// AviationStack quota guard. AviationStack is a PAID, per-airport API: one call
+// per airport (~55 today) on EVERY cron tick, with no upstream batching. Intl
+// airport-delay data moves slowly (already cached 30min client-side, 3h Redis
+// TTL), so re-buying all 55 airports on a 10–30min cron burns quota for data we
+// already hold. When the last successful intl publish is younger than this, we
+// SKIP the fetch entirely and just extend the last-good TTLs — turning the cron
+// cadence into an effective floor of INTL_MIN_REFRESH_MIN between paid fetches.
+//
+// Keep at or below runSeed's maxStaleMin (90) minus one 30min cron interval so
+// seed-meta fetchedAt never ages into a false STALE_SEED: 55min default leaves
+// headroom even on a 30min cron (worst-case fetchedAt age ≈ 55+30 = 85 < 90).
+// Set to 0 to disable the gate (fetch every tick, legacy behaviour). Override
+// via AVIATIONSTACK_MIN_REFRESH_MIN.
+const MAX_INTL_MIN_REFRESH_MIN = 60;
+const INTL_MIN_REFRESH_MIN = nonNegativeEnv('AVIATIONSTACK_MIN_REFRESH_MIN', 55, MAX_INTL_MIN_REFRESH_MIN);
 
 // health.js expects these exact meta keys (api/health.js:222,223,269)
 const INTL_META_KEY  = 'seed-meta:aviation:intl';
@@ -78,6 +114,20 @@ const PREV_STATE_TTL            = 86_400; // 24h — longer than any realistic c
 //   'notam'         — ICAO NOTAM list includes this ICAO
 // lat/lon/city are only required for rows with 'aviationstack' (feed the
 // AirportDelayAlert envelope).
+
+// Keep this provider contract narrow and evidence-backed: these are individual
+// hubs AviationStack is expected to return, not a claim that every airport in
+// China's ICAO allocation is covered.
+export const CHINA_AVIATIONSTACK_HUBS = [
+  { iata: 'PEK', icao: 'ZBAA', name: 'Beijing Capital',                 city: 'Beijing',   country: 'China', lat: 40.0799, lon: 116.6031, region: 'apac', sources: ['aviationstack', 'notam'] },
+  { iata: 'PVG', icao: 'ZSPD', name: 'Shanghai Pudong',                 city: 'Shanghai',  country: 'China', lat: 31.1443, lon: 121.8083, region: 'apac', sources: ['aviationstack'] },
+  { iata: 'CAN', icao: 'ZGGG', name: 'Guangzhou Baiyun International', city: 'Guangzhou', country: 'China', lat: 23.3924, lon: 113.2988, region: 'apac', sources: ['aviationstack'] },
+  { iata: 'SZX', icao: 'ZGSZ', name: "Shenzhen Bao'an International", city: 'Shenzhen',  country: 'China', lat: 22.6393, lon: 113.8107, region: 'apac', sources: ['aviationstack'] },
+  { iata: 'CTU', icao: 'ZUUU', name: 'Chengdu Shuangliu International', city: 'Chengdu',  country: 'China', lat: 30.5785, lon: 103.9471, region: 'apac', sources: ['aviationstack'] },
+  { iata: 'KMG', icao: 'ZPPP', name: 'Kunming Changshui',              city: 'Kunming',   country: 'China', lat: 25.1019, lon: 102.9292, region: 'apac', sources: ['aviationstack', 'notam'] },
+  { iata: 'URC', icao: 'ZWWW', name: 'Urumqi Diwopu International',    city: 'Urumqi',    country: 'China', lat: 43.9071, lon: 87.4742,  region: 'apac', sources: ['aviationstack'] },
+  { iata: 'HKG', icao: 'VHHH', name: 'Hong Kong International',        city: 'Hong Kong', country: 'China', lat: 22.3080, lon: 113.9185, region: 'apac', sources: ['aviationstack', 'notam'] },
+];
 
 const AIRPORTS = [
   // ── Americas — AviationStack + NOTAM ──
@@ -146,9 +196,7 @@ const AIRPORTS = [
   // ── APAC — AviationStack + NOTAM ──
   { iata: 'HND', icao: 'RJTT', name: 'Tokyo Haneda',                 city: 'Tokyo',        country: 'Japan',       lat: 35.5494, lon: 139.7798, region: 'apac', sources: ['aviationstack', 'notam'] },
   { iata: 'NRT', icao: 'RJAA', name: 'Narita International',         city: 'Tokyo',        country: 'Japan',       lat: 35.7720, lon: 140.3929, region: 'apac', sources: ['aviationstack'] },
-  { iata: 'PEK', icao: 'ZBAA', name: 'Beijing Capital',              city: 'Beijing',      country: 'China',       lat: 40.0799, lon: 116.6031, region: 'apac', sources: ['aviationstack', 'notam'] },
-  { iata: 'PVG', icao: 'ZSPD', name: 'Shanghai Pudong',              city: 'Shanghai',     country: 'China',       lat: 31.1443, lon: 121.8083, region: 'apac', sources: ['aviationstack'] },
-  { iata: 'HKG', icao: 'VHHH', name: 'Hong Kong International',      city: 'Hong Kong',    country: 'China',       lat: 22.3080, lon: 113.9185, region: 'apac', sources: ['aviationstack', 'notam'] },
+  ...CHINA_AVIATIONSTACK_HUBS,
   { iata: 'SIN', icao: 'WSSS', name: 'Singapore Changi',             city: 'Singapore',    country: 'Singapore',   lat: 1.3644,  lon: 103.9915, region: 'apac', sources: ['aviationstack', 'notam'] },
   { iata: 'ICN', icao: 'RKSI', name: 'Incheon International',        city: 'Seoul',        country: 'South Korea', lat: 37.4602, lon: 126.4407, region: 'apac', sources: ['aviationstack', 'notam'] },
   { iata: 'BKK', icao: 'VTBS', name: 'Suvarnabhumi Airport',         city: 'Bangkok',      country: 'Thailand',    lat: 13.6900, lon: 100.7501, region: 'apac', sources: ['aviationstack', 'notam'] },
@@ -156,11 +204,8 @@ const AIRPORTS = [
   { iata: 'DEL', icao: 'VIDP', name: 'Indira Gandhi International',  city: 'Delhi',        country: 'India',       lat: 28.5562, lon: 77.1000,  region: 'apac', sources: ['aviationstack', 'notam'] },
   { iata: 'BOM', icao: 'VABB', name: 'Chhatrapati Shivaji Maharaj',  city: 'Mumbai',       country: 'India',       lat: 19.0896, lon: 72.8656,  region: 'apac', sources: ['aviationstack'] },
   { iata: 'KUL', icao: 'WMKK', name: 'Kuala Lumpur International',   city: 'Kuala Lumpur', country: 'Malaysia',    lat: 2.7456,  lon: 101.7099, region: 'apac', sources: ['aviationstack', 'notam'] },
-  { iata: 'CAN', icao: 'ZGGG', name: 'Guangzhou Baiyun International', city: 'Guangzhou',  country: 'China',       lat: 23.3924, lon: 113.2988, region: 'apac', sources: ['aviationstack'] },
   { iata: 'TPE', icao: 'RCTP', name: 'Taiwan Taoyuan International', city: 'Taipei',       country: 'Taiwan',      lat: 25.0797, lon: 121.2342, region: 'apac', sources: ['aviationstack'] },
   { iata: 'MNL', icao: 'RPLL', name: 'Ninoy Aquino International',   city: 'Manila',       country: 'Philippines', lat: 14.5086, lon: 121.0197, region: 'apac', sources: ['aviationstack'] },
-  // APAC NOTAM-only
-  { iata: 'KMG', icao: 'ZPPP', name: 'Kunming Changshui',            city: 'Kunming',      country: 'China',       region: 'apac', sources: ['notam'] },
 
   // ── MENA — AviationStack + NOTAM ──
   { iata: 'DXB', icao: 'OMDB', name: 'Dubai International',          city: 'Dubai',       country: 'UAE',         lat: 25.2532, lon: 55.3657, region: 'mena', sources: ['aviationstack', 'notam'] },
@@ -204,6 +249,8 @@ const AIRPORTS = [
 const AVIATIONSTACK_LIST = AIRPORTS.filter(a => a.sources.includes('aviationstack'));
 const FAA_LIST           = AIRPORTS.filter(a => a.sources.includes('faa')).map(a => a.iata);
 const NOTAM_LIST         = AIRPORTS.filter(a => a.sources.includes('notam')).map(a => a.icao);
+const AVIATIONSTACK_IATAS = new Set(AVIATIONSTACK_LIST.map(a => a.iata));
+const FAA_IATAS = new Set(FAA_LIST);
 
 // iata → aviationstack-enriched meta (for building AirportDelayAlert envelopes
 // with coordinates — aviationstack rows are the only ones with lat/lon).
@@ -289,8 +336,8 @@ async function upstashSetNx(key, value, ttlSeconds) {
   try {
     const serialized = typeof value === 'string' ? value : JSON.stringify(value);
     const result = await upstashCommand(['SET', key, serialized, 'NX', 'EX', String(ttlSeconds)]);
-    return result?.result === 'OK' ? 'OK' : null;
-  } catch { return null; }
+    return classifySetNxResult(result?.result);
+  } catch { return 'error'; }
 }
 
 async function upstashLpush(key, value) {
@@ -322,16 +369,26 @@ function notifyHash(str) {
 async function publishNotificationEvent({ eventType, payload, severity, variant, dedupTtl = 1800 }) {
   try {
     const variantSuffix = variant ? `:${variant}` : '';
-    const dedupKey = `wm:notif:scan-dedup:${eventType}${variantSuffix}:${notifyHash(`${eventType}:${payload.title ?? ''}`)}`;
-    const isNew = await upstashSetNx(dedupKey, '1', dedupTtl);
-    if (!isNew) {
+    const dedupMaterial = buildDedupMaterial(eventType, payload?.title, payload?.coalesceKey);
+    const dedupKey = `wm:notif:scan-dedup:${eventType}${variantSuffix}:${notifyHash(dedupMaterial)}`;
+    const dedupResult = await upstashSetNx(dedupKey, '1', dedupTtl);
+    const dedupDecision = recordDedupOutcome(dedupResult, {
+      surface: 'seed-aviation',
+      eventType,
+      severity,
+      fallbackKey: dedupKey,
+      fallbackTtlSeconds: dedupTtl,
+      emitTelemetry: ({ line }) => console.warn(line),
+    });
+    if (!dedupDecision.shouldPublish) {
+      if (!dedupDecision.isDuplicate) return;
       console.log(`[Notify] Dedup hit — ${eventType}: ${String(payload.title ?? '').slice(0, 60)}`);
       return;
     }
-    const msg = JSON.stringify({ eventType, payload, severity, ...(variant ? { variant } : {}), publishedAt: Date.now() });
+    const msg = JSON.stringify({ eventType, payload, severity: dedupDecision.severity, ...(variant ? { variant } : {}), publishedAt: Date.now() });
     const ok = await upstashLpush('wm:events:queue', msg);
     if (ok) {
-      console.log(`[Notify] Queued ${severity} event: ${eventType} — ${String(payload.title ?? '').slice(0, 60)}`);
+      console.log(`[Notify] Queued ${dedupDecision.severity} event: ${eventType} — ${String(payload.title ?? '').slice(0, 60)}`);
     } else {
       console.warn(`[Notify] LPUSH failed for ${eventType} — rolling back dedup key`);
       await upstashDel(dedupKey);
@@ -353,29 +410,44 @@ function aviationDetermineSeverity(avgDelay, delayedPct) {
   return 'normal';
 }
 
-async function fetchAviationStackSingle(apiKey, iata) {
+async function fetchAviationStackSingle(
+  apiKey,
+  airport,
+  fetchFn = (...args) => globalThis.fetch(...args),
+  logger = console,
+) {
+  const { iata } = airport;
   const today = new Date().toISOString().slice(0, 10);
   const url = `${AVIATIONSTACK_URL}?access_key=${apiKey}&dep_iata=${iata}&flight_date=${today}&limit=100`;
   try {
-    const resp = await fetch(url, {
+    const resp = await fetchFn(url, {
       headers: { 'User-Agent': CHROME_UA },
       signal: AbortSignal.timeout(10_000),
     });
     if (!resp.ok) {
-      console.warn(`[Aviation] ${iata}: HTTP ${resp.status}`);
-      return { ok: false, alert: null };
+      logger.warn(`[Aviation] ${iata}: HTTP ${resp.status}`);
+      return { iata, status: 'failed', alert: null, flightCount: 0 };
     }
     const json = await resp.json();
     if (json.error) {
-      console.warn(`[Aviation] ${iata}: ${json.error.message}`);
-      return { ok: false, alert: null };
+      logger.warn(`[Aviation] ${iata}: ${json.error.message}`);
+      return { iata, status: 'failed', alert: null, flightCount: 0 };
     }
-    const flights = json?.data ?? [];
+    const flights = Array.isArray(json?.data) ? json.data : [];
+    if (flights.length === 0) {
+      logger.warn(`[Aviation] ${iata}: provider omitted hub (0 flight records)`);
+      return { iata, status: 'omitted', alert: null, flightCount: 0 };
+    }
     const alert = aviationAggregateFlights(iata, flights);
-    return { ok: true, alert };
+    return {
+      iata,
+      status: alert ? 'disruption' : 'normal',
+      alert,
+      flightCount: flights.length,
+    };
   } catch (err) {
-    console.warn(`[Aviation] ${iata}: fetch error: ${err?.message || err}`);
-    return { ok: false, alert: null };
+    logger.warn(`[Aviation] ${iata}: fetch error: ${err?.message || err}`);
+    return { iata, status: 'failed', alert: null, flightCount: 0 };
   }
 }
 
@@ -442,35 +514,74 @@ function aviationAggregateFlights(iata, flights) {
   };
 }
 
-async function seedIntlDelays() {
-  const apiKey = process.env.AVIATIONSTACK_API;
+export async function seedIntlDelays({
+  apiKey = process.env.AVIATIONSTACK_API,
+  airports = AVIATIONSTACK_LIST,
+  fetchFn = (...args) => globalThis.fetch(...args),
+  logger = console,
+} = {}) {
   if (!apiKey) {
-    console.log('[Intl] No AVIATIONSTACK_API key — skipping');
-    return { alerts: [], healthy: false, skipped: true };
+    logger.log('[Intl] No AVIATIONSTACK_API key — skipping');
+    return { alerts: [], coverage: [], healthy: false, skipped: true };
   }
 
   const t0 = Date.now();
   const alerts = [];
-  let succeeded = 0, failed = 0;
+  const coverage = [];
+  let succeeded = 0, failed = 0, omitted = 0;
 
-  for (let i = 0; i < AVIATIONSTACK_LIST.length; i += AVIATION_BATCH_CONCURRENCY) {
-    const chunk = AVIATIONSTACK_LIST.slice(i, i + AVIATION_BATCH_CONCURRENCY);
+  for (let i = 0; i < airports.length; i += AVIATION_BATCH_CONCURRENCY) {
+    const chunk = airports.slice(i, i + AVIATION_BATCH_CONCURRENCY);
     const results = await Promise.allSettled(
-      chunk.map(a => fetchAviationStackSingle(apiKey, a.iata)),
+      chunk.map(a => fetchAviationStackSingle(apiKey, a, fetchFn, logger)),
     );
-    for (const r of results) {
+    for (let j = 0; j < results.length; j++) {
+      const r = results[j];
       if (r.status === 'fulfilled') {
-        if (r.value.ok) { succeeded++; if (r.value.alert) alerts.push(r.value.alert); }
-        else failed++;
+        coverage.push({
+          iata: r.value.iata,
+          status: r.value.status,
+          flightCount: r.value.flightCount,
+          updatedAt: Date.now(),
+        });
+        if (r.value.status === 'failed') failed++;
+        else if (r.value.status === 'omitted') omitted++;
+        else succeeded++;
+        if (r.value.alert) alerts.push(r.value.alert);
       } else {
         failed++;
+        coverage.push({ iata: chunk[j].iata, status: 'failed', flightCount: 0, updatedAt: Date.now() });
       }
     }
   }
 
-  const healthy = AVIATIONSTACK_LIST.length < 5 || failed <= succeeded;
-  console.log(`[Intl] ${alerts.length} alerts (${succeeded} ok, ${failed} failed, healthy: ${healthy}) in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
-  return { alerts, healthy, skipped: false };
+  const unavailable = failed + omitted;
+  const healthy = airports.length < 5 || unavailable <= succeeded;
+  logger.log(`[Intl] ${alerts.length} alerts (${succeeded} covered, ${omitted} omitted, ${failed} failed, healthy: ${healthy}) in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
+  return { alerts, coverage, healthy, skipped: false };
+}
+
+export async function runChinaAviationStackSmoke({
+  apiKey = process.env.AVIATIONSTACK_API,
+  fetchFn = (...args) => globalThis.fetch(...args),
+  logger = console,
+} = {}) {
+  const result = await seedIntlDelays({
+    apiKey,
+    airports: CHINA_AVIATIONSTACK_HUBS,
+    fetchFn,
+    logger,
+  });
+  const statusByIata = new Map(result.coverage.map((hub) => [hub.iata, hub.status]));
+  const summary = CHINA_AVIATIONSTACK_HUBS
+    .map((hub) => `${hub.iata}=${statusByIata.get(hub.iata) || 'failed'}`)
+    .join(' ');
+  const ok = !result.skipped && CHINA_AVIATIONSTACK_HUBS.every((hub) => {
+    const status = statusByIata.get(hub.iata);
+    return status === 'normal' || status === 'disruption';
+  });
+  logger.log(`[China aviation smoke] ${summary} result=${ok ? 'PASS' : 'FAIL'}`);
+  return { ok, ...result };
 }
 
 // ─── Section 2: FAA delays (XML) ─────────────────────────────────────────────
@@ -752,19 +863,46 @@ async function dispatchAviationNotifications(alerts) {
   const severeAlerts = alerts.filter(a =>
     a.severity === 'FLIGHT_DELAY_SEVERITY_SEVERE' || a.severity === 'FLIGHT_DELAY_SEVERITY_MAJOR',
   );
-  const currentIatas = new Set(severeAlerts.map(a => a.iata).filter(Boolean));
+  // Diff identity MUST match the publisher coalesce key (airport + severity band).
+  // Diffing by airport alone would filter a MAJOR->SEVERE escalation for an
+  // already-alerted airport out HERE — before the severity-aware coalesce key is
+  // ever reached — so the escalation would never publish (PR #4985 review P1).
+  const aviationSeverityBand = a => (a.severity === 'FLIGHT_DELAY_SEVERITY_SEVERE' ? 'critical' : 'high');
+  const aviationAlertKey = a => `${a.iata}:${aviationSeverityBand(a)}`;
+  const currentKeys = new Set(severeAlerts.filter(a => a.iata).map(aviationAlertKey));
   const prev = await upstashGet(AVIATION_PREV_ALERTED_KEY);
   const prevSet = new Set(Array.isArray(prev) ? prev : []);
-  const newAlerts = severeAlerts.filter(a => a.iata && !prevSet.has(a.iata));
+  const newAlerts = severeAlerts.filter(a => a.iata && !prevSet.has(aviationAlertKey(a)));
 
   // Persist current set for next tick's diff (24h TTL guards restarts).
-  await upstashSet(AVIATION_PREV_ALERTED_KEY, [...currentIatas], PREV_STATE_TTL);
+  // Keyed by airport+severity so a later band change is seen as a new state.
+  await upstashSet(AVIATION_PREV_ALERTED_KEY, [...currentKeys], PREV_STATE_TTL);
 
   for (const a of newAlerts.slice(0, 3)) {
+    const severity = aviationSeverityBand(a);
+    // Alert rows carry the registry's country NAME ('Brazil', 'China');
+    // normalize so country-scoped rules can filter (#5359 — GRU/HKG/KUL/CAN
+    // criticals leaked to an Eastern-Europe-scoped user as unattributed).
+    // A miss means scoped users never see this airport's alerts (relay drops
+    // unattributed non-news events) — warn so it reads as a data-quality bug,
+    // not silent filtering. tests/notification-relay-country-scope-5359.test.mjs
+    // asserts every registry country name currently normalizes.
+    const countryCode = countryNameToIso2(a.country);
+    if (!countryCode) console.warn(`[Notify] aviation_closure ${a.iata}: registry country ${JSON.stringify(a.country ?? null)} did not normalize — publishing unattributed (invisible to country-scoped rules)`);
     await publishNotificationEvent({
       eventType: 'aviation_closure',
-      payload: { title: `${a.iata}${a.city ? ` (${a.city})` : ''}: ${a.reason || 'Airport disruption'}`, source: 'AviationStack' },
-      severity: a.severity === 'FLIGHT_DELAY_SEVERITY_SEVERE' ? 'critical' : 'high',
+      payload: {
+        title: `${a.iata}${a.city ? ` (${a.city})` : ''}: ${a.reason || 'Airport disruption'}`,
+        source: 'AviationStack',
+        ...(countryCode ? { countryCode } : {}),
+        // Coalesce by airport + severity band: repeated same-band disruptions
+        // collapse, but a MAJOR->SEVERE escalation produces a distinct key — and
+        // the prev-state diff above uses the SAME identity, so the escalation is
+        // not filtered upstream (mirrors marketAlertCoalesceKey; prefix matches
+        // the aviation_closure eventType and the notam:closure sibling). PR #4985.
+        coalesceKey: `aviation:closure:${a.iata}:${severity}`,
+      },
+      severity,
       variant: undefined,
       dedupTtl: 14_400, // 4h
     });
@@ -779,9 +917,19 @@ async function dispatchNotamNotifications(closedIcaos, reasons) {
   await upstashSet(NOTAM_PREV_CLOSED_KEY, closedIcaos, PREV_STATE_TTL);
 
   for (const icao of newClosures.slice(0, 3)) {
+    // NOTAM rows are keyed by ICAO; resolve country through the airport
+    // registry so country-scoped rules can filter (#5359). Same miss-warn
+    // rationale as dispatchAviationNotifications above.
+    const countryCode = countryNameToIso2(AIRPORTS.find(a => a.icao === icao)?.country);
+    if (!countryCode) console.warn(`[Notify] notam_closure ${icao}: no registry country normalized — publishing unattributed (invisible to country-scoped rules)`);
     await publishNotificationEvent({
       eventType: 'notam_closure',
-      payload: { title: `NOTAM: ${icao} — ${reasons[icao] || 'Airport closure'}`, source: 'ICAO NOTAM' },
+      payload: {
+        title: `NOTAM: ${icao} — ${reasons[icao] || 'Airport closure'}`,
+        source: 'ICAO NOTAM',
+        coalesceKey: `notam:closure:${icao}`,
+        ...(countryCode ? { countryCode } : {}),
+      },
       severity: 'high',
       variant: undefined,
       dedupTtl: 21_600, // 6h
@@ -799,7 +947,7 @@ async function dispatchNotamNotifications(closedIcaos, reasons) {
 
 const SEV_ORDER = ['normal', 'minor', 'moderate', 'major', 'severe'];
 
-function buildNormalOpsAlert(airport) {
+function buildNormalOpsAlert(airport, source = 'FLIGHT_DELAY_SOURCE_COMPUTED') {
   return {
     id: `status-${airport.iata}`,
     iata: airport.iata,
@@ -816,7 +964,29 @@ function buildNormalOpsAlert(airport) {
     cancelledFlights: 0,
     totalFlights: 0,
     reason: 'Normal operations',
-    source: 'FLIGHT_DELAY_SOURCE_COMPUTED',
+    source,
+    updatedAt: Date.now(),
+  };
+}
+
+function buildUnknownOpsAlert(airport) {
+  return {
+    id: `unknown-${airport.iata}`,
+    iata: airport.iata,
+    icao: airport.icao,
+    name: airport.name,
+    city: airport.city ?? '',
+    country: airport.country,
+    location: { latitude: airport.lat ?? 0, longitude: airport.lon ?? 0 },
+    region: REGION_MAP[airport.region] ?? 'AIRPORT_REGION_AMERICAS',
+    delayType: 'FLIGHT_DELAY_TYPE_GENERAL',
+    severity: 'FLIGHT_DELAY_SEVERITY_UNKNOWN',
+    avgDelayMinutes: 0,
+    delayedFlightsPct: 0,
+    cancelledFlights: 0,
+    totalFlights: 0,
+    reason: 'Coverage unavailable',
+    source: 'FLIGHT_DELAY_SOURCE_UNSPECIFIED',
     updatedAt: Date.now(),
   };
 }
@@ -945,52 +1115,80 @@ function buildFillerRegistry() {
   return [...byIata.values()];
 }
 
-// Build + write the page-load bootstrap aggregate. Pass `intlAlertsOverride` to
-// use this-tick's intl from afterPublish (skips the Redis round-trip and avoids
+export function buildDelaysBootstrapPayload({
+  faaPayload,
+  intlPayload,
+  notamPayload,
+  fillerRegistry = buildFillerRegistry(),
+} = {}) {
+  const faaSourceCovered = !!faaPayload && Array.isArray(faaPayload.alerts);
+  const intlSourceCovered = !!intlPayload && Array.isArray(intlPayload.alerts);
+  const faaAlerts = faaSourceCovered ? faaPayload.alerts : [];
+  const intlAlerts = intlSourceCovered ? intlPayload.alerts : [];
+  const hasIntlCoverage = Array.isArray(intlPayload?.coverage);
+  const intlCoverage = hasIntlCoverage ? intlPayload.coverage : [];
+  const intlCoveredIatas = new Set(
+    hasIntlCoverage
+      ? intlCoverage
+        .filter((hub) => hub.status === 'normal' || hub.status === 'disruption')
+        .map((hub) => hub.iata)
+      : [],
+  );
+  const closedIcaos = Array.isArray(notamPayload?.closedIcaos) ? notamPayload.closedIcaos : [];
+  const restrictedIcaos = Array.isArray(notamPayload?.restrictedIcaos) ? notamPayload.restrictedIcaos : [];
+  const reasons = (notamPayload?.reasons && typeof notamPayload.reasons === 'object') ? notamPayload.reasons : {};
+
+  const allAlerts = [...faaAlerts, ...intlAlerts];
+  const existingIatas = new Set(allAlerts.map(a => a.iata));
+  const applyNotam = (icao, severity, delayType, fallback) => {
+    const airport = fillerRegistry.find(a => a.icao === icao);
+    if (!airport) return;
+    const reason = reasons[icao] || fallback;
+    if (existingIatas.has(airport.iata)) {
+      const idx = allAlerts.findIndex(a => a.iata === airport.iata);
+      if (idx >= 0) allAlerts[idx] = mergeNotamWithExistingAlert(airport, reason, allAlerts[idx], severity, delayType);
+    } else {
+      allAlerts.push(buildNotamAlert(airport, reason, severity, delayType));
+      existingIatas.add(airport.iata);
+    }
+  };
+  for (const icao of closedIcaos) applyNotam(icao, 'severe', 'closure', 'Airport closure (NOTAM)');
+  for (const icao of restrictedIcaos) applyNotam(icao, 'major', 'general', 'Airspace restriction (NOTAM)');
+
+  const alertedIatas = new Set(allAlerts.map(a => a.iata));
+  for (const airport of fillerRegistry) {
+    if (alertedIatas.has(airport.iata)) continue;
+    const isFaaCovered = FAA_IATAS.has(airport.iata) && faaSourceCovered;
+    const isIntlCovered = AVIATIONSTACK_IATAS.has(airport.iata) && intlCoveredIatas.has(airport.iata);
+    if (isFaaCovered || isIntlCovered) {
+      allAlerts.push(buildNormalOpsAlert(
+        airport,
+        isFaaCovered ? 'FLIGHT_DELAY_SOURCE_FAA' : 'FLIGHT_DELAY_SOURCE_AVIATIONSTACK',
+      ));
+    } else {
+      allAlerts.push(buildUnknownOpsAlert(airport));
+    }
+  }
+
+  return { alerts: allAlerts, coverage: intlCoverage };
+}
+
+// Build + write the page-load bootstrap aggregate. Pass `intlOverride` to use
+// this-tick's intl from afterPublish (skips the Redis round-trip and avoids
 // a one-tick lag); omit to fall back to the last-good intl in Redis (used by
 // the pre-runSeed call so a current-tick intl failure still refreshes bootstrap).
-async function writeDelaysBootstrap(intlAlertsOverride) {
+async function writeDelaysBootstrap(intlOverride) {
   try {
     const [faaPayload, intlPayload, notamPayload] = await Promise.all([
       upstashGetUnwrapped(FAA_KEY),
-      intlAlertsOverride ? Promise.resolve({ alerts: intlAlertsOverride }) : upstashGetUnwrapped(INTL_KEY),
+      intlOverride ? Promise.resolve(intlOverride) : upstashGetUnwrapped(INTL_KEY),
       upstashGetUnwrapped(NOTAM_KEY),
     ]);
 
-    const faaAlerts  = Array.isArray(faaPayload?.alerts)  ? faaPayload.alerts  : [];
-    const intlAlerts = Array.isArray(intlPayload?.alerts) ? intlPayload.alerts : [];
-    const closedIcaos     = Array.isArray(notamPayload?.closedIcaos)     ? notamPayload.closedIcaos     : [];
-    const restrictedIcaos = Array.isArray(notamPayload?.restrictedIcaos) ? notamPayload.restrictedIcaos : [];
-    const reasons = (notamPayload?.reasons && typeof notamPayload.reasons === 'object') ? notamPayload.reasons : {};
-
-    const allAlerts = [...faaAlerts, ...intlAlerts];
-    // Union of seeder AIRPORTS + RPC MONITORED_AIRPORTS so the bootstrap matches
-    // what the live RPC produces even when registries drift.
-    const fillerRegistry = buildFillerRegistry();
-    const existingIatas = new Set(allAlerts.map(a => a.iata));
-    const applyNotam = (icao, severity, delayType, fallback) => {
-      const airport = fillerRegistry.find(a => a.icao === icao);
-      if (!airport) return;
-      const reason = reasons[icao] || fallback;
-      if (existingIatas.has(airport.iata)) {
-        const idx = allAlerts.findIndex(a => a.iata === airport.iata);
-        if (idx >= 0) allAlerts[idx] = mergeNotamWithExistingAlert(airport, reason, allAlerts[idx], severity, delayType);
-      } else {
-        allAlerts.push(buildNotamAlert(airport, reason, severity, delayType));
-        existingIatas.add(airport.iata);
-      }
-    };
-    for (const icao of closedIcaos)     applyNotam(icao, 'severe', 'closure', 'Airport closure (NOTAM)');
-    for (const icao of restrictedIcaos) applyNotam(icao, 'major',  'general', 'Airspace restriction (NOTAM)');
-
-    const alertedIatas = new Set(allAlerts.map(a => a.iata));
-    for (const airport of fillerRegistry) {
-      if (!alertedIatas.has(airport.iata)) allAlerts.push(buildNormalOpsAlert(airport));
-    }
-
-    const ok = await upstashSet(BOOTSTRAP_KEY, { alerts: allAlerts }, BOOTSTRAP_TTL);
+    const payload = buildDelaysBootstrapPayload({ faaPayload, intlPayload, notamPayload });
+    const ok = await upstashSet(BOOTSTRAP_KEY, payload, BOOTSTRAP_TTL);
     if (ok) {
-      console.log(`[Bootstrap] wrote ${allAlerts.length} alerts to ${BOOTSTRAP_KEY} (faa=${faaAlerts.length}, intl=${intlAlerts.length}, notam-closed=${closedIcaos.length}, notam-restricted=${restrictedIcaos.length})`);
+      console.log(`[Bootstrap] wrote ${payload.alerts.length} alerts to ${BOOTSTRAP_KEY} (faa=${Array.isArray(faaPayload?.alerts) ? faaPayload.alerts.length : 0}, intl=${Array.isArray(intlPayload?.alerts) ? intlPayload.alerts.length : 0}, notam-closed=${Array.isArray(notamPayload?.closedIcaos) ? notamPayload.closedIcaos.length : 0}, notam-restricted=${Array.isArray(notamPayload?.restrictedIcaos) ? notamPayload.restrictedIcaos.length : 0})`);
     } else {
       console.warn(`[Bootstrap] SET ${BOOTSTRAP_KEY} returned false`);
     }
@@ -1107,13 +1305,104 @@ async function runNewsSideCar() {
 // last-good snapshot. FAA/NOTAM/news already ran via their side-cars and are
 // independent — an intl outage does NOT freeze their freshness.
 
+// Quota guard: returns true when the last successful intl publish is younger
+// than INTL_MIN_REFRESH_MIN, meaning we can serve last-good and skip the paid
+// AviationStack fetch this tick. Reads seed-meta:aviation:intl, whose fetchedAt
+// runSeed refreshes ONLY on a successful publish — the graceful-failure path
+// leaves it stale, so a real upstream outage still retries every tick rather
+// than being suppressed by the gate. Fail-open: any read error / missing meta /
+// non-numeric fetchedAt → false (fetch), so we never trade freshness for a
+// flaky Redis read.
+export async function intlIsFresh() {
+  if (INTL_MIN_REFRESH_MIN <= 0) return false;
+  try {
+    const meta = await readCanonicalValue(INTL_META_KEY);
+    const fetchedAt = meta?.fetchedAt;
+    if (typeof fetchedAt !== 'number' || !Number.isFinite(fetchedAt)) return false;
+    const ageMin = (Date.now() - fetchedAt) / 60_000;
+    if (ageMin < 0) return false; // clock skew — treat as stale, fetch
+    return ageMin < INTL_MIN_REFRESH_MIN;
+  } catch {
+    return false;
+  }
+}
+
+// Monthly AviationStack budget backstop. Mirrors reserveAviationStackCalls() in
+// server/worldmonitor/aviation/v1/_avstack-budget.ts — SAME Redis key + env
+// names so the seeder and the request-time RPCs share one counter and one hard
+// ceiling. Keep the two in lockstep. 'seed' kind reserves against the full
+// AVIATIONSTACK_MONTHLY_BUDGET; request-time stops earlier (see
+// _avstack-budget.ts), reserving headroom for this curated feed.
+export function avstackMonthlyBudget() {
+  return nonNegativeEnv('AVIATIONSTACK_MONTHLY_BUDGET', 130_000);
+}
+
+export async function reserveAviationStackBudget(count) {
+  const cap = avstackMonthlyBudget();
+  if (cap <= 0 || count <= 0) return true; // disabled
+  const { url, token } = getRedisCredentials();
+  if (!url || !token) return true; // fail-open (gate already bounds spend)
+  const now = new Date();
+  const ym = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
+  const key = `aviation:avstack:calls:${ym}`;
+  const ttl = 40 * 24 * 60 * 60; // 40d
+  try {
+    const resp = await fetch(`${url}/pipeline`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify([['INCRBY', key, count], ['EXPIRE', key, ttl]]),
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!resp.ok) return true; // fail-open
+    const results = await resp.json();
+    const total = Number(results?.[0]?.result);
+    if (!Number.isFinite(total)) return true;
+    if (total > cap) {
+      // Return the reservation so the counter reflects calls actually made.
+      try {
+        const refundResp = await fetch(`${url}/pipeline`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify([['DECRBY', key, count]]),
+          signal: AbortSignal.timeout(10_000),
+        });
+        if (!refundResp.ok) {
+          console.warn(`[Aviation] AviationStack seed budget refund failed with HTTP ${refundResp.status}; counter may be inflated`);
+        } else {
+          const refundResults = await refundResp.json();
+          const refundedTotal = Number(refundResults?.[0]?.result);
+          if (!Number.isFinite(refundedTotal)) {
+            console.warn(`[Aviation] AviationStack seed budget refund returned no counter; counter may be inflated`);
+          }
+        }
+      } catch (err) {
+        console.warn(`[Aviation] AviationStack seed budget refund failed: ${err instanceof Error ? err.message : err}; counter may be inflated`);
+      }
+      return false;
+    }
+    return true;
+  } catch {
+    return true; // fail-open
+  }
+}
+
 async function fetchIntl() {
   const result = await seedIntlDelays();
   if (!result.healthy || result.skipped) {
     const why = result.skipped
       ? 'no AVIATIONSTACK_API key'
       : 'systemic fetch failure (failures > successes)';
-    throw new Error(`intl unpublishable: ${why}`);
+    // nonRetryable is load-bearing for the budget cap. Without it, runSeed's
+    // withRetry re-runs fetchIntl up to 4x on an unhealthy tick, and EACH run
+    // sweeps the FULL airport list again — so a degraded upstream costs up to
+    // 4x the paid AviationStack calls while the budget counter (reserved once
+    // in main()) only saw one batch, letting actual spend run past the ceiling
+    // exactly when the cap matters most. Tagging the error makes withRetry exit
+    // after one attempt, keeping actual calls bounded by the single
+    // reservation. We lose nothing: the seeder already re-runs every cron tick.
+    const err = new Error(`intl unpublishable: ${why}`);
+    err.nonRetryable = true;
+    throw err;
   }
   return result;
 }
@@ -1123,31 +1412,43 @@ export function declareRecords(data) {
 }
 
 // publishTransform reshapes seedIntlDelays' output into the canonical envelope
-// shape consumers read ({ alerts: AirportDelayAlert[] }). declareRecords sees
-// this transformed shape; afterPublish still receives the raw fetchIntl result.
-function publishTransform(data) {
-  return { alerts: data?.alerts ?? [] };
+// consumers read. Coverage makes provider omission distinguishable from a
+// successful hub response with no current disruption.
+export function publishTransform(data) {
+  return {
+    alerts: data?.alerts ?? [],
+    coverage: data?.coverage ?? [],
+  };
 }
 
 async function afterPublishIntl(data) {
   // CONTRACT: runSeed forwards the RAW fetchIntl() result here, NOT the
   // publishTransform()'d shape. fetchIntl returns seedIntlDelays' output
-  // ({ alerts, healthy, skipped, ... }), so data.alerts is the same array
-  // publishTransform wraps into INTL_KEY. If publishTransform ever filters
-  // or mutates alerts (today it's a pass-through wrapper), this bootstrap
-  // write would silently diverge from INTL_KEY — keep them in lockstep.
+  // ({ alerts, coverage, healthy, skipped, ... }). Keep the bootstrap's intl
+  // envelope in lockstep with INTL_KEY so provider omissions stay observable.
   try { await dispatchAviationNotifications(data.alerts); }
   catch (e) { console.warn(`[Intl] notify error: ${e?.message || e}`); }
   // Refresh the page-load bootstrap with this-tick intl. The pre-runSeed call
   // in main() already wrote a bootstrap using last-good intl; this overwrite
   // upgrades it to current.
-  await writeDelaysBootstrap(data?.alerts);
+  await writeDelaysBootstrap(publishTransform(data));
 }
 
-function validate(publishData) {
+export function validate(publishData) {
   // Zero alerts is a valid steady state (no current airport disruptions) —
-  // but shape must be { alerts: [] } regardless.
-  return !!(publishData && Array.isArray(publishData.alerts));
+  // but alerts and per-hub provider coverage must both retain their shape.
+  return !!(
+    publishData
+    && Array.isArray(publishData.alerts)
+    && Array.isArray(publishData.coverage)
+    && publishData.coverage.every((hub) => (
+      typeof hub?.iata === 'string'
+      && ['normal', 'disruption', 'omitted', 'failed'].includes(hub.status)
+      && Number.isInteger(hub.flightCount)
+      && hub.flightCount >= 0
+      && Number.isFinite(hub.updatedAt)
+    ))
+  );
 }
 
 // Entry point: run the three independent side-cars sequentially, then hand off
@@ -1165,6 +1466,36 @@ async function main() {
   // intl on success.
   await writeDelaysBootstrap();
 
+  // Quota guard — skip the paid AviationStack fetch when last-good intl is still
+  // fresh. Just extend the TTLs on the canonical key + its freshness meta so
+  // consumers and /api/health keep serving last-good, then exit clean. The
+  // FAA/NOTAM/news side-cars (free) and the bootstrap write above already ran,
+  // so the page-load aggregate is still refreshed this tick.
+  if (await intlIsFresh()) {
+    await extendExistingTtl([INTL_KEY, INTL_META_KEY], INTL_TTL);
+    console.log(
+      `[Intl] SKIPPED AviationStack fetch — last publish < ${INTL_MIN_REFRESH_MIN}min old; ` +
+      `saved ${AVIATIONSTACK_LIST.length} API call(s), extended TTLs on last-good.`,
+    );
+    process.exit(0);
+  }
+
+  // Monthly budget backstop — reserve this tick's batch (one call per airport)
+  // against the shared AviationStack counter. If we'd breach the monthly
+  // ceiling, skip the fetch and serve last-good, same as the freshness gate.
+  // Belt-and-braces: the freshness gate already bounds normal spend; this caps
+  // the worst case (misconfigured gate, traffic spike on the shared counter).
+  // Only reserve when a key is present — seedIntlDelays no-ops without one, so
+  // reserving would overcount calls that never happen.
+  if (process.env.AVIATIONSTACK_API && !(await reserveAviationStackBudget(AVIATIONSTACK_LIST.length))) {
+    await extendExistingTtl([INTL_KEY, INTL_META_KEY], INTL_TTL);
+    console.log(
+      `[Intl] SKIPPED AviationStack fetch — monthly budget (${avstackMonthlyBudget()}) reached; ` +
+      `extended TTLs on last-good.`,
+    );
+    process.exit(0);
+  }
+
   return runSeed('aviation', 'intl', INTL_KEY, fetchIntl, {
     validateFn: validate,
     ttlSeconds: INTL_TTL,
@@ -1178,7 +1509,18 @@ async function main() {
   });
 }
 
-main().catch((err) => {
+// isMain guard so tests/agents can `import` the pure helpers (intlIsFresh,
+// reserveAviationStackBudget, declareRecords) without firing the side-cars +
+// runSeed on module load (which would touch Redis and process.exit). Matches
+// the repo convention (see scripts/seed-token-panels.mjs, seed-cyber-threats).
+// Railway still runs the seed via `node scripts/seed-aviation.mjs` because
+// argv[1] resolves to this file.
+const isMain = process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/^.*[\\/]/, ''));
+if (isMain) (process.argv.includes('--smoke-china')
+  ? runChinaAviationStackSmoke().then((result) => {
+    process.exit(result.ok ? 0 : 1);
+  })
+  : main()).catch((err) => {
   const cause = err.cause ? ` (cause: ${err.cause.message || err.cause.code || err.cause})` : '';
   console.error('FATAL:', (err.message || err) + cause);
   process.exit(1);

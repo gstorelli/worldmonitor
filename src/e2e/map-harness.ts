@@ -2,31 +2,32 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import '../styles/main.css';
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import { DeckGLMap } from '../components/DeckGLMap';
+import { MILITARY_BASES } from '@/config/military-bases';
 import {
   SITE_VARIANT,
   INTEL_HOTSPOTS,
   CONFLICT_ZONES,
-  MILITARY_BASES,
-  UNDERSEA_CABLES,
-  NUCLEAR_FACILITIES,
   GAMMA_IRRADIATORS,
   PIPELINES,
   STRATEGIC_WATERWAYS,
-  ECONOMIC_CENTERS,
-  AI_DATA_CENTERS,
-  STARTUP_HUBS,
-  ACCELERATORS,
-  TECH_HQS,
-  CLOUD_REGIONS,
   PORTS,
-  SPACEPORTS,
   APT_GROUPS,
-  CRITICAL_MINERALS,
   STOCK_EXCHANGES,
   FINANCIAL_CENTERS,
   CENTRAL_BANKS,
   COMMODITY_HUBS,
+  MINING_SITES,
+  PROCESSING_PLANTS,
+  COMMODITY_PORTS,
 } from '../config';
+// Tech-geo + ai-datacenters + geo-map tables imported directly so they stay off the eager @/config barrel (#4404).
+import { STARTUP_HUBS, ACCELERATORS, TECH_HQS, CLOUD_REGIONS } from '../config/tech-geo';
+import { AI_DATA_CENTERS } from '../config/ai-datacenters';
+import { UNDERSEA_CABLES, NUCLEAR_FACILITIES, ECONOMIC_CENTERS, SPACEPORTS, CRITICAL_MINERALS } from '../config/geo-map';
+import type { PositiveGeoEvent } from '../services/positive-events-geo';
+import type { KindnessPoint } from '../services/kindness-data';
+import type { SpeciesRecovery } from '../services/conservation-data';
+import type { RenewableInstallation } from '../services/renewable-installations';
 import type {
   AisDensityZone,
   AisDisruptionEvent,
@@ -47,13 +48,15 @@ import type {
 import type { AirportDelayAlert } from '../services/aviation';
 import type { ClimateAnomaly } from '../services/climate';
 import type { Earthquake } from '../services/earthquakes';
+import type { DiseaseOutbreakItem } from '../services/disease-outbreaks';
 import { setCachedFuelShortageRegistry } from '../shared/fuel-shortage-registry-store';
 import { setCachedPipelineRegistries } from '../shared/pipeline-registry-store';
 import { setCachedStorageFacilityRegistry } from '../shared/storage-facility-registry-store';
 import type { WeatherAlert } from '../services/weather';
+import { CHINA_LOGISTICS_CORRIDORS } from '../../shared/china-logistics-corridors';
 
 type Scenario = 'alpha' | 'beta';
-type HarnessVariant = 'full' | 'tech' | 'finance' | 'energy';
+type HarnessVariant = 'full' | 'tech' | 'finance' | 'commodity' | 'energy' | 'happy';
 type HarnessLayerKey = keyof MapLayers;
 type PulseProtestScenario =
   | 'none'
@@ -130,6 +133,7 @@ type MapHarness = {
   getProtestClusterCount: () => number;
   getOverlaySnapshot: () => OverlaySnapshot;
   getCyberTooltipHtml: (indicator: string) => string;
+  showChinaCorridor: (index?: number) => void;
   destroy: () => void;
 };
 
@@ -265,7 +269,7 @@ const allLayersDisabled: MapLayers = {
   processingPlants: false,
   commodityPorts: false,
   webcams: false,
-  diseaseOutbreaks: true,
+  diseaseOutbreaks: false,
   storageFacilities: false,
   fuelShortages: false,
   liveTankers: false,
@@ -304,19 +308,119 @@ const SEEDED_LIVE_TANKERS: LiveTankerFixture[] = [
   },
 ];
 
+const SEEDED_POSITIVE_EVENTS: PositiveGeoEvent[] = [
+  {
+    lat: 37.77,
+    lon: -122.42,
+    name: 'Harness breakthrough expands clean water access',
+    category: 'humanity-kindness',
+    count: 12,
+    timestamp: Date.now(),
+  },
+];
+
+const SEEDED_KINDNESS_POINTS: KindnessPoint[] = [
+  {
+    lat: 51.5,
+    lon: -0.12,
+    name: 'Harness community aid network',
+    description: 'Local volunteers coordinated emergency support.',
+    intensity: 0.9,
+    type: 'real',
+    timestamp: Date.now(),
+  },
+];
+
+const SEEDED_SPECIES_RECOVERY: SpeciesRecovery[] = [
+  {
+    id: 'e2e-species-recovery',
+    commonName: 'Harness Falcon',
+    scientificName: 'Falco harnessus',
+    photoUrl: 'https://example.com/falcon.jpg',
+    iucnCategory: 'Least Concern',
+    populationTrend: 'increasing',
+    recoveryStatus: 'recovering',
+    populationData: [
+      { year: 2015, value: 120 },
+      { year: 2025, value: 420 },
+    ],
+    summaryText: 'Harness conservation recovery fixture.',
+    source: 'e2e',
+    region: 'Harness Reserve',
+    lastUpdated: '2026-02-01',
+    recoveryZone: {
+      name: 'Harness Reserve',
+      lat: -1.29,
+      lon: 36.82,
+    },
+  },
+];
+
+const SEEDED_RENEWABLE_INSTALLATIONS: RenewableInstallation[] = [
+  {
+    id: 'e2e-renewable-installation',
+    name: 'Harness Solar Park',
+    type: 'solar',
+    capacityMW: 500,
+    country: 'US',
+    lat: 34.05,
+    lon: -117.2,
+    status: 'operational',
+    year: 2026,
+  },
+];
+
+const SEEDED_DISEASE_OUTBREAKS: DiseaseOutbreakItem[] = [
+  {
+    id: 'e2e-disease-outbreak',
+    disease: 'Harness Fever',
+    location: 'Harness Province',
+    countryCode: 'KE',
+    alertLevel: 'warning',
+    summary: 'Deterministic outbreak fixture for map smoke coverage.',
+    sourceUrl: 'https://example.com/outbreak',
+    publishedAt: Date.parse('2026-02-01T12:00:00.000Z'),
+    sourceName: 'E2E Health Desk',
+    lat: -1.29,
+    lng: 36.82,
+    cases: 37,
+  },
+];
+
 const SEEDED_MILITARY_BASES: MilitaryBaseEnriched[] = (MILITARY_BASES as MilitaryBaseEnriched[])
   .map((base) => ({ ...base }));
 
+const commodityAllLayersEnabled: MapLayers = {
+  ...allLayersEnabled,
+  miningSites: true,
+  processingPlants: true,
+  commodityPorts: true,
+};
+
 const energyAllLayersEnabled: MapLayers = {
   ...allLayersEnabled,
+  // commodityPorts is base-false in allLayersEnabled post-#3925 isolation
+  // refactor (was true in an earlier snapshot Greptile reviewed) — energy
+  // explicitly enables it because the energy harness ships seeded port
+  // fixtures and tests/energy-variant-atlas-guard asserts on this line.
   commodityPorts: true,
   storageFacilities: true,
   fuelShortages: true,
   liveTankers: true,
 };
 
+const happyAllLayersEnabled: MapLayers = {
+  ...allLayersEnabled,
+  speciesRecovery: true,
+  renewableInstallations: true,
+};
+
 const seededAllLayers: MapLayers = isEnergyHarnessVariant
   ? energyAllLayersEnabled
+  : SITE_VARIANT === 'commodity'
+  ? commodityAllLayersEnabled
+  : SITE_VARIANT === 'happy'
+  ? happyAllLayersEnabled
   : allLayersEnabled;
 
 const initialLayers: MapLayers = {
@@ -530,6 +634,11 @@ const seededCameras = {
   fires: toCamera(-60.1, -5.4, 5.0),
   techEvents: toCamera(-122.42, 37.77, 5.2),
   news: toCamera(2.35, 48.85, 5.0),
+  positiveEvents: toCamera(-122.42, 37.77, 5.2),
+  kindness: toCamera(-0.12, 51.5, 5.2),
+  speciesRecovery: toCamera(36.82, -1.29, 5.2),
+  renewableInstallations: toCamera(-117.2, 34.05, 5.2),
+  diseaseOutbreaks: toCamera(36.82, -1.29, 5.2),
 };
 
 const [conflictLon, conflictLat] = firstConflictPoint([36.0, 35.0]);
@@ -554,6 +663,9 @@ const [exchangeLon, exchangeLat] = firstLatLon(STOCK_EXCHANGES, [-74.0, 40.7]);
 const [financialCenterLon, financialCenterLat] = firstLatLon(FINANCIAL_CENTERS, [-74.0, 40.7]);
 const [centralBankLon, centralBankLat] = firstLatLon(CENTRAL_BANKS, [-77.0, 38.9]);
 const [commodityHubLon, commodityHubLat] = firstLatLon(COMMODITY_HUBS, [-87.6, 41.8]);
+const [miningSiteLon, miningSiteLat] = firstLatLon(MINING_SITES, [-116.12, 40.73]);
+const [processingPlantLon, processingPlantLat] = firstLatLon(PROCESSING_PLANTS, [121.5, -30.7]);
+const [commodityPortLon, commodityPortLat] = firstLatLon(COMMODITY_PORTS, [32.5, 29.9]);
 
 const VISUAL_SCENARIOS: VisualScenario[] = [
   {
@@ -834,6 +946,70 @@ const VISUAL_SCENARIOS: VisualScenario[] = [
     expectedDeckLayers: ['commodity-hubs-layer'],
     expectedSelectors: [],
   },
+  {
+    id: 'mining-sites-z5',
+    variant: 'commodity',
+    enabledLayers: ['miningSites'],
+    camera: toCamera(miningSiteLon, miningSiteLat, 5.2),
+    expectedDeckLayers: ['mining-sites-layer'],
+    expectedSelectors: [],
+  },
+  {
+    id: 'processing-plants-z5',
+    variant: 'commodity',
+    enabledLayers: ['processingPlants'],
+    camera: toCamera(processingPlantLon, processingPlantLat, 5.2),
+    expectedDeckLayers: ['processing-plants-layer'],
+    expectedSelectors: [],
+  },
+  {
+    id: 'commodity-ports-z5',
+    variant: 'commodity',
+    enabledLayers: ['commodityPorts'],
+    camera: toCamera(commodityPortLon, commodityPortLat, 5.2),
+    expectedDeckLayers: ['commodity-ports-layer'],
+    expectedSelectors: [],
+  },
+  {
+    id: 'positive-events-z5',
+    variant: 'happy',
+    enabledLayers: ['positiveEvents'],
+    camera: seededCameras.positiveEvents,
+    expectedDeckLayers: ['positive-events-layer'],
+    expectedSelectors: [],
+  },
+  {
+    id: 'kindness-z5',
+    variant: 'happy',
+    enabledLayers: ['kindness'],
+    camera: seededCameras.kindness,
+    expectedDeckLayers: ['kindness-layer'],
+    expectedSelectors: [],
+  },
+  {
+    id: 'species-recovery-z5',
+    variant: 'happy',
+    enabledLayers: ['speciesRecovery'],
+    camera: seededCameras.speciesRecovery,
+    expectedDeckLayers: ['species-recovery-layer'],
+    expectedSelectors: [],
+  },
+  {
+    id: 'renewable-installations-z5',
+    variant: 'happy',
+    enabledLayers: ['renewableInstallations'],
+    camera: seededCameras.renewableInstallations,
+    expectedDeckLayers: ['renewable-installations-layer'],
+    expectedSelectors: [],
+  },
+  {
+    id: 'disease-outbreaks-z5',
+    variant: 'full',
+    enabledLayers: ['diseaseOutbreaks'],
+    camera: seededCameras.diseaseOutbreaks,
+    expectedDeckLayers: ['disease-outbreaks-layer'],
+    expectedSelectors: [],
+  },
   // Note: `sanctions` has no map renderer in DeckGLMap today; excluded from visual scenarios.
 ];
 
@@ -851,6 +1027,10 @@ const currentHarnessVariant: HarnessVariant = SITE_VARIANT === 'tech'
   ? 'energy'
   : SITE_VARIANT === 'finance'
   ? 'finance'
+  : SITE_VARIANT === 'commodity'
+  ? 'commodity'
+  : SITE_VARIANT === 'happy'
+  ? 'happy'
   : 'full';
 
 const buildProtests = (scenario: Scenario): SocialUnrestEvent[] => {
@@ -1235,6 +1415,11 @@ const seedAllDynamicData = (): void => {
   map.setMilitaryVessels(militaryVessels, militaryVesselClusters);
   map.setNaturalEvents(naturalEvents);
   map.setClimateAnomalies(climateAnomalies);
+  map.setDiseaseOutbreaks(SEEDED_DISEASE_OUTBREAKS);
+  map.setPositiveEvents(SEEDED_POSITIVE_EVENTS);
+  map.setKindnessData(SEEDED_KINDNESS_POINTS);
+  map.setSpeciesRecoveryZones(SEEDED_SPECIES_RECOVERY);
+  map.setRenewableInstallations(SEEDED_RENEWABLE_INSTALLATIONS);
   map.setFires([
     {
       lat: -5.4,
@@ -1489,6 +1674,14 @@ window.__mapHarness = {
   getProtestClusterCount,
   getOverlaySnapshot,
   getCyberTooltipHtml,
+  showChinaCorridor: (index = 0): void => {
+    const definition = CHINA_LOGISTICS_CORRIDORS[index] ?? CHINA_LOGISTICS_CORRIDORS[0]!;
+    map.setChinaCorridorSelection({
+      ...definition,
+      availability: 'partial',
+      conditions: [],
+    });
+  },
   destroy: (): void => {
     map.destroy();
   },

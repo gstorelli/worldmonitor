@@ -2,6 +2,8 @@ import * as d3 from 'd3';
 import { escapeHtml } from '@/utils/sanitize';
 import { getCSSColor } from '@/utils';
 import { t } from '@/services/i18n';
+import { setTrustedHtml, trustedHtml } from '@/utils/dom-utils';
+
 
 export interface TimelineEvent {
   timestamp: number;
@@ -68,7 +70,7 @@ export class CountryTimeline {
       border: `1px solid ${getCSSColor('--border')}`,
       borderRadius: '6px',
       padding: '6px 10px',
-      fontSize: '12px',
+      fontSize: 'calc(12px * var(--wm-panel-effective-scale, 1))',
       color: getCSSColor('--text'),
       zIndex: '9999',
       display: 'none',
@@ -161,7 +163,7 @@ export class CountryTimeline {
       .attr('transform', `translate(0,${innerH})`)
       .call(xAxis);
 
-    xAxisG.selectAll('text').attr('fill', getCSSColor('--text-dim')).attr('font-size', '10px');
+    xAxisG.selectAll('text').attr('fill', getCSSColor('--text-dim')).style('font-size', 'calc(10px * var(--wm-panel-effective-scale, 1))');
     xAxisG.selectAll('line').attr('stroke', getCSSColor('--border'));
     xAxisG.select('.domain').attr('stroke', getCSSColor('--border'));
 
@@ -180,7 +182,7 @@ export class CountryTimeline {
       .attr('text-anchor', 'end')
       .attr('dominant-baseline', 'central')
       .attr('fill', (d: TimelineEvent['lane']) => LANE_COLORS[d])
-      .attr('font-size', '11px')
+      .style('font-size', 'calc(11px * var(--wm-panel-effective-scale, 1))')
       .attr('font-weight', '500')
       .text((d: TimelineEvent['lane']) => laneLabels[d] || d);
   }
@@ -207,7 +209,7 @@ export class CountryTimeline {
       .attr('y', -6)
       .attr('text-anchor', 'middle')
       .attr('fill', getCSSColor('--text-muted'))
-      .attr('font-size', '9px')
+      .style('font-size', 'calc(9px * var(--wm-panel-effective-scale, 1))')
       .text(t('components.countryTimeline.now'));
   }
 
@@ -228,7 +230,7 @@ export class CountryTimeline {
       .attr('text-anchor', 'middle')
       .attr('dominant-baseline', 'central')
       .attr('fill', getCSSColor('--text-ghost'))
-      .attr('font-size', '10px')
+      .style('font-size', 'calc(10px * var(--wm-panel-effective-scale, 1))')
       .attr('font-style', 'italic')
       .text(t('components.countryTimeline.noEventsIn7Days'));
   }
@@ -257,7 +259,7 @@ export class CountryTimeline {
       .on('mouseenter', function (event: MouseEvent, d: TimelineEvent) {
         d3.select(this).attr('opacity', 1).attr('stroke', getCSSColor('--text')).attr('stroke-width', 1.5);
         const dateStr = fmt(new Date(d.timestamp));
-        tooltip.innerHTML = `<strong>${escapeHtml(d.label)}</strong><br/>${escapeHtml(dateStr)}`;
+        setTrustedHtml(tooltip, trustedHtml(`<strong>${escapeHtml(d.label)}</strong><br/>${escapeHtml(dateStr)}`, "legacy direct innerHTML migration"));
         tooltip.style.display = 'block';
         const rect = container.getBoundingClientRect();
         const x = event.clientX - rect.left + 12;

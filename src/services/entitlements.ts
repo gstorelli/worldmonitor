@@ -4,10 +4,18 @@ export interface EntitlementState {
     tier: number;
     apiAccess: boolean;
     apiRateLimit: number;
+    planLimits?: {
+      apiRequestsPerDay: number | null;
+      apiBurstRequestsPerMinute: number | null;
+      mcpCallsPerDay: number | null;
+      mcpBurstRequestsPerMinute: number | null;
+      dashboardAiCallsPerDay?: number | null;
+    };
     maxDashboards: number;
     prioritySupport: boolean;
     exportFormats: string[];
     mcpAccess?: boolean;
+    dataExport?: boolean;
   };
   validUntil: number;
 }

@@ -20,7 +20,9 @@ import {
   mapItem,
   diseaseContentMeta,
   diseasePublishTransform,
+  cleanRssDescription,
   DISEASE_MAX_CONTENT_AGE_MIN,
+  ALERT_LEVEL_METHODOLOGY_VERSION,
 } from './_disease-outbreaks-helpers.mjs';
 
 loadEnvFile(import.meta.url);
@@ -86,9 +88,7 @@ async function fetchRssItems(url, sourceName) {
       const title = (block.match(/<title>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/title>/) || [])[1]?.trim() || '';
       const link = (block.match(/<link>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/link>/) || [])[1]?.trim() || '';
       const rawDesc = (block.match(/<description>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/description>/) || [])[1] || '';
-      const desc = rawDesc
-        .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, ' ')
-        .replace(/<[^>]+>/g, '').trim().slice(0, 300);
+      const desc = cleanRssDescription(rawDesc);
       const pubDate = (block.match(/<pubDate>(.*?)<\/pubDate>/) || [])[1]?.trim() || '';
       // Per-item synthetic-tag normalization lives in _disease-outbreaks-helpers.mjs
       // (rssNormalizeItem) so tests verify the exact contract without duplicating logic.
@@ -139,7 +139,7 @@ async function fetchThinkGlobalHealth() {
     for (const rec of records) {
       if (rec.lat == null || rec.lng == null || !rec.disease || !rec.date) continue;
       const publishedMs = new Date(rec.date).getTime();
-      if (isNaN(publishedMs) || publishedMs < cutoff) continue;
+      if (Number.isNaN(publishedMs) || publishedMs < cutoff) continue;
       // Per-item normalization lives in _disease-outbreaks-helpers.mjs
       // (tghNormalizeItem) so tests verify the exact contract without duplicating logic.
       items.push(tghNormalizeItem(rec));
@@ -197,7 +197,16 @@ async function fetchDiseaseOutbreaks() {
   // Up to 150 TGH geo-pinned alerts + up to 50 from other authoritative sources.
   const outbreaks = [...tghSorted.slice(0, 150), ...dedupedOthers.slice(0, 50)];
 
-  return { outbreaks, fetchedAt: Date.now() };
+  // Stamp the editorial-classifier version onto the wire payload so the field
+  // bumps observably when ALERT_LEVEL_METHODOLOGY_VERSION moves per the change
+  // protocol in docs/methodology/disease-alert-level.mdx. Without this, the
+  // constant exists but nothing consumes it — bumping it has no observable
+  // effect on clients or the canonical key.
+  return {
+    outbreaks,
+    fetchedAt: Date.now(),
+    alertLevelMethodologyVersion: ALERT_LEVEL_METHODOLOGY_VERSION,
+  };
 }
 
 function validate(data) {

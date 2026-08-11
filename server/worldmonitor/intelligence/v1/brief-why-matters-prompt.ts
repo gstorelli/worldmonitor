@@ -12,8 +12,8 @@
  * LLM latency predictable.
  */
 
-import { WHY_MATTERS_ANALYST_SYSTEM_V2 } from '../../../../shared/brief-llm-core.js';
-import { sanitizeForPrompt } from '../../../_shared/llm-sanitize.js';
+import { WHY_MATTERS_ANALYST_SYSTEM_V2, briefDateLine } from '../../../../shared/brief-llm-core.js';
+import { sanitizeForPromptLine } from '../../../_shared/llm-sanitize.js';
 import type { BriefStoryContext } from './brief-story-context';
 
 export interface StoryForPrompt {
@@ -30,19 +30,28 @@ export interface StoryForPrompt {
 /**
  * Sanitize all untrusted string fields before interpolating into the
  * LLM prompt. Defense-in-depth: the endpoint is already
- * RELAY_SHARED_SECRET-gated, but repo convention applies
- * `sanitizeForPrompt` at every LLM boundary regardless of auth tier.
+ * RELAY_SHARED_SECRET-gated, but repo convention applies prompt
+ * sanitization at every LLM boundary regardless of auth tier.
  * Strips role markers, instruction overrides, control chars, etc.
+ *
+ * Every one of these fields is rendered as a single `Label: value` row in a
+ * newline-joined block -- here in `buildAnalystWhyMattersPrompt`, and identically
+ * in `buildWhyMattersUserPrompt` (shared/brief-llm-core.js:75), which the
+ * legacy relay path feeds from this same function. So the newline is the
+ * delimiter, and plain `sanitizeForPrompt` (which preserves a lone newline for
+ * prose) lets one feed value forge an extra `Key: value` line the model reads
+ * as a real field. `description` is the likeliest carrier: it is free-form
+ * article body. #5857 / #5881.
  */
 export function sanitizeStoryFields(story: StoryForPrompt): StoryForPrompt {
   return {
-    headline: sanitizeForPrompt(story.headline),
-    source: sanitizeForPrompt(story.source),
-    threatLevel: sanitizeForPrompt(story.threatLevel),
-    category: sanitizeForPrompt(story.category),
-    country: sanitizeForPrompt(story.country),
+    headline: sanitizeForPromptLine(story.headline),
+    source: sanitizeForPromptLine(story.source),
+    threatLevel: sanitizeForPromptLine(story.threatLevel),
+    category: sanitizeForPromptLine(story.category),
+    country: sanitizeForPromptLine(story.country),
     ...(typeof story.description === 'string' && story.description.length > 0
-      ? { description: sanitizeForPrompt(story.description) }
+      ? { description: sanitizeForPromptLine(story.description) }
       : {}),
   };
 }
@@ -67,10 +76,12 @@ const CONTEXT_BUDGET_CHARS = 1700;
 // stories don't see domestic risk scores; etc. The model physically cannot
 // cite what it wasn't given.
 //
-// Matching is case-insensitive substring on the story's category slug
-// (shared/brief-filter.js:134 — category is free-form like "Humanitarian
-// Crisis", "Geopolitical Risk", "Energy"). First match wins. Unknown →
-// DEFAULT_SECTIONS (all six — same as pre-gating behavior).
+// Category matching is case-insensitive because the production brief
+// envelope carries Title-Cased canonical EventCategory values. A narrow
+// story-text override below handles local stories whose canonical category
+// is necessarily broader (for example a historical genocide retrospective
+// classified as Conflict). First match wins. Unknown → DEFAULT_SECTIONS
+// (all six — same as pre-gating behavior).
 type SectionKey = Exclude<keyof BriefStoryContext, 'degraded'>;
 
 // Per-section caps so no single heavy bundle (e.g. long worldBrief)
@@ -94,6 +105,31 @@ const DEFAULT_SECTIONS: SectionKey[] = [
   'marketData',
 ];
 
+const LOCAL_SECTIONS: SectionKey[] = ['countryBrief', 'riskScores'];
+
+// The production classifier deliberately emits a small canonical category
+// enum, so justice/history/human-interest are often represented as General,
+// Crime, or even Conflict when a phrase such as "genocide" or "mass casualty"
+// wins keyword classification. Use grounded story text to recover that local
+// scope without weakening genuine active-conflict routing.
+const LOCAL_HISTORY_OR_HUMAN_INTEREST_RE =
+  /\b(?:historical memory|anniversar(?:y|ies)|commemorat(?:e|es|ed|ing|ion|ions)|memorials?|retrospective|survivors?\s+of\s+(?:the\s+)?(?:19|20)\d{2}|human[\s-]?interest|obituar(?:y|ies)|celebrit(?:y|ies)|entertainment)\b/i;
+const LOCAL_JUSTICE_RE =
+  /\b(?:court|judge|judicial|plaintiffs?|defendants?|lawsuits?|rulings?|sentenc(?:e|es|ed|ing)|convict(?:ed|ion|ions)?|extradit(?:e|es|ed|ing|ion|ions)|guilty pleas?|pleads? guilty|prosecut(?:e|es|ed|ing|ion|ions|or|ors)|indict(?:ed|ment|ments)?|trials?|appeals?|reparations?)\b/i;
+const ACTIVE_GEOPOLITICAL_RE =
+  /\b(?:airstrikes?|missiles?|troops?|military|war|armed conflict|ceasefires?|invasion|bombing|drone strikes?|nuclear|hostages?|genocides?|ethnic cleansing|terror(?:ism|ists?| attacks?)?)\b/i;
+
+function storyUsesLocalContext(story: StoryForPrompt): boolean {
+  // Only repair the broad classifier buckets that swallowed the reported
+  // local stories. Specific categories (Energy, Economic, Diplomatic, etc.)
+  // already carry stronger editorial intent and must keep their own policy
+  // even when a headline happens to mention a court or ruling.
+  if (!/^(?:conflict|general)$/i.test(story.category)) return false;
+  const text = `${story.headline} ${story.description ?? ''}`;
+  if (LOCAL_HISTORY_OR_HUMAN_INTEREST_RE.test(text)) return true;
+  return LOCAL_JUSTICE_RE.test(text) && !ACTIVE_GEOPOLITICAL_RE.test(text);
+}
+
 // NOTE on regex shape: patterns use a LEADING `\b` (start-of-word
 // anchor) but NO TRAILING `\b`, so they match stems. "Diplomac" must
 // match "Diplomacy" and "Diplomatic"; "migrat" must match "migration"
@@ -107,9 +143,20 @@ const CATEGORY_SECTION_POLICY: Array<{ match: RegExp; sections: SectionKey[]; la
     match: /\b(energy|commodit|market|financ|trade|oil|gas|fuel)/i,
     sections: ['worldBrief', 'countryBrief', 'forecasts', 'macroSignals', 'marketData'],
   },
+  // Justice, history, and human-interest stories are usually local to the
+  // reported event. Do not feed them the global narrative or forecasts: a
+  // country-specific fact can still help, but a live conflict storyline
+  // should not be shoehorned into a court ruling or historical commemoration.
+  {
+    label: 'local',
+    match: /\b(justice|court|legal|law\b|crime|criminal|history|historical|heritage|culture|human.?interest|obituar|celebrity|entertainment)/i,
+    sections: LOCAL_SECTIONS,
+  },
   // Humanitarian / civil / social / rights — NO market, NO forecasts.
   // This is the #1 source of the "77% FX stress dragged into a Rwanda
-  // story" pattern from the 2026-04-22 shadow review.
+  // story" pattern from the 2026-04-22 shadow review. Keep this after the
+  // local rule so a combined label such as "Civil Rights Court Ruling"
+  // receives the narrower court-story context.
   {
     label: 'humanitarian',
     match: /\b(humanitarian|refuge|civil|social|rights|genocid|aid\b|migrat)/i,
@@ -154,8 +201,8 @@ const CATEGORY_SECTION_POLICY: Array<{ match: RegExp; sections: SectionKey[]; la
  * story category. Exported for testability — the category → sections
  * map is the main lever for tuning analyst output relevance.
  *
- * @param category — the story's category slug (free-form, from the cron
- *   payload). `""` or unknown categories fall back to DEFAULT_SECTIONS.
+ * @param category — the story's category from the cron payload. `""` or
+ *   unknown categories fall back to DEFAULT_SECTIONS.
  */
 export function sectionsForCategory(category: string): {
   sections: SectionKey[];
@@ -221,9 +268,12 @@ export function buildContextBlock(
 export function buildAnalystWhyMattersPrompt(
   story: StoryForPrompt,
   context: BriefStoryContext,
+  todayIso?: string,
 ): { system: string; user: string; policyLabel: string } {
   const safe = sanitizeStoryFields(story);
-  const { sections: allowedSections, policyLabel } = sectionsForCategory(safe.category);
+  const { sections: allowedSections, policyLabel } = storyUsesLocalContext(safe)
+    ? { sections: LOCAL_SECTIONS, policyLabel: 'local' }
+    : sectionsForCategory(safe.category);
   const contextBlock = buildContextBlock(context, allowedSections);
 
   const storyLineList = [
@@ -238,7 +288,7 @@ export function buildAnalystWhyMattersPrompt(
 
   const parts: string[] = [];
   if (contextBlock) {
-    parts.push('# Live WorldMonitor Context', contextBlock);
+    parts.push('# Optional Live WorldMonitor Context', contextBlock);
   }
   parts.push('# Story', storyLines);
   // Prompt footer restates the grounding requirement inline (models
@@ -258,16 +308,22 @@ export function buildAnalystWhyMattersPrompt(
   // and that a named actor from the headline / description is a valid
   // grounding target when no context fact is a clean fit.
   parts.push(
-    `Write 2–3 sentences (40–70 words) on why this ${safe.category || 'story'} matters, grounded in at ` +
-      "least ONE specific reference. Prefer a fact drawn from the context block above WHEN it clearly " +
-      "relates to this story's category and country. If no context fact is a clean fit, ground " +
+    `Write 1–2 sentences (25–40 words) on why this ${safe.category || 'story'} matters, grounded in at ` +
+      "least ONE specific reference. Reference the global context only when materially connected to this " +
+      "story's category and country; most stories should not mention the global context. If no context fact is a clean fit, ground " +
       'instead in a named actor, place, date, or figure from the headline or description. ' +
       'DO NOT force an off-topic market metric, VIX value, FX reading, or forecast probability ' +
-      "into a story where it does not belong. Plain prose, no section labels in the output:",
+      'into a story where it does not belong. Treat forecasts as private reasoning input: do not quote raw ' +
+      'forecast probabilities or present them as user-facing facts. Be concise and vary sentence structure; avoid a stock ' +
+      '"This…" second-sentence opener or "Watch for…" closer. Plain prose, no section labels in the output:',
   );
 
+  // F6: append the current date so the analyst does not fabricate
+  // years from training-data priors (a May 2026 brief shipped a
+  // "deploy ... in 2024" whyMatters). `todayIso` is injectable for
+  // deterministic tests; production callers pass nothing.
   return {
-    system: WHY_MATTERS_ANALYST_SYSTEM_V2,
+    system: `${WHY_MATTERS_ANALYST_SYSTEM_V2}\n${briefDateLine(todayIso)}`,
     user: parts.join('\n\n'),
     policyLabel,
   };
