@@ -1,13 +1,22 @@
 # =============================================================================
-# World Monitor — Docker / Podman Compose
+# World Monitor — Docker / Podman Compose (nginx-proxy production layout)
 # =============================================================================
 # Self-contained stack: app + Redis + AIS relay.
 #
-# Quick start:
+# Quick start (dev, no proxy):
 #   cp .env.example .env        # add your API keys
 #   docker compose up -d --build
 #
-# The app will be available at http://localhost:3000
+# Production (Contabo VPS behind jwilder/nginx-proxy + acme-companion):
+#   - the `worldmonitor` container joins the EXTERNAL `nginx-proxy` network
+#     and is routed via VIRTUAL_HOST / LETSENCRYPT_HOST
+#   - NO host ports are exposed: all inbound traffic passes through the proxy
+#   - Redis/relay stay on the isolated `internal-net` bridge
+#   - one-time server setup:
+#       docker network create nginx-proxy   # must exist before compose up
+#       cp .env.example .env && $EDITOR .env
+#   - to reach the app locally during debugging, run a throwaway mapping:
+#       docker run --rm -p 8080:8080 --env-file .env --network <stack>_internal-net worldmonitor:latest
 # =============================================================================
 
 services:
@@ -18,9 +27,17 @@ services:
       dockerfile: Dockerfile
     image: worldmonitor:latest
     container_name: worldmonitor
-    ports:
-      - "${WM_PORT:-3000}:8080"
+    networks:
+      - nginx-proxy
+      - internal-net
     environment:
+      # ── jwilder/nginx-proxy routing (external network) ──
+      VIRTUAL_HOST: risksentinel.opencyber.org
+      LETSENCRYPT_HOST: risksentinel.opencyber.org
+      LETSENCRYPT_EMAIL: info@opencyber.org
+      # Internal port the container nginx listens on (Dockerfile EXPOSE 8080)
+      VIRTUAL_PORT: "8080"
+      # ── App configuration ──
       UPSTASH_REDIS_REST_URL: "http://redis-rest:80"
       UPSTASH_REDIS_REST_TOKEN: "${REDIS_TOKEN:?REDIS_TOKEN required — generate with: openssl rand -hex 32}"
       LOCAL_API_PORT: "46123"
@@ -50,7 +67,6 @@ services:
       TRAVELPAYOUTS_API_TOKEN: "${TRAVELPAYOUTS_API_TOKEN:-}"
     # Docker secrets (recommended for API keys — keeps them out of docker inspect).
     # Create secrets/ dir with one file per key, then uncomment below.
-    # See SELF_HOSTING.md or docker-compose.override.yml for details.
     # secrets:
     #   - GROQ_API_KEY
     #   - AISSTREAM_API_KEY
@@ -71,6 +87,8 @@ services:
       dockerfile: Dockerfile.relay
     image: worldmonitor-ais-relay:latest
     container_name: worldmonitor-ais-relay
+    networks:
+      - internal-net
     environment:
       AISSTREAM_API_KEY: "${AISSTREAM_API_KEY:-}"
       FINNHUB_API_KEY: "${FINNHUB_API_KEY:-}"
@@ -88,6 +106,8 @@ services:
   redis:
     image: docker.io/redis:7-alpine
     container_name: worldmonitor-redis
+    networks:
+      - internal-net
     # --requirepass closes off the network so any future sidecar / compromised
     # dependency added to the worldmonitor network can't read or write cache
     # entries without the password. Defense-in-depth alongside the REST token.
@@ -106,8 +126,8 @@ services:
       dockerfile: Dockerfile.redis-rest
     image: worldmonitor-redis-rest:latest
     container_name: worldmonitor-redis-rest
-    ports:
-      - "127.0.0.1:8079:80"
+    networks:
+      - internal-net
     environment:
       SRH_TOKEN: "${REDIS_TOKEN:?REDIS_TOKEN required — generate with: openssl rand -hex 32}"
       # Defense-in-depth: the redis service's --requirepass already fails
@@ -134,6 +154,15 @@ services:
 #     file: ./secrets/nasa_firms_api_key.txt
 #   LLM_API_KEY:
 #     file: ./secrets/llm_api_key.txt
+
+networks:
+  # Created once on the host: docker network create nginx-proxy
+  nginx-proxy:
+    external: true
+  # Isolated bridge for Redis + relay + redis-rest. The public-facing
+  # worldmonitor container joins BOTH networks.
+  internal-net:
+    driver: bridge
 
 volumes:
   redis-data:

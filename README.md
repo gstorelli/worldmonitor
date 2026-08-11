@@ -24,6 +24,8 @@
 - [Stack Tecnologico](#stack-tecnologico)
 - [Quick Start](#quick-start)
 - [Configurazione Variabili d'Ambiente](#configurazione-variabili-dambiente)
+- [Deployment di Produzione (Contabo VPS)](#deployment-di-produzione-contabo-vps)
+- [Sincronizzazione con il repository upstream (koala73/worldmonitor)](#sincronizzazione-con-il-repository-upstream-koala73worldmonitor)
 - [Struttura Repository](#struttura-repository)
 - [Pannelli Disponibili](#pannelli-disponibili)
 - [Roadmap e Next Steps](#roadmap-e-next-steps)
@@ -395,6 +397,128 @@ git merge upstream/main --no-edit                                     # risolver
 npm run typecheck:all
 npm run test:sidecar
 ```
+
+---
+
+## Deployment di Produzione (Contabo VPS)
+
+Risk Sentinel gira in produzione su un **Contabo VPS** dietro un reverse proxy
+centralizzato basato su **`jwilder/nginx-proxy`** + **`nginx-proxy/acme-companion`**
+(routing per dominio e certificati Let's Encrypt globali).
+
+### Architettura di rete
+
+```
+Internet
+   │  https://risksentinel.opencyber.org
+   ▼
+jwilder/nginx-proxy  (rete esterna "nginx-proxy", acme-companion per TLS)
+   │  VIRTUAL_HOST risposto dal container worldmonitor (porta interna 8080)
+   ▼
+┌─ container worldmonitor ──────────────────────────────────────────────┐
+│ Nginx (8080) → SPA statica + proxy /api/* → local-api-server (Node)  │
+└────────────────────────────────────────────────────────────────────────┘
+   │ rete interna "internal-net"
+   ▼
+redis ⇄ redis-rest (Upstash-compatibile) · ais-relay
+```
+
+- **Nessuna porta host esposta**: tutto il traffico entrante passa solo dalla
+  rete `nginx-proxy` (`VIRTUAL_HOST` / `LETSENCRYPT_HOST` in `docker-compose.yml`).
+- Redis, proxy `redis-rest` e relay AIS restano sulla rete isolata `internal-net`.
+- La rete esterna deve esistere sull'host: `docker network create nginx-proxy`.
+
+### Setup una tantum del server
+
+```bash
+# 1. (se non presente) rete esterna del proxy
+docker network create nginx-proxy
+
+# 2. checkout del repository nella DEPLOY_PATH (es. /srv/worldmonitor)
+git clone https://github.com/gstorelli/worldmonitor.git /srv/worldmonitor
+cd /srv/worldmonitor
+
+# 3. ambiente di produzione
+cp .env.example .env
+$EDITOR .env
+#    → obbligatori: REDIS_PASSWORD, REDIS_TOKEN (openssl rand -hex 32)
+#    → consigliati: N8N_INGEST_SECRET, API_MCP_N8N e le API keys dati
+
+# 4. avvio dello stack (si aggancia alla rete nginx-proxy)
+docker compose up -d --build
+
+# 5. verifica
+curl https://risksentinel.opencyber.org/api/version
+curl -X POST https://risksentinel.opencyber.org/api/n8n/ingest \
+     -H "Authorization: Bearer $N8N_INGEST_SECRET" \
+     -H "Content-Type: application/json" \
+     -d '{"pipeline":"customs-intelligence","alerts":[]}'
+```
+
+> ⚠️ **Non modificare la porta host nel compose**: `VIRTUAL_PORT=8080` indica al
+> proxy la porta interna del container. Per test locali usa un override
+> (`docker run -p 8080:8080 ...`) senza toccare il file di produzione.
+
+### Deploy automatico (GitHub Actions)
+
+Il workflow [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) viene
+eseguito a **ogni push sul branch `main`** (inclusi i push automatici di Kilo
+Code): via SSH su Contabo esegue `git pull origin main`, `docker compose up -d
+--build` e `docker image prune -f`.
+
+**GitHub Secrets richiesti** (Settings → Secrets and variables → Actions):
+
+| Secret | Descrizione |
+|--------|-------------|
+| `SERVER_HOST` | IP/hostname del VPS (es. `123.123.123.123`) |
+| `SERVER_USER` | Utente SSH (es. `root` o utente con permessi docker) |
+| `SSH_PRIVATE_KEY` | Chiave privata SSH (formato PEM) autorizzata sul VPS |
+| `DEPLOY_PATH` | Percorso assoluto del checkout sul VPS (es. `/srv/worldmonitor`) |
+| `SERVER_PORT` | *(opzionale)* porta SSH, default `22` |
+
+### Deploy manuale (fallback)
+
+Sul VPS (stesso set di comandi del workflow):
+
+```bash
+./scripts/deploy.sh /srv/worldmonitor
+```
+
+### Integrazione n8n MCP
+
+Il workspace MCP del progetto è configurato in [`.mcp/n8n-mcp.json`](.mcp/n8n-mcp.json)
+per esporre l'istanza n8n esterna come server MCP:
+
+```json
+{
+  "mcpServers": {
+    "n8n-mcp": {
+      "type": "http",
+      "url": "https://automata.opencyber.org/mcp-server/http",
+      "headers": {
+        "Authorization": "Bearer ${API_MCP_N8N}"
+      }
+    }
+  }
+}
+```
+
+- **Token**: variabile `API_MCP_N8N` (vedi `.env.example`). I client MCP che
+  espandono le variabili d'ambiente la risolveranno automaticamente; se il tuo
+  client non supporta l'espansione, sostituisci `${API_MCP_N8N}` con il token
+  reale **senza committarlo** (il file è pensato come template).
+- **CLI helper** per interagire con il server MCP da script/pipeline:
+
+```bash
+API_MCP_N8N=xxx node scripts/n8n-mcp.mjs list-tools
+API_MCP_N8N=xxx node scripts/n8n-mcp.mjs call "esegui-workflow-customs" '{"source":"gdelt"}'
+```
+
+- **CORS**: l'origin di produzione `https://risksentinel.opencyber.org` (e i
+  sottodomini `opencyber.org`) sono aggiunti agli allowlist di `api/_cors.js` e
+  del sidecar API, così client web e integrazioni possono interrogare gli
+  endpoint API; SPA e API condividono comunque lo stesso origin, quindi le
+  chiamate interne non richiedono CORS.
 
 ---
 

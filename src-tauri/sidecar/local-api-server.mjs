@@ -602,6 +602,10 @@ const SIDECAR_ALLOWED_ORIGINS = [
   // The previous (.*\.)? pattern was overly broad. Anchored to prevent spoofing
   // via domains like worldmonitorEVIL.vercel.app.
   /^https:\/\/([a-z0-9-]+\.)?worldmonitor\.app$/,
+  // Risk Sentinel production origin + opencyber.org infrastructure subdomains
+  // (the nginx-proxy front routes browser traffic to this server).
+  /^https:\/\/([a-z0-9-]+\.)?risksentinel\.opencyber\.org$/,
+  /^https:\/\/([a-z0-9-]+\.)?opencyber\.org$/,
 ];
 
 function getSidecarCorsOrigin(req) {

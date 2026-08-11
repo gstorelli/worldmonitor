@@ -1,5 +1,9 @@
 const ALLOWED_ORIGIN_PATTERNS = [
   /^https:\/\/(.*\.)?worldmonitor\.app$/,
+  // Risk Sentinel production origin (self-hosted behind nginx-proxy) plus
+  // the opencyber.org infrastructure domain (n8n / automata console).
+  /^https:\/\/(.*\.)?risksentinel\.opencyber\.org$/,
+  /^https:\/\/(.*\.)?opencyber\.org$/,
   // Vercel preview deployments under the "eliewm" team scope, e.g.
   //   worldmonitor-git-<branch>-eliewm.vercel.app  (git-branch alias)
   //   worldmonitor-<hash>-eliewm.vercel.app        (deployment URL)
