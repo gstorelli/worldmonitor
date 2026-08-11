@@ -4,8 +4,6 @@
  */
 
 import { filterCountries, getAllCountries, type CountryListEntry } from './RouteExplorer.utils';
-import { setTrustedHtml, trustedHtml } from '@/utils/dom-utils';
-
 
 export interface CountryPickerOptions {
   placeholder?: string;
@@ -84,7 +82,7 @@ export class CountryPicker {
   }
 
   private renderList(): void {
-    setTrustedHtml(this.list, trustedHtml('', "legacy direct innerHTML migration"));
+    this.list.innerHTML = '';
     if (this.results.length === 0) {
       const empty = document.createElement('li');
       empty.className = 're-picker__empty';
@@ -102,7 +100,7 @@ export class CountryPicker {
         li.classList.add('re-picker__item--active');
         li.setAttribute('aria-selected', 'true');
       }
-      setTrustedHtml(li, trustedHtml(`<span class="re-picker__flag">${entry.flag}</span><span class="re-picker__name">${escapeHtml(entry.name)}</span><span class="re-picker__code">${entry.iso2}</span>`, "legacy direct innerHTML migration"));
+      li.innerHTML = `<span class="re-picker__flag">${entry.flag}</span><span class="re-picker__name">${escapeHtml(entry.name)}</span><span class="re-picker__code">${entry.iso2}</span>`;
       this.list.append(li);
     });
   }

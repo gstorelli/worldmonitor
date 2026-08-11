@@ -6,16 +6,27 @@
  */
 
 import { getRpcBaseUrl } from '@/services/rpc-client';
-import type { ListMarketQuotesResponse, ListCommodityQuotesResponse, GetSectorSummaryResponse, ListCryptoQuotesResponse, ListCryptoSectorsResponse, CryptoSector, ListDefiTokensResponse, ListAiTokensResponse, ListOtherTokensResponse, MarketQuote as ProtoMarketQuote, MarketQuoteUnavailable, CryptoQuote as ProtoCryptoQuote } from '@/generated/client/worldmonitor/market/v1/service_client';
+import {
+  MarketServiceClient,
+  type ListMarketQuotesResponse,
+  type ListCommodityQuotesResponse,
+  type GetSectorSummaryResponse,
+  type ListCryptoQuotesResponse,
+  type ListCryptoSectorsResponse,
+  type CryptoSector,
+  type ListDefiTokensResponse,
+  type ListAiTokensResponse,
+  type ListOtherTokensResponse,
+  type MarketQuote as ProtoMarketQuote,
+  type CryptoQuote as ProtoCryptoQuote,
+} from '@/generated/client/worldmonitor/market/v1/service_client';
 import type { MarketData, CryptoData, TokenData } from '@/types';
 import { createCircuitBreaker } from '@/utils/circuit-breaker';
 import { getHydratedData } from '@/services/bootstrap';
-import { MarketServiceClient } from '@/services/generated-rpc-clients';
-import { proFreshRpcFetch } from '@/services/premium-fetch';
 
 // ---- Client + Circuit Breakers ----
 
-const client = new MarketServiceClient(getRpcBaseUrl(), { fetch: proFreshRpcFetch });
+const client = new MarketServiceClient(getRpcBaseUrl(), { fetch: (...args: Parameters<typeof fetch>) => globalThis.fetch(...args) });
 const MARKET_QUOTES_CACHE_TTL_MS = 5 * 60 * 1000;
 const stockBreaker = createCircuitBreaker<ListMarketQuotesResponse>({ name: 'Market Quotes', cacheTtlMs: MARKET_QUOTES_CACHE_TTL_MS, persistCache: true });
 const commodityBreaker = createCircuitBreaker<ListCommodityQuotesResponse>({ name: 'Commodity Quotes', cacheTtlMs: MARKET_QUOTES_CACHE_TTL_MS, persistCache: true });
@@ -29,11 +40,7 @@ const otherBreaker = createCircuitBreaker<ListOtherTokensResponse>({ name: 'Othe
 const emptyStockFallback: ListMarketQuotesResponse = { quotes: [], finnhubSkipped: false, skipReason: '', rateLimited: false, unavailableSymbols: [] };
 const emptyCommodityFallback: ListCommodityQuotesResponse = { quotes: [] };
 const emptySectorFallback: GetSectorSummaryResponse = { sectors: [] };
-const EMPTY_CRYPTO_FALLBACK: ListCryptoQuotesResponse = {
-  quotes: [],
-  unresolvedIds: [],
-  provider: 'degraded',
-};
+const emptyCryptoFallback: ListCryptoQuotesResponse = { quotes: [], unresolvedIds: [], provider: '' };
 const emptyCryptoSectorsFallback: ListCryptoSectorsResponse = { sectors: [] };
 const emptyDefiTokensFallback: ListDefiTokensResponse = { tokens: [] };
 const emptyAiTokensFallback: ListAiTokensResponse = { tokens: [] };
@@ -71,12 +78,6 @@ export interface MarketFetchResult {
   skipped?: boolean;
   reason?: string;
   rateLimited?: boolean;
-  /**
-   * Requested symbols that produced no quote, each with a reason (#6305).
-   * A custom watchlist ticker the fixed seed does not carry used to vanish
-   * from `data` with no signal at all.
-   */
-  unavailableSymbols?: MarketQuoteUnavailable[];
 }
 
 // ========================================================================
@@ -142,9 +143,6 @@ export async function fetchMultipleStocks(
     skipped: resp.finnhubSkipped || undefined,
     reason: resp.skipReason || undefined,
     rateLimited: resp.rateLimited || undefined,
-    // `resp` can be the pre-#6305 breaker cache or the empty fallback, so
-    // treat a missing field as "nothing to report" rather than trusting it.
-    unavailableSymbols: resp.unavailableSymbols?.length ? resp.unavailableSymbols : undefined,
   };
 }
 
@@ -245,7 +243,7 @@ export async function fetchCrypto(): Promise<CryptoData[]> {
 
   const resp = await cryptoBreaker.execute(async () => {
     return client.listCryptoQuotes({ ids: [] }); // empty = all defaults
-  }, EMPTY_CRYPTO_FALLBACK);
+  }, emptyCryptoFallback);
 
   const results = resp.quotes
     .map(toCryptoData)

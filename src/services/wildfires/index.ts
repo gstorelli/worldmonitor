@@ -1,12 +1,14 @@
 import { getRpcBaseUrl } from '@/services/rpc-client';
-import type { FireDetection, FireConfidence, ListFireDetectionsResponse } from '@/generated/client/worldmonitor/wildfire/v1/service_client';
+import {
+  WildfireServiceClient,
+  type FireDetection,
+  type FireConfidence,
+  type ListFireDetectionsResponse,
+} from '@/generated/client/worldmonitor/wildfire/v1/service_client';
 import { createCircuitBreaker } from '@/utils';
 import { getHydratedData } from '@/services/bootstrap';
-import { WildfireServiceClient } from '@/services/generated-rpc-clients';
-import { resolveFireDetectionTotalCount } from './payload';
 
 export type { FireDetection };
-export { resolveFireDetectionTotalCount } from './payload';
 
 // -- Types --
 
@@ -63,7 +65,7 @@ export async function fetchAllFires(_days?: number): Promise<FetchResult> {
     (regions[r] ??= []).push(d);
   }
 
-  return { regions, totalCount: resolveFireDetectionTotalCount(response) };
+  return { regions, totalCount: detections.length };
 }
 
 export function computeRegionStats(regions: Record<string, FireDetection[]>): FireRegionStats[] {

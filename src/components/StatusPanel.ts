@@ -15,7 +15,6 @@ export interface ApiStatus {
   name: string;
   status: StatusLevel;
   latency?: number;
-  errorMessage?: string;
 }
 
 // Allowlists for each variant
@@ -28,7 +27,7 @@ const TECH_FEEDS = new Set([
 ]);
 const TECH_APIS = new Set([
   'RSS Proxy', 'Finnhub', 'CoinGecko', 'Tech Events API', 'Service Status', 'Polymarket',
-  'Cyber Threats API', 'Signal Aggregator'
+  'Cyber Threats API'
 ]);
 
 const WORLD_FEEDS = new Set([
@@ -40,8 +39,7 @@ const WORLD_FEEDS = new Set([
 const WORLD_APIS = new Set([
   'RSS2JSON', 'Finnhub', 'CoinGecko', 'Polymarket', 'USGS', 'FRED',
   'AISStream', 'GDELT Doc', 'EIA', 'USASpending', 'PizzINT', 'FIRMS',
-  'Global Procurement',
-  'Cyber Threats API', 'BIS', 'WTO', 'SupplyChain', 'OFAC', 'Signal Aggregator'
+  'Cyber Threats API', 'BIS', 'WTO', 'SupplyChain', 'OFAC'
 ]);
 
 import { t } from '../services/i18n';

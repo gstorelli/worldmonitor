@@ -5,7 +5,6 @@
 
 import { pipeline, env } from '@xenova/transformers';
 import { MODEL_CONFIGS, type ModelConfig } from '@/config/ml-config';
-import { createLoadDeduper } from './load-dedupe';
 import { storeVectors, searchVectors, getCount, resetStore, sanitizeTitle, type VectorSearchResult } from './vector-db';
 
 // Configure transformers.js
@@ -120,11 +119,7 @@ type MLWorkerMessage =
 // Loaded pipelines (using unknown since pipeline types vary)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const loadedPipelines = new Map<string, any>();
-// Concurrent loads of the same model share one download; the entry clears
-// when the load settles (NOT only on success), so a transient failure is
-// retried on the next request instead of poisoning the model for the whole
-// session (#5425).
-const modelLoads = createLoadDeduper<string>();
+const loadingPromises = new Map<string, Promise<void>>();
 
 function getModelConfig(modelId: string): ModelConfig | undefined {
   return MODEL_CONFIGS.find(m => m.id === modelId);
@@ -137,15 +132,17 @@ function isSupportedModelId(modelId: string): boolean {
 async function loadModel(modelId: string): Promise<void> {
   if (loadedPipelines.has(modelId)) return;
 
+  // Prevent concurrent loads - return existing promise if loading
+  const existing = loadingPromises.get(modelId);
+  if (existing) return existing;
+
   const config = getModelConfig(modelId);
   if (!config) throw new Error(`Unknown model: ${modelId}`);
 
-  // Concurrent callers share one in-flight load; a failed load clears on
-  // settle so the next request re-attempts the download (#5425).
-  return modelLoads.run(modelId, async () => {
-    console.log(`[MLWorker] Loading model: ${config.hfModel}`);
-    const startTime = Date.now();
+  console.log(`[MLWorker] Loading model: ${config.hfModel}`);
+  const startTime = Date.now();
 
+  const loadPromise = (async () => {
     // Suppress verbose ONNX Runtime warnings (CleanUnusedInitializersAndNodeArgs)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const ort = (globalThis as any).ort;
@@ -164,11 +161,15 @@ async function loadModel(modelId: string): Promise<void> {
     });
 
     loadedPipelines.set(modelId, pipe);
+    loadingPromises.delete(modelId);
     console.log(`[MLWorker] Model loaded in ${Date.now() - startTime}ms: ${modelId}`);
 
     // Notify manager that model is now available (no id = unsolicited notification)
     self.postMessage({ type: 'model-loaded', modelId });
-  });
+  })();
+
+  loadingPromises.set(modelId, loadPromise);
+  return loadPromise;
 }
 
 function unloadModel(modelId: string): void {

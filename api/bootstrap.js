@@ -1,4 +1,11 @@
-import { waitUntil as vercelWaitUntil } from '@vercel/functions';
+// De-clouded self-hosted runtime: no Vercel @vercel/functions dependency.
+// Background work (R2 shadow reads) runs fire-and-forget on the Node server,
+// mirroring the deferred-execution semantics of Vercel's waitUntil().
+function waitUntil(promise) {
+  Promise.resolve(promise).catch((err) => {
+    console.error('[bootstrap] background waitUntil task failed', err);
+  });
+}
 
 import {
   PUBLIC_BOOTSTRAP_TIERS,
@@ -139,7 +146,7 @@ export function isAnonymousWeatherBootstrapRequest(req) {
 }
 
 let nextBootstrapR2ShadowProbeIsCold = true;
-let scheduleBootstrapR2Shadow = vercelWaitUntil;
+let scheduleBootstrapR2Shadow = waitUntil;
 let readBootstrapR2ShadowTier = readBootstrapTierObject;
 
 function shouldMeasureBootstrapR2Shadow(authKind, tier) {
@@ -574,7 +581,7 @@ export default async function handler(req, ctx) {
 export const __testing__ = {
   resetBootstrapR2ShadowForTests() {
     nextBootstrapR2ShadowProbeIsCold = true;
-    scheduleBootstrapR2Shadow = vercelWaitUntil;
+    scheduleBootstrapR2Shadow = waitUntil;
     readBootstrapR2ShadowTier = readBootstrapTierObject;
   },
   setWaitUntilForTests(waitUntil) {

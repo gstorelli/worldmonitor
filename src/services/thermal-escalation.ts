@@ -1,8 +1,14 @@
 import { getRpcBaseUrl } from '@/services/rpc-client';
 import { getHydratedData } from '@/services/bootstrap';
 import { createCircuitBreaker } from '@/utils';
-import type { ThermalConfidence as ProtoThermalConfidence, ThermalContext as ProtoThermalContext, ThermalEscalationCluster as ProtoThermalEscalationCluster, ThermalStatus as ProtoThermalStatus, ThermalStrategicRelevance as ProtoThermalStrategicRelevance } from '@/generated/client/worldmonitor/thermal/v1/service_client';
-import { ThermalServiceClient } from '@/services/generated-rpc-clients';
+import {
+  ThermalServiceClient,
+  type ThermalConfidence as ProtoThermalConfidence,
+  type ThermalContext as ProtoThermalContext,
+  type ThermalEscalationCluster as ProtoThermalEscalationCluster,
+  type ThermalStatus as ProtoThermalStatus,
+  type ThermalStrategicRelevance as ProtoThermalStrategicRelevance,
+} from '@/generated/client/worldmonitor/thermal/v1/service_client';
 
 export type ThermalStatus = 'normal' | 'elevated' | 'spike' | 'persistent';
 export type ThermalContext =

@@ -7,8 +7,6 @@ import {
 import { PanelGateReason } from '../services/panel-gating';
 import type { Panel } from './Panel';
 import { t } from '../services/i18n';
-import { setTrustedHtml, trustedHtml } from '@/utils/dom-utils';
-
 
 interface FrameworkSelectorOptions {
   panelId: AnalysisPanelId;
@@ -32,7 +30,7 @@ export class FrameworkSelector {
 
     const btn = document.createElement('button');
     btn.className = 'icon-btn framework-settings-btn';
-    setTrustedHtml(btn, trustedHtml('⚙', "legacy direct innerHTML migration"));
+    btn.innerHTML = '⚙';
     this.btn = btn;
 
     if (opts.isPremium) {
@@ -124,7 +122,7 @@ export class FrameworkSelector {
   }
 
   private populateOptions(select: HTMLSelectElement): void {
-    setTrustedHtml(select, trustedHtml('', "legacy direct innerHTML migration"));
+    select.innerHTML = '';
     const defaultOpt = document.createElement('option');
     defaultOpt.value = '';
     defaultOpt.textContent = t('components.frameworkSelector.defaultNeutral');

@@ -1,11 +1,10 @@
 import { Panel } from './Panel';
-import { joinSafeHtml, safeHtml } from '@/utils/sanitize';
+import { escapeHtml } from '@/utils/sanitize';
 import { type ClimateAnomaly, getSeverityIcon, formatDelta } from '@/services/climate';
 import { t } from '@/services/i18n';
 
 export class ClimateAnomalyPanel extends Panel {
   private anomalies: ClimateAnomaly[] = [];
-  private hasLoadedAnomalies = false;
   private onZoneClick?: (lat: number, lon: number) => void;
 
   constructor() {
@@ -25,18 +24,13 @@ export class ClimateAnomalyPanel extends Panel {
 
   public setAnomalies(anomalies: ClimateAnomaly[]): void {
     this.anomalies = anomalies;
-    this.hasLoadedAnomalies = true;
     this.setCount(anomalies.length);
     this.renderContent();
   }
 
-  public hasData(): boolean {
-    return this.hasLoadedAnomalies;
-  }
-
   private renderContent(): void {
     if (this.anomalies.length === 0) {
-      this.setSafeContent(safeHtml`<div class="panel-empty">${t('components.climate.noAnomalies')}</div>`);
+      this.setContent(`<div class="panel-empty">${t('components.climate.noAnomalies')}</div>`);
       return;
     }
 
@@ -45,22 +39,22 @@ export class ClimateAnomalyPanel extends Panel {
       return (severityOrder[a.severity] || 2) - (severityOrder[b.severity] || 2);
     });
 
-    const rows = joinSafeHtml(sorted.map(a => {
+    const rows = sorted.map(a => {
       const icon = getSeverityIcon(a);
       const tempClass = a.tempDelta > 0 ? 'climate-warm' : 'climate-cold';
       const precipClass = a.precipDelta > 0 ? 'climate-wet' : 'climate-dry';
       const sevClass = `severity-${a.severity}`;
       const rowClass = a.severity === 'extreme' ? ' climate-extreme-row' : '';
 
-      return safeHtml`<tr class="climate-row${rowClass}" data-lat="${a.lat}" data-lon="${a.lon}">
-        <td class="climate-zone"><span class="climate-icon">${icon}</span>${a.zone}</td>
+      return `<tr class="climate-row${rowClass}" data-lat="${a.lat}" data-lon="${a.lon}">
+        <td class="climate-zone"><span class="climate-icon">${icon}</span>${escapeHtml(a.zone)}</td>
         <td class="climate-num ${tempClass}">${formatDelta(a.tempDelta, '°C')}</td>
         <td class="climate-num ${precipClass}">${formatDelta(a.precipDelta, 'mm')}</td>
         <td><span class="climate-badge ${sevClass}">${t(`components.climate.severity.${a.severity}`)}</span></td>
       </tr>`;
-    }));
+    }).join('');
 
-    this.setSafeContent(safeHtml`
+    this.setContent(`
       <div class="climate-panel-content">
         <table class="climate-table">
           <thead>

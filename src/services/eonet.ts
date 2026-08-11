@@ -1,10 +1,12 @@
 import type { NaturalEvent, NaturalEventCategory } from '@/types';
 import { getRpcBaseUrl } from '@/services/rpc-client';
 import { NATURAL_EVENT_CATEGORIES } from '@/types';
-import type { ListNaturalEventsResponse } from '@/generated/client/worldmonitor/natural/v1/service_client';
+import {
+  NaturalServiceClient,
+  type ListNaturalEventsResponse,
+} from '@/generated/client/worldmonitor/natural/v1/service_client';
 import { createCircuitBreaker } from '@/utils';
 import { getHydratedData } from '@/services/bootstrap';
-import { NaturalServiceClient } from '@/services/generated-rpc-clients';
 
 const CATEGORY_ICONS: Record<NaturalEventCategory, string> = {
   severeStorms: '🌀',
@@ -67,11 +69,6 @@ function toNaturalEvent(e: ListNaturalEventsResponse['events'][number]): Natural
       ? e.conePolygon.map(ring => ring.points.map(p => [p.lon, p.lat]))
       : undefined,
     pastTrack: e.pastTrack?.length ? e.pastTrack : undefined,
-    canonicalId: e.canonicalId || undefined,
-    matchingConfidence: e.matchingConfidence || undefined,
-    canonicalAliases: e.canonicalAliases?.length ? e.canonicalAliases : undefined,
-    windAveragingPeriodMinutes: e.windAveragingPeriodMinutes ?? undefined,
-    agencyObservations: e.agencyObservations?.length ? e.agencyObservations : undefined,
   };
 }
 

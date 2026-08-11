@@ -5,7 +5,7 @@
  * instead of reading localStorage keys directly. Resolution order:
  *
  *   1. Clerk auth (via getCurrentClerkUser() — the initialized clerkInstance)
- *   2. Legacy wm-pro-key through the HttpOnly-session migration helper
+ *   2. Legacy wm-pro-key from localStorage
  *   3. Stable anonymous ID (auto-generated, persisted in localStorage)
  *
  * This module is the "identity bridge" between checkout, billing,
@@ -18,36 +18,18 @@
  * there is no automatic way to reconnect the purchase to the user.
  *
  * Migration path: After Clerk auth lands, the client should call
- * `claimSubscription(anonId, claimToken)` (convex/payments/billing.ts) on
- * first authenticated session to reassign payment records from the anon ID
- * to the real Clerk user ID. The anon ID and server-issued claim token
- * should be read from localStorage before they are cleared.
+ * `claimSubscription(anonId)` (convex/payments/billing.ts) on first
+ * authenticated session to reassign payment records from the anon ID to
+ * the real Clerk user ID. The anon ID should be read from localStorage
+ * before it is replaced by the real identity.
  *
  * @see https://github.com/koala73/worldmonitor/issues/2078
  */
 
 import { getCurrentClerkUser } from './clerk';
-import { migrateLegacyKeysToHttpOnlySession, readLegacySessionKey } from './browser-key-session';
-import { getStoredAnonId, saveAnonId } from './anonymous-identity-storage';
-export {
-  clearStoredAnonIdentity,
-  getFreshStoredAnonClaimToken,
-  getStoredAnonClaimToken,
-  getStoredAnonId,
-  saveAnonClaimToken,
-} from './anonymous-identity-storage';
 
-let legacyProMigrationStarted = false;
-
-function legacyProKeyForMigration(): string {
-  const proKey = readLegacySessionKey('wm-pro-key');
-  if (!proKey || legacyProMigrationStarted) return proKey;
-  legacyProMigrationStarted = true;
-  void migrateLegacyKeysToHttpOnlySession({ proKey }).catch(() => {
-    legacyProMigrationStarted = false;
-  });
-  return proKey;
-}
+const LEGACY_PRO_KEY = 'wm-pro-key';
+const ANON_KEY = 'wm-anon-id';
 
 /**
  * Returns (or creates) a stable anonymous ID for this browser.
@@ -57,10 +39,10 @@ function legacyProKeyForMigration(): string {
  */
 export function getOrCreateAnonId(): string {
   try {
-    let id = getStoredAnonId();
+    let id = localStorage.getItem(ANON_KEY);
     if (!id) {
       id = crypto.randomUUID();
-      saveAnonId(id);
+      localStorage.setItem(ANON_KEY, id);
     }
     return id;
   } catch {
@@ -80,10 +62,11 @@ export function getUserId(): string | null {
   const clerkUser = getCurrentClerkUser();
   if (clerkUser?.id) return clerkUser.id;
 
-  // 2. Legacy wm-pro-key: preserve existing identity behavior while moving the
-  // key into a server-issued HttpOnly cookie and clearing JS-readable storage.
-  const proKey = legacyProKeyForMigration();
-  if (proKey) return proKey;
+  // 2. Legacy wm-pro-key
+  try {
+    const proKey = localStorage.getItem(LEGACY_PRO_KEY);
+    if (proKey) return proKey;
+  } catch { /* SSR or restricted context */ }
 
   // 3. Stable anonymous ID — always available
   return getOrCreateAnonId();
@@ -99,5 +82,9 @@ export function hasUserIdentity(): boolean {
   if (clerkUser?.id) return true;
 
   // 2. Legacy pro key
-  return !!legacyProKeyForMigration();
+  try {
+    return !!localStorage.getItem(LEGACY_PRO_KEY);
+  } catch {
+    return false;
+  }
 }

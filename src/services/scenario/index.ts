@@ -1,7 +1,16 @@
 import { getRpcBaseUrl } from '@/services/rpc-client';
 import { premiumFetch } from '@/services/premium-fetch';
-import type { RunScenarioRequest, RunScenarioResponse, GetScenarioStatusResponse, ListScenarioTemplatesResponse, ScenarioResult, ScenarioImpactCountry, ScenarioResultTemplate, ScenarioTemplate } from '@/generated/client/worldmonitor/scenario/v1/service_client';
-import { ScenarioServiceClient } from '@/services/generated-rpc-clients';
+import {
+  ScenarioServiceClient,
+  type RunScenarioRequest,
+  type RunScenarioResponse,
+  type GetScenarioStatusResponse,
+  type ListScenarioTemplatesResponse,
+  type ScenarioResult,
+  type ScenarioImpactCountry,
+  type ScenarioResultTemplate,
+  type ScenarioTemplate,
+} from '@/generated/client/worldmonitor/scenario/v1/service_client';
 
 export type {
   RunScenarioRequest,

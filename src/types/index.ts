@@ -64,7 +64,7 @@ export interface DeductContextDetail {
   autoSubmit?: boolean;
 }
 
-export type PropagandaRisk = 'low' | 'medium' | 'high' | 'unknown';
+export type PropagandaRisk = 'low' | 'medium' | 'high';
 
 export interface Feed {
   name: string;
@@ -73,8 +73,7 @@ export interface Feed {
   region?: string;
   propagandaRisk?: PropagandaRisk;
   stateAffiliated?: string;  // e.g., "Russia", "China", "Iran"
-  lang?: string;             // ISO 2-letter code for filtering (locale boost)
-  strategicDefault?: boolean; // always default-on regardless of UI language
+  lang?: string;             // ISO 2-letter code for filtering
 }
 
 export type ThreatLevel = 'critical' | 'high' | 'medium' | 'low' | 'info';
@@ -106,15 +105,6 @@ export interface NewsItem {
   title: string;
   link: string;
   pubDate: Date;
-  /**
-   * True when the upstream feed item had no parseable pubDate/published/
-   * updated timestamp. The `pubDate` field is still populated (synthesized
-   * stamp) for display, but ranking/recency consumers MUST route through
-   * `effectivePubDateMs` from feed-date.ts so these items don't claim
-   * false freshness. Optional so synthesized items from non-RSS producers
-   * don't need to set it explicitly — `undefined` is treated as `false`.
-   */
-  pubDateMissing?: boolean;
   isAlert: boolean;
   monitorColor?: string;
   tier?: number;
@@ -135,13 +125,6 @@ export interface NewsItem {
    * Consumers MUST fall back to `title` for display when absent (R6).
    */
   snippet?: string;
-  /**
-   * Stock tickers extracted at ingest (#4922a): cashtags + company-name
-   * dictionary matches from title + description. Uppercase, deduped,
-   * first-occurrence order, ≤8. Absent on pre-rollout cached items and
-   * non-digest producers.
-   */
-  tickers?: string[];
 }
 
 export type VelocityLevel = 'normal' | 'elevated' | 'spike';
@@ -161,14 +144,7 @@ export interface ClusteredEvent {
   primaryTitle: string;
   primarySource: string;
   primaryLink: string;
-  /** Articles in the cluster — a volume signal, not a corroboration signal. */
   sourceCount: number;
-  /**
-   * Distinct PUBLISHERS behind those articles (#6428). Any "N sources"
-   * corroboration claim shown to a user reads this, never sourceCount:
-   * one newsroom's editions are one publisher.
-   */
-  uniquePublisherCount: number;
   topSources: Array<{ name: string; tier: number; url: string }>;
   allItems: NewsItem[];
   firstSeen: Date;
@@ -375,8 +351,6 @@ export interface ConflictZone {
   location?: string;
   description?: string;
   keyDevelopments?: string[];
-  peaceAgreements?: string[];
-  totalFatalities?: string;
 }
 
 
@@ -566,10 +540,6 @@ export interface NuclearFacility {
   type: NuclearFacilityType;
   status: 'active' | 'contested' | 'inactive' | 'decommissioned' | 'construction';
   operator?: string;  // Operating country
-  operationalSince?: string;
-  treaties?: string[];
-  iaeaStatus?: string;
-  keyEvents?: string[];
 }
 
 export interface GammaIrradiator {
@@ -636,16 +606,6 @@ export interface PanelConfig {
   enabled: boolean;
   priority?: number;
   premium?: 'locked' | 'enhanced';
-  /** Absolute panel text scale. When absent, the panel follows the global scale. */
-  fontScale?: 0.9 | 1 | 1.1 | 1.25 | 1.5 | 2;
-  /**
-   * Set by `enforceFreePanelLimit` when the free-tier pro gate — not the user —
-   * is what turned this panel off. Distinguishes "hidden because you aren't Pro"
-   * from "you hid it in settings", so the gate can be reversed on upgrade
-   * without overriding a deliberate choice. Used for both `cw-*` panels and
-   * ordinary panels disabled by the free panel-count cap.
-   */
-  proGated?: boolean;
 }
 
 export interface MapLayers {
@@ -894,7 +854,6 @@ export type MilitaryOperator =
 
 export interface MilitaryFlight {
   id: string;
-  source?: string;
   callsign: string;
   hexCode: string;             // ICAO 24-bit address
   registration?: string;
@@ -1131,22 +1090,6 @@ export interface PastTrackPoint {
   timestamp: number;
 }
 
-/** A single agency report retained on a canonical tropical cyclone event. */
-export interface CycloneAgencyObservation {
-  agency: string;
-  agencyId: string;
-  observedAt: number;
-  lat: number;
-  lon: number;
-  windKt?: number;
-  windAveragingPeriodMinutes?: number;
-  pressureMb?: number;
-  classification?: string;
-  status: string;
-  sourceName?: string;
-  sourceUrl?: string;
-}
-
 export interface NaturalEvent {
   id: string;
   title: string;
@@ -1173,11 +1116,6 @@ export interface NaturalEvent {
   forecastTrack?: ForecastPoint[];
   conePolygon?: number[][][];
   pastTrack?: PastTrackPoint[];
-  canonicalId?: string;
-  matchingConfidence?: string;
-  canonicalAliases?: string[];
-  windAveragingPeriodMinutes?: number;
-  agencyObservations?: CycloneAgencyObservation[];
 }
 
 // Infrastructure Cascade Types

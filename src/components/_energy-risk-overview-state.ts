@@ -75,3 +75,10 @@ export function buildOverviewState(
       : { status: 'rejected' },
   };
 }
+
+/**
+ * Convenience for tests: count tiles that are in degraded ('rejected') state.
+ */
+export function countDegradedTiles(state: OverviewState): number {
+  return Object.values(state).filter((t) => t.status === 'rejected').length;
+}

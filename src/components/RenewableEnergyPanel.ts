@@ -9,12 +9,7 @@
 import { Panel } from './Panel';
 import { t } from '@/services/i18n';
 import * as d3 from 'd3';
-import type {
-  RenewableEnergyFetchResult,
-  RegionRenewableData,
-  CapacitySeries,
-} from '@/services/renewable-energy-data';
-import { describeFreshness } from '@/services/persistent-cache';
+import type { RenewableEnergyData, RegionRenewableData, CapacitySeries } from '@/services/renewable-energy-data';
 import { getCSSColor } from '@/utils';
 import { replaceChildren } from '@/utils/dom-utils';
 
@@ -26,25 +21,18 @@ export class RenewableEnergyPanel extends Panel {
   /**
    * Set data and render the full panel: gauge + sparkline + regional breakdown.
    */
-  public setData(result: RenewableEnergyFetchResult): void {
+  public setData(data: RenewableEnergyData): void {
     replaceChildren(this.content);
-    const { data, state, cachedAt } = result;
 
-    if (state === 'cached') {
-      this.setDataBadge('cached', cachedAt === null ? undefined : describeFreshness(cachedAt));
-    } else {
-      this.setDataBadge(state);
-    }
-
-    // Fail closed when neither live nor bounded last-known-good data exists.
-    if (data === null || (data.globalPercentage === 0 && !data.regions?.length)) {
+    // Empty state
+    if (data.globalPercentage === 0 && !data.regions?.length) {
       const empty = document.createElement('div');
       empty.className = 'renewable-empty';
       Object.assign(empty.style, {
         padding: '24px 16px',
         color: 'var(--text-dim)',
         textAlign: 'center',
-        fontSize: 'calc(13px * var(--wm-panel-effective-scale, 1))',
+        fontSize: '13px',
       });
       empty.textContent = 'No renewable energy data available';
       this.content.appendChild(empty);
@@ -150,7 +138,7 @@ export class RenewableEnergyPanel extends Panel {
       .attr('dominant-baseline', 'central')
       .attr('dy', '-0.15em')
       .attr('fill', getCSSColor('--text'))
-      .style('font-size', 'calc(22px * var(--wm-panel-effective-scale, 1))')
+      .attr('font-size', '22px')
       .attr('font-weight', '700')
       .text(`${percentage.toFixed(1)}%`);
 
@@ -161,7 +149,7 @@ export class RenewableEnergyPanel extends Panel {
       .attr('dominant-baseline', 'central')
       .attr('dy', '1.4em')
       .attr('fill', getCSSColor('--text-dim'))
-      .style('font-size', 'calc(10px * var(--wm-panel-effective-scale, 1))')
+      .attr('font-size', '10px')
       .text('Renewable');
 
     // Data year label below gauge
@@ -169,7 +157,7 @@ export class RenewableEnergyPanel extends Panel {
     yearLabel.className = 'gauge-year';
     Object.assign(yearLabel.style, {
       textAlign: 'center',
-      fontSize: 'calc(10px * var(--wm-panel-effective-scale, 1))',
+      fontSize: '10px',
       color: 'var(--text-dim)',
       marginTop: '4px',
     });
@@ -263,7 +251,7 @@ export class RenewableEnergyPanel extends Panel {
       const nameSpan = document.createElement('span');
       nameSpan.className = 'region-name';
       Object.assign(nameSpan.style, {
-        fontSize: 'calc(11px * var(--wm-panel-effective-scale, 1))',
+        fontSize: '11px',
         color: 'var(--text-dim)',
         minWidth: '120px',
         flexShrink: '0',
@@ -302,7 +290,7 @@ export class RenewableEnergyPanel extends Panel {
       const valueSpan = document.createElement('span');
       valueSpan.className = 'region-value';
       Object.assign(valueSpan.style, {
-        fontSize: 'calc(11px * var(--wm-panel-effective-scale, 1))',
+        fontSize: '11px',
         fontWeight: '600',
         color: 'var(--text)',
         minWidth: '42px',
@@ -481,7 +469,7 @@ export class RenewableEnergyPanel extends Panel {
       .attr('y', innerHeight + 12)
       .attr('text-anchor', 'start')
       .attr('fill', getCSSColor('--text-dim'))
-      .style('font-size', 'calc(9px * var(--wm-panel-effective-scale, 1))')
+      .attr('font-size', '9px')
       .text(String(firstYear));
 
     g.append('text')
@@ -489,7 +477,7 @@ export class RenewableEnergyPanel extends Panel {
       .attr('y', innerHeight + 12)
       .attr('text-anchor', 'end')
       .attr('fill', getCSSColor('--text-dim'))
-      .style('font-size', 'calc(9px * var(--wm-panel-effective-scale, 1))')
+      .attr('font-size', '9px')
       .text(String(lastYear));
 
     // Compact inline legend below chart

@@ -1,6 +1,5 @@
 import type { ResilienceRankingItem } from '@/services/resilience';
 import type { MapLayers } from '@/types';
-import { getResilienceVisualLevel, hasScoredResilienceOverall } from './resilience-widget-utils';
 
 export type ResilienceChoroplethLevel = 'very_low' | 'low' | 'moderate' | 'high' | 'very_high' | 'insufficient_data';
 
@@ -9,7 +8,6 @@ export interface ResilienceChoroplethEntry {
   level: ResilienceChoroplethLevel;
   serverLevel: string;
   lowConfidence: boolean;
-  outsideHeadlineRanking: boolean;
 }
 
 export const RESILIENCE_CHOROPLETH_COLORS: Record<ResilienceChoroplethLevel, [number, number, number, number]> = {
@@ -21,51 +19,16 @@ export const RESILIENCE_CHOROPLETH_COLORS: Record<ResilienceChoroplethLevel, [nu
   insufficient_data: [120, 120, 120, 60],
 };
 
-const INSUFFICIENT_SERVER_LEVELS = new Set(['insufficient', 'insufficient_data', 'insufficient data', 'insufficient-data']);
-
 function clampScore(score: number): number {
   return Math.max(0, Math.min(100, Number(score.toFixed(1))));
 }
 
-function normalizeServerLevel(level: string | null | undefined): string {
-  return String(level || 'unknown').trim().toLowerCase();
-}
-
-function hasScoredResilienceRankingItem(item: ResilienceRankingItem): boolean {
-  const overallScore = Number(item.overallScore);
-  if (!hasScoredResilienceOverall({ overallScore, level: item.level })) return false;
-
-  const serverLevel = normalizeServerLevel(item.level);
-  return overallScore !== 0 || !INSUFFICIENT_SERVER_LEVELS.has(serverLevel);
-}
-
-function toResilienceChoroplethEntry(item: ResilienceRankingItem): [string, ResilienceChoroplethEntry] | null {
-  const countryCode = String(item.countryCode || '').trim().toUpperCase();
-  if (!/^[A-Z]{2}$/.test(countryCode)) return null;
-
-  if (!hasScoredResilienceRankingItem(item)) {
-    return [countryCode, {
-      overallScore: 0,
-      level: 'insufficient_data',
-      serverLevel: normalizeServerLevel(item.level),
-      lowConfidence: true,
-      outsideHeadlineRanking: false,
-    }];
-  }
-
-  const normalizedScore = clampScore(Number(item.overallScore));
-  return [countryCode, {
-    overallScore: normalizedScore,
-    level: getResilienceChoroplethLevel(normalizedScore),
-    serverLevel: normalizeServerLevel(item.level),
-    lowConfidence: Boolean(item.lowConfidence),
-    outsideHeadlineRanking: item.headlineEligible === false,
-  }];
-}
-
 export function getResilienceChoroplethLevel(score: number): ResilienceChoroplethLevel {
-  const visualLevel = getResilienceVisualLevel(score);
-  return visualLevel === 'unknown' ? 'insufficient_data' : visualLevel;
+  if (score >= 80) return 'very_high';
+  if (score >= 60) return 'high';
+  if (score >= 40) return 'moderate';
+  if (score >= 20) return 'low';
+  return 'very_low';
 }
 
 export function formatResilienceChoroplethLevel(level: ResilienceChoroplethLevel): string {
@@ -79,13 +42,28 @@ export function buildResilienceChoroplethMap(
   const scores = new Map<string, ResilienceChoroplethEntry>();
 
   for (const item of items) {
-    const entry = toResilienceChoroplethEntry(item);
-    if (entry) scores.set(entry[0], entry[1]);
+    const countryCode = String(item.countryCode || '').trim().toUpperCase();
+    const overallScore = Number(item.overallScore);
+    if (!/^[A-Z]{2}$/.test(countryCode) || !Number.isFinite(overallScore) || overallScore < 0) continue;
+
+    const normalizedScore = clampScore(overallScore);
+    scores.set(countryCode, {
+      overallScore: normalizedScore,
+      level: getResilienceChoroplethLevel(normalizedScore),
+      serverLevel: String(item.level || 'unknown'),
+      lowConfidence: Boolean(item.lowConfidence),
+    });
   }
 
   for (const item of greyedOut) {
-    const entry = toResilienceChoroplethEntry(item);
-    if (entry) scores.set(entry[0], entry[1]);
+    const countryCode = String(item.countryCode || '').trim().toUpperCase();
+    if (!/^[A-Z]{2}$/.test(countryCode)) continue;
+    scores.set(countryCode, {
+      overallScore: 0,
+      level: 'insufficient_data',
+      serverLevel: 'insufficient_data',
+      lowConfidence: true,
+    });
   }
 
   return scores;

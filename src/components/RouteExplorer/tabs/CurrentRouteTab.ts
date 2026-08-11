@@ -18,8 +18,6 @@ import {
   warRiskTierClass,
   escapeHtml,
 } from './route-utils';
-import { setTrustedHtml, trustedHtml } from '@/utils/dom-utils';
-
 
 export interface CurrentRouteTabOptions {
   onChokepointSelect?: (chokepointId: string) => void;
@@ -46,21 +44,23 @@ export class CurrentRouteTab {
   }
 
   private renderEmpty(): void {
-    setTrustedHtml(this.element, trustedHtml('<div class="re-tab__placeholder">Pick a country pair and product to see the current route.</div>', "legacy direct innerHTML migration"));
+    this.element.innerHTML =
+      '<div class="re-tab__placeholder">Pick a country pair and product to see the current route.</div>';
   }
 
   private renderNoModeledLane(): void {
-    setTrustedHtml(this.element, trustedHtml('<div class="re-tab__empty">' +
+    this.element.innerHTML =
+      '<div class="re-tab__empty">' +
       '<h3>No modeled lane</h3>' +
       '<p>WorldMonitor does not have a modeled maritime route between these two countries. ' +
       'This may mean the pair shares no major trade corridor in our dataset, or one country is landlocked.</p>' +
-      '</div>', "legacy direct innerHTML migration"));
+      '</div>';
   }
 
   private renderData(data: GetRouteExplorerLaneResponse): void {
     const summaryHtml = this.renderSummary(data);
     const chokepointsHtml = this.renderChokepointList(data.chokepointExposures);
-    setTrustedHtml(this.element, trustedHtml(`${summaryHtml}${chokepointsHtml}`, "legacy direct innerHTML migration"));
+    this.element.innerHTML = `${summaryHtml}${chokepointsHtml}`;
     this.attachChokepointListeners();
   }
 

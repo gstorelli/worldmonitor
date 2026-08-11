@@ -25,22 +25,6 @@ const THEME_STORAGE_PREFIX = 'wm-map-theme:';
 
 export { hasTilesUrl as hasPMTilesUrl };
 
-function readStorageValue(key: string): string | null {
-  try {
-    return localStorage.getItem(key);
-  } catch {
-    return null;
-  }
-}
-
-function writeStorageValue(key: string, value: string): void {
-  try {
-    localStorage.setItem(key, value);
-  } catch {
-    // Map preferences remain at their in-memory defaults for this session.
-  }
-}
-
 export const MAP_PROVIDER_OPTIONS: { value: MapProvider; label: string }[] = (() => {
   const opts: { value: MapProvider; label: string }[] = [];
   if (hasTilesUrl) {
@@ -82,7 +66,7 @@ const DEFAULT_THEME: Record<MapProvider, string> = {
 };
 
 export function getMapProvider(): MapProvider {
-  const stored = readStorageValue(STORAGE_KEY) as MapProvider | null;
+  const stored = localStorage.getItem(STORAGE_KEY) as MapProvider | null;
   if (stored) {
     if (stored === 'pmtiles' || stored === 'auto') {
       return hasTilesUrl ? stored : 'openfreemap';
@@ -93,11 +77,11 @@ export function getMapProvider(): MapProvider {
 }
 
 export function setMapProvider(provider: MapProvider): void {
-  writeStorageValue(STORAGE_KEY, provider);
+  localStorage.setItem(STORAGE_KEY, provider);
 }
 
 export function getMapTheme(provider: MapProvider): string {
-  const stored = readStorageValue(THEME_STORAGE_PREFIX + provider);
+  const stored = localStorage.getItem(THEME_STORAGE_PREFIX + provider);
   const options = MAP_THEME_OPTIONS[provider];
   if (stored && options.some(o => o.value === stored)) return stored;
   return DEFAULT_THEME[provider];
@@ -106,7 +90,7 @@ export function getMapTheme(provider: MapProvider): string {
 export function setMapTheme(provider: MapProvider, theme: string): void {
   const options = MAP_THEME_OPTIONS[provider];
   if (!options.some(o => o.value === theme)) return;
-  writeStorageValue(THEME_STORAGE_PREFIX + provider, theme);
+  localStorage.setItem(THEME_STORAGE_PREFIX + provider, theme);
 }
 
 export function isLightMapTheme(mapTheme: string): boolean {

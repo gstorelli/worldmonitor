@@ -12,8 +12,7 @@ export * from '../irradiators';
 export * from '../pipelines';
 export * from '../ports';
 export * from '../military';
-// airports intentionally not re-exported here — keeps the airports table off the
-// eager variant/@/config barrel; AviationCommandBar imports it directly. (#4404)
+export * from '../airports';
 export * from '../entities';
 
 // Panel configuration for geopolitical analysis

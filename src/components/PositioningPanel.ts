@@ -2,7 +2,7 @@ import type { MarketServiceClient } from '@/generated/client/worldmonitor/market
 import type { HyperliquidAssetFlow } from '@/generated/client/worldmonitor/market/v1/service_client';
 import { Panel } from './Panel';
 import { t } from '@/services/i18n';
-import { escapeHtml, unsafeRawHtml } from '@/utils/sanitize';
+import { escapeHtml } from '@/utils/sanitize';
 import { getHydratedData } from '@/services/bootstrap';
 
 let _client: MarketServiceClient | null = null;
@@ -120,7 +120,7 @@ function renderArcGauge(score: number, color: string, size = 56): string {
   return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" class="pos-gauge">
     <path d="M ${bgX1} ${bgY1} A ${r} ${r} 0 1 1 ${bgX2} ${bgY2}" fill="none" stroke="var(--border-color, #333)" stroke-width="3" stroke-linecap="round"/>
     ${score > 0 ? `<path d="M ${bgX1} ${bgY1} A ${r} ${r} 0 ${largeArc} 1 ${fX2} ${fY2}" fill="none" stroke="${color}" stroke-width="3.5" stroke-linecap="round" opacity="${opacity}"/>` : ''}
-    <text x="${cx}" y="${cy + 2}" text-anchor="middle" dominant-baseline="middle" fill="${color}" style="font-size:calc(13px * var(--wm-panel-effective-scale, 1))" font-weight="600" opacity="${opacity}">${Math.round(score)}</text>
+    <text x="${cx}" y="${cy + 2}" text-anchor="middle" dominant-baseline="middle" fill="${color}" font-size="13" font-weight="600" opacity="${opacity}">${Math.round(score)}</text>
   </svg>`;
 }
 
@@ -256,7 +256,7 @@ export class PositioningPanel extends Panel {
     if (this._flow.unavailable) {
       // Empty snapshots on fresh deploy / cold seed are normal warmup, not errors.
       // Show guidance that samples populate over the next few minutes.
-      this.setSafeContent(unsafeRawHtml(`<div class="pos-panel"><div class="pos-warmup">${escapeHtml(t('components.positioning247.warmup'))}</div></div>`, 'legacy Panel.setContent() migration'));
+      this.setContent(`<div class="pos-panel"><div class="pos-warmup">${escapeHtml(t('components.positioning247.warmup'))}</div></div>`);
       return;
     }
 
@@ -272,6 +272,6 @@ export class PositioningPanel extends Panel {
 
     sections.push(`<div class="pos-footer">${escapeHtml(t('components.positioning247.footer'))}</div>`);
 
-    this.setSafeContent(unsafeRawHtml(`<div class="pos-panel">${sections.join('')}</div>`, 'legacy Panel.setContent() migration'));
+    this.setContent(`<div class="pos-panel">${sections.join('')}</div>`);
   }
 }

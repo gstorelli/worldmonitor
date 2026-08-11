@@ -7,12 +7,9 @@ import {
   calculateCascade,
   getGraphStats,
   clearGraphCache,
-  preloadCables,
   type DependencyGraph,
 } from '@/services/infrastructure-cascade';
 import type { CascadeResult, CascadeImpactLevel, InfrastructureNode } from '@/types';
-import { setTrustedHtml, trustedHtml } from '@/utils/dom-utils';
-
 
 type NodeFilter = 'all' | 'cable' | 'pipeline' | 'port' | 'chokepoint';
 
@@ -38,7 +35,6 @@ export class CascadePanel extends Panel {
   private async init(): Promise<void> {
     this.showLoading();
     try {
-      await preloadCables();
       this.graph = buildDependencyGraph();
       const stats = getGraphStats();
       this.setCount(stats.nodes);
@@ -119,7 +115,7 @@ export class CascadePanel extends Panel {
     return `
       <div class="cascade-selector">
         <div class="panel-tabs" role="radiogroup" aria-label="Infrastructure type filter">${filterButtons}</div>
-        <select class="cascade-select" aria-label="${t('components.cascade.selectInfrastructureHint')}" ${nodes.length === 0 ? 'disabled' : ''}>
+        <select class="cascade-select" ${nodes.length === 0 ? 'disabled' : ''}>
           <option value="">${t('components.cascade.selectPrompt', { type: selectedType })}</option>
           ${nodeOptions}
         </select>
@@ -194,13 +190,13 @@ export class CascadePanel extends Panel {
       </div>
     `;
 
-    setTrustedHtml(this.content, trustedHtml(`
+    this.content.innerHTML = `
       <div class="cascade-panel">
         ${statsHtml}
         ${this.renderSelector()}
         ${this.cascadeResult ? this.renderCascadeResult() : `<div class="cascade-hint">${t('components.cascade.selectInfrastructureHint')}</div>`}
       </div>
-    `, "legacy direct innerHTML migration"));
+    `;
   }
 
   /**

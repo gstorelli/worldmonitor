@@ -1,8 +1,6 @@
 import { fetchFlightStatus, fetchAirportOpsSummary, fetchFlightPrices, fetchAviationNews, fetchGoogleFlights } from '@/services/aviation';
 import { escapeHtml, sanitizeUrl } from '@/utils/sanitize';
 import { MONITORED_AIRPORTS } from '@/config/airports';
-import { setTrustedHtml, trustedHtml } from '@/utils/dom-utils';
-
 
 // ---- Intent types ----
 
@@ -122,25 +120,13 @@ async function executeIntent(intent: Intent): Promise<CommandResult> {
     if (intent.type === 'OPS') {
         const summaries = await fetchAirportOpsSummary(intent.airports);
         if (!summaries.length) return { html: '<div class="cmd-empty">No ops data found.</div>' };
-        const rows = summaries.map(s => {
-            // #3707: 'unknown' = no telemetry. Render desaturated grey + 'NO DATA'
-            // suffix so users don't conflate uncovered airports with healthy ones.
-            const sevColor = s.severity === 'unknown' ? '#7d7d8a'
-                : s.severity === 'normal' ? '#22c55e'
-                : s.severity === 'minor' ? '#f59e0b'
-                : '#ef4444';
-            const sevLabel = s.severity === 'unknown' ? 'NO DATA' : s.severity.toUpperCase();
-            const suffix = s.severity === 'unknown'
-                ? ''
-                : `<span>${s.avgDelayMinutes > 0 ? `+${s.avgDelayMinutes}m delay` : 'Normal ops'}</span>`;
-            return `
+        const rows = summaries.map(s => `
       <div class="cmd-row">
         <strong>${escapeHtml(s.iata)}</strong>
-        <span style="color:${sevColor}">${sevLabel}</span>
-        ${suffix}
+        <span style="color:${s.severity === 'normal' ? '#22c55e' : s.severity === 'minor' ? '#f59e0b' : '#ef4444'}">${s.severity.toUpperCase()}</span>
+        <span>${s.avgDelayMinutes > 0 ? `+${s.avgDelayMinutes}m delay` : 'Normal ops'}</span>
         ${s.closureStatus ? '<span style="color:#ef4444">CLOSED</span>' : ''}
-      </div>`;
-        }).join('');
+      </div>`).join('');
         return { html: `<div class="cmd-section"><strong>✈️ Ops Snapshot</strong>${rows}</div>` };
     }
 
@@ -156,10 +142,10 @@ async function executeIntent(intent: Intent): Promise<CommandResult> {
             : '';
         const carrierLabel = f.carrier.name || f.carrier.iata;
         const gateLine = (f.gate || f.terminal)
-            ? `<div style="color:#9ca3af;font-size:calc(11px * var(--wm-panel-effective-scale, 1))">Gate ${escapeHtml(f.gate || '—')}${f.terminal ? ` · Terminal ${escapeHtml(f.terminal)}` : ''}</div>`
+            ? `<div style="color:#9ca3af;font-size:11px">Gate ${escapeHtml(f.gate || '—')}${f.terminal ? ` · Terminal ${escapeHtml(f.terminal)}` : ''}</div>`
             : '';
         const acLine = f.aircraftType
-            ? `<div style="color:#9ca3af;font-size:calc(11px * var(--wm-panel-effective-scale, 1))">${escapeHtml(f.aircraftType)}</div>`
+            ? `<div style="color:#9ca3af;font-size:11px">${escapeHtml(f.aircraftType)}</div>`
             : '';
         return {
             html: `<div class="cmd-section">
@@ -183,13 +169,13 @@ async function executeIntent(intent: Intent): Promise<CommandResult> {
             const lbl = days === 1 ? 'Tomorrow' : `+${days}d`;
             const active = d === date;
             const cmd = `fly ${intent.origin} ${intent.destination} ${d}`;
-            return `<button data-rerun="${escapeHtml(cmd)}" style="background:${active ? 'rgba(68,255,136,.1)' : 'none'};border:1px solid ${active ? 'var(--green,#44ff88)' : 'var(--border,#2a2a2a)'};border-radius:3px;color:${active ? 'var(--green,#44ff88)' : 'var(--text-dim,#6b7280)'};cursor:pointer;font-size:calc(10px * var(--wm-panel-effective-scale, 1));padding:1px 6px">${lbl}</button>`;
+            return `<button data-rerun="${escapeHtml(cmd)}" style="background:${active ? 'rgba(68,255,136,.1)' : 'none'};border:1px solid ${active ? 'var(--green,#44ff88)' : 'var(--border,#2a2a2a)'};border-radius:3px;color:${active ? 'var(--green,#44ff88)' : 'var(--text-dim,#6b7280)'};cursor:pointer;font-size:10px;padding:1px 6px">${lbl}</button>`;
         }).join('');
         const header = `<div style="margin-bottom:4px">
           <strong>💸 ${escapeHtml(intent.origin)} → ${escapeHtml(intent.destination)}</strong>
         </div>
         <div style="margin-bottom:8px;display:flex;gap:4px;align-items:center">
-          <span style="color:#6b7280;font-size:calc(10px * var(--wm-panel-effective-scale, 1));margin-right:2px">${escapeHtml(dateLabel)}</span>${dateChips}
+          <span style="color:#6b7280;font-size:10px;margin-right:2px">${escapeHtml(dateLabel)}</span>${dateChips}
         </div>`;
 
         // Try Google Flights first — sort nonstop first, then by price
@@ -208,61 +194,32 @@ async function executeIntent(intent: Intent): Promise<CommandResult> {
                 const rowUrl = sanitizeUrl(`https://www.google.com/travel/flights/search?q=Flights+from+${encodeURIComponent(intent.origin)}+to+${encodeURIComponent(intent.destination)}+on+${encodeURIComponent(date)}`);
                 return `<a class="cmd-row" href="${rowUrl}" target="_blank" rel="noopener" style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05);text-decoration:none;cursor:pointer;color:var(--text,#e8e8e8)">
           <div style="flex:1;min-width:0">
-            <span style="font-size:calc(13px * var(--wm-panel-effective-scale, 1))">${carrier}</span>
-            <span style="color:${stopColor};font-size:calc(11px * var(--wm-panel-effective-scale, 1));margin-left:6px">${stopLabel}</span>
+            <span style="font-size:13px">${carrier}</span>
+            <span style="color:${stopColor};font-size:11px;margin-left:6px">${stopLabel}</span>
           </div>
-          <div style="color:#9ca3af;font-size:calc(11px * var(--wm-panel-effective-scale, 1));margin:0 10px">${safeDepTime}${safeArrTime ? `–${safeArrTime}` : ''} · ${escapeHtml(fmtDur(f.durationMinutes))}</div>
+          <div style="color:#9ca3af;font-size:11px;margin:0 10px">${safeDepTime}${safeArrTime ? `–${safeArrTime}` : ''} · ${escapeHtml(fmtDur(f.durationMinutes))}</div>
           <div style="color:var(--green,#44ff88);font-weight:600">$${Math.round(f.price).toLocaleString()}</div>
         </a>`;
             }).join('');
             return {
-                html: `<div class="cmd-section">${header}${rows}${gfResult.degraded ? '<div style="color:#f59e0b;font-size:calc(11px * var(--wm-panel-effective-scale, 1));margin-top:4px">Partial results</div>' : ''}</div>`,
+                html: `<div class="cmd-section">${header}${rows}${gfResult.degraded ? '<div style="color:#f59e0b;font-size:11px;margin-top:4px">Partial results</div>' : ''}</div>`,
             };
         }
 
-        // Fallback to TravelPayouts. Demo data is gated behind an explicit
-        // server-side AVIATION_DEMO_PRICES=1 (issue #3756) — surface the
-        // distinct degraded states clearly rather than swallowing
-        // missing-credentials / upstream-error / no-results into a single
-        // "Indicative prices" footnote.
-        const { quotes, isDemoMode, degraded, error } = await fetchFlightPrices({ origin: intent.origin, destination: intent.destination, departureDate: date });
-        const gflLink = sanitizeUrl(`https://www.google.com/travel/flights/search?q=Flights+from+${encodeURIComponent(intent.origin)}+to+${encodeURIComponent(intent.destination)}+on+${encodeURIComponent(date)}`);
-        const gflFallbackLink = `<a href="${gflLink}" target="_blank" rel="noopener" style="color:var(--accent,#60a5fa)">Search Google Flights instead →</a>`;
-        if (!quotes.length) {
-            // Per the server contract, empty quotes ⇒ degraded:true. Future
-            // server-side `error` values get a generic-but-honest message
-            // via the trailing `else if (degraded)` branch, not the
-            // misleading silent "No prices found." default the previous
-            // draft used.
-            let msg: string;
-            if (error === 'missing_credentials') {
-                msg = `Live flight pricing requires TRAVELPAYOUTS_API_TOKEN. ${gflFallbackLink}`;
-            } else if (error === 'upstream_error') {
-                msg = `Flight pricing provider temporarily unavailable. ${gflFallbackLink}`;
-            } else if (error === 'no_results') {
-                msg = `No live prices found for ${escapeHtml(intent.origin)} → ${escapeHtml(intent.destination)}.`;
-            } else if (degraded) {
-                msg = `Flight pricing unavailable (${escapeHtml(error || 'unknown')}). ${gflFallbackLink}`;
-            } else {
-                msg = `No prices found for ${escapeHtml(intent.origin)} → ${escapeHtml(intent.destination)}.`;
-            }
-            return { html: `<div class="cmd-empty">${msg}</div>` };
-        }
+        // Fallback to TravelPayouts / demo
+        const { quotes, isDemoMode } = await fetchFlightPrices({ origin: intent.origin, destination: intent.destination, departureDate: date });
+        if (!quotes.length) return { html: '<div class="cmd-empty">No prices found.</div>' };
         const rows = [...quotes].sort((a, b) => a.stops !== b.stops ? a.stops - b.stops : a.priceAmount - b.priceAmount).slice(0, 5).map(q => {
             const stopColor = q.stops === 0 ? 'var(--green,#44ff88)' : 'var(--text-dim,#9ca3af)';
             const stopLabel = q.stops === 0 ? 'nonstop' : `${q.stops} stop${q.stops > 1 ? 's' : ''}`;
-            return `<a class="cmd-row" href="${gflLink}" target="_blank" rel="noopener" style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05);text-decoration:none;cursor:pointer;color:var(--text,#e8e8e8)">
-          <div style="flex:1">${escapeHtml(q.carrierName || q.carrierIata)}<span style="color:${stopColor};font-size:calc(11px * var(--wm-panel-effective-scale, 1));margin-left:6px">${stopLabel}</span></div>
+            const rowUrl = sanitizeUrl(`https://www.google.com/travel/flights/search?q=Flights+from+${encodeURIComponent(intent.origin)}+to+${encodeURIComponent(intent.destination)}+on+${encodeURIComponent(date)}`);
+            return `<a class="cmd-row" href="${rowUrl}" target="_blank" rel="noopener" style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05);text-decoration:none;cursor:pointer;color:var(--text,#e8e8e8)">
+          <div style="flex:1">${escapeHtml(q.carrierName || q.carrierIata)}<span style="color:${stopColor};font-size:11px;margin-left:6px">${stopLabel}</span></div>
           <div style="color:var(--green,#44ff88);font-weight:600">$${Math.round(q.priceAmount)}</div>
         </a>`;
         }).join('');
-        // Demo mode is opt-in only. When it fires, show an unmistakable
-        // banner above the result set, not a tiny gray footnote.
-        const demoBanner = isDemoMode
-            ? `<div style="background:rgba(245,158,11,0.15);border:1px solid #f59e0b;color:#f59e0b;padding:6px 10px;border-radius:4px;margin-bottom:6px;font-size:calc(12px * var(--wm-panel-effective-scale, 1));font-weight:600">⚠ DEMO DATA — synthetic distance-based estimates, not live market quotes</div>`
-            : '';
         return {
-            html: `<div class="cmd-section">${demoBanner}${header}${rows}</div>`,
+            html: `<div class="cmd-section">${header}${rows}${isDemoMode ? '<div style="color:#6b7280;font-size:11px;margin-top:4px">Indicative prices</div>' : ''}</div>`,
         };
     }
 
@@ -315,7 +272,7 @@ export class AviationCommandBar {
 
         this.overlay = document.createElement('div');
         this.overlay.id = 'aviation-cmd-overlay';
-        setTrustedHtml(this.overlay, trustedHtml(`
+        this.overlay.innerHTML = `
       <div id="aviation-cmd-box">
         <div id="aviation-cmd-header">
           <span>✈️ Aviation Command</span>
@@ -326,7 +283,7 @@ export class AviationCommandBar {
         <div id="aviation-cmd-result"></div>
         <div id="aviation-cmd-history-list"></div>
         <div id="aviation-cmd-hint">Press <kbd>Enter</kbd> to run · <kbd>Esc</kbd> to close · <kbd>Ctrl+J</kbd> to toggle</div>
-      </div>`, "legacy direct innerHTML migration"));
+      </div>`;
 
         document.body.appendChild(this.overlay);
 
@@ -371,14 +328,14 @@ export class AviationCommandBar {
     private async run(raw: string): Promise<void> {
         const resultEl = this.overlay?.querySelector('#aviation-cmd-result');
         if (!resultEl) return;
-        setTrustedHtml(resultEl, trustedHtml('<div style="color:var(--text-dim,#9ca3af);font-size:calc(12px * var(--wm-panel-effective-scale, 1))">Running…</div>', "legacy direct innerHTML migration"));
+        resultEl.innerHTML = '<div style="color:var(--text-dim,#9ca3af);font-size:12px">Running…</div>';
 
         try {
             const intent = parseIntent(raw);
             const result = await executeIntent(intent);
-            setTrustedHtml(resultEl, trustedHtml(result.html, "legacy direct innerHTML migration"));
+            resultEl.innerHTML = result.html;
         } catch (err) {
-            setTrustedHtml(resultEl, trustedHtml(`<div style="color:#ef4444">Error: ${err instanceof Error ? escapeHtml(err.message) : 'Unknown error'}</div>`, "legacy direct innerHTML migration"));
+            resultEl.innerHTML = `<div style="color:#ef4444">Error: ${err instanceof Error ? escapeHtml(err.message) : 'Unknown error'}</div>`;
         }
     }
 
@@ -397,10 +354,10 @@ export class AviationCommandBar {
         const el = this.overlay?.querySelector('#aviation-cmd-history-list');
         if (!el) return;
         const h = this.getHistory().slice(0, 5);
-        if (!h.length) { setTrustedHtml(el, trustedHtml('', "legacy direct innerHTML migration")); return; }
-        setTrustedHtml(el, trustedHtml(`<div style="font-size:calc(11px * var(--wm-panel-effective-scale, 1));color:#6b7280;margin-top:4px">${h.map(c =>
-            `<button class="cmd-hist-btn" style="background:none;border:none;color:#9ca3af;cursor:pointer;font-size:calc(11px * var(--wm-panel-effective-scale, 1));padding:1px 4px;border-radius:2px">${escapeHtml(c)}</button>`
-        ).join('')}</div>`, "legacy direct innerHTML migration"));
+        if (!h.length) { el.innerHTML = ''; return; }
+        el.innerHTML = `<div style="font-size:11px;color:#6b7280;margin-top:4px">${h.map(c =>
+            `<button class="cmd-hist-btn" style="background:none;border:none;color:#9ca3af;cursor:pointer;font-size:11px;padding:1px 4px;border-radius:2px">${escapeHtml(c)}</button>`
+        ).join('')}</div>`;
         el.querySelectorAll('.cmd-hist-btn').forEach((btn, i) => {
             btn.addEventListener('click', () => {
                 const input = this.overlay?.querySelector('#aviation-cmd-input') as HTMLInputElement;
@@ -418,10 +375,10 @@ export class AviationCommandBar {
             'fly IST LHR', 'fly Dubai London', 'fly LHR to DXB', 'fly BEY DXB',
             'brief', 'brief TK',
         ].filter(s => s.toLowerCase().startsWith(val.toLowerCase()) && s.toLowerCase() !== val.toLowerCase());
-        if (!val || !suggestions.length) { setTrustedHtml(el, trustedHtml('', "legacy direct innerHTML migration")); return; }
-        setTrustedHtml(el, trustedHtml(suggestions.slice(0, 4).map(s =>
-            `<button class="cmd-sug-btn" style="background:none;border:1px solid var(--border,#2a2a2a);border-radius:3px;color:var(--text-dim,#9ca3af);cursor:pointer;font-size:calc(11px * var(--wm-panel-effective-scale, 1));padding:2px 6px;margin:2px">${escapeHtml(s)}</button>`
-        ).join(''), "legacy direct innerHTML migration"));
+        if (!val || !suggestions.length) { el.innerHTML = ''; return; }
+        el.innerHTML = suggestions.slice(0, 4).map(s =>
+            `<button class="cmd-sug-btn" style="background:none;border:1px solid var(--border,#2a2a2a);border-radius:3px;color:var(--text-dim,#9ca3af);cursor:pointer;font-size:11px;padding:2px 6px;margin:2px">${escapeHtml(s)}</button>`
+        ).join('');
         el.querySelectorAll('.cmd-sug-btn').forEach((btn) => {
             btn.addEventListener('click', async () => {
                 const input = this.overlay?.querySelector('#aviation-cmd-input') as HTMLInputElement;
@@ -437,21 +394,21 @@ export class AviationCommandBar {
         style.textContent = `
       #aviation-cmd-overlay { position:fixed;inset:0;background:var(--bg,#0a0a0a);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding-top:80px;backdrop-filter:blur(4px); }
       #aviation-cmd-box { background:var(--surface,#141414);border:1px solid var(--border,#2a2a2a);border-radius:8px;width:min(560px,92vw);box-shadow:0 20px 60px rgba(0,0,0,.8);max-height:80vh;overflow-y:auto; }
-      #aviation-cmd-header { display:flex;justify-content:space-between;align-items:center;padding:12px 16px;font-size:calc(13px * var(--wm-panel-effective-scale, 1));font-weight:600;color:var(--text,#e8e8e8);border-bottom:1px solid var(--border,#2a2a2a); }
-      #aviation-cmd-close { background:none;border:none;color:var(--text-dim,#6b7280);cursor:pointer;font-size:calc(16px * var(--wm-panel-effective-scale, 1));line-height:1; }
-      #aviation-cmd-input { width:100%;box-sizing:border-box;background:transparent;border:none;border-bottom:1px solid var(--border,#2a2a2a);color:var(--text,#e8e8e8);font-family:inherit;font-size:calc(14px * var(--wm-panel-effective-scale, 1));padding:12px 16px;outline:none; }
+      #aviation-cmd-header { display:flex;justify-content:space-between;align-items:center;padding:12px 16px;font-size:13px;font-weight:600;color:var(--text,#e8e8e8);border-bottom:1px solid var(--border,#2a2a2a); }
+      #aviation-cmd-close { background:none;border:none;color:var(--text-dim,#6b7280);cursor:pointer;font-size:16px;line-height:1; }
+      #aviation-cmd-input { width:100%;box-sizing:border-box;background:transparent;border:none;border-bottom:1px solid var(--border,#2a2a2a);color:var(--text,#e8e8e8);font-family:inherit;font-size:14px;padding:12px 16px;outline:none; }
       #aviation-cmd-input:focus { border-bottom-color:var(--green,#44ff88); }
       #aviation-cmd-input::placeholder { color:var(--text-dim,#6b7280); }
       #aviation-cmd-suggestions { padding:4px 16px; }
-      #aviation-cmd-result { padding:8px 16px 12px;font-size:calc(13px * var(--wm-panel-effective-scale, 1)); }
+      #aviation-cmd-result { padding:8px 16px 12px;font-size:13px; }
       #aviation-cmd-history-list { padding:0 16px; }
-      .cmd-row { display:flex;gap:10px;align-items:center;font-size:calc(13px * var(--wm-panel-effective-scale, 1));color:var(--text,#e8e8e8);text-decoration:none; }
+      .cmd-row { display:flex;gap:10px;align-items:center;font-size:13px;color:var(--text,#e8e8e8);text-decoration:none; }
       .cmd-section { padding:4px 0; }
-      .cmd-empty { color:var(--text-dim,#6b7280);font-size:calc(12px * var(--wm-panel-effective-scale, 1));padding:8px 0; }
+      .cmd-empty { color:var(--text-dim,#6b7280);font-size:12px;padding:8px 0; }
       .cmd-news-item { padding:4px 0; }
-      .cmd-news-item a { color:var(--text,#e8e8e8);text-decoration:none;font-size:calc(12px * var(--wm-panel-effective-scale, 1)); }
+      .cmd-news-item a { color:var(--text,#e8e8e8);text-decoration:none;font-size:12px; }
       .cmd-news-item a:hover { color:var(--green,#44ff88); }
-      #aviation-cmd-hint { font-size:calc(11px * var(--wm-panel-effective-scale, 1));color:var(--text-dim,#6b7280);padding:10px 16px;text-align:right;border-top:1px solid var(--border,#2a2a2a); }
+      #aviation-cmd-hint { font-size:11px;color:var(--text-dim,#6b7280);padding:10px 16px;text-align:right;border-top:1px solid var(--border,#2a2a2a); }
       #aviation-cmd-hint kbd { background:var(--border,#2a2a2a);border-radius:3px;padding:1px 5px;font-family:inherit; }
     `;
         document.head.appendChild(style);

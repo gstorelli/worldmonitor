@@ -1,19 +1,22 @@
 import { getRpcBaseUrl } from '@/services/rpc-client';
-import type { BacktestStockResponse } from '@/generated/client/worldmonitor/market/v1/service_client';
+import {
+  MarketServiceClient,
+  type BacktestStockResponse,
+} from '@/generated/client/worldmonitor/market/v1/service_client';
 import { runThrottledTargetRequests } from '@/services/throttled-target-requests';
 import { premiumFetch } from '@/services/premium-fetch';
-import { MarketServiceClient } from '@/services/generated-rpc-clients';
 
 const client = new MarketServiceClient(getRpcBaseUrl(), { fetch: premiumFetch });
 
 export type StockBacktestResult = BacktestStockResponse;
 
+const DEFAULT_LIMIT = 4;
 const DEFAULT_EVAL_WINDOW_DAYS = 10;
 export const STOCK_BACKTEST_FRESH_MS = 24 * 60 * 60 * 1000;
 
-async function getTargets(limitOverride?: number) {
+async function getTargets(limit: number) {
   const { getStockAnalysisTargets } = await import('./stock-analysis');
-  return getStockAnalysisTargets(limitOverride);
+  return getStockAnalysisTargets(limit);
 }
 
 export async function fetchStockBacktestsForTargets(
@@ -30,17 +33,17 @@ export async function fetchStockBacktestsForTargets(
 }
 
 export async function fetchStockBacktests(
-  limitOverride?: number,
+  limit = DEFAULT_LIMIT,
   evalWindowDays = DEFAULT_EVAL_WINDOW_DAYS,
 ): Promise<StockBacktestResult[]> {
-  return fetchStockBacktestsForTargets(await getTargets(limitOverride), evalWindowDays);
+  return fetchStockBacktestsForTargets(await getTargets(limit), evalWindowDays);
 }
 
 export async function fetchStoredStockBacktests(
-  limitOverride?: number,
+  limit = DEFAULT_LIMIT,
   evalWindowDays = DEFAULT_EVAL_WINDOW_DAYS,
 ): Promise<StockBacktestResult[]> {
-  const targets = await getTargets(limitOverride);
+  const targets = await getTargets(limit);
   const symbols = targets.map((target) => target.symbol);
   const response = await client.listStoredStockBacktests({
     symbols,

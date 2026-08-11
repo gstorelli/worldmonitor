@@ -1,6 +1,9 @@
 import { getRpcBaseUrl } from '@/services/rpc-client';
-import type { AirQualityStation, ListAirQualityDataResponse } from '@/generated/client/worldmonitor/climate/v1/service_client';
-import { ClimateServiceClient } from '@/services/generated-rpc-clients';
+import {
+  ClimateServiceClient,
+  type AirQualityStation,
+  type ListAirQualityDataResponse,
+} from '@/generated/client/worldmonitor/climate/v1/service_client';
 
 export type { AirQualityStation, ListAirQualityDataResponse };
 

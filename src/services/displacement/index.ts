@@ -1,8 +1,11 @@
 import { getRpcBaseUrl } from '@/services/rpc-client';
-import type { GetDisplacementSummaryResponse as ProtoResponse, CountryDisplacement as ProtoCountry, DisplacementFlow as ProtoFlow } from '@/generated/client/worldmonitor/displacement/v1/service_client';
+import {
+  DisplacementServiceClient,
+  type GetDisplacementSummaryResponse as ProtoResponse,
+  type CountryDisplacement as ProtoCountry,
+  type DisplacementFlow as ProtoFlow,
+} from '@/generated/client/worldmonitor/displacement/v1/service_client';
 import { createCircuitBreaker, getCSSColor } from '@/utils';
-import { DisplacementServiceClient } from '@/services/generated-rpc-clients';
-import { publicRpcFetch } from '@/services/public-rpc-fetch';
 
 // ─── Consumer-friendly types (matching legacy shape exactly) ───
 
@@ -113,14 +116,7 @@ function toDisplayFlow(proto: ProtoFlow): DisplacementFlow {
 
 // ─── Client + circuit breaker ───
 
-async function fetchPublicDisplacementSummary(): Promise<ProtoResponse> {
-  return new DisplacementServiceClient(getRpcBaseUrl(), { fetch: publicRpcFetch })
-    .getDisplacementSummary({
-      year: 0,          // 0 = handler uses year fallback
-      countryLimit: 0,  // 0 = all countries
-      flowLimit: 50,    // top 50 flows (matching legacy)
-    });
-}
+const client = new DisplacementServiceClient(getRpcBaseUrl(), { fetch: (...args) => globalThis.fetch(...args) });
 
 const breaker = createCircuitBreaker<UnhcrSummary>({
   name: 'UNHCR Displacement',
@@ -132,7 +128,11 @@ const breaker = createCircuitBreaker<UnhcrSummary>({
 
 export async function fetchUnhcrPopulation(): Promise<UnhcrFetchResult> {
   const data = await breaker.execute(async () => {
-    const response = await fetchPublicDisplacementSummary();
+    const response = await client.getDisplacementSummary({
+      year: 0,          // 0 = handler uses year fallback
+      countryLimit: 0,  // 0 = all countries
+      flowLimit: 50,    // top 50 flows (matching legacy)
+    });
     return toDisplaySummary(response);
   }, emptyResult, { shouldCache: (r) => r.countries.length > 0 });
 

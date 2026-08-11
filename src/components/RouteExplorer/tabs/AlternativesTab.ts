@@ -9,8 +9,6 @@ import type {
   GetRouteExplorerLaneResponse,
 } from '@/generated/server/worldmonitor/supply_chain/v1/service_server';
 import { renderRouteCard } from '../components/RouteCard';
-import { setTrustedHtml, trustedHtml } from '@/utils/dom-utils';
-
 
 export interface AlternativesTabOptions {
   onSelectBypass: (option: BypassCorridorOption) => void;
@@ -48,19 +46,22 @@ export class AlternativesTab {
   }
 
   private renderEmpty(): void {
-    setTrustedHtml(this.element, trustedHtml('<div class="re-tab__placeholder">Pick a country pair and product to see alternatives.</div>', "legacy direct innerHTML migration"));
+    this.element.innerHTML =
+      '<div class="re-tab__placeholder">Pick a country pair and product to see alternatives.</div>';
   }
 
   private renderNoLane(): void {
-    setTrustedHtml(this.element, trustedHtml('<div class="re-tab__empty"><p>No modeled lane. Alternatives require a primary route to divert from.</p></div>', "legacy direct innerHTML migration"));
+    this.element.innerHTML =
+      '<div class="re-tab__empty"><p>No modeled lane. Alternatives require a primary route to divert from.</p></div>';
   }
 
   private renderEmptyAlternatives(): void {
-    setTrustedHtml(this.element, trustedHtml('<div class="re-tab__empty"><p>No sea-route alternatives available for this lane\'s primary chokepoint.</p></div>', "legacy direct innerHTML migration"));
+    this.element.innerHTML =
+      '<div class="re-tab__empty"><p>No sea-route alternatives available for this lane\'s primary chokepoint.</p></div>';
   }
 
   private renderList(): void {
-    setTrustedHtml(this.element, trustedHtml('', "legacy direct innerHTML migration"));
+    this.element.innerHTML = '';
     const listEl = document.createElement('div');
     listEl.className = 're-alternatives__list';
     listEl.setAttribute('role', 'listbox');

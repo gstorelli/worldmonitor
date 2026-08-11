@@ -1,7 +1,7 @@
 import { Panel } from './Panel';
-import { escapeHtml, unsafeRawHtml } from '@/utils/sanitize';
+import { escapeHtml } from '@/utils/sanitize';
 import { fetchCachedTheaterPosture, type CachedTheaterPosture } from '@/services/cached-theater-posture';
-import { getMilitaryVesselsModule, isVesselRuntimeStoppedError } from '@/services/military-vessels-lazy';
+import { fetchMilitaryVessels } from '@/services/military-vessels';
 import { recalcPostureWithVessels, type TheaterPostureSummary } from '@/services/military-surge';
 import { isDesktopRuntime } from '@/services/runtime';
 import { t } from '../services/i18n';
@@ -54,7 +54,7 @@ export class StrategicPosturePanel extends Panel {
 
   public override showLoading(): void {
     this.loadingStartTime = Date.now();
-    this.setSafeContent(unsafeRawHtml(`
+    this.setContent(`
       <div class="posture-panel">
         <div class="posture-loading">
           <div class="posture-loading-radar">
@@ -81,7 +81,7 @@ export class StrategicPosturePanel extends Panel {
           <div class="posture-loading-note">${t('components.strategicPosture.initialLoadNote')}</div>
         </div>
       </div>
-    `, 'legacy Panel.setContent() migration'));
+    `);
     this.startLoadingTimer();
   }
 
@@ -165,7 +165,6 @@ export class StrategicPosturePanel extends Panel {
 
   private async augmentWithVessels(): Promise<void> {
     try {
-      const { fetchMilitaryVessels } = await getMilitaryVesselsModule();
       const { vessels } = await fetchMilitaryVessels();
       console.log(`[StrategicPosturePanel] Got ${vessels.length} total military vessels`);
       if (vessels.length === 0) {
@@ -217,9 +216,6 @@ export class StrategicPosturePanel extends Panel {
       recalcPostureWithVessels(this.postures);
       console.log('[StrategicPosturePanel] Augmented with', vessels.length, 'vessels, posture levels recalculated');
     } catch (error) {
-      // Deliberate teardown of the lazy vessel runtime — leave the cached
-      // posture as-is rather than logging a misleading fetch failure.
-      if (isVesselRuntimeStoppedError(error)) return;
       console.warn('[StrategicPosturePanel] Failed to fetch vessels:', error);
       // Restore cached vessel counts if live fetch failed
       this.restoreVesselCounts();
@@ -307,7 +303,7 @@ export class StrategicPosturePanel extends Panel {
 
   private showNoData(): void {
     this.stopLoadingTimer();
-    this.setSafeContent(unsafeRawHtml(`
+    this.setContent(`
       <div class="posture-panel">
         <div class="posture-no-data">
           <div class="posture-no-data-icon pulse">📡</div>
@@ -328,13 +324,13 @@ export class StrategicPosturePanel extends Panel {
           <button class="posture-retry-btn" data-panel-retry>↻ ${t('components.strategicPosture.retryNow')}</button>
         </div>
       </div>
-    `, 'legacy Panel.setContent() migration'));
+    `);
     this.setRetryCallback(() => this.refresh());
   }
 
   private showFetchError(): void {
     this.stopLoadingTimer();
-    this.setSafeContent(unsafeRawHtml(`
+    this.setContent(`
       <div class="posture-panel">
         <div class="posture-no-data">
           <div class="posture-no-data-icon">⚠️</div>
@@ -348,7 +344,7 @@ export class StrategicPosturePanel extends Panel {
           <button class="posture-retry-btn" data-panel-retry>↻ ${t('components.strategicPosture.tryAgain')}</button>
         </div>
       </div>
-    `, 'legacy Panel.setContent() migration'));
+    `);
     this.setRetryCallback(() => this.refresh());
   }
 
@@ -499,7 +495,7 @@ export class StrategicPosturePanel extends Panel {
       </div>
     `;
 
-    this.setSafeContent(unsafeRawHtml(html, 'legacy Panel.setContent() migration'));
+    this.setContent(html);
     this.attachEventListeners();
   }
 

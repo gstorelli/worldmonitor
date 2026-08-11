@@ -8,8 +8,7 @@ export interface McpClientInfo {
 
 export interface McpQuota {
   used: number;
-  /** Plan-resolved daily allowance. `null` = unlimited (plan 2026-07-25-001 U3b). */
-  limit: number | null;
+  limit: number;
   resetsAt: string;
 }
 

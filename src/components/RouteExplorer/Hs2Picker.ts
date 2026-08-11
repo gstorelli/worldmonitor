@@ -3,8 +3,6 @@
  */
 
 import { filterHs2, getAllHs2, type Hs2Entry } from './RouteExplorer.utils';
-import { setTrustedHtml, trustedHtml } from '@/utils/dom-utils';
-
 
 export interface Hs2PickerOptions {
   placeholder?: string;
@@ -81,7 +79,7 @@ export class Hs2Picker {
   }
 
   private renderList(): void {
-    setTrustedHtml(this.list, trustedHtml('', "legacy direct innerHTML migration"));
+    this.list.innerHTML = '';
     if (this.results.length === 0) {
       const empty = document.createElement('li');
       empty.className = 're-picker__empty';
@@ -99,7 +97,7 @@ export class Hs2Picker {
         li.classList.add('re-picker__item--active');
         li.setAttribute('aria-selected', 'true');
       }
-      setTrustedHtml(li, trustedHtml(`<span class="re-picker__code">HS ${entry.hs2}</span><span class="re-picker__name">${escapeHtml(entry.label)}</span>`, "legacy direct innerHTML migration"));
+      li.innerHTML = `<span class="re-picker__code">HS ${entry.hs2}</span><span class="re-picker__name">${escapeHtml(entry.label)}</span>`;
       this.list.append(li);
     });
   }

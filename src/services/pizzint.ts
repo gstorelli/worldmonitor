@@ -1,14 +1,19 @@
 import type { PizzIntStatus, PizzIntLocation, PizzIntDefconLevel, GdeltTensionPair } from '@/types';
-import { createLazyClient, getRpcBaseUrl } from '@/services/rpc-client';
+import { getRpcBaseUrl } from '@/services/rpc-client';
 import { createCircuitBreaker } from '@/utils';
 import { getHydratedData } from '@/services/bootstrap';
 import { t } from '@/services/i18n';
-import type { GetPizzintStatusResponse, PizzintStatus as ProtoPizzintStatus, PizzintLocation as ProtoLocation, GdeltTensionPair as ProtoTensionPair } from '@/generated/client/worldmonitor/intelligence/v1/service_client';
-import { IntelligenceServiceClient } from '@/services/generated-rpc-clients';
+import {
+  IntelligenceServiceClient,
+  type GetPizzintStatusResponse,
+  type PizzintStatus as ProtoPizzintStatus,
+  type PizzintLocation as ProtoLocation,
+  type GdeltTensionPair as ProtoTensionPair,
+} from '@/generated/client/worldmonitor/intelligence/v1/service_client';
 
 // ---- Sebuf client ----
 
-const getClient = createLazyClient(() => new IntelligenceServiceClient(getRpcBaseUrl(), { fetch: (...args) => globalThis.fetch(...args) }));
+const client = new IntelligenceServiceClient(getRpcBaseUrl(), { fetch: (...args) => globalThis.fetch(...args) });
 
 // ---- Circuit breakers ----
 
@@ -115,7 +120,7 @@ export async function fetchPizzIntStatus(): Promise<PizzIntStatus> {
   if (hydrated?.pizzint) return toStatus(hydrated.pizzint);
 
   return pizzintBreaker.execute(async () => {
-    const resp: GetPizzintStatusResponse = await getClient().getPizzintStatus({ includeGdelt: false });
+    const resp: GetPizzintStatusResponse = await client.getPizzintStatus({ includeGdelt: false });
     if (!resp.pizzint) throw new Error('No PizzINT data');
     return toStatus(resp.pizzint);
   }, defaultStatus);
@@ -123,7 +128,7 @@ export async function fetchPizzIntStatus(): Promise<PizzIntStatus> {
 
 export async function fetchGdeltTensions(): Promise<GdeltTensionPair[]> {
   return gdeltBreaker.execute(async () => {
-    const resp: GetPizzintStatusResponse = await getClient().getPizzintStatus({ includeGdelt: true });
+    const resp: GetPizzintStatusResponse = await client.getPizzintStatus({ includeGdelt: true });
     return resp.tensionPairs.map(toTensionPair);
   }, []);
 }

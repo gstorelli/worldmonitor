@@ -1,4 +1,3 @@
-import { setTrustedHtml, trustedHtml } from '@/utils/dom-utils';
 /**
  * `?` cheat-sheet overlay for the Route Explorer keyboard bindings.
  */
@@ -32,14 +31,15 @@ export class KeyboardHelp {
 
     const header = document.createElement('div');
     header.className = 're-help__header';
-    setTrustedHtml(header, trustedHtml('<span class="re-help__title">Keyboard shortcuts</span>' +
-      '<button class="re-help__close" aria-label="Close help">×</button>', "legacy direct innerHTML migration"));
+    header.innerHTML =
+      '<span class="re-help__title">Keyboard shortcuts</span>' +
+      '<button class="re-help__close" aria-label="Close help">×</button>';
 
     const list = document.createElement('table');
     list.className = 're-help__table';
     for (const [key, label] of BINDINGS) {
       const row = document.createElement('tr');
-      setTrustedHtml(row, trustedHtml(`<td class="re-help__key"><kbd>${escapeHtml(key)}</kbd></td><td class="re-help__label">${escapeHtml(label)}</td>`, "legacy direct innerHTML migration"));
+      row.innerHTML = `<td class="re-help__key"><kbd>${escapeHtml(key)}</kbd></td><td class="re-help__label">${escapeHtml(label)}</td>`;
       list.append(row);
     }
 

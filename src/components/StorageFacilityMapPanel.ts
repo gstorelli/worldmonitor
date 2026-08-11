@@ -1,8 +1,8 @@
 import { Panel } from './Panel';
-import { escapeHtml, sanitizeUrl, unsafeRawHtml } from '@/utils/sanitize';
-import { createLazyClient, getRpcBaseUrl, rpcFetch } from '@/services/rpc-client';
+import { escapeHtml, sanitizeUrl } from '@/utils/sanitize';
+import { getRpcBaseUrl } from '@/services/rpc-client';
 import { attributionFooterHtml, ATTRIBUTION_FOOTER_CSS } from '@/utils/attribution-footer';
-
+import { SupplyChainServiceClient } from '@/generated/client/worldmonitor/supply_chain/v1/service_client';
 import type {
   ListStorageFacilitiesResponse,
   StorageFacilityEntry,
@@ -17,11 +17,10 @@ import {
   setCachedStorageFacilityRegistry,
   type RawStorageFacilityRegistry,
 } from '@/shared/storage-facility-registry-store';
-import { SupplyChainServiceClient } from '@/services/generated-rpc-clients';
 
-const getSupplyChainClient = createLazyClient(() => new SupplyChainServiceClient(getRpcBaseUrl(), {
-  fetch: rpcFetch,
-}));
+const client = new SupplyChainServiceClient(getRpcBaseUrl(), {
+  fetch: (...args: Parameters<typeof fetch>) => globalThis.fetch(...args),
+});
 
 const BADGE_COLOR: Record<string, string> = {
   operational: '#2ecc71',
@@ -213,7 +212,7 @@ export class StorageFacilityMapPanel extends Panel {
         // Background RPC refresh for post-deploy classifier-version bumps.
         // When it lands, mirror the fresh shape into the store so the
         // map's next re-render uses the newer stamps too.
-        void getSupplyChainClient().listStorageFacilities({ facilityType: '' }).then(live => {
+        void client.listStorageFacilities({ facilityType: '' }).then(live => {
           if (!this.element?.isConnected || !live?.facilities?.length) return;
           this.data = live;
           this.render();
@@ -228,7 +227,7 @@ export class StorageFacilityMapPanel extends Panel {
         return;
       }
 
-      const live = await getSupplyChainClient().listStorageFacilities({ facilityType: '' });
+      const live = await client.listStorageFacilities({ facilityType: '' });
       if (!this.element?.isConnected) return;
       if (live.upstreamUnavailable || !live.facilities?.length) {
         this.showError('Storage registry unavailable', () => void this.fetchData());
@@ -257,8 +256,8 @@ export class StorageFacilityMapPanel extends Panel {
     this.render();
     try {
       const [d, events] = await Promise.all([
-        getSupplyChainClient().getStorageFacilityDetail({ facilityId }),
-        getSupplyChainClient().listEnergyDisruptions({ assetId: facilityId, assetType: 'storage', ongoingOnly: false }),
+        client.getStorageFacilityDetail({ facilityId }),
+        client.listEnergyDisruptions({ assetId: facilityId, assetType: 'storage', ongoingOnly: false }),
       ]);
       if (!this.element?.isConnected || this.selectedId !== facilityId) return;
       this.detail = d;
@@ -339,7 +338,7 @@ export class StorageFacilityMapPanel extends Panel {
 
     const drawer = this.selectedId ? this.renderDrawer() : '';
 
-    this.setSafeContent(unsafeRawHtml(`
+    this.setContent(`
       <div class="sf-wrap">
         <table class="sf-table">
           <thead>
@@ -357,26 +356,26 @@ export class StorageFacilityMapPanel extends Panel {
       </div>
       ${ATTRIBUTION_FOOTER_CSS}
       <style>
-        .sf-wrap { position: relative; font-size: calc(11px * var(--wm-panel-effective-scale, 1)); }
+        .sf-wrap { position: relative; font-size: 11px; }
         .sf-table { width: 100%; border-collapse: collapse; }
-        .sf-table th { text-align: left; font-size: calc(9px * var(--wm-panel-effective-scale, 1)); text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-dim, #888); padding: 4px 6px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+        .sf-table th { text-align: left; font-size: 9px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-dim, #888); padding: 4px 6px; border-bottom: 1px solid rgba(255,255,255,0.08); }
         .sf-table td { padding: 6px; border-bottom: 1px solid rgba(255,255,255,0.04); }
         .sf-table tr.sf-row { cursor: pointer; }
         .sf-table tr.sf-row:hover td { background: rgba(255,255,255,0.03); }
         .sf-name { font-weight: 600; color: var(--text, #eee); }
-        .sf-sub  { font-size: calc(9px * var(--wm-panel-effective-scale, 1)); color: var(--text-dim, #888); text-transform: uppercase; letter-spacing: 0.04em; }
-        .sf-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: calc(9px * var(--wm-panel-effective-scale, 1)); font-weight: 700; color: #fff; text-transform: uppercase; letter-spacing: 0.04em; }
+        .sf-sub  { font-size: 9px; color: var(--text-dim, #888); text-transform: uppercase; letter-spacing: 0.04em; }
+        .sf-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 9px; font-weight: 700; color: #fff; text-transform: uppercase; letter-spacing: 0.04em; }
         .sf-drawer { position: absolute; inset: 0; background: var(--panel-bg, #0f1218); padding: 12px; overflow-y: auto; border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; }
-        .sf-drawer-close { position: absolute; top: 8px; right: 10px; background: transparent; border: 0; color: var(--text-dim, #888); cursor: pointer; font-size: calc(14px * var(--wm-panel-effective-scale, 1)); }
-        .sf-drawer h3 { margin: 0 0 6px 0; font-size: calc(13px * var(--wm-panel-effective-scale, 1)); color: var(--text, #eee); }
-        .sf-drawer .sf-kv { display: grid; grid-template-columns: 120px 1fr; gap: 4px 10px; font-size: calc(10px * var(--wm-panel-effective-scale, 1)); margin-bottom: 10px; }
-        .sf-drawer .sf-kv-key { color: var(--text-dim, #888); text-transform: uppercase; letter-spacing: 0.04em; font-size: calc(9px * var(--wm-panel-effective-scale, 1)); padding-top: 2px; }
+        .sf-drawer-close { position: absolute; top: 8px; right: 10px; background: transparent; border: 0; color: var(--text-dim, #888); cursor: pointer; font-size: 14px; }
+        .sf-drawer h3 { margin: 0 0 6px 0; font-size: 13px; color: var(--text, #eee); }
+        .sf-drawer .sf-kv { display: grid; grid-template-columns: 120px 1fr; gap: 4px 10px; font-size: 10px; margin-bottom: 10px; }
+        .sf-drawer .sf-kv-key { color: var(--text-dim, #888); text-transform: uppercase; letter-spacing: 0.04em; font-size: 9px; padding-top: 2px; }
         .sf-evidence { margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.06); }
-        .sf-ev-item { font-size: calc(10px * var(--wm-panel-effective-scale, 1)); color: var(--text, #eee); margin-bottom: 6px; }
+        .sf-ev-item { font-size: 10px; color: var(--text, #eee); margin-bottom: 6px; }
         .sf-ev-item a { color: #4ade80; text-decoration: none; }
         .sf-ev-item a:hover { text-decoration: underline; }
       </style>
-    `, 'legacy Panel.setContent() migration'));
+    `);
 
     const table = this.element?.querySelector('.sf-table') as HTMLTableElement | null;
     table?.querySelectorAll<HTMLTableRowElement>('tr.sf-row').forEach(tr => {

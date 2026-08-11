@@ -3,8 +3,6 @@ import type { NewsItem } from '@/types';
 import { generateSummary } from '@/services/summarization';
 import { escapeHtml, sanitizeUrl } from '@/utils/sanitize';
 import { t } from '@/services/i18n';
-import { setTrustedHtml, trustedHtml } from '@/utils/dom-utils';
-
 
 /**
  * GoodThingsDigestPanel -- Displays the top 5 positive stories of the day,
@@ -20,7 +18,7 @@ export class GoodThingsDigestPanel extends Panel {
 
   constructor() {
     super({ id: 'digest', title: '5 Good Things', trackActivity: false });
-    setTrustedHtml(this.content, trustedHtml('<p class="digest-placeholder">Loading today\u2019s digest\u2026</p>', "legacy direct innerHTML migration"));
+    this.content.innerHTML = '<p class="digest-placeholder">Loading today\u2019s digest\u2026</p>';
   }
 
   /**
@@ -37,13 +35,13 @@ export class GoodThingsDigestPanel extends Panel {
     const top5 = items.slice(0, 5);
 
     if (top5.length === 0) {
-      setTrustedHtml(this.content, trustedHtml(`<p class="digest-placeholder">${escapeHtml(t('components.goodThingsDigest.noStories'))}</p>`, "legacy direct innerHTML migration"));
+      this.content.innerHTML = `<p class="digest-placeholder">${escapeHtml(t('components.goodThingsDigest.noStories'))}</p>`;
       this.cardElements = [];
       return;
     }
 
     // Render stub cards immediately (titles only, no summaries yet)
-    setTrustedHtml(this.content, trustedHtml('', "legacy direct innerHTML migration"));
+    this.content.innerHTML = '';
     const list = document.createElement('div');
     list.className = 'digest-list';
     this.cardElements = [];
@@ -52,7 +50,7 @@ export class GoodThingsDigestPanel extends Panel {
       const item = top5[i]!;
       const card = document.createElement('div');
       card.className = 'digest-card';
-      setTrustedHtml(card, trustedHtml(`
+      card.innerHTML = `
         <span class="digest-card-number">${i + 1}</span>
         <div class="digest-card-body">
           <a class="digest-card-title" href="${sanitizeUrl(item.link)}" target="_blank" rel="noopener">
@@ -61,7 +59,7 @@ export class GoodThingsDigestPanel extends Panel {
           <span class="digest-card-source">${escapeHtml(item.source)}</span>
           <p class="digest-card-summary digest-card-summary--loading">${escapeHtml(t('components.goodThingsDigest.summarizing'))}</p>
         </div>
-      `, "legacy direct innerHTML migration"));
+      `;
       list.appendChild(card);
       this.cardElements.push(card);
     }

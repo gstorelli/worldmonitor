@@ -1,15 +1,6 @@
-import { escapeHtml, sanitizeUrl } from '@/utils/sanitize';
+import { escapeHtml } from '@/utils/sanitize';
 
 const SECTION_HEADERS = ['SITUATION NOW', 'WHAT THIS MEANS FOR', 'KEY RISKS', 'OUTLOOK', 'WATCH ITEMS'];
-
-export interface IntelBriefCitationSource {
-  title?: string;
-  url?: string;
-}
-
-type IntelBriefCitationOptions =
-  | { sources: readonly IntelBriefCitationSource[] }
-  | { count: number; hrefPrefix: string };
 
 /**
  * Converts structured LLM intel brief text into HTML.
@@ -21,7 +12,7 @@ type IntelBriefCitationOptions =
  */
 export function formatIntelBrief(
   text: string,
-  citationOpts?: IntelBriefCitationOptions,
+  citationOpts?: { count: number; hrefPrefix: string },
 ): string {
   const escaped = escapeHtml(text);
   const lines = escaped.split('\n');
@@ -55,18 +46,10 @@ export function formatIntelBrief(
   if (inSection) out.push('</div>');
   let html = out.join('') || `<p>${escaped.replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>')}</p>`;
 
-  if (citationOpts && ('sources' in citationOpts || citationOpts.count > 0)) {
+  if (citationOpts && citationOpts.count > 0) {
+    const { count, hrefPrefix } = citationOpts;
     html = html.replace(/\[(\d{1,2})\]/g, (_match, numStr) => {
       const n = parseInt(numStr, 10);
-      if ('sources' in citationOpts) {
-        const source = citationOpts.sources[n - 1];
-        const href = sanitizeUrl(source?.url ?? '');
-        return href
-          ? `<a href="${href}" target="_blank" rel="noopener noreferrer" class="cb-citation" title="${escapeHtml(source?.title ?? `Source ${n}`)}">[${n}]</a>`
-          : `[${numStr}]`;
-      }
-
-      const { count, hrefPrefix } = citationOpts;
       return n >= 1 && n <= count
         ? `<a href="${hrefPrefix}${n}" class="cb-citation">[${n}]</a>`
         : `[${numStr}]`;

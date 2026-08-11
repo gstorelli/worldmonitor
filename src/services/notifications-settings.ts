@@ -1,5 +1,3 @@
-import { WEB_APP_ORIGIN } from '@/config/web-origin';
-import { openExternalUrl } from '@/services/external-navigation';
 import { escapeHtml } from '@/utils/sanitize';
 import { renderSVG } from 'uqr';
 import {
@@ -22,40 +20,13 @@ import {
 } from '@/services/notification-channels';
 import { getCurrentClerkUser } from '@/services/clerk';
 import { hasTier } from '@/services/entitlements';
-import { t } from '@/services/i18n';
-import { getMarketWatchlistEntries } from '@/services/market-watchlist';
 import { SITE_VARIANT } from '@/config/variant';
-import { mountCountryChipPicker, loadFollowedCountriesSafe, type CountryChipPickerHandle } from '@/utils/country-chip-picker';
-import { setTrustedHtml, trustedHtml } from '@/utils/dom-utils';
-
 
 const QUIET_HOURS_BATCH_ENABLED = import.meta.env.VITE_QUIET_HOURS_BATCH_ENABLED !== '0';
 const DIGEST_CRON_ENABLED = import.meta.env.VITE_DIGEST_CRON_ENABLED !== '0';
 
-// Watchlist story alerts (#4922 U3). Opt-in event type: unlike the broadcast
-// types (covered by the eventTypes:[] wildcard), the relay only delivers this
-// one when the rule explicitly lists it AND rule.tickers intersects the
-// story's extracted tickers. Enabling the toggle sends the current market
-// watchlist symbols as `tickers`; the watchlist-modal save path re-syncs them.
-const WATCHLIST_STORY_EVENT_TYPE = 'watchlist_story_alert';
-
 export interface NotificationsSettingsHost {
   isSignedIn?: boolean;
-  /**
-   * Optional ISO-3166 alpha-2 country code to pre-fill into the alert-rule
-   * country picker on first render of the create form. Used by the deep-dive
-   * "Notify me about this country" sub-action (PR B U8 R9): the user clicks
-   * the link on the Iran deep-dive → notifications settings opens with 'IR'
-   * pre-checked.
-   *
-   * Only applies on NEW-rule create. Existing rules respect their stored
-   * countries[] regardless of this parameter.
-   *
-   * Validation: must match /^[A-Z]{2}$/ after trim+uppercase; otherwise
-   * silently dropped (defensive — the dispatcher should already normalize,
-   * but this is a public entry point so we don't trust the input).
-   */
-  preselectCountry?: string;
 }
 
 export interface NotificationsSettingsResult {
@@ -63,120 +34,8 @@ export interface NotificationsSettingsResult {
   attach: (container: HTMLElement) => () => void;
 }
 
-function normalizePreselectCountry(input: string | undefined): string | null {
-  if (typeof input !== 'string') return null;
-  const trimmed = input.trim().toUpperCase();
-  if (!/^[A-Z]{2}$/.test(trimmed)) return null;
-  return trimmed;
-}
-
-function appendNotificationError(rowEl: HTMLElement, message: string): void {
-  rowEl.querySelector('.us-notif-error')?.remove();
-  const errorEl = document.createElement('span');
-  errorEl.className = 'us-notif-error';
-  errorEl.setAttribute('role', 'alert');
-  errorEl.textContent = message;
-  rowEl.appendChild(errorEl);
-}
-
-type WebPushSettingsState = 'available' | 'denied' | 'unsupported';
-
-const WEB_PUSH_BLOCKED_BADGE = 'Blocked';
-const WEB_PUSH_UNSUPPORTED_BADGE = 'Not supported';
-
-function browserPushBlockedMessage(): string {
-  return t('components.proActivation.steps.alerts.blockedNote', {
-    defaultValue:
-      "Notifications are blocked in your browser. Turn them on in your browser's site settings to get alerts.",
-  });
-}
-
-function browserPushUnsupportedMessage(): string {
-  return 'This browser or in-app webview does not support web push notifications.';
-}
-
-// User-Agent is long and ugly. Surface a short label only: "Chrome",
-// "Firefox", "Safari", etc. Shared by the connected row and the
-// connected-but-denied row so the two can't drift.
-function webPushDeviceLabel(channel: NotificationChannel): string {
-  const ua = channel.userAgent ?? '';
-  return /Firefox\/|Chrome\/|Edge\/|Safari\//.exec(ua)?.[0]?.replace('/', '') ?? 'This device';
-}
-
-async function readWebPushSettingsState(): Promise<WebPushSettingsState> {
-  try {
-    const { getPushPermission, isWebPushSupported } = await import('@/services/push-notifications');
-    if (!isWebPushSupported()) return 'unsupported';
-    return getPushPermission() === 'denied' ? 'denied' : 'available';
-  } catch {
-    return 'unsupported';
-  }
-}
-
-// Single writer for the two runtime web-push transitions, so the imperative
-// path can't drift from the equivalent template branches in renderChannelRow.
-function applyWebPushRowState(
-  rowEl: HTMLElement,
-  state: 'denied' | 'unsupported',
-  message: string,
-  badgeClass: string,
-  badgeLabel: string,
-): void {
-  rowEl.dataset.webPushState = state;
-  rowEl.querySelector('.us-notif-error')?.remove();
-  const sub = rowEl.querySelector<HTMLElement>('.us-notif-ch-sub');
-  if (sub) {
-    // Role FIRST: a live region that is created already-populated has no
-    // content change for assistive tech to announce.
-    if (state === 'denied') sub.setAttribute('role', 'status');
-    else sub.removeAttribute('role');
-    sub.classList.add('us-notif-ch-sub-wrap');
-    sub.textContent = message;
-  }
-  const actions = rowEl.querySelector<HTMLElement>('.us-notif-ch-actions');
-  if (actions) {
-    const badge = document.createElement('span');
-    badge.className = badgeClass;
-    badge.textContent = badgeLabel;
-    // Preserve Remove: a channel registered on this account stays removable
-    // even once this browser can no longer subscribe.
-    const remove = actions.querySelector('.us-notif-disconnect');
-    actions.replaceChildren(badge);
-    if (remove) actions.appendChild(remove);
-  }
-}
-
-function showWebPushBlockedState(rowEl: HTMLElement): void {
-  applyWebPushRowState(
-    rowEl,
-    'denied',
-    browserPushBlockedMessage(),
-    'us-notif-ch-badge us-notif-ch-badge-blocked',
-    WEB_PUSH_BLOCKED_BADGE,
-  );
-}
-
-function showWebPushUnsupportedState(rowEl: HTMLElement): void {
-  applyWebPushRowState(
-    rowEl,
-    'unsupported',
-    browserPushUnsupportedMessage(),
-    'us-notif-ch-badge',
-    WEB_PUSH_UNSUPPORTED_BADGE,
-  );
-}
-
-function getTelegramBotUsername(): string {
-  try {
-    return import.meta.env.VITE_TELEGRAM_BOT_USERNAME || 'WorldMonitorBot';
-  } catch {
-    return 'WorldMonitorBot';
-  }
-}
-
 export function renderNotificationsSettings(host: NotificationsSettingsHost): NotificationsSettingsResult {
   const isPro = !!host.isSignedIn && hasTier(1);
-  const preselectCountry = normalizePreselectCountry(host.preselectCountry);
 
   let html = '';
   if (isPro) {
@@ -229,51 +88,9 @@ export function renderNotificationsSettings(host: NotificationsSettingsHost): No
 
       const CHANNEL_LABELS: Record<ChannelType, string> = { telegram: 'Telegram', email: 'Email', slack: 'Slack', discord: 'Discord', webhook: 'Webhook', web_push: 'Browser Push' };
 
-      function renderChannelRow(
-        channel: NotificationChannel | null,
-        type: ChannelType,
-        webPushState: WebPushSettingsState,
-      ): string {
+      function renderChannelRow(channel: NotificationChannel | null, type: ChannelType): string {
         const icon = channelIcon(type);
         const name = CHANNEL_LABELS[type];
-
-        if (type === 'web_push' && webPushState === 'denied') {
-          // Push permission is per-BROWSER; the web_push channel record is
-          // per-ACCOUNT (convex keys it by userId + channelType and transfers
-          // it across devices). So a denial here says nothing about whether the
-          // account is receiving push — it may be live on another device.
-          //
-          // A connected account therefore keeps the connected presentation, and
-          // critically keeps `us-notif-ch-on`: getCurrentAlertRuleFormState()
-          // derives the persisted `channels` array from that class, so dropping
-          // it would silently delete web_push from the alert rule on the next
-          // autosave (sensitivity, quiet hours, country picker, connecting any
-          // other channel...) with no way to re-add it while denied.
-          if (channel?.verified) {
-            return `<div class="us-notif-ch-row us-notif-ch-on" data-channel-type="web_push" data-web-push-state="denied">
-              <div class="us-notif-ch-icon">${icon}</div>
-              <div class="us-notif-ch-body">
-                <div class="us-notif-ch-name">${name}</div>
-                <div class="us-notif-ch-sub">${escapeHtml(webPushDeviceLabel(channel))}</div>
-                <div class="us-notif-ch-sub us-notif-ch-sub-wrap us-notif-ch-sub-warn" role="status">${escapeHtml(browserPushBlockedMessage())}</div>
-              </div>
-              <div class="us-notif-ch-actions">
-                <span class="us-notif-ch-badge">Connected</span>
-                <button type="button" class="us-notif-ch-btn us-notif-disconnect" data-channel="web_push">Remove</button>
-              </div>
-            </div>`;
-          }
-          return `<div class="us-notif-ch-row" data-channel-type="web_push" data-web-push-state="denied">
-            <div class="us-notif-ch-icon">${icon}</div>
-            <div class="us-notif-ch-body">
-              <div class="us-notif-ch-name">${name}</div>
-              <div class="us-notif-ch-sub us-notif-ch-sub-wrap" role="status">${escapeHtml(browserPushBlockedMessage())}</div>
-            </div>
-            <div class="us-notif-ch-actions">
-              <span class="us-notif-ch-badge us-notif-ch-badge-blocked">${WEB_PUSH_BLOCKED_BADGE}</span>
-            </div>
-          </div>`;
-        }
 
         if (channel?.verified) {
           let sub: string;
@@ -287,7 +104,11 @@ export function renderNotificationsSettings(host: NotificationsSettingsHost): No
           } else if (type === 'webhook') {
             sub = channel.webhookLabel ? escapeHtml(channel.webhookLabel) : 'Connected';
           } else if (type === 'web_push') {
-            sub = escapeHtml(webPushDeviceLabel(channel));
+            // User-Agent is long and ugly. Surface a short label only:
+            // "Chrome", "Firefox", "Safari", etc.
+            const ua = channel.userAgent ?? '';
+            const browser = /Firefox\/|Chrome\/|Edge\/|Safari\//.exec(ua)?.[0]?.replace('/', '') ?? 'This device';
+            sub = escapeHtml(browser);
           } else {
             const rawCh = channel.slackChannelName ?? '';
             const ch = rawCh ? `#${escapeHtml(rawCh.startsWith('#') ? rawCh.slice(1) : rawCh)}` : 'connected';
@@ -383,19 +204,7 @@ export function renderNotificationsSettings(host: NotificationsSettingsHost): No
         }
 
         if (type === 'web_push') {
-          if (webPushState === 'unsupported') {
-            return `<div class="us-notif-ch-row" data-channel-type="web_push" data-web-push-state="unsupported">
-              <div class="us-notif-ch-icon">${icon}</div>
-              <div class="us-notif-ch-body">
-                <div class="us-notif-ch-name">${name}</div>
-                <div class="us-notif-ch-sub us-notif-ch-sub-wrap">${escapeHtml(browserPushUnsupportedMessage())}</div>
-              </div>
-              <div class="us-notif-ch-actions">
-                <span class="us-notif-ch-badge">${WEB_PUSH_UNSUPPORTED_BADGE}</span>
-              </div>
-            </div>`;
-          }
-          return `<div class="us-notif-ch-row" data-channel-type="web_push" data-web-push-state="available">
+          return `<div class="us-notif-ch-row" data-channel-type="web_push">
             <div class="us-notif-ch-icon">${icon}</div>
             <div class="us-notif-ch-body">
               <div class="us-notif-ch-name">${name}</div>
@@ -412,10 +221,7 @@ export function renderNotificationsSettings(host: NotificationsSettingsHost): No
 
       const detectedTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-      function renderNotifContent(
-        data: Awaited<ReturnType<typeof getChannelsData>>,
-        webPushState: WebPushSettingsState,
-      ): string {
+      function renderNotifContent(data: Awaited<ReturnType<typeof getChannelsData>>): string {
         const channelTypes: ChannelType[] = ['telegram', 'email', 'slack', 'discord', 'webhook', 'web_push'];
         const alertRule = data.alertRules?.[0] ?? null;
         const sensitivity = alertRule?.sensitivity ?? 'all';
@@ -423,7 +229,7 @@ export function renderNotificationsSettings(host: NotificationsSettingsHost): No
         let html = '<div class="ai-flow-section-label">Channels</div>';
         for (const type of channelTypes) {
           const channel = data.channels.find(c => c.channelType === type) ?? null;
-          html += renderChannelRow(channel, type, webPushState);
+          html += renderChannelRow(channel, type);
         }
 
         const qhEnabled = alertRule?.quietHoursEnabled ?? false;
@@ -488,7 +294,7 @@ export function renderNotificationsSettings(host: NotificationsSettingsHost): No
             Sensitivity lives OUTSIDE usRealtimeSection so digest-mode users can
             see and change it. The 'all' option is disabled when delivery mode is
             realtime — the (realtime, all) pair is forbidden by the server. See
-            docs/archive/plans/forbid-realtime-all-events.md §2a.
+            plans/forbid-realtime-all-events.md §2a.
           -->
           <div class="ai-flow-section-label" style="margin-top:8px">Sensitivity</div>
           <select class="unified-settings-select" id="usNotifSensitivity">
@@ -506,16 +312,6 @@ export function renderNotificationsSettings(host: NotificationsSettingsHost): No
               </div>
               <label class="ai-flow-switch">
                 <input type="checkbox" id="usNotifEnabled"${alertRule?.enabled ? ' checked' : ''}>
-                <span class="ai-flow-slider"></span>
-              </label>
-            </div>
-            <div class="ai-flow-toggle-row">
-              <div class="ai-flow-toggle-label-wrap">
-                <div class="ai-flow-toggle-label">Watchlist story alerts</div>
-                <div class="ai-flow-toggle-desc">Alert when a high-importance story mentions a company on your market watchlist</div>
-              </div>
-              <label class="ai-flow-switch">
-                <input type="checkbox" id="usWatchlistAlerts"${alertRule?.eventTypes?.includes(WATCHLIST_STORY_EVENT_TYPE) ? ' checked' : ''}>
                 <span class="ai-flow-slider"></span>
               </label>
             </div>
@@ -570,235 +366,51 @@ export function renderNotificationsSettings(host: NotificationsSettingsHost): No
               </label>
             </div>
           </div>
-          <div class="ai-flow-section-label" style="margin-top:8px">Country scope</div>
-          <div class="ai-flow-toggle-desc" style="margin-bottom:6px">Restrict alerts to specific countries (ISO-3166 alpha-2). Leave empty to receive alerts from all countries. When set, global alerts without a country (markets, shipping) are excluded; breaking-news alerts are still delivered.</div>
-          <div id="usNotifCountryPicker"></div>
           <div class="ai-flow-section-label" style="margin-top:8px">Timezone</div>
           <select class="unified-settings-select" id="usSharedTimezone" style="width:100%">${makeTzOptions(sharedTz)}</select>`;
         return html;
       }
 
-      // Country chip picker handle — recreated each reload. Held outside the
-      // reload closure so the change handlers (debounced save below) can read
-      // the current value via picker?.getValue().
-      let countryPicker: CountryChipPickerHandle | null = null;
-
-      // Debounce timers — declared up-front so the country picker's onChange
-      // (defined inside an async then() that fires after this scope's sync
-      // body completes) can reuse alertRuleDebounceTimer without TDZ risk.
-      let slackOAuthPopup: Window | null = null;
-      let discordOAuthPopup: Window | null = null;
-      let alertRuleDebounceTimer: ReturnType<typeof setTimeout> | null = null;
-      let qhDebounceTimer: ReturnType<typeof setTimeout> | null = null;
-      let digestDebounceTimer: ReturnType<typeof setTimeout> | null = null;
-
-      // Last web-push state actually rendered, so the permission watchers below
-      // only re-render when it really changed.
-      let renderedWebPushState: WebPushSettingsState | null = null;
-      let requestedWebPushState: WebPushSettingsState | null = null;
-      let notifReloadGeneration = 0;
-
-      // Fire-and-forget settings writes MUST NOT surface as unhandled promise
-      // rejections. A debounced auto-save that 401s (expired Clerk session) or
-      // hits a transient network error is expected and non-fatal — swallow it
-      // here so it never reaches window.onunhandledrejection (WORLDMONITOR-SN).
-      // Logged for local debugging only; the setting simply isn't persisted.
-      function fireForgetSave(p: Promise<unknown>, label: string): void {
-        void p.catch((err) => {
-          if (signal.aborted) return;
-          console.warn(`[notifications] ${label} failed (not saved):`, err);
-        });
-      }
-
       function reloadNotifSection(): void {
-        const generation = ++notifReloadGeneration;
         const loadingEl = container.querySelector<HTMLElement>('#usNotifLoading');
         const contentEl = container.querySelector<HTMLElement>('#usNotifContent');
         if (!loadingEl || !contentEl) return;
         loadingEl.style.display = 'block';
         contentEl.style.display = 'none';
         if (signal.aborted) return;
-        Promise.all([
-          getChannelsData(undefined, signal),
-          readWebPushSettingsState(),
-        ]).then(([data, webPushState]) => {
-          if (signal.aborted || generation !== notifReloadGeneration) return;
-          renderedWebPushState = webPushState;
-          requestedWebPushState = null;
-          setTrustedHtml(contentEl, trustedHtml(renderNotifContent(data, webPushState), "legacy direct innerHTML migration"));
+        getChannelsData().then((data) => {
+          if (signal.aborted) return;
+          contentEl.innerHTML = renderNotifContent(data);
           loadingEl.style.display = 'none';
           contentEl.style.display = 'block';
-
-          // Tear down stale picker (if any) before mounting fresh one — the
-          // innerHTML rewrite above orphans the previous root.
-          if (countryPicker) {
-            try { countryPicker.destroy(); } catch { /* ignore */ }
-            countryPicker = null;
-          }
-
-          const pickerRoot = contentEl.querySelector<HTMLElement>('#usNotifCountryPicker');
-          if (!pickerRoot) return;
-
-          const existingRule = data.alertRules?.[0] ?? null;
-          const existingCountries = Array.isArray(existingRule?.countries) ? existingRule!.countries! : [];
-          // Smart-default ONLY on NEW-rule create — when there's no existing
-          // alertRules row at all. If the user already has a row (even with
-          // countries: []), respect that as an explicit "all countries" choice.
-          const isNewRule = existingRule === null;
-
-          let initial = existingCountries;
-          if (isNewRule) {
-            // Three-way precedence on NEW rules:
-            //   (1) preselectCountry from caller (deep-dive "Notify me about
-            //       this country" sub-action — PR B U8 R9 pre-fill).
-            //   (2) followed-countries from PR A's primitive (smart default).
-            //   (3) [] fallback (all countries; current behavior).
-            // (1) wins when present; the user explicitly clicked into this
-            // form FROM a country deep-dive, so that country should be
-            // pre-checked even if it's not in their watchlist.
-            if (preselectCountry) {
-              initial = [preselectCountry];
-            } else {
-              const followed = loadFollowedCountriesSafe();
-              if (followed.length > 0) initial = followed;
-            }
-          }
-
-          countryPicker = mountCountryChipPicker(pickerRoot, {
-            initial,
-            onChange: () => {
-              // Debounced save through the existing alertRule pipeline.
-              if (alertRuleDebounceTimer) clearTimeout(alertRuleDebounceTimer);
-              alertRuleDebounceTimer = setTimeout(() => {
-                saveCurrentAlertRule();
-              }, 800);
-            },
-          });
         }).catch((err) => {
-          if (signal.aborted || generation !== notifReloadGeneration) return;
-          requestedWebPushState = null;
+          if (signal.aborted) return;
           console.error('[notifications] Failed to load settings:', err);
           if (loadingEl) loadingEl.textContent = 'Failed to load notification settings.';
         });
       }
 
-      /**
-       * Centralized snapshot of the live alert-rule form state.
-       *
-       * EVERY alertRules save path in this file MUST source its payload from
-       * this helper (or augment its return value with overrides) — bypassing
-       * it risks dropping `countries` (the picker value lives outside the
-       * form's input elements) or any future field added to AlertRule.
-       *
-       * Why a helper instead of inlining `countries: countryPicker?.getValue()`
-       * at every call site: each save handler historically reconstructed the
-       * payload from scratch, and the picker value was easy to forget. PR
-       * #3632 review surfaced one missed call site (channel-connect saves);
-       * centralizing makes future drift impossible to introduce silently.
-       */
-      function getCurrentAlertRuleFormState(): {
-        enabled: boolean;
-        eventTypes: string[];
-        sensitivity: 'all' | 'high' | 'critical';
-        channels: ChannelType[];
-        aiDigestEnabled: boolean;
-        countries: string[] | undefined;
-        tickers: string[];
-      } {
-        const enabledEl = container.querySelector<HTMLInputElement>('#usNotifEnabled');
-        const sensitivityEl = container.querySelector<HTMLSelectElement>('#usNotifSensitivity');
-        const aiDigestEl = container.querySelector<HTMLInputElement>('#usAiDigestEnabled');
-        const watchlistEl = container.querySelector<HTMLInputElement>('#usWatchlistAlerts');
-        const connectedChannelTypes = Array.from(
-          container.querySelectorAll<HTMLElement>('[data-channel-type]'),
-        )
-          .filter(el => el.classList.contains('us-notif-ch-on'))
-          .map(el => el.dataset.channelType as ChannelType);
-        // Picker may be absent during async mount or gated render. In that
-        // case send undefined so insert-capable APIs preserve-on-omit instead
-        // of accidentally clearing the stored country scope.
-        const alertRuleCountries = countryPicker ? countryPicker.getValue() : undefined;
-        // Watchlist story alerts (#4922 U3): the toggle is the opt-in — ON
-        // adds the event type AND snapshots the current market watchlist
-        // symbols as `tickers` (re-synced on every save while enabled); OFF
-        // restores the broadcast wildcard ([]) and clears tickers so no
-        // stale scope lingers server-side.
-        const watchlistOn = watchlistEl?.checked ?? false;
-        return {
-          enabled: enabledEl?.checked ?? false,
-          eventTypes: watchlistOn ? [WATCHLIST_STORY_EVENT_TYPE] : [],
-          sensitivity: (sensitivityEl?.value ?? 'all') as 'all' | 'high' | 'critical',
-          channels: connectedChannelTypes,
-          aiDigestEnabled: aiDigestEl?.checked ?? true,
-          countries: alertRuleCountries,
-          tickers: watchlistOn ? getMarketWatchlistEntries().map((e) => e.symbol) : [],
-        };
-      }
-
-      // Read all current alert-rule fields off the DOM and POST through the
-      // existing saveAlertRules pipeline. Sources its full payload from
-      // getCurrentAlertRuleFormState so `countries` flows through every time.
-      function saveCurrentAlertRule(): void {
-        const state = getCurrentAlertRuleFormState();
-        fireForgetSave(saveAlertRules({
-          variant: SITE_VARIANT,
-          ...state,
-        }, signal), 'save alert rules');
-      }
-
       reloadNotifSection();
 
-      // The blocked copy sends the user to their BROWSER's site settings, which
-      // is an in-page action: nothing here remounts afterwards (a settings
-      // tab-switch is a guarded no-op in UnifiedSettings.attachNotificationsTab).
-      // Without a watcher the row would stay on "Blocked" with no Enable button
-      // after the user did exactly what we asked, so re-read the permission and
-      // re-render when it actually changes.
-      function resyncWebPushState(): void {
-        if (signal.aborted) return;
-        void readWebPushSettingsState().then((state) => {
-          if (signal.aborted) return;
-          if (
-            renderedWebPushState === null
-            || state === renderedWebPushState
-            || state === requestedWebPushState
-          ) return;
-          // Coalesce the permission listener and focus fallback without
-          // claiming the state as rendered until the reload actually wins.
-          requestedWebPushState = state;
-          reloadNotifSection();
-        });
-      }
-
-      // Chromium/Firefox fire this the moment the site-settings toggle flips.
-      void (async () => {
-        try {
-          const status = await navigator.permissions.query({
-            name: 'notifications' as PermissionName,
-          });
-          if (signal.aborted) return;
-          status.addEventListener('change', resyncWebPushState, { signal });
-        } catch {
-          // Safari and older browsers don't expose the notifications
-          // permission descriptor — the focus fallback below covers them.
-        }
-      })();
-
-      // Fallback for browsers without the permission descriptor: changing site
-      // settings there takes focus away and returns it.
-      window.addEventListener('focus', resyncWebPushState, { signal });
-
       function saveRuleWithNewChannel(newChannel: ChannelType): void {
-        const state = getCurrentAlertRuleFormState();
-        // Augment channels with the newly connected one (set semantics).
-        const channels = [...new Set([...state.channels, newChannel])];
-        fireForgetSave(saveAlertRules({
-          variant: SITE_VARIANT,
-          ...state,
-          channels,
-        }, signal), 'save alert rules');
+        const enabledEl = container.querySelector<HTMLInputElement>('#usNotifEnabled');
+        const sensitivityEl = container.querySelector<HTMLSelectElement>('#usNotifSensitivity');
+        if (!enabledEl) return;
+        const enabled = enabledEl.checked;
+        const sensitivity = (sensitivityEl?.value ?? 'all') as 'all' | 'high' | 'critical';
+        const existing = Array.from(container.querySelectorAll<HTMLElement>('[data-channel-type]'))
+          .filter(el => el.classList.contains('us-notif-ch-on'))
+          .map(el => el.dataset.channelType as ChannelType);
+        const channels = [...new Set([...existing, newChannel])];
+        const aiEl = container.querySelector<HTMLInputElement>('#usAiDigestEnabled');
+        void saveAlertRules({ variant: SITE_VARIANT, enabled, eventTypes: [], sensitivity, channels, aiDigestEnabled: aiEl?.checked ?? true });
       }
 
+      let slackOAuthPopup: Window | null = null;
+      let discordOAuthPopup: Window | null = null;
+      let alertRuleDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+      let qhDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+      let digestDebounceTimer: ReturnType<typeof setTimeout> | null = null;
       signal.addEventListener('abort', () => {
         if (alertRuleDebounceTimer !== null) {
           clearTimeout(alertRuleDebounceTimer);
@@ -822,15 +434,14 @@ export function renderNotificationsSettings(host: NotificationsSettingsHost): No
           const endEl = container.querySelector<HTMLSelectElement>('#usQhEnd');
           const tzEl = container.querySelector<HTMLSelectElement>('#usSharedTimezone');
           const overrideEl = container.querySelector<HTMLSelectElement>('#usQhOverride');
-          fireForgetSave(setQuietHours({
+          void setQuietHours({
             variant: SITE_VARIANT,
             quietHoursEnabled: enabledEl?.checked ?? false,
             quietHoursStart: startEl ? Number(startEl.value) : 22,
             quietHoursEnd: endEl ? Number(endEl.value) : 7,
             quietHoursTimezone: tzEl?.value || detectedTz,
             quietHoursOverride: (overrideEl?.value ?? 'critical_only') as QuietHoursOverride,
-            countries: countryPicker ? countryPicker.getValue() : undefined,
-          }, signal), 'save quiet hours');
+          });
         }, 800);
       };
 
@@ -840,13 +451,12 @@ export function renderNotificationsSettings(host: NotificationsSettingsHost): No
           const modeEl = container.querySelector<HTMLSelectElement>('#usDigestMode');
           const hourEl = container.querySelector<HTMLSelectElement>('#usDigestHour');
           const tzEl = container.querySelector<HTMLSelectElement>('#usSharedTimezone');
-          fireForgetSave(setDigestSettings({
+          void setDigestSettings({
             variant: SITE_VARIANT,
             digestMode: (modeEl?.value ?? 'realtime') as DigestMode,
             digestHour: hourEl ? Number(hourEl.value) : 8,
             digestTimezone: tzEl?.value || detectedTz,
-            countries: countryPicker ? countryPicker.getValue() : undefined,
-          }, signal), 'save digest settings');
+          });
         }, 800);
       };
 
@@ -876,7 +486,7 @@ export function renderNotificationsSettings(host: NotificationsSettingsHost): No
           // server never sees the forbidden pair. When switching AWAY, re-enable
           // 'all'. Save atomically via setNotificationConfig (the legacy
           // setDigestSettings call would race against the cross-field validator).
-          // See docs/archive/plans/forbid-realtime-all-events.md §2c, §2d.
+          // See plans/forbid-realtime-all-events.md §2c, §2d.
           const sensitivityEl = container.querySelector<HTMLSelectElement>('#usNotifSensitivity');
           const allOption = sensitivityEl?.querySelector<HTMLOptionElement>('option[value="all"]');
           const highOption = sensitivityEl?.querySelector<HTMLOptionElement>('option[value="high"]');
@@ -915,30 +525,20 @@ export function renderNotificationsSettings(host: NotificationsSettingsHost): No
           digestDebounceTimer = setTimeout(() => {
             void (async () => {
               try {
-                const state = getCurrentAlertRuleFormState();
                 await setNotificationConfig({
                   variant: SITE_VARIANT,
-                  ...state,
                   digestMode: target.value as DigestMode,
                   digestHour: hourEl ? Number(hourEl.value) : 8,
                   digestTimezone: tzEl?.value || detectedTz,
-                  ...(snappedSensitivity ? { sensitivity: snappedSensitivity } : {}),
-                }, undefined, signal);
+                  sensitivity: snappedSensitivity, // undefined unless we just snapped
+                });
               } catch (err) {
                 if (err instanceof IncompatibleDeliveryError) {
                   const hint = container.querySelector<HTMLElement>('#usSensitivityHint');
                   if (hint) hint.textContent = err.message;
                   return;
                 }
-                // This IIFE is `void`-ed with no .catch(), so a rethrow here
-                // escapes as an unhandled rejection and reaches
-                // window.onunhandledrejection — the exact WORLDMONITOR-SN
-                // invariant fireForgetSave exists to uphold. Every sibling save
-                // in this file routes through fireForgetSave; this one cannot,
-                // because it needs the IncompatibleDeliveryError branch above.
-                // So swallow the same way fireForgetSave does instead.
-                if (signal.aborted) return;
-                console.warn('[notifications] save digest mode failed (not saved):', err);
+                throw err;
               }
             })();
           }, 800);
@@ -969,28 +569,47 @@ export function renderNotificationsSettings(host: NotificationsSettingsHost): No
         if (target.id === 'usAiDigestEnabled') {
           if (alertRuleDebounceTimer) clearTimeout(alertRuleDebounceTimer);
           alertRuleDebounceTimer = setTimeout(() => {
-            // Source from the centralized helper so `countries` flows through.
-            // Override aiDigestEnabled with the just-toggled value (the helper
-            // reads from the DOM, which has already been updated by the time
-            // the debounce fires, but explicit override avoids any race).
-            const state = getCurrentAlertRuleFormState();
-            fireForgetSave(saveAlertRules({
+            const enabledEl = container.querySelector<HTMLInputElement>('#usNotifEnabled');
+            const sensitivityEl = container.querySelector<HTMLSelectElement>('#usNotifSensitivity');
+            const enabled = enabledEl?.checked ?? false;
+            const sensitivity = (sensitivityEl?.value ?? 'all') as 'all' | 'high' | 'critical';
+            const connectedChannelTypes = Array.from(
+              container.querySelectorAll<HTMLElement>('[data-channel-type]'),
+            )
+              .filter(el => el.classList.contains('us-notif-ch-on'))
+              .map(el => el.dataset.channelType as ChannelType);
+            void saveAlertRules({
               variant: SITE_VARIANT,
-              ...state,
+              enabled,
+              eventTypes: [],
+              sensitivity,
+              channels: connectedChannelTypes,
               aiDigestEnabled: target.checked,
-            }, signal), 'save alert rules');
+            });
           }, 500);
           return;
         }
-        if (target.id === 'usNotifEnabled' || target.id === 'usNotifSensitivity' || target.id === 'usWatchlistAlerts') {
+        if (target.id === 'usNotifEnabled' || target.id === 'usNotifSensitivity') {
           if (alertRuleDebounceTimer) clearTimeout(alertRuleDebounceTimer);
           alertRuleDebounceTimer = setTimeout(() => {
-            // Source from the centralized helper so `countries` flows through.
-            const state = getCurrentAlertRuleFormState();
-            fireForgetSave(saveAlertRules({
+            const enabledEl = container.querySelector<HTMLInputElement>('#usNotifEnabled');
+            const sensitivityEl = container.querySelector<HTMLSelectElement>('#usNotifSensitivity');
+            const enabled = enabledEl?.checked ?? false;
+            const sensitivity = (sensitivityEl?.value ?? 'all') as 'all' | 'high' | 'critical';
+            const connectedChannelTypes = Array.from(
+              container.querySelectorAll<HTMLElement>('[data-channel-type]'),
+            )
+              .filter(el => el.classList.contains('us-notif-ch-on'))
+              .map(el => el.dataset.channelType as ChannelType);
+            const aiDigestEl = container.querySelector<HTMLInputElement>('#usAiDigestEnabled');
+            void saveAlertRules({
               variant: SITE_VARIANT,
-              ...state,
-            }, signal), 'save alert rules');
+              enabled,
+              eventTypes: [],
+              sensitivity,
+              channels: connectedChannelTypes,
+              aiDigestEnabled: aiDigestEl?.checked ?? true,
+            });
           }, 1000);
         }
       }, { signal });
@@ -1023,15 +642,15 @@ export function renderNotificationsSettings(host: NotificationsSettingsHost): No
         }
 
         const startTelegramPairing = (rowEl: HTMLElement) => {
-          setTrustedHtml(rowEl, trustedHtml(`<div class="us-notif-ch-icon">${channelIcon('telegram')}</div><div class="us-notif-ch-body"><div class="us-notif-ch-name">Telegram</div><div class="us-notif-ch-sub">Generating code…</div></div>`, "legacy direct innerHTML migration"));
-          createPairingToken(signal).then(({ token, expiresAt }) => {
+          rowEl.innerHTML = `<div class="us-notif-ch-icon">${channelIcon('telegram')}</div><div class="us-notif-ch-body"><div class="us-notif-ch-name">Telegram</div><div class="us-notif-ch-sub">Generating code…</div></div>`;
+          createPairingToken().then(({ token, expiresAt }) => {
             if (signal.aborted) return;
-            const botUsername = getTelegramBotUsername();
+            const botUsername = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_TELEGRAM_BOT_USERNAME as string | undefined) ?? 'WorldMonitorBot';
             const deepLink = `https://t.me/${String(botUsername)}?start=${token}`;
             const startCmd = `/start ${token}`;
             const secsLeft = Math.max(0, Math.floor((expiresAt - Date.now()) / 1000));
             const qrSvg = renderSVG(deepLink, { ecc: 'M', border: 1 });
-            setTrustedHtml(rowEl, trustedHtml(`
+            rowEl.innerHTML = `
               <div class="us-notif-ch-icon">${channelIcon('telegram')}</div>
               <div class="us-notif-ch-body">
                 <div class="us-notif-ch-name">Connect Telegram</div>
@@ -1050,7 +669,7 @@ export function renderNotificationsSettings(host: NotificationsSettingsHost): No
               <div class="us-notif-ch-actions">
                 <span class="us-notif-tg-countdown" id="usTgCountdown">Waiting… ${secsLeft}s</span>
               </div>
-            `, "legacy direct innerHTML migration"));
+            `;
             let remaining = secsLeft;
             clearNotifPoll();
             notifPollInterval = setInterval(() => {
@@ -1061,7 +680,7 @@ export function renderNotificationsSettings(host: NotificationsSettingsHost): No
               const expired = remaining <= 0;
               if (expired) {
                 clearNotifPoll();
-                setTrustedHtml(rowEl, trustedHtml(`
+                rowEl.innerHTML = `
                   <div class="us-notif-ch-icon">${channelIcon('telegram')}</div>
                   <div class="us-notif-ch-body">
                     <div class="us-notif-ch-name">Telegram</div>
@@ -1070,10 +689,10 @@ export function renderNotificationsSettings(host: NotificationsSettingsHost): No
                   <div class="us-notif-ch-actions">
                     <button type="button" class="us-notif-ch-btn us-notif-ch-btn-primary us-notif-tg-regen">Generate new code</button>
                   </div>
-                `, "legacy direct innerHTML migration"));
+                `;
                 return;
               }
-              getChannelsData(undefined, signal).then((data) => {
+              getChannelsData().then((data) => {
                 const tg = data.channels.find(c => c.channelType === 'telegram');
                 if (tg?.verified) {
                   clearNotifPoll();
@@ -1083,7 +702,7 @@ export function renderNotificationsSettings(host: NotificationsSettingsHost): No
               }).catch(() => {});
             }, 3000);
           }).catch(() => {
-            setTrustedHtml(rowEl, trustedHtml(`<div class="us-notif-ch-icon">${channelIcon('telegram')}</div><div class="us-notif-ch-body"><div class="us-notif-ch-name">Telegram</div><div class="us-notif-ch-sub us-notif-tg-expired">Failed to generate code</div></div><div class="us-notif-ch-actions"><button type="button" class="us-notif-ch-btn us-notif-ch-btn-primary us-notif-tg-regen">Try again</button></div>`, "legacy direct innerHTML migration"));
+            rowEl.innerHTML = `<div class="us-notif-ch-icon">${channelIcon('telegram')}</div><div class="us-notif-ch-body"><div class="us-notif-ch-name">Telegram</div><div class="us-notif-ch-sub us-notif-tg-expired">Failed to generate code</div></div><div class="us-notif-ch-actions"><button type="button" class="us-notif-ch-btn us-notif-ch-btn-primary us-notif-tg-regen">Try again</button></div>`;
           });
         };
 
@@ -1100,11 +719,12 @@ export function renderNotificationsSettings(host: NotificationsSettingsHost): No
           if (!email) {
             const rowEl = target.closest('.us-notif-ch-row') as HTMLElement | null;
             if (rowEl) {
-              appendNotificationError(rowEl, 'No email found on your account');
+              rowEl.querySelector('.us-notif-error')?.remove();
+              rowEl.insertAdjacentHTML('beforeend', '<span class="us-notif-error">No email found on your account</span>');
             }
             return;
           }
-          setEmailChannel(email, undefined, signal).then(() => {
+          setEmailChannel(email).then(() => {
             if (!signal.aborted) { saveRuleWithNewChannel('email'); reloadNotifSection(); }
           }).catch(() => {});
           return;
@@ -1117,14 +737,15 @@ export function renderNotificationsSettings(host: NotificationsSettingsHost): No
             return;
           }
           if (btn) btn.textContent = 'Connecting…';
-          startSlackOAuth(signal).then((oauthUrl) => {
+          startSlackOAuth().then((oauthUrl) => {
             if (signal.aborted) return;
             const popup = window.open(oauthUrl, 'slack-oauth', 'width=600,height=700,menubar=no,toolbar=no');
             if (!popup) {
               if (btn) btn.textContent = 'Add to Slack';
               const rowEl = btn?.closest<HTMLElement>('[data-channel-type="slack"]');
               if (rowEl) {
-                appendNotificationError(rowEl, 'Popup blocked — please allow popups for this site, then try again.');
+                rowEl.querySelector('.us-notif-error')?.remove();
+                rowEl.insertAdjacentHTML('beforeend', '<span class="us-notif-error">Popup blocked — please allow popups for this site, then try again.</span>');
               }
             } else {
               slackOAuthPopup = popup;
@@ -1142,14 +763,15 @@ export function renderNotificationsSettings(host: NotificationsSettingsHost): No
             return;
           }
           if (btn) btn.textContent = 'Connecting…';
-          startDiscordOAuth(signal).then((oauthUrl) => {
+          startDiscordOAuth().then((oauthUrl) => {
             if (signal.aborted) return;
             const popup = window.open(oauthUrl, 'discord-oauth', 'width=600,height=700,menubar=no,toolbar=no');
             if (!popup) {
               if (btn) btn.textContent = 'Connect Discord';
               const rowEl = btn?.closest<HTMLElement>('[data-channel-type="discord"]');
               if (rowEl) {
-                appendNotificationError(rowEl, 'Popup blocked — please allow popups for this site, then try again.');
+                rowEl.querySelector('.us-notif-error')?.remove();
+                rowEl.insertAdjacentHTML('beforeend', '<span class="us-notif-error">Popup blocked — please allow popups for this site, then try again.</span>');
               }
             } else {
               discordOAuthPopup = popup;
@@ -1163,7 +785,7 @@ export function renderNotificationsSettings(host: NotificationsSettingsHost): No
         if (target.closest('#usConnectWebhook')) {
           const rowEl = target.closest<HTMLElement>('[data-channel-type="webhook"]');
           if (!rowEl) return;
-          setTrustedHtml(rowEl.querySelector('.us-notif-ch-actions')!, trustedHtml(`
+          rowEl.querySelector('.us-notif-ch-actions')!.innerHTML = `
             <div style="display:flex;flex-direction:column;gap:6px;width:100%">
               <input type="url" id="usWebhookUrl" placeholder="https://hooks.example.com/..." class="unified-settings-input" style="font-size:12px;width:100%">
               <input type="text" id="usWebhookLabel" placeholder="Label (optional)" class="unified-settings-input" style="font-size:12px;width:100%">
@@ -1171,7 +793,7 @@ export function renderNotificationsSettings(host: NotificationsSettingsHost): No
                 <button type="button" class="us-notif-ch-btn us-notif-ch-btn-primary" id="usWebhookSave">Save</button>
                 <button type="button" class="us-notif-ch-btn" id="usWebhookCancel">Cancel</button>
               </div>
-            </div>`, "legacy direct innerHTML migration"));
+            </div>`;
           const urlInput = rowEl.querySelector<HTMLInputElement>('#usWebhookUrl');
           urlInput?.focus();
           return;
@@ -1186,7 +808,7 @@ export function renderNotificationsSettings(host: NotificationsSettingsHost): No
           }
           const saveBtn = target.closest<HTMLButtonElement>('#usWebhookSave');
           if (saveBtn) saveBtn.textContent = 'Saving...';
-          setWebhookChannel(url, labelInput?.value?.trim() || undefined, signal).then(() => {
+          setWebhookChannel(url, labelInput?.value?.trim() || undefined).then(() => {
             if (!signal.aborted) { saveRuleWithNewChannel('webhook'); reloadNotifSection(); }
           }).catch(() => {
             if (saveBtn && !signal.aborted) saveBtn.textContent = 'Save';
@@ -1200,61 +822,28 @@ export function renderNotificationsSettings(host: NotificationsSettingsHost): No
 
         if (target.closest('#usConnectWebPush')) {
           const btn = target.closest<HTMLButtonElement>('#usConnectWebPush');
-          // Re-query rather than capture: Notification.requestPermission() has
-          // no timeout, and any sibling channel action (webhook cancel/save,
-          // email connect, a disconnect, a Slack/Discord OAuth message, the
-          // Telegram pairing poll) can call reloadNotifSection() meanwhile,
-          // which replaces the whole content subtree. A node captured before
-          // the prompt would then be detached and the blocked/unsupported/error
-          // result would be written somewhere the user can never see.
-          const liveRow = (): HTMLElement | null =>
-            container.querySelector<HTMLElement>('[data-channel-type="web_push"]');
-          const liveBtn = (): HTMLButtonElement | null =>
-            container.querySelector<HTMLButtonElement>('#usConnectWebPush');
           if (btn) {
             btn.disabled = true;
             btn.textContent = 'Requesting…';
           }
           (async () => {
-            let pushRuntime: typeof import('@/services/push-notifications') | null = null;
             try {
-              pushRuntime = await import('@/services/push-notifications');
-              if (signal.aborted) return;
-              if (!pushRuntime.isWebPushSupported()) {
-                const row = liveRow();
-                if (row) showWebPushUnsupportedState(row);
+              const { subscribeToPush, isWebPushSupported } = await import('@/services/push-notifications');
+              if (!isWebPushSupported()) {
+                if (btn) {
+                  btn.disabled = false;
+                  btn.textContent = 'Not supported';
+                  btn.setAttribute('title', 'This browser (or in-app webview) does not support web push notifications.');
+                }
                 return;
               }
-              if (pushRuntime.getPushPermission() === 'denied') {
-                const row = liveRow();
-                if (row) showWebPushBlockedState(row);
-                return;
-              }
-              await pushRuntime.subscribeToPush();
+              await subscribeToPush();
               if (!signal.aborted) { saveRuleWithNewChannel('web_push'); reloadNotifSection(); }
             } catch (err) {
               console.warn('[notif] web_push subscribe failed:', err);
-              if (signal.aborted) return;
-              const row = liveRow();
-              const permission = pushRuntime?.getPushPermission();
-              if (permission === 'denied') {
-                if (row) showWebPushBlockedState(row);
-                return;
-              }
-              if (pushRuntime && !pushRuntime.isWebPushSupported()) {
-                if (row) showWebPushUnsupportedState(row);
-                return;
-              }
-              const enableBtn = liveBtn();
-              if (enableBtn) {
-                enableBtn.disabled = false;
-                enableBtn.textContent = 'Enable';
-              }
-              if (row) {
-                appendNotificationError(
-                  row,
-                  'Could not enable browser notifications. Try again.',
-                );
+              if (btn && !signal.aborted) {
+                btn.disabled = false;
+                btn.textContent = 'Enable';
               }
             }
           })();
@@ -1281,7 +870,7 @@ export function renderNotificationsSettings(host: NotificationsSettingsHost): No
             })();
             return;
           }
-          deleteChannel(channelType, signal).then(() => {
+          deleteChannel(channelType).then(() => {
             if (!signal.aborted) reloadNotifSection();
           }).catch(() => {});
           return;
@@ -1301,7 +890,8 @@ export function renderNotificationsSettings(host: NotificationsSettingsHost): No
         } else if (e.data?.type === 'wm:slack_error') {
           const rowEl = container.querySelector<HTMLElement>('[data-channel-type="slack"]');
           if (rowEl) {
-            appendNotificationError(rowEl, `Slack connection failed: ${String(e.data.error ?? 'unknown')}`);
+            rowEl.querySelector('.us-notif-error')?.remove();
+            rowEl.insertAdjacentHTML('beforeend', `<span class="us-notif-error">Slack connection failed: ${escapeHtml(String(e.data.error ?? 'unknown'))}</span>`);
             const btn = rowEl.querySelector<HTMLButtonElement>('#usConnectSlack');
             if (btn) btn.textContent = 'Add to Slack';
           }
@@ -1310,7 +900,8 @@ export function renderNotificationsSettings(host: NotificationsSettingsHost): No
         } else if (e.data?.type === 'wm:discord_error') {
           const rowEl = container.querySelector<HTMLElement>('[data-channel-type="discord"]');
           if (rowEl) {
-            appendNotificationError(rowEl, `Discord connection failed: ${String(e.data.error ?? 'unknown')}`);
+            rowEl.querySelector('.us-notif-error')?.remove();
+            rowEl.insertAdjacentHTML('beforeend', `<span class="us-notif-error">Discord connection failed: ${escapeHtml(String(e.data.error ?? 'unknown'))}</span>`);
             const btn = rowEl.querySelector<HTMLButtonElement>('#usConnectDiscord');
             if (btn) btn.textContent = 'Connect Discord';
           }

@@ -1,8 +1,10 @@
 import { getHydratedData } from '@/services/bootstrap';
 import { getRpcBaseUrl } from '@/services/rpc-client';
 import { createCircuitBreaker } from '@/utils';
-import type { ListCrossSourceSignalsResponse } from '@/generated/client/worldmonitor/intelligence/v1/service_client';
-import { IntelligenceServiceClient } from '@/services/generated-rpc-clients';
+import {
+  IntelligenceServiceClient,
+  type ListCrossSourceSignalsResponse,
+} from '@/generated/client/worldmonitor/intelligence/v1/service_client';
 
 const client = new IntelligenceServiceClient(getRpcBaseUrl(), { fetch: (...args) => globalThis.fetch(...args) });
 const breaker = createCircuitBreaker<ListCrossSourceSignalsResponse>({ name: 'Cross-Source Signals', cacheTtlMs: 15 * 60 * 1000, persistCache: true });

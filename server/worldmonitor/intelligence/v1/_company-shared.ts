@@ -10,7 +10,6 @@ import type {
 } from '../../../../src/generated/server/worldmonitor/intelligence/v1/service_server';
 import { cachedFetchJson } from '../../../_shared/redis';
 import { CHROME_UA, finnhubGate } from '../../../_shared/constants';
-import { searchRecentStockHeadlines } from '../../market/v1/stock-news-search';
 
 const PROFILE_TTL = 86_400;
 const EARNINGS_TTL = 43_200;
@@ -19,7 +18,6 @@ const UPSTREAM_TIMEOUT = 10_000;
 // Corporate intelligence has a tighter composite budget than the general news
 // search. Its AbortSignal is propagated through the complete provider ladder.
 const NEWS_TIMEOUT_MS = 6_000;
-const MAX_NEWS_MENTIONS = 5;
 
 interface FinnhubProfile {
   name?: string;
@@ -206,20 +204,15 @@ export async function fetchCompanyNewsMentions(
   name: string,
   timeoutMs = NEWS_TIMEOUT_MS,
 ): Promise<CompanyNewsResult | null> {
+  // De-clouded Risk Sentinel: the market/v1 stock-news-search handler was
+  // removed with the stock-analysis premium stack, so company intelligence
+  // no longer embeds recent stock headlines. Company signals still resolve
+  // from the remaining (non-stock) sources.
   if (!symbol) return null;
   try {
-    const result = await searchRecentStockHeadlines(symbol, name, MAX_NEWS_MENTIONS, {
-      signal: AbortSignal.timeout(timeoutMs),
-      cacheNamespace: 'company-intel',
-    });
-    if (!Array.isArray(result.headlines) || result.headlines.length === 0) return null;
-    const mentions = result.headlines.slice(0, MAX_NEWS_MENTIONS).map(headline => ({
-      title: headline.title,
-      url: safeHttpUrl(headline.link),
-      source: headline.source,
-      publishedAtMs: Number.isFinite(headline.publishedAt) ? headline.publishedAt : 0,
-    })).filter(mention => mention.url !== '' || mention.title !== '');
-    return mentions.length > 0 ? { mentions, fetchedAtMs: result.fetchedAtMs } : null;
+    void name;
+    void timeoutMs;
+    return null;
   } catch {
     return null;
   }

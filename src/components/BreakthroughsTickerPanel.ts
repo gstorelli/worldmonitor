@@ -2,8 +2,6 @@ import { Panel } from './Panel';
 import type { NewsItem } from '@/types';
 import { escapeHtml, sanitizeUrl } from '@/utils/sanitize';
 import { t } from '@/services/i18n';
-import { setTrustedHtml, trustedHtml } from '@/utils/dom-utils';
-
 
 /**
  * BreakthroughsTickerPanel -- Horizontally scrolling ticker of science breakthroughs.
@@ -35,7 +33,7 @@ export class BreakthroughsTickerPanel extends Panel {
     this.tickerTrack = track;
 
     // Clear loading state and append the ticker
-    setTrustedHtml(this.content, trustedHtml('', "legacy direct innerHTML migration"));
+    this.content.innerHTML = '';
     this.content.appendChild(wrapper);
   }
 
@@ -47,7 +45,8 @@ export class BreakthroughsTickerPanel extends Panel {
     if (!this.tickerTrack) return;
 
     if (items.length === 0) {
-      setTrustedHtml(this.tickerTrack, trustedHtml(`<span class="ticker-item ticker-placeholder">${t('components.breakthroughsTicker.noData')}</span>`, "legacy direct innerHTML migration"));
+      this.tickerTrack.innerHTML =
+        `<span class="ticker-item ticker-placeholder">${t('components.breakthroughsTicker.noData')}</span>`;
       return;
     }
 
@@ -63,7 +62,7 @@ export class BreakthroughsTickerPanel extends Panel {
       .join('');
 
     // Double the content for seamless infinite scroll
-    setTrustedHtml(this.tickerTrack, trustedHtml(itemsHtml + itemsHtml, "legacy direct innerHTML migration"));
+    this.tickerTrack.innerHTML = itemsHtml + itemsHtml;
   }
 
   /**

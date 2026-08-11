@@ -13,8 +13,6 @@ import {
   corridorStatusClass,
   escapeHtml,
 } from '../tabs/route-utils';
-import { setTrustedHtml, trustedHtml } from '@/utils/dom-utils';
-
 
 export interface RouteCardOptions {
   option: BypassCorridorOption;
@@ -42,7 +40,7 @@ export function renderRouteCard(opts: RouteCardOptions): HTMLDivElement {
   const statusTag = corridorStatusLabel(o.status);
   const riskCls = warRiskTierClass(o.warRiskTier);
 
-  setTrustedHtml(card, trustedHtml([
+  card.innerHTML = [
     `<div class="re-route-card__header">`,
     `  <span class="re-route-card__rank">${index + 1}</span>`,
     `  <span class="re-route-card__name">${escapeHtml(o.name)}</span>`,
@@ -52,7 +50,7 @@ export function renderRouteCard(opts: RouteCardOptions): HTMLDivElement {
     `  <span class="re-route-card__delta">${formatCostDelta(o.addedTransitDays, o.addedCostMultiplier)}</span>`,
     `  <span class="re-route-card__risk ${riskCls}">${escapeHtml(warRiskTierLabel(o.warRiskTier))}</span>`,
     `</div>`,
-  ].join('\n'), "legacy direct innerHTML migration"));
+  ].join('\n');
 
   if (!isDisabled) {
     const select = () => onSelect(o);

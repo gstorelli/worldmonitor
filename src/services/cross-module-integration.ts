@@ -3,12 +3,10 @@ import type { CountryScore } from './country-instability';
 import { getLatestSanctionsPressure, type SanctionsPressureResult } from './sanctions-pressure';
 import { getLatestRadiationWatch, type RadiationObservation } from './radiation';
 import type { CascadeResult, CascadeImpactLevel } from '@/types';
-import { isInLearningMode } from './country-instability';
-import { getCachedCountryScores, isElevatedCiiScore } from './cached-risk-scores';
+import { calculateCII, isInLearningMode } from './country-instability';
 import { getCountryNameByCode } from './country-geometry';
 import { t } from '@/services/i18n';
 import type { TheaterPostureSummary } from '@/services/military-surge';
-import { detectCiiScoreChanges } from './cii-score-changes';
 
 export type AlertPriority = 'critical' | 'high' | 'medium' | 'low';
 export type AlertType = 'convergence' | 'cii_spike' | 'cascade' | 'sanctions' | 'radiation' | 'composite';
@@ -96,19 +94,13 @@ export interface StrategicRiskOverview {
   topRisks: string[];
   topConvergenceZones: { cellId: string; lat: number; lon: number; score: number }[];
   unstableCountries: CountryScore[];
-  timestamp: Date | null;
-  degraded: boolean;
-  stale: boolean;
+  timestamp: Date;
 }
 
 const alerts: UnifiedAlert[] = [];
-let previousCIIScores = new Map<string, number>();
+const previousCIIScores = new Map<string, number>();
 const ALERT_MERGE_WINDOW_MS = 2 * 60 * 60 * 1000;
 const ALERT_MERGE_DISTANCE_KM = 200;
-
-function getAuthoritativeCIIScores(): CountryScore[] {
-  return getCachedCountryScores();
-}
 
 let alertIdCounter = 0;
 function generateAlertId(): string {
@@ -568,34 +560,38 @@ function getCountriesNearLocation(lat: number, lon: number): string[] {
 
 export function checkCIIChanges(): UnifiedAlert[] {
   const newAlerts: UnifiedAlert[] = [];
-  const scores = getAuthoritativeCIIScores();
+  const scores = calculateCII();
 
   // Skip alerting during learning mode - data not yet reliable
   const inLearning = isInLearningMode();
 
-  const detected = detectCiiScoreChanges(scores, previousCIIScores, inLearning);
-  for (const { score, previousScore } of detected.changes) {
+  for (const score of scores) {
+    const previous = previousCIIScores.get(score.code) ?? score.score;
+    const change = score.score - previous;
+
+    // Only emit alerts after learning period completes
+    if (!inLearning && Math.abs(change) >= 10) {
       const driver = getHighestComponent(score);
       const alert = createCIIAlert(
         score.code,
         score.name,
-        previousScore,
+        previous,
         score.score,
         score.level,
         driver
       );
       if (alert) newAlerts.push(alert);
-  }
+    }
 
-  previousCIIScores = detected.nextScores;
+    previousCIIScores.set(score.code, score.score);
+  }
 
   return newAlerts;
 }
 
 function getHighestComponent(score: CountryScore): string {
-  const { unrest, conflict, security, information } = score.components;
-  if (unrest >= conflict && unrest >= security && unrest >= information) return 'Civil Unrest';
-  if (conflict >= security && conflict >= information) return 'Conflict Activity';
+  const { unrest, security, information } = score.components;
+  if (unrest >= security && unrest >= information) return 'Civil Unrest';
   if (security >= information) return 'Security Activity';
   return 'Information Velocity';
 }
@@ -631,7 +627,7 @@ export function calculateStrategicRiskOverview(
   breakingAlertScore?: number,
   theaterStaleFactor?: number
 ): StrategicRiskOverview {
-  const ciiScores = getAuthoritativeCIIScores();
+  const ciiScores = calculateCII();
 
   // Update the alerts array with current data
   updateAlerts(convergenceAlerts);
@@ -710,10 +706,8 @@ export function calculateStrategicRiskOverview(
     topConvergenceZones: convergenceAlerts
       .slice(0, 3)
       .map(a => ({ cellId: a.cellId, lat: a.lat, lon: a.lon, score: a.score })),
-    unstableCountries: ciiScores.filter(s => isElevatedCiiScore(s.score)).slice(0, 5),
+    unstableCountries: ciiScores.filter(s => s.score >= 50).slice(0, 5),
     timestamp: new Date(),
-    degraded: false,
-    stale: false,
   };
 }
 
@@ -738,8 +732,8 @@ function calculateCIIRiskScore(scores: CountryScore[]): number {
     }
   }
 
-  // Count of countries in the formal elevated-or-higher CII bands adds bonus.
-  const elevatedCount = scores.filter(s => isElevatedCiiScore(s.score)).length;
+  // Count of elevated countries (score >= 50) adds bonus
+  const elevatedCount = scores.filter(s => s.score >= 50).length;
   const elevatedBonus = Math.min(20, elevatedCount * 5);
 
   return Math.min(100, weightedScore + elevatedBonus);
@@ -811,6 +805,10 @@ export function getAlerts(): UnifiedAlert[] {
 export function getRecentAlerts(hours: number = 24): UnifiedAlert[] {
   const cutoff = Date.now() - hours * 60 * 60 * 1000;
   return alerts.filter(a => a.timestamp.getTime() > cutoff);
+}
+
+export function clearAlerts(): void {
+  alerts.length = 0;
 }
 
 export function getAlertCount(): { critical: number; high: number; medium: number; low: number } {

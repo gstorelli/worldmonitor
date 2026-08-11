@@ -9,7 +9,12 @@ import {
   MILITARY_QUERY_REGIONS,
 } from '@/config/military';
 import type { QueryRegion } from '@/config/military';
-import type { MilitaryFlight as ProtoMilitaryFlight, MilitaryAircraftType as ProtoMilitaryAircraftType, MilitaryOperator as ProtoMilitaryOperator } from '@/generated/client/worldmonitor/military/v1/service_client';
+import {
+  MilitaryServiceClient,
+  type MilitaryFlight as ProtoMilitaryFlight,
+  type MilitaryAircraftType as ProtoMilitaryAircraftType,
+  type MilitaryOperator as ProtoMilitaryOperator,
+} from '@/generated/client/worldmonitor/military/v1/service_client';
 import { getRpcBaseUrl } from '@/services/rpc-client';
 import {
   getAircraftDetailsBatch,
@@ -18,7 +23,6 @@ import {
 } from './wingbits';
 import { isFeatureAvailable } from './runtime-config';
 import { isDesktopRuntime, toApiUrl } from './runtime';
-import { MilitaryServiceClient } from '@/services/generated-rpc-clients';
 
 const militaryClient = new MilitaryServiceClient(getRpcBaseUrl(), {
   fetch: (...args) => globalThis.fetch(...args),
@@ -121,7 +125,6 @@ function mapProtoFlight(pf: ProtoMilitaryFlight, nowDate: Date): MilitaryFlight 
 
   return {
     id: pf.id,
-    source: pf.source || undefined,
     callsign: pf.callsign,
     hexCode: pf.hexCode,
     registration: pf.registration || undefined,
@@ -157,77 +160,27 @@ function mapProtoFlight(pf: ProtoMilitaryFlight, nowDate: Date): MilitaryFlight 
   };
 }
 
-// Ceiling on cursor follows per query region. Each page returns up to 100
-// flights, so 50 pages bounds a region at 5,000 flights — far above any real
-// military-flight count while still guaranteeing termination against a server
-// that never stops emitting a fresh cursor.
-const MAX_REGION_PAGES = 50;
-
 async function fetchViaProto(): Promise<MilitaryFlight[]> {
-  // Request one full-world region so the seed cron's global OpenSky snapshot
-  // reaches the dashboard without being clipped back to the legacy boxes. The
-  // handler falls through to request-specific recovery when a seed snapshot
-  // declares only regional coverage.
+  // Iterate the same PACIFIC/WESTERN regions the server-side seed cron uses
+  // so dashboard coverage matches the analytic pipeline. The proto handler
+  // caches per-bbox, so parallel region calls warm independent cache keys.
   const results = await Promise.all(
     MILITARY_QUERY_REGIONS.map(async (region) => {
-      // The server now bounds every response to a page, so follow next_cursor
-      // to reassemble the full region the dashboard depends on. pageSize:0 asks
-      // for the server default; a server that predates pagination omits
-      // next_cursor and the loop stops after one call.
-      //
-      // Failure posture (fail closed, matching this feature's trust model):
-      //  - A region unavailable on its FIRST call degrades to empty — a single
-      //    region being down was tolerated before pagination existed.
-      //  - A failure AFTER pages were already collected, or a cursor that does
-      //    not terminate (repeats, or exceeds the page ceiling), is a data
-      //    integrity failure. Rethrow so fetchViaProto fails and the outer
-      //    circuit breaker keeps its last COMPLETE snapshot, rather than caching
-      //    a silently truncated region.
-      const regionFlights: ProtoMilitaryFlight[] = [];
-      const seenCursors = new Set<string>();
-      let cursor = '';
-      let pagesFetched = 0;
-      for (;;) {
-        let resp: Awaited<ReturnType<typeof militaryClient.listMilitaryFlights>>;
-        try {
-          resp = await militaryClient.listMilitaryFlights({
-            pageSize: 0,
-            cursor,
-            neLat: region.lamax,
-            neLon: region.lomax,
-            swLat: region.lamin,
-            swLon: region.lomin,
-            operator: '' as ProtoMilitaryOperator,
-            aircraftType: '' as ProtoMilitaryAircraftType,
-          });
-        } catch (err) {
-          if (pagesFetched > 0) throw err;
-          return [];
-        }
-        pagesFetched += 1;
-        const pageFlights = resp.flights ?? [];
-        // We only reach a continuation request because a prior page advertised
-        // more rows. An empty continuation page therefore means the server's
-        // snapshot shrank or its live+stale data vanished between pages — a
-        // silent-truncation risk. Fail closed so the breaker keeps its last
-        // complete snapshot instead of caching page 1 alone.
-        if (cursor !== '' && pageFlights.length === 0) {
-          throw new Error('Military flight pagination returned an empty continuation page');
-        }
-        regionFlights.push(...pageFlights);
-        const next = resp.pagination?.nextCursor ?? '';
-        if (!next) break;
-        // A next cursor that equals the current one, was already visited, or
-        // pushes past the ceiling cannot make progress — abort instead of
-        // looping forever (a misbehaving or malicious server otherwise hangs
-        // this region and the enclosing Promise.all indefinitely).
-        if (next === cursor || seenCursors.has(next) || pagesFetched >= MAX_REGION_PAGES) {
-          throw new Error('Military flight pagination did not terminate');
-        }
-        seenCursors.add(next);
-        cursor = next;
+      try {
+        const resp = await militaryClient.listMilitaryFlights({
+          pageSize: 0,
+          cursor: '',
+          neLat: region.lamax,
+          neLon: region.lomax,
+          swLat: region.lamin,
+          swLon: region.lomin,
+          operator: '' as ProtoMilitaryOperator,
+          aircraftType: '' as ProtoMilitaryAircraftType,
+        });
+        return resp.flights ?? [];
+      } catch {
+        return [];
       }
-      return regionFlights;
     }),
   );
 
@@ -279,14 +232,7 @@ function determineAircraftInfo(
     return { type: csMatch.aircraftType || 'unknown', operator: csMatch.operator, country: countryMap[csMatch.operator], confidence: 'high' };
   }
   const hexMatch = isKnownMilitaryHex(icao24);
-  if (hexMatch) {
-    return {
-      type: hexMatch.aircraftType || 'unknown',
-      operator: hexMatch.operator,
-      country: hexMatch.country,
-      confidence: hexMatch.confidence,
-    };
-  }
+  if (hexMatch) return { type: 'unknown', operator: hexMatch.operator, country: hexMatch.country, confidence: 'medium' };
   return { type: 'unknown', operator: 'other', country: 'Unknown', confidence: 'low' };
 }
 
@@ -538,9 +484,8 @@ function cleanupFlightHistory(): void {
   }
 }
 
-/** Start the periodic flight-history cleanup if it is not already running. */
-export function startFlightHistoryCleanup(): void {
-  if (typeof window === 'undefined' || historyCleanupIntervalId) return;
+// Set up periodic cleanup
+if (typeof window !== 'undefined') {
   historyCleanupIntervalId = setInterval(cleanupFlightHistory, HISTORY_CLEANUP_INTERVAL);
 }
 
@@ -551,8 +496,6 @@ export function stopFlightHistoryCleanup(): void {
     historyCleanupIntervalId = null;
   }
 }
-
-startFlightHistoryCleanup();
 
 /**
  * Main function to fetch military flights

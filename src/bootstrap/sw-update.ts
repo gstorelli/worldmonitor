@@ -1,4 +1,3 @@
-import { setTrustedHtml, trustedHtml } from '@/utils/dom-utils';
 interface VisibleElementLike {
   checkVisibility?: () => boolean;
   getClientRects?: () => { length: number };
@@ -17,30 +16,6 @@ interface DocumentLike {
 interface ServiceWorkerContainerLike {
   readonly controller: object | null;
   addEventListener: (type: string, cb: () => void) => void;
-}
-
-/**
- * Read `navigator.serviceWorker` without letting a hostile context abort boot.
- *
- * `'serviceWorker' in navigator` is TRUE inside an iframe sandboxed without
- * `allow-same-origin` — the property exists on `Navigator.prototype` — but the
- * getter itself throws `SecurityError: Failed to read the 'serviceWorker'
- * property from 'Navigator': Service worker is disabled because the context is
- * sandboxed and lacks the 'allow-same-origin' flag.` So an existence check
- * passes and the first real READ throws, which at module scope takes the rest
- * of the entry module's top-level statements down with it (WORLDMONITOR-Y5).
- *
- * Returns null whenever the container is unreadable or absent, so every caller
- * can treat "no service worker here" as one ordinary branch.
- */
-export function readServiceWorkerContainer(
-  nav: Navigator = navigator,
-): ServiceWorkerContainerLike | null {
-  try {
-    return (nav as { serviceWorker?: ServiceWorkerContainerLike }).serviceWorker ?? null;
-  } catch {
-    return null;
-  }
 }
 
 export interface SwUpdateHandlerOptions {
@@ -134,13 +109,7 @@ function appendDebugLog(entry: Record<string, unknown>): void {
  * Dismissing one version never suppresses toasts for future deploys.
  */
 export function installSwUpdateHandler(options: SwUpdateHandlerOptions = {}): void {
-  // No readable container (sandboxed iframe, or an engine without SW support)
-  // means there is nothing to install — and reading it eagerly would throw.
-  // Rebound as a non-nullable const so the hoisted helpers below (which TS
-  // treats as callable before this guard) see the narrowed type.
-  const container = options.swContainer ?? readServiceWorkerContainer();
-  if (!container) return;
-  const swContainer: ServiceWorkerContainerLike = container;
+  const swContainer = options.swContainer ?? navigator.serviceWorker;
   const doc = options.document ?? (document as unknown as DocumentLike);
   const reload = options.reload ?? (() => window.location.reload());
   const raf = options.raf ?? ((cb: () => void) => requestAnimationFrame(() => requestAnimationFrame(cb)));
@@ -188,7 +157,7 @@ export function installSwUpdateHandler(options: SwUpdateHandlerOptions = {}): vo
 
     const toast = doc.createElement('div');
     toast.className = 'update-toast';
-    setTrustedHtml(toast, trustedHtml(`
+    toast.innerHTML = `
       <div class="update-toast-icon">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <polyline points="23 4 23 10 17 10"/>
@@ -201,7 +170,7 @@ export function installSwUpdateHandler(options: SwUpdateHandlerOptions = {}): vo
       </div>
       <button class="update-toast-action" data-action="reload">Reload</button>
       <button class="update-toast-dismiss" data-action="dismiss" aria-label="Dismiss">\u00d7</button>
-    `, "legacy direct innerHTML migration"));
+    `;
 
     let dismissed = false;
     let autoReloadAllowed = false;

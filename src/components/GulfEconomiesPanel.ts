@@ -1,16 +1,14 @@
 import { Panel } from './Panel';
-import { createLazyClient, getRpcBaseUrl } from '@/services/rpc-client';
-import { proFreshRpcFetch } from '@/services/premium-fetch';
+import { getRpcBaseUrl } from '@/services/rpc-client';
 import { t } from '@/services/i18n';
-import { escapeHtml, unsafeRawHtml } from '@/utils/sanitize';
+import { escapeHtml } from '@/utils/sanitize';
 import { formatPrice, formatChange, getChangeClass } from '@/utils';
 import { miniSparkline } from '@/utils/sparkline';
-
+import { MarketServiceClient } from '@/generated/client/worldmonitor/market/v1/service_client';
 import type { ListGulfQuotesResponse, GulfQuote } from '@/generated/client/worldmonitor/market/v1/service_client';
 import { getHydratedData } from '@/services/bootstrap';
-import { MarketServiceClient } from '@/services/generated-rpc-clients';
 
-const getMarketClient = createLazyClient(() => new MarketServiceClient(getRpcBaseUrl(), { fetch: proFreshRpcFetch }));
+const client = new MarketServiceClient(getRpcBaseUrl(), { fetch: (...args: Parameters<typeof fetch>) => globalThis.fetch(...args) });
 
 function renderSection(title: string, quotes: GulfQuote[]): string {
   if (quotes.length === 0) return '';
@@ -41,13 +39,13 @@ export class GulfEconomiesPanel extends Panel {
       if (hydrated?.quotes?.length) {
         if (!this.element?.isConnected) return;
         this.renderGulf(hydrated);
-        void getMarketClient().listGulfQuotes({}).then(data => {
+        void client.listGulfQuotes({}).then(data => {
           if (!this.element?.isConnected || !data.quotes?.length) return;
           this.renderGulf(data);
         }).catch(() => {});
         return;
       }
-      const data = await getMarketClient().listGulfQuotes({});
+      const data = await client.listGulfQuotes({});
       if (!this.element?.isConnected) return;
       this.renderGulf(data);
     } catch (err) {
@@ -73,6 +71,6 @@ export class GulfEconomiesPanel extends Panel {
       renderSection(t('panels.gulfCurrencies'), currencies) +
       renderSection(t('panels.gulfOil'), oil);
 
-    this.setSafeContent(unsafeRawHtml(html, 'legacy Panel.setContent() migration'));
+    this.setContent(html);
   }
 }
