@@ -127,8 +127,9 @@ Risk Sentinel risponde a queste esigenze con un approccio **multimodale e multi-
                            │
                            ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                     EDGE API LAYER (Vercel/Netlify)                    │
-│               60+ endpoint · CORS · Rate limiting · Auth              │
+│                         API SELF-HOSTED (Node.js)                       │
+│          local-api-server · 69+ endpoint · CORS · Rate limiting         │
+│              servito da Nginx dentro il container Docker                │
 └──────────────────────────┬──────────────────────────────────────────────┘
                            │
                            ▼
@@ -260,8 +261,8 @@ Per istruzioni dettagliate su import e configurazione, vedi [`n8n-workflows/READ
 | **Visualizzazione** | globe.gl + Three.js (3D), deck.gl + MapLibre GL (2D) |
 | **AI / LLM** | OpenRouter (GPT-4, Claude, Mistral), Ollama (locale) |
 | **Orchestrazione Dati** | n8n (5 workflow JSON importabili) |
-| **Caching** | Redis (Upstash) — cache tiers: 5min/10min/30min/2h/24h |
-| **Deployment** | Netlify / Vercel Edge Functions, PWA |
+| **Caching** | Redis (Upstash REST compatibile, self-hosted via `redis-rest` in Docker) — cache tiers: 5min/10min/30min/2h/24h |
+| **Deployment** | **Docker Compose 100% self-hosted** (Nginx + Node.js API + Redis REST proxy), PWA |
 | **API Contracts** | Protocol Buffers (sebuf framework) |
 | **Testing** | node:test runner, Playwright E2E |
 
@@ -269,46 +270,130 @@ Per istruzioni dettagliate su import e configurazione, vedi [`n8n-workflows/READ
 
 ## Quick Start
 
+### 🐳 Docker Compose (deployment consigliato — 100% self-hosted)
+
 ```bash
-# 1. Clone
+# 1. Clona il repository
 git clone https://github.com/gstorelli/worldmonitor.git
 cd worldmonitor
 
-# 2. Installa dipendenze
-npm install
+# 2. Copia le variabili d'ambiente e compila il file .env
+cp .env.example .env
+#   → genera valori casuali per REDIS_PASSWORD e REDIS_TOKEN:
+#     openssl rand -hex 32
 
-# 3. Avvia dev server
-npm run dev
+# 3. Avvia l'intero stack (SPA + API/ingestion + Redis)
+docker compose up -d --build
 
 # 4. Apri nel browser
+open http://localhost:3000
+```
+
+Lo stack compose include **tre servizi**:
+
+| Servizio | Ruolo |
+|----------|-------|
+| `worldmonitor` | Nginx (SPA statica) + Node.js `local-api-server` (tutti gli endpoint `/api/*`, inclusa l'ingestion n8n) |
+| `redis` | Redis 7 locale (persistenza dati delle pipeline n8n) |
+| `redis-rest` | Proxy Upstash-compatibile (`UPSTASH_REDIS_REST_URL` → Redis locale) |
+| `ais-relay` | Relay AIS marittimo (opzionale) |
+
+### 🧪 Sviluppo locale (Vite dev server)
+
+```bash
+# 1. Installa dipendenze
+npm install
+
+# 2. Avvia dev server
+npm run dev
+
+# 3. Apri nel browser
 open http://localhost:5173
 ```
 
 > **Nota**: Senza variabili d'ambiente configurate, molti pannelli mostreranno "dati non disponibili".
-> Per popolare i dati, è necessario configurare Redis (Upstash) e le API keys, oppure attivare
-> i workflow n8n con l'endpoint di ingestion.
+> Per popolare i dati, è necessario configurare Redis e le API keys, oppure attivare
+> i workflow n8n con l'endpoint di ingestion (`POST /api/n8n/ingest`).
 
 ---
 
 ## Configurazione Variabili d'Ambiente
 
-Crea un file `.env.local` nella root del progetto:
+Crea un file `.env` nella root del progetto (vedi [`.env.example`](./.env.example) per l'elenco completo):
 
 ```env
-# ─── Redis (Upstash) — obbligatorio per dati live ───
+# ─── Redis self-hosted (Docker Compose) — obbligatorio ───
+REDIS_PASSWORD=openssl-rand-hex-32          # AUTH password del Redis locale
+REDIS_TOKEN=openssl-rand-hex-32             # Bearer token del proxy redis-rest
+
+# ─── Oppure Upstash Redis remoto (senza il servizio redis locale) ───
 UPSTASH_REDIS_REST_URL=https://your-redis.upstash.io
 UPSTASH_REDIS_REST_TOKEN=your-token
 
-# ─── API Keys (opzionali, migliorano copertura dati) ───
-ALPHA_VANTAGE_API_KEY=your-key          # Commodity prices
-OPENROUTER_API_KEY=your-key             # LLM per AI insights
-ACLED_EMAIL=your-email                  # Conflict data (ACLED)
-ACLED_PASSWORD=your-password
-FRED_API_KEY=your-key                   # Macro indicators (FRED)
+# ─── n8n Ingestion (Risk Sentinel) ───
+N8N_INGEST_SECRET=openssl-rand-hex-32       # Bearer token atteso da POST /api/n8n/ingest
+RISK_SENTINEL_WEBHOOK_URL=                  # URL completo usato dai workflow n8n
+                                            # (default: http://localhost:3000/api/n8n/ingest)
 
-# ─── n8n Integration ───
-# Configura RISK_SENTINEL_WEBHOOK_URL nel tuo server n8n
-# puntandolo all'endpoint /api/n8n/ingest di questa applicazione
+# ─── API Keys (opzionali, migliorano copertura dati) ───
+OPENROUTER_API_KEY=your-key                 # LLM per AI insights
+ACLED_ACCESS_TOKEN=your-token               # Conflict data (ACLED)
+FRED_API_KEY=your-key                       # Macro indicators (FRED)
+EIA_API_KEY=your-key                        # Energy data (EIA)
+FINNHUB_API_KEY=your-key                    # Stock quotes
+```
+
+### Endpoint di Ingestion n8n (self-hosted)
+
+I 5 workflow in [`n8n-workflows/`](./n8n-workflows/) inviano i payload a
+
+```
+POST http://<HOST>:3000/api/n8n/ingest
+Authorization: Bearer <N8N_INGEST_SECRET>
+```
+
+Il filtro `/api/*` di Nginx inoltra le richieste al `local-api-server` Node.js, che
+esegue l'handler `api/n8n/ingest.js` e scrive i dati trasformati su Redis (via
+`UPSTASH_REDIS_REST_URL`). Le pipeline supportate: `customs-intelligence`,
+`seismic-trade-impact`, `climate-trade-anomalies`, `commodity-customs-tracker`,
+`conflict-trade-impact`.
+
+---
+
+## Sincronizzazione con il repository upstream (koala73/worldmonitor)
+
+Risk Sentinel è un fork indipendente di [WorldMonitor](https://github.com/koala73/worldmonitor).
+Il sync viene eseguito periodicamente con un merge di `upstream/main` nel branch di lavoro.
+
+### Stato della sincronizzazione
+
+| Aspetto | Stato |
+|---------|:-----:|
+| Backend/API (endpoint `/api/*`, caching Redis, seed scripts, proto) | ✅ Sincronizzato con `upstream/main` |
+| Infrastruttura (Dockerfile, docker-compose, docker/*, deploy/*, CI) | ✅ Sincronizzato con `upstream/main` |
+| Dati condivisi (`shared/*.json`, `data/`) | ✅ Sincronizzato (con commodity customs aggiunte) |
+| SPA (`src/`) — dominio doganale, de-clouding, branding | 🛡️ Mantenuta come baseline del fork (protezione a priorità massima) |
+
+### Regole di sync
+
+- **Vengono adottati dall'upstream**: bug fix e performance su backend/API, nuovi
+  endpoint, miglioramenti infrastrutturali, aggiornamenti di configurazione dati.
+- **Vengono protette (mai sovrascritte)**: `api/n8n/ingest.js`, le 5 pipeline
+  `n8n-workflows/`, il Risk Scoring Engine 8D (`src/services/CustomsRiskScorer.ts`),
+  gli stub de-clouded (`entitlements.ts`, `api-keys.ts`, `mcp-clients.ts`), il
+  branding Risk Sentinel e l'integrazione HS2 (`Hs2Picker`, `CommoditiesPanel`).
+- Il blocco SPA (`src/`) è la **baseline convalidata** del fork: le sue dipendenze
+  interne (barrel `@/services`, `@/config`, classi `Panel`) non vengono sostituite
+  da refactoring upstream fino a che il fork non decide di migrarvi.
+
+### Procedura
+
+```bash
+git remote add upstream https://github.com/koala73/worldmonitor.git   # una volta
+git fetch upstream
+git merge upstream/main --no-edit                                     # risolvere i conflitti
+npm run typecheck:all
+npm run test:sidecar
 ```
 
 ---
@@ -325,7 +410,7 @@ FRED_API_KEY=your-key                   # Macro indicators (FRED)
 │   ├── types/                  # Type definitions
 │   ├── utils/                  # Utilities condivise
 │   └── workers/                # Web Workers (analysis, ML/ONNX)
-├── api/                        # Edge Functions (JS, self-contained)
+├── api/                        # Endpoint API (Node.js, self-contained)
 ├── server/                     # Server-side code (Redis, rate-limit, gateway)
 ├── scripts/                    # Seed scripts per Redis (30+ file)
 ├── n8n-workflows/              # ← 5 workflow JSON + README
@@ -337,6 +422,9 @@ FRED_API_KEY=your-key                   # Macro indicators (FRED)
 │   └── README.md
 ├── shared/                     # JSON configs cross-platform
 ├── proto/                      # Protobuf definitions
+├── docker/                     # Docker infra (nginx, supervisord, redis-rest)
+├── Dockerfile                  # Immagine multi-stage (SPA + API server)
+├── docker-compose.yml          # Stack self-hosted (web + redis + redis-rest + ais-relay)
 ├── tests/                      # Unit/integration tests
 ├── e2e/                        # Playwright E2E specs
 ├── blog-site/                  # Blog statico (Astro)
@@ -396,7 +484,7 @@ Il sistema include **86 pannelli** organizzati per dominio. Quelli rilevanti per
 - [x] Integrazione sistema di pannelli completo (86 pannelli)
 - [x] Progettazione Risk Scoring Engine (8 dimensioni)
 - [x] Creazione 5 workflow n8n per data ingestion
-- [x] Build pipeline funzionante (Netlify/Vercel)
+- [x] Build pipeline funzionante (Docker Compose self-hosted)
 
 ### Fase 2 — Completata ✅ (Stabilizzazione & Commodity Tracker)
 
@@ -412,9 +500,9 @@ Il sistema include **86 pannelli** organizzati per dominio. Quelli rilevanti per
 *Obiettivo attuale: rendere il sistema live e iniziare a raccogliere/validare i dati per il paper di ricerca, oltre a introdurre l'infrastruttura semantica (Knowledge Graph e RAG).*
 
 - [ ] **Deployment Infrastruttura Live**:
-  - [ ] Deploy dell'app web su Vercel/Netlify.
-  - [ ] Deploy di n8n su un server/VPS dedicato (es. Railway, DigitalOcean).
-  - [ ] Configurazione dei Webhook n8n affinché puntino all'endpoint `POST /api/n8n/ingest` dell'app live.
+  - [ ] Deploy dell'app web **self-hosted via Docker Compose** (`docker compose up -d`) su VPS/server dedicato.
+  - [ ] Deploy di n8n su un server/VPS dedicato (es. Railway, DigitalOcean, oppure container n8n).
+  - [ ] Configurazione dei Webhook n8n affinché puntino all'endpoint `POST /api/n8n/ingest` dell'app live (variabile `RISK_SENTINEL_WEBHOOK_URL`).
 - [ ] **Validazione Dati Live**: Test in produzione dei pannelli con dati freschi inseriti su Redis dalle pipeline n8n.
 - [ ] **Implementazione Ontologia Doganale (Knowledge Graph)**:
   - Entità: `EventoGeopolitico`, `EventoSismico`, `EventoClimatico`, `RottaCommerciale`, `CommoditySensibile`, `NodoLogistico`, `Paese`, `FlussoCommerciale`
