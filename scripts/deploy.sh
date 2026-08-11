@@ -10,8 +10,8 @@
 #   ./scripts/deploy.sh [REPO_PATH]
 #
 # REPO_PATH defaults to the repository root (parent of this script). If the
-# directory does not exist yet it is bootstrapped with a fresh clone using
-# the repo's SSH deploy key (git@github.com:gstorelli/worldmonitor.git).
+# directory does not exist yet it is bootstrapped with a fresh clone over
+# HTTPS (no credentials needed for the public repository).
 #
 # The script self-heals:
 #   - creates the external `nginx-proxy` network if missing
@@ -20,7 +20,10 @@
 # =============================================================================
 set -euo pipefail
 
-REPO_URL="git@github.com:gstorelli/worldmonitor.git"
+# Public repo: HTTPS clone/pull needs no credentials on the VPS.
+# Switch to git@github.com:gstorelli/worldmonitor.git (and register a
+# deploy key) if the repository ever becomes private.
+REPO_URL="https://github.com/gstorelli/worldmonitor.git"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_PATH="${1:-$(cd "${SCRIPT_DIR}/.." && pwd)}"
 

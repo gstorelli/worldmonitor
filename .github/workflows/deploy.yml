@@ -33,12 +33,18 @@ jobs:
           script: |
             set -e
             DEPLOY_PATH="${{ secrets.DEPLOY_PATH }}"
-            REPO_URL="git@github.com:gstorelli/worldmonitor.git"
+            # Public repo: HTTPS clone/pull needs no credentials on the VPS.
+            # Switch to git@github.com:gstorelli/worldmonitor.git (and register
+            # a deploy key) if the repository ever becomes private.
+            REPO_URL="https://github.com/gstorelli/worldmonitor.git"
+
+            echo "==> identity"
+            whoami
 
             echo "==> tooling check"
             docker --version || { echo "ERROR: docker missing on VPS"; exit 1; }
-            if docker compose version >/dev/null 2>&1; then COMPOSE="docker compose"; COMPOSE_COMMAND="compose"
-            elif command -v docker-compose >/dev/null 2>&1; then COMPOSE="docker-compose"; COMPOSE_COMMAND=""
+            if docker compose version >/dev/null 2>&1; then COMPOSE="docker compose"
+            elif command -v docker-compose >/dev/null 2>&1; then COMPOSE="docker-compose"
             else echo "ERROR: neither 'docker compose' (v2) nor 'docker-compose' found"; exit 1; fi
             echo "using: ${COMPOSE}"
 
