@@ -489,10 +489,30 @@ Sul VPS (stesso set di comandi del workflow):
 | Sintomo | Causa probabile | Fix |
 |---------|-----------------|-----|
 | `503 Service Unavailable` sul dominio | Il proxy `nginx-proxy` non trova il container `worldmonitor` sulla rete esterna (container giù o rete mancante) | `docker network create nginx-proxy`; poi `./scripts/deploy.sh` |
-| Workflow "Deploy to Contabo VPS" fallisce allo step SSH | Host key non registrata, chiave errata o secrets mancanti | Verifica `SERVER_HOST`/`SERVER_USER`/`SSH_PRIVATE_KEY`/`DEPLOY_PATH` in GitHub Secrets; il workflow usa `host_key_checking: false` |
+| Workflow "Deploy to Contabo VPS" fallisce allo step SSH con **connection timed out** | La porta SSH del VPS non è raggiungibile dai runner GitHub (firewall) | Apri la porta SSH (22 o porta custom) verso le range dei runner GitHub — vedi sotto |
+| Workflow fallisce allo step SSH con *Permission denied (publickey)* | Chiave privata in `SSH_PRIVATE_KEY` non corrisponde a una chiave autorizzata sul VPS | Installa `SERVER_USER`'s public key in `~/.ssh/authorized_keys` e riprova |
 | `docker: 'compose' is not a docker command` | Host con solo Compose v1 | Installare il plugin v2 (`apt install docker-compose-v2`), oppure usare `docker-compose` (lo script prova entrambi) |
 | `error while interpolating ... REDIS_TOKEN` | `.env` senza valori Redis | Non più bloccante: cala su default locali; in produzione però imposta `REDIS_PASSWORD`/`REDIS_TOKEN` |
 | HTTPS senza certificato | acme-companion non ha ancora emesso il certificato per `risksentinel.opencyber.org` | Attendi l'emissione (DNS già puntato alla VPS); verifica `docker compose logs nginx-proxy`/`acme-companion` |
+
+#### 🔥 Requisito precondizione: Firewall/SSH aperto verso GitHub Actions
+
+Il deploy via GitHub Actions richiede che la porta SSH del VPS accetti connessioni
+dai runner GitHub-hosted. Sintomo: `ssh: connect to host <IP> port 22: Connection
+timed out` nel log del workflow.
+
+```bash
+# Esempio con ufw (adatta al tuo firewall)
+sudo ufw allow 22/tcp          # SSH
+sudo ufw allow 80,443/tcp      # http/https del proxy
+
+# Verifica locale
+ssh -o ConnectTimeout=10 root@<SERVER_HOST> hostname
+```
+
+Dopo aver aperto la porta, riavvia il deploy dal tab **Actions** del repository
+(workflow "Deploy to Contabo VPS" → **Run workflow**) oppure con un nuovo push
+su `main`.
 
 ### Integrazione n8n MCP
 
