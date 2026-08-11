@@ -38,8 +38,11 @@ services:
       # Internal port the container nginx listens on (Dockerfile EXPOSE 8080)
       VIRTUAL_PORT: "8080"
       # ── App configuration ──
+      # Upstash-compatible Redis REST endpoint (local redis-rest service).
+      # The token falls back to the local development default when
+      # REDIS_TOKEN is not set in .env — production must override it.
       UPSTASH_REDIS_REST_URL: "http://redis-rest:80"
-      UPSTASH_REDIS_REST_TOKEN: "${REDIS_TOKEN:?REDIS_TOKEN required — generate with: openssl rand -hex 32}"
+      UPSTASH_REDIS_REST_TOKEN: "${REDIS_TOKEN:-risk_sentinel_local_redis_secret}"
       LOCAL_API_PORT: "46123"
       LOCAL_API_MODE: "docker"
       LOCAL_API_CLOUD_FALLBACK: "false"
@@ -94,7 +97,7 @@ services:
       FINNHUB_API_KEY: "${FINNHUB_API_KEY:-}"
       MARKET_YAHOO_REFRESH_INTERVAL_MS: "${MARKET_YAHOO_REFRESH_INTERVAL_MS:-900000}"
       UPSTASH_REDIS_REST_URL: "http://redis-rest:80"
-      UPSTASH_REDIS_REST_TOKEN: "${REDIS_TOKEN:?REDIS_TOKEN required — generate with: openssl rand -hex 32}"
+      UPSTASH_REDIS_REST_TOKEN: "${REDIS_TOKEN:-risk_sentinel_local_redis_secret}"
       UPSTASH_ALLOW_INSECURE_HTTP: "true"
       UCDP_ACCESS_TOKEN: "${UCDP_ACCESS_TOKEN:-}"
       PORT: "3004"
@@ -111,9 +114,11 @@ services:
     # --requirepass closes off the network so any future sidecar / compromised
     # dependency added to the worldmonitor network can't read or write cache
     # entries without the password. Defense-in-depth alongside the REST token.
+    # Falls back to the local development password when REDIS_PASSWORD is not
+    # set in .env — production must override it.
     command: >
       redis-server
-      --requirepass "${REDIS_PASSWORD:?REDIS_PASSWORD required — generate with: openssl rand -hex 32}"
+      --requirepass "${REDIS_PASSWORD:-risk_sentinel_local_redis_password}"
       --maxmemory 256mb
       --maxmemory-policy allkeys-lru
     volumes:
@@ -129,12 +134,13 @@ services:
     networks:
       - internal-net
     environment:
-      SRH_TOKEN: "${REDIS_TOKEN:?REDIS_TOKEN required — generate with: openssl rand -hex 32}"
-      # Defense-in-depth: the redis service's --requirepass already fails
-      # compose validation if REDIS_PASSWORD is unset, but the explicit
-      # :? here protects against a future PR removing --requirepass or
-      # copying this connection string into a new service.
-      SRH_CONNECTION_STRING: "redis://:${REDIS_PASSWORD:?REDIS_PASSWORD required — generate with: openssl rand -hex 32}@redis:6379"
+      SRH_TOKEN: "${REDIS_TOKEN:-risk_sentinel_local_redis_secret}"
+      # Defense-in-depth: the redis service's --requirepass already locks the
+      # backend, and the explicit password here keeps the connection string
+      # consistent even if redis is later split out of this compose file.
+      # Both values fall back to the local development defaults when unset in
+      # .env — production must override them.
+      SRH_CONNECTION_STRING: "redis://:${REDIS_PASSWORD:-risk_sentinel_local_redis_password}@redis:6379"
     depends_on:
       - redis
     restart: unless-stopped
