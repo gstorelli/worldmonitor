@@ -15,7 +15,7 @@
  *   - conflict-trade-impact (ACLED conflict events)
  */
 
-import { getPublicCorsHeaders } from './_cors.js';
+import { getPublicCorsHeaders } from '../_cors.js';
 
 // ─── Redis helpers (inline for Edge Function isolation) ───
 

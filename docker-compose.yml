@@ -33,6 +33,9 @@ services:
       LLM_MODEL: "${LLM_MODEL:-}"
       GROQ_API_KEY: "${GROQ_API_KEY:-}"
       OPENROUTER_API_KEY: "${OPENROUTER_API_KEY:-}"
+      # n8n ingestion auth (Risk Sentinel): required by POST /api/n8n/ingest
+      # when set. Generate with: openssl rand -hex 32
+      N8N_INGEST_SECRET: "${N8N_INGEST_SECRET:-}"
       # Data source API keys (optional — features degrade gracefully)
       AISSTREAM_API_KEY: "${AISSTREAM_API_KEY:-}"
       FINNHUB_API_KEY: "${FINNHUB_API_KEY:-}"
