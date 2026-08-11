@@ -474,7 +474,7 @@ Code): via SSH su Contabo esegue `git pull origin main`, `docker compose up -d
 | `SERVER_USER` | Utente SSH (es. `root` o utente con permessi docker) |
 | `SSH_PRIVATE_KEY` | Chiave privata SSH (formato PEM) autorizzata sul VPS |
 | `DEPLOY_PATH` | Percorso assoluto del checkout sul VPS (es. `/srv/worldmonitor`) |
-| `SERVER_PORT` | *(opzionale)* porta SSH, default `22` |
+| `SERVER_PORT` | *(opzionale)* porta SSH — **produzione: `56969`** (default `22`) |
 
 ### Deploy manuale (fallback)
 
