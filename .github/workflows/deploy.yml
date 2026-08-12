@@ -28,7 +28,6 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.SERVER_PORT || 22 }}
-          host_key_checking: false
           command_timeout: 50m
           script: |
             set -e
