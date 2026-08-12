@@ -59,6 +59,10 @@ services:
       # n8n ingestion auth (Risk Sentinel): required by POST /api/n8n/ingest
       # when set. Generate with: openssl rand -hex 32
       N8N_INGEST_SECRET: "${N8N_INGEST_SECRET:-}"
+      # Anonymous browser session tokens (HMAC) — the SPA mints one via
+      # POST /api/wm-session and sends it as X-WorldMonitor-Key. Without this
+      # secret every data endpoint 401s ("API key required"). Min 32 chars.
+      WM_SESSION_SECRET: "${WM_SESSION_SECRET:-}"
       # Data source API keys (optional — features degrade gracefully)
       AISSTREAM_API_KEY: "${AISSTREAM_API_KEY:-}"
       FINNHUB_API_KEY: "${FINNHUB_API_KEY:-}"
