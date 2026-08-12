@@ -40,6 +40,14 @@ jobs:
             echo "==> identity"
             whoami
 
+            # The checkout may be owned by another user (e.g. created by an
+            # earlier root/other-user step). Git refuses it as "dubious
+            # ownership" (CVE-2022-24765) unless it is whitelisted for this
+            # SSH user — add the path unconditionally (tolerates a first run
+            # where the directory does not exist yet).
+            echo "==> git safe.directory (dubious-ownership guard)"
+            git config --global --add safe.directory "${DEPLOY_PATH}" || true
+
             echo "==> tooling check"
             docker --version || { echo "ERROR: docker missing on VPS"; exit 1; }
             if docker compose version >/dev/null 2>&1; then COMPOSE="docker compose"

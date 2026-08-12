@@ -35,6 +35,10 @@ fi
 
 cd "${REPO_PATH}"
 
+# Git refuses checkouts owned by another user ("dubious ownership",
+# CVE-2022-24765) unless whitelisted. Add the path for this user.
+git config --global --add safe.directory "${REPO_PATH}" 2>/dev/null || true
+
 if ! command -v docker >/dev/null 2>&1; then
   echo "error: docker is not installed on this host" >&2
   exit 1
