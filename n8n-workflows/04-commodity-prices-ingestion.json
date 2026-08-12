@@ -80,6 +80,14 @@
       },
       "id": "push-commodities",
       "name": "Push to Risk Sentinel API",
+      "headerParameters": {
+        "parameters": [
+          {
+            "name": "Authorization",
+            "value": "={{ 'Bearer ' + $env.N8N_INGEST_SECRET }}"
+          }
+        ]
+      },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [1500, 300]
