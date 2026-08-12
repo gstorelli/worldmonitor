@@ -1130,14 +1130,33 @@ async function dispatch(requestUrl, req, routes, context) {
     return new Response(html, { status: 200, headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'permissions-policy': 'autoplay=*, encrypted-media=*, storage-access=(self "https://www.youtube.com")', ...makeCorsHeaders(req) } });
   }
 
+  // ── Liveness (auth-exempt) ─────────────────────────────────────────────
+  // Probed by the container HEALTHCHECK (Dockerfile): reaching this route
+  // through nginx proves BOTH nginx and this server are up, so it must stay
+  // exempt from the token gate below.
+  if (requestUrl.pathname === '/api/sidecar-health') {
+    return json({ ok: true, mode: context.mode });
+  }
+
   // ── Global auth gate ────────────────────────────────────────────────────
   // Every endpoint below requires a valid LOCAL_API_TOKEN.  This prevents
   // other local processes, malicious browser scripts, and rogue extensions
   // from accessing the sidecar API without the per-session token.
   const expectedToken = process.env.LOCAL_API_TOKEN;
   if (expectedToken) {
-    const authHeader = req.headers.authorization || '';
-    if (authHeader !== `Bearer ${expectedToken}`) {
+    // `req` here is the raw Node IncomingMessage (headers = plain object),
+    // not the synthetic Request built for handlers — read headers defensively.
+    const getHeader = (name) => {
+      const h = req.headers;
+      if (h && typeof h.get === 'function') return h.get(name);
+      return h ? h[name.toLowerCase()] ?? null : null;
+    };
+    const authHeader = getHeader('authorization') || '';
+    // Docker: nginx forwards the internal token in X-WorldMonitor-Local-Token
+    // (see docker/nginx.conf) so a caller's Authorization header (e.g. the
+    // n8n ingest Bearer secret) reaches route handlers unchanged.
+    const localTokenHeader = getHeader('x-worldmonitor-local-token') || '';
+    if (authHeader !== `Bearer ${expectedToken}` && localTokenHeader !== expectedToken) {
       context.logger.warn(`[local-api] unauthorized request to ${requestUrl.pathname}`);
       return json({ error: 'Unauthorized' }, 401);
     }

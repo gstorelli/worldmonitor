@@ -47,6 +47,9 @@ services:
       LOCAL_API_MODE: "docker"
       LOCAL_API_CLOUD_FALLBACK: "false"
       WS_RELAY_URL: "http://ais-relay:3004"
+      # Shared secret authenticating this app to the ais-relay (and the relay
+      # back to it). Local fallback default — production must override.
+      RELAY_SHARED_SECRET: "${RELAY_SHARED_SECRET:-risk_sentinel_local_relay_secret}"
       # LLM provider (any OpenAI-compatible endpoint)
       LLM_API_URL: "${LLM_API_URL:-}"
       LLM_API_KEY: "${LLM_API_KEY:-}"
@@ -100,6 +103,7 @@ services:
       UPSTASH_REDIS_REST_TOKEN: "${REDIS_TOKEN:-risk_sentinel_local_redis_secret}"
       UPSTASH_ALLOW_INSECURE_HTTP: "true"
       UCDP_ACCESS_TOKEN: "${UCDP_ACCESS_TOKEN:-}"
+      RELAY_SHARED_SECRET: "${RELAY_SHARED_SECRET:-risk_sentinel_local_relay_secret}"
       PORT: "3004"
     depends_on:
       redis-rest:
