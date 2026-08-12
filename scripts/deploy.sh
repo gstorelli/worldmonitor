@@ -39,6 +39,12 @@ cd "${REPO_PATH}"
 # CVE-2022-24765) unless whitelisted. Add the path for this user.
 git config --global --add safe.directory "${REPO_PATH}" 2>/dev/null || true
 
+# Guard against Windows/CRLF checkout churn that marks every tracked file as
+# modified (git pull --ff-only would abort). Real config lives in the
+# gitignored .env, which is never touched.
+git config core.autocrlf false 2>/dev/null || true
+git checkout -- . 2>/dev/null || true
+
 if ! command -v docker >/dev/null 2>&1; then
   echo "error: docker is not installed on this host" >&2
   exit 1

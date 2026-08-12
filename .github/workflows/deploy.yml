@@ -63,6 +63,13 @@ jobs:
             cd "${DEPLOY_PATH}"
             git remote set-url origin "${REPO_URL}" || true
 
+            # Guard against Windows/CRLF checkout churn that makes every tracked
+            # file appear modified (git pull --ff-only would abort). Real server
+            # config lives in the gitignored .env, which is never touched.
+            echo "==> normalize repo state"
+            git config core.autocrlf false || true
+            git checkout -- . 2>/dev/null || true
+
             echo "==> ensure external proxy network (idempotent)"
             docker network inspect nginx-proxy >/dev/null 2>&1 || docker network create nginx-proxy
 
