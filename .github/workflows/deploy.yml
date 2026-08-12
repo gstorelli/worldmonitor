@@ -91,3 +91,26 @@ jobs:
             echo "==> stack status"
             ${COMPOSE} ps
             echo "==> deploy complete: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+      # End-to-end verification from the public internet: proxies the same
+      # vantage point as a visitor, so it catches proxy-routing / certificate
+      # issues the container health gate can't. -L follows any http->https
+      # redirect, -k tolerates the interim acme-companion cert.
+      - name: Verify production endpoint
+        run: |
+          ok=0
+          for i in $(seq 1 30); do
+            code=$(curl -sLk -o /dev/null -w '%{http_code}' --connect-timeout 15 --max-time 25 https://risksentinel.opencyber.org/api/version 2>/dev/null || true)
+            echo "attempt ${i}: https://risksentinel.opencyber.org/api/version -> ${code}"
+            if [ "${code}" = "200" ]; then ok=1; break; fi
+            sleep 15
+          done
+          if [ "${ok}" != "1" ]; then
+            echo "ERROR: production endpoint never returned 200 from the public internet"
+            echo "--- http://risksentinel.opencyber.org/ ---"
+            curl -sI --max-time 20 http://risksentinel.opencyber.org/ || true
+            echo "--- https://risksentinel.opencyber.org/ ---"
+            curl -sIk --max-time 20 https://risksentinel.opencyber.org/ | head -20
+            exit 1
+          fi
+          echo "==> production endpoint OK: https://risksentinel.opencyber.org"

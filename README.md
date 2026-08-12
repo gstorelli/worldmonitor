@@ -506,8 +506,8 @@ timed out` nel log del workflow.
 sudo ufw allow 22/tcp          # SSH
 sudo ufw allow 80,443/tcp      # http/https del proxy
 
-# Verifica locale
-ssh -o ConnectTimeout=10 root@<SERVER_HOST> hostname
+# Verifica locale (usa la porta SSH reale, qui 56969)
+ssh -p 56969 -o ConnectTimeout=10 root@<SERVER_HOST> hostname
 ```
 
 Dopo aver aperto la porta, riavvia il deploy dal tab **Actions** del repository
