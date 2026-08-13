@@ -1,4 +1,4 @@
-﻿import { readJsonFromUpstash } from '../_upstash-json.js';
+import { readJsonFromUpstash } from '../_upstash-json.js';
 
 export const config = {
   runtime: 'edge',
