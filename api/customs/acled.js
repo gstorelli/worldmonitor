@@ -1,10 +1,10 @@
-import { readJsonFromUpstash } from '../_upstash-json.js';
+﻿import { readJsonFromUpstash } from '../_upstash-json.js';
 
 export const config = {
   runtime: 'edge',
 };
 
-export default async function handler(req) {
+export default async function handler(_req) {
   const cacheKey = 'risk_sentinel:n8n:acled';
   
   try {

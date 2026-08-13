@@ -1,10 +1,10 @@
-import { readJsonFromUpstash } from '../_upstash-json.js';
+﻿import { readJsonFromUpstash } from '../_upstash-json.js';
 
 export const config = {
   runtime: 'edge',
 };
 
-export default async function handler(req) {
+export default async function handler(_req) {
   // n8n will push directly to this Redis key
   const cacheKey = 'risk_sentinel:n8n:gdelt';
   

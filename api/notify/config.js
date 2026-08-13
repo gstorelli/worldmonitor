@@ -61,7 +61,7 @@ function validateConfig(config) {
   return true;
 }
 
-export default async function handler(request, context = {}) {
+export default async function handler(request, _context = {}) {
   const corsHeaders = getPublicCorsHeaders('GET, POST, OPTIONS');
   if (request.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: corsHeaders });
