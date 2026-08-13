@@ -56,7 +56,7 @@
     "worktree:env": "node scripts/bootstrap-worktree.mjs --skip-install"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.4.9",
+    "@biomejs/biome": "2.4.7",
     "@bufbuild/buf": "^1.66.0",
     "@edge-runtime/vm": "^5.0.0",
     "@playwright/test": "^1.52.0",
