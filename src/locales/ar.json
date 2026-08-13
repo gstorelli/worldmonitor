@@ -3195,10 +3195,10 @@
     "previewErrorCopy": "صحّح المشكلة ثم أعد المحاولة. أدواتك الموجودة لم تتأثر.",
     "createInteractive": "إنشاء أداة تفاعلية",
     "proBadge": "PRO",
-    "preflightProUnavailable": "وكيل أداة PRO غير متاح. تحقق من PRO_WIDGET_KEY على الخادم.",
+    "preflightProUnavailable": "Widget agent unavailable. Check the widget key on the server.",
     "preflightInvalidProKey": "مفتاح PRO مرفوض. حدّث wm-pro-key وأعد التحميل.",
-    "preflightProSubscriptionRequired": "مطلوب اشتراك Pro. إذا قمت بالترقية للتو، أعد تحميل الصفحة؛ وإلا اتصل بالدعم.",
-    "preflightProRequired": "مطلوب اشتراك Pro لاستخدام منشئ الأدوات. قم بالترقية لفتح المزيد.",
+    "preflightProSubscriptionRequired": "Widget builder access is unavailable right now. If this persists, refresh the page or contact support.",
+    "preflightProRequired": "Widget builder access requires additional configuration. Refresh the page or contact support.",
     "examples": {
       "oilGold": "أظهر لي سعر النفط الخام مقابل الذهب اليوم",
       "cryptoMovers": "إنشاء أداة للعملات المشفرة الأكثر تحركاً في آخر 24 ساعة",

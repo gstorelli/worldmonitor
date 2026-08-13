@@ -1,6 +1,6 @@
 import '@/styles/settings-window.css';
 import { FEEDS, INTEL_SOURCES, SOURCE_REGION_MAP } from '@/config/feeds';
-import { PANEL_CATEGORY_MAP, ALL_PANELS, VARIANT_DEFAULTS, getEffectivePanelConfig, isPanelEntitled } from '@/config/panels';
+import { PANEL_CATEGORY_MAP, ALL_PANELS, VARIANT_DEFAULTS, getEffectivePanelConfig } from '@/config/panels';
 
 import { SITE_VARIANT } from '@/config/variant';
 import { t } from '@/services/i18n';
@@ -11,8 +11,7 @@ import { renderPreferences } from '@/services/preferences-content';
 import { renderNotificationsSettings, type NotificationsSettingsResult } from '@/services/notifications-settings';
 import { getAuthState } from '@/services/auth-state';
 import { track } from '@/services/analytics';
-import { isEntitled, hasFeature, onEntitlementChange, getEntitlementState } from '@/services/entitlements';
-import { hasPremiumAccess } from '@/services/panel-gating';
+import { hasFeature } from '@/services/entitlements';
 
 import { createApiKey, listApiKeys, revokeApiKey, type ApiKeyInfo } from '@/services/api-keys';
 import { listMcpClients, revokeMcpClient, fetchMcpQuota, type McpClientInfo, type McpQuota } from '@/services/mcp-clients';
@@ -62,15 +61,6 @@ export class UnifiedSettings {
   private mcpQuota: McpQuota | null = null;
   /** setInterval handle for quota auto-refresh; cleared on close()/destroy()/tab-switch. */
   private mcpQuotaTimer: ReturnType<typeof setInterval> | null = null;
-  private unsubscribeEntitlement: (() => void) | null = null;
-  // Bounded "entitlement snapshot might still arrive" window. Starts false
-  // on open() when currentState is null, flips true on first snapshot OR
-  // after a fallback timeout so signed-in free users aren't stranded on an
-  // empty placeholder when Convex is disabled / auth times out / init
-  // silently fails (all of which leave currentState === null forever — see
-  // src/services/entitlements.ts:41,47,58,78).
-  private entitlementReady = false;
-  private entitlementReadyTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(config: UnifiedSettingsConfig) {
     this.config = config;
@@ -97,15 +87,6 @@ export class UnifiedSettings {
 
       if (target.closest('.unified-settings-close')) {
         this.close();
-        return;
-      }
-
-      if (target.closest('.upgrade-pro-cta')) {
-        this.handleUpgradeClick();
-        return;
-      }
-
-      if (target.closest('.manage-billing-btn')) {
         return;
       }
 
@@ -138,10 +119,6 @@ export class UnifiedSettings {
 
       const panelItem = target.closest<HTMLElement>('.panel-toggle-item');
       if (panelItem?.dataset.panel) {
-        if (panelItem.dataset.proLocked) {
-          window.open('/pro', '_blank');
-          return;
-        }
         this.toggleDraftPanel(panelItem.dataset.panel);
         return;
       }
@@ -251,63 +228,11 @@ export class UnifiedSettings {
   public open(tab?: TabId): void {
     if (tab) this.activeTab = tab;
     this.resetPanelDraft();
-    // Seed entitlementReady BEFORE render() so the first paint of
-    // renderUpgradeSection branches on the current snapshot state, not the
-    // stale value left over from a previous open/close cycle.
-    this.entitlementReady = getEntitlementState() !== null;
     this.render();
     this.overlay.classList.add('active');
     localStorage.setItem('wm-settings-open', '1');
     document.addEventListener('keydown', this.escapeHandler);
     track('settings-open', { tab: tab ?? 'default' });
-
-    // Re-render API Keys panel when entitlements arrive (cold-load race:
-    // hasFeature('apiAccess') returns false until the Convex subscription
-    // delivers data, so a paid API Starter user sees the upgrade CTA briefly).
-    this.unsubscribeEntitlement?.();
-    this.unsubscribeEntitlement = onEntitlementChange(() => {
-      this.entitlementReady = true;
-      const panel = this.overlay.querySelector<HTMLElement>('[data-panel-id="api-keys"]');
-      if (panel) {
-        panel.innerHTML = this.renderApiKeysContent();
-        // Re-attach CTA and input handlers for the refreshed content
-        this.attachApiKeysHandlers();
-        if (this.activeTab === 'api-keys' && getAuthState().user && hasFeature('apiAccess')) {
-          void this.loadApiKeys();
-        }
-      }
-      this.replaceUpgradeSection();
-    });
-    // Bounded fallback: the entitlement listener can legitimately never
-    // fire (no VITE_CONVEX_URL, Convex API fails to load, waitForConvexAuth
-    // times out at 10s, or init throws — see entitlements.ts:41,47,58,78).
-    // Without this timer, the signed-in-free branch of renderUpgradeSection
-    // would show a blank placeholder for the entire session. 12s > the 10s
-    // auth timeout so the healthy-but-slow path lands on the real state;
-    // any later path falls back to "Upgrade to Pro" with handleUpgradeClick
-    // defensively re-checking isEntitled() at click time.
-    if (this.entitlementReadyTimer) clearTimeout(this.entitlementReadyTimer);
-    if (!this.entitlementReady) {
-      this.entitlementReadyTimer = setTimeout(() => {
-        this.entitlementReadyTimer = null;
-        if (this.entitlementReady) return;
-        this.entitlementReady = true;
-        this.replaceUpgradeSection();
-      }, 12_000);
-    }
-  }
-
-  /**
-   * Swap the .upgrade-pro-section wrapper in place. Click handlers are
-   * delegated at overlay level, so replacing the node needs no rebind.
-   */
-  private replaceUpgradeSection(): void {
-    const upgradeSection = this.overlay.querySelector('.upgrade-pro-section');
-    if (!upgradeSection) return;
-    const fresh = document.createElement('template');
-    fresh.innerHTML = this.renderUpgradeSection().trim();
-    const next = fresh.content.firstElementChild;
-    if (next) upgradeSection.replaceWith(next);
   }
 
   public close(): void {
@@ -318,12 +243,6 @@ export class UnifiedSettings {
     this.notifCleanup?.();
     this.notifCleanup = null;
     this.pendingNotifs = null;
-    this.unsubscribeEntitlement?.();
-    this.unsubscribeEntitlement = null;
-    if (this.entitlementReadyTimer) {
-      clearTimeout(this.entitlementReadyTimer);
-      this.entitlementReadyTimer = null;
-    }
     this.stopMcpQuotaPolling();
     this.resetPanelDraft();
     localStorage.removeItem('wm-settings-open');
@@ -352,17 +271,6 @@ export class UnifiedSettings {
     this.notifCleanup?.();
     this.notifCleanup = null;
     this.pendingNotifs = null;
-    this.unsubscribeEntitlement?.();
-    this.unsubscribeEntitlement = null;
-    // Mirror close() — without this, a destroy() during the 12s fallback
-    // window leaves the timer live; it fires after teardown and calls
-    // replaceUpgradeSection() against a detached overlay (no-op via the
-    // querySelector early return, but a stray async callback + DOM
-    // reference alive longer than intended).
-    if (this.entitlementReadyTimer) {
-      clearTimeout(this.entitlementReadyTimer);
-      this.entitlementReadyTimer = null;
-    }
     this.stopMcpQuotaPolling();
     document.removeEventListener('keydown', this.escapeHandler);
     this.overlay.remove();
@@ -398,12 +306,11 @@ export class UnifiedSettings {
           <button class="${tabClass('panels')}" data-tab="panels" role="tab" aria-selected="${this.activeTab === 'panels'}" id="us-tab-panels" aria-controls="us-tab-panel-panels">${t('header.tabPanels')}</button>
           <button class="${tabClass('sources')}" data-tab="sources" role="tab" aria-selected="${this.activeTab === 'sources'}" id="us-tab-sources" aria-controls="us-tab-panel-sources">${t('header.tabSources')}</button>
           ${showNotificationsTab ? `<button class="${tabClass('notifications')}" data-tab="notifications" role="tab" aria-selected="${this.activeTab === 'notifications'}" id="us-tab-notifications" aria-controls="us-tab-panel-notifications">${t('header.tabNotifications')}</button>` : ''}
-          <button class="${tabClass('api-keys')}" data-tab="api-keys" role="tab" aria-selected="${this.activeTab === 'api-keys'}" id="us-tab-api-keys" aria-controls="us-tab-panel-api-keys">API Keys <span class="panel-pro-badge">PRO</span></button>
-          ${hasFeature('mcpAccess') ? `<button class="${tabClass('mcp-clients')}" data-tab="mcp-clients" role="tab" aria-selected="${this.activeTab === 'mcp-clients'}" id="us-tab-mcp-clients" aria-controls="us-tab-panel-mcp-clients">MCP Clients <span class="panel-pro-badge">PRO</span></button>` : ''}
+          <button class="${tabClass('api-keys')}" data-tab="api-keys" role="tab" aria-selected="${this.activeTab === 'api-keys'}" id="us-tab-api-keys" aria-controls="us-tab-panel-api-keys">API Keys</button>
+          ${hasFeature('mcpAccess') ? `<button class="${tabClass('mcp-clients')}" data-tab="mcp-clients" role="tab" aria-selected="${this.activeTab === 'mcp-clients'}" id="us-tab-mcp-clients" aria-controls="us-tab-panel-mcp-clients">MCP Clients</button>` : ''}
         </div>
         <div class="unified-settings-tab-panel${this.activeTab === 'settings' ? ' active' : ''}" data-panel-id="settings" id="us-tab-panel-settings" role="tabpanel" aria-labelledby="us-tab-settings">
           ${prefs.html}
-          ${this.renderUpgradeSection()}
         </div>
         <div class="unified-settings-tab-panel${this.activeTab === 'panels' ? ' active' : ''}" data-panel-id="panels" id="us-tab-panel-panels" role="tabpanel" aria-labelledby="us-tab-panels">
           <div class="unified-settings-region-wrapper">
@@ -455,8 +362,8 @@ export class UnifiedSettings {
     }
 
     // Defer notifications attach until the tab is first activated —
-    // otherwise Pro users pay a getChannelsData() fetch on every modal
-    // open even if they never visit this tab.
+    // otherwise every modal open pays a getChannelsData() fetch even if
+    // the user never visits this tab.
     this.pendingNotifs = notifs;
     if (this.activeTab === 'notifications') this.attachNotificationsTab();
 
@@ -521,106 +428,6 @@ export class UnifiedSettings {
     if (notifPanel) {
       this.notifCleanup = this.pendingNotifs.attach(notifPanel as HTMLElement);
     }
-  }
-
-  private renderUpgradeSection(): string {
-    // Non-Dodo premium (API key / tester key / Clerk pro role without a
-    // Convex subscription): neither "Upgrade" nor "Manage Billing" is
-    // actionable. Checked FIRST so these users don't get stuck on the
-    // loading placeholder below — their Convex entitlement snapshot may
-    // never arrive at all.
-    if (!isEntitled() && hasPremiumAccess()) {
-      return '<div class="upgrade-pro-section upgrade-pro-hidden" hidden></div>';
-    }
-    // Signed-in user whose Convex entitlement snapshot has not arrived yet
-    // AND whose bounded-wait window has not expired. Rendering "Upgrade to
-    // Pro" in this window is how paying users click through to
-    // /api/create-checkout and hit 409 duplicate_subscription — same race
-    // as the 2026-04-17/18 panel-overlay incident fixed in panel-gating.ts,
-    // different surface. The entitlementReady flag is flipped either by
-    // the onEntitlementChange listener (healthy path) or by a 12s fallback
-    // timer in open() (Convex-disabled / auth-timeout / init-fail paths
-    // where currentState would otherwise stay null forever and strand a
-    // signed-in free user on an empty placeholder).
-    if (!this.entitlementReady && getAuthState().user && getEntitlementState() === null) {
-      // `hidden` so the browser's default `[hidden] { display: none }`
-      // suppresses the empty card — without it, the base `.upgrade-pro-
-      // section` styles (margin + padding + border + surface background
-      // in main.css:22833) paint a visibly empty bordered box during the
-      // Convex cold-load window, which is exactly the state we're trying
-      // to clean up. Element stays queryable for the replaceWith swap in
-      // open().
-      return '<div class="upgrade-pro-section upgrade-pro-loading" hidden aria-hidden="true"></div>';
-    }
-    if (isEntitled()) {
-      const planName = 'Pro';
-      const statusColor = '#22c55e';
-      const statusBorderColor = '#22c55e33';
-      const statusBgColor = '#22c55e0a';
-      
-      let statusLine = '';
-
-      return `
-        <div class="upgrade-pro-section upgrade-pro-active" style="margin-top:16px;padding:14px 16px;border:1px solid ${statusBorderColor};border-radius:6px;background:${statusBgColor};">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:${statusLine ? '8' : '0'}px;">
-            <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${statusColor};flex-shrink:0;"></span>
-            <span style="color:${statusColor};font-weight:600;font-size:13px;">${escapeHtml(planName)}</span>
-          </div>
-          ${statusLine ? `<div class="upgrade-pro-status-line">${escapeHtml(statusLine)}</div>` : ''}
-          <button class="manage-billing-btn">Manage Billing</button>
-        </div>
-      `;
-    }
-
-    // Fallback branch: 12s timer fired but Convex never delivered a
-    // snapshot. entitlementReady===true does NOT prove the user is free —
-    // it just means we've given up waiting. A paying user whose auth/query
-    // is simply very slow (beyond the 10s waitForConvexAuth timeout) would
-    // otherwise race into in-modal startCheckout here and reproduce the
-    // 409 duplicate_subscription cascade this PR exists to eliminate.
-    // Render the card with a plain anchor to /pro instead: /pro has its
-    // own entitlement gating on fresh page load, and navigating away is a
-    // no-op for backend subscription state. The `upgrade-pro-cta-link`
-    // class does NOT match the `.upgrade-pro-cta` delegated click handler
-    // (line ~95), so the browser handles the navigation natively.
-    if (getAuthState().user && getEntitlementState() === null) {
-      return `
-        <div class="upgrade-pro-section upgrade-pro-fallback">
-          <div class="upgrade-pro-title">Upgrade to Pro</div>
-          <div class="upgrade-pro-desc">Unlock all panels, AI analysis, and priority data refresh.</div>
-          <a class="upgrade-pro-cta-link" href="/pro" target="_blank" rel="noopener">View plans →</a>
-        </div>
-      `;
-    }
-
-    return `
-      <div class="upgrade-pro-section">
-        <div class="upgrade-pro-title">Upgrade to Pro</div>
-        <div class="upgrade-pro-desc">Unlock all panels, AI analysis, and priority data refresh.</div>
-        <button class="upgrade-pro-cta">Upgrade to Pro</button>
-      </div>
-    `;
-  }
-
-  private handleUpgradeClick(): void {
-    // Defense in depth: the upgrade CTA can only be clicked when either (a)
-    // the user is genuinely free-tier, or (b) the 12s fallback timer fired
-    // before the Convex snapshot arrived. In (b), the snapshot might land
-    // AFTER the timer but BEFORE the click — re-check isEntitled() here so
-    // a late-arriving "you're a paying user" state routes to the billing
-    // portal instead of triggering /api/create-checkout against an active
-    // subscription (which would 409 and re-enter the duplicate_subscription
-    // → getCustomerPortalUrl cascade this PR is trying to eliminate).
-    if (isEntitled()) {
-      this.close();
-      return;
-    }
-    this.close();
-    if (this.config.isDesktopApp) {
-      window.open('https://worldmonitor.app/pro', '_blank');
-      return;
-    }
-    window.open('https://worldmonitor.app/pro', '_blank');
   }
 
   private categoryMatchesVariant(catDef: { variants?: string[] }): boolean {
@@ -690,15 +497,12 @@ export class UnifiedSettings {
     const savedSettings = this.config.getPanelSettings();
     const entries = this.getVisiblePanelEntries();
     container.innerHTML = entries.map(([key, panel]) => {
-      const entitled = isPanelEntitled(key, ALL_PANELS[key] ?? panel);
-      const locked = !entitled;
-      const changed = !locked && savedSettings[key]?.enabled !== panel.enabled;
+      const changed = savedSettings[key]?.enabled !== panel.enabled;
       const displayName = this.config.getLocalizedPanelName(key, getEffectivePanelConfig(key, SITE_VARIANT).name ?? panel.name);
       return `
-        <div class="panel-toggle-item ${panel.enabled && !locked ? 'active' : ''}${changed ? ' changed' : ''}${locked ? ' pro-locked' : ''}" data-panel="${escapeHtml(key)}" aria-pressed="${panel.enabled && !locked}" ${locked ? 'data-pro-locked="1"' : ''}>
-          <div class="panel-toggle-checkbox">${panel.enabled && !locked ? '\u2713' : ''}${locked ? '\uD83D\uDD12' : ''}</div>
+        <div class="panel-toggle-item ${panel.enabled ? 'active' : ''}${changed ? ' changed' : ''}" data-panel="${escapeHtml(key)}" aria-pressed="${panel.enabled}">
+          <div class="panel-toggle-checkbox">${panel.enabled ? '\u2713' : ''}</div>
           <span class="panel-toggle-label">${escapeHtml(displayName)}</span>
-          ${(locked || (ALL_PANELS[key] ?? panel).premium) ? '<span class="panel-toggle-pro-badge">PRO</span>' : ''}
         </div>
       `;
     }).join('');
@@ -732,7 +536,6 @@ export class UnifiedSettings {
   private toggleDraftPanel(key: string): void {
     const panel = this.draftPanelSettings[key];
     if (!panel) return;
-    if (!panel.enabled && !isPanelEntitled(key, ALL_PANELS[key] ?? panel)) return;
     panel.enabled = !panel.enabled;
     this.panelsJustSaved = false;
     this.renderPanelsTab();
@@ -882,16 +685,13 @@ export class UnifiedSettings {
       });
     }
 
-    // Gate CTA click (sign-in for anonymous, checkout for free)
+    // Gate CTA click (sign-in for anonymous)
     const gateBtn = this.overlay.querySelector<HTMLElement>('.api-keys-gate-btn');
     if (gateBtn) {
       gateBtn.addEventListener('click', () => {
         if (!getAuthState().user) {
           this.close();
           import('@/services/clerk').then(m => m.openSignIn()).catch(() => {});
-        } else {
-          this.close();
-          window.open('https://worldmonitor.app/pro', '_blank');
         }
       });
     }
@@ -907,16 +707,6 @@ export class UnifiedSettings {
           <div class="panel-locked-icon">${lockIcon}</div>
           <div class="panel-locked-desc">Sign in to unlock API Keys</div>
           <button class="panel-locked-cta api-keys-gate-btn">Sign In</button>
-        </div>`;
-    }
-
-    if (!hasFeature('apiAccess')) {
-      const upgradeIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="16 12 12 8 8 12"/><line x1="12" y1="16" x2="12" y2="8"/></svg>`;
-      return `
-        <div class="panel-locked-state">
-          <div class="panel-locked-icon">${upgradeIcon}</div>
-          <div class="panel-locked-desc">Create and manage API keys to access WorldMonitor data programmatically.</div>
-          <button class="panel-locked-cta api-keys-gate-btn">Upgrade to API Starter</button>
         </div>`;
     }
 
@@ -975,7 +765,7 @@ export class UnifiedSettings {
       this.apiKeysError = msg.includes('KEY_LIMIT_REACHED')
         ? 'Maximum of 5 active keys reached. Revoke an existing key first.'
         : msg.includes('API_ACCESS_REQUIRED')
-        ? 'API keys require an API access subscription (API Starter or higher).'
+        ? 'API key access is unavailable.'
         : msg;
       this.renderApiKeysError();
     } finally {
@@ -1078,11 +868,10 @@ export class UnifiedSettings {
   // ---------------------------------------------------------------------------
   // Connected MCP clients tab (plan 2026-05-10-001 U9)
   //
-  // Distinct from the API Keys tab above (gated on `apiAccess`). This tab is
-  // gated on `mcpAccess` so Pro users (where `apiAccess === false`) see ONLY
-  // this tab. API Starter+ users (`apiAccess && mcpAccess`) see BOTH tabs;
-  // they manage independent surfaces (manual API keys vs auto-issued OAuth
-  // tokens for Claude Desktop / Cursor / etc).
+  // Distinct from the API Keys tab above (gated on `apiAccess`). Users
+  // with `apiAccess && mcpAccess` see BOTH tabs; they manage independent
+  // surfaces (manual API keys vs auto-issued OAuth tokens for Claude
+  // Desktop / Cursor / etc).
   // ---------------------------------------------------------------------------
 
   private renderMcpClientsContent(): string {
@@ -1094,18 +883,6 @@ export class UnifiedSettings {
         <div class="panel-locked-state">
           <div class="panel-locked-icon">${lockIcon}</div>
           <div class="panel-locked-desc">Sign in to manage connected MCP clients</div>
-        </div>`;
-    }
-
-    if (!hasFeature('mcpAccess')) {
-      // Defensive — if the user lost mcpAccess (subscription lapsed) but the
-      // tab was still rendered, show an upgrade CTA. Normal flow hides the
-      // tab entirely.
-      const upgradeIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="16 12 12 8 8 12"/><line x1="12" y1="16" x2="12" y2="8"/></svg>`;
-      return `
-        <div class="panel-locked-state">
-          <div class="panel-locked-icon">${upgradeIcon}</div>
-          <div class="panel-locked-desc">Connect Claude Desktop and other AI clients to your WorldMonitor account.</div>
         </div>`;
     }
 
@@ -1249,7 +1026,7 @@ export class UnifiedSettings {
       container.innerHTML = `
         <div class="mcp-clients-empty">
           <div class="mcp-clients-empty-title">No connected MCP clients yet</div>
-          <div class="mcp-clients-empty-desc">To connect Claude Desktop or another AI client, paste this URL into the client's MCP server settings and sign in with your WorldMonitor Pro account:</div>
+          <div class="mcp-clients-empty-desc">To connect Claude Desktop or another AI client, paste this URL into the client's MCP server settings and sign in with your WorldMonitor account:</div>
           <div class="mcp-clients-empty-url">
             <code>${escapeHtml(mcpUrl)}</code>
             <button class="btn btn-secondary mcp-clients-copy-url-btn" data-copy-value="${escapeHtml(mcpUrl)}">Copy URL</button>

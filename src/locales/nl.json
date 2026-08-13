@@ -3200,10 +3200,10 @@
     "previewErrorCopy": "Los het probleem op en probeer opnieuw. Je bestaande widgets worden niet beïnvloed.",
     "createInteractive": "Interactief Widget maken",
     "proBadge": "PRO",
-    "preflightProUnavailable": "PRO widget-agent niet beschikbaar. Controleer PRO_WIDGET_KEY op de server.",
+    "preflightProUnavailable": "Widget agent unavailable. Check the widget key on the server.",
     "preflightInvalidProKey": "PRO-sleutel afgewezen. Werk wm-pro-key bij en herlaad.",
-    "preflightProSubscriptionRequired": "Pro-abonnement vereist. Als je zojuist hebt geüpgraded, vernieuw de pagina; anders neem contact op met support.",
-    "preflightProRequired": "Pro-abonnement vereist om Widget Builder te gebruiken. Upgrade om toegang te krijgen.",
+    "preflightProSubscriptionRequired": "Widget builder access is unavailable right now. If this persists, refresh the page or contact support.",
+    "preflightProRequired": "Widget builder access requires additional configuration. Refresh the page or contact support.",
     "examples": {
       "oilGold": "Toon mij de prijs van ruwe olie versus goud vandaag",
       "cryptoMovers": "Maak een widget voor de belangrijkste crypto-bewegingen in de laatste 24 uur",

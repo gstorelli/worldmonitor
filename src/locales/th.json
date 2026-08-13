@@ -3195,10 +3195,10 @@
     "previewErrorCopy": "แก้ไขปัญหาแล้วลองอีกครั้ง วิดเจ็ตที่มีอยู่ของคุณไม่ได้รับผลกระทบ",
     "createInteractive": "สร้างวิดเจ็ตแบบโต้ตอบ",
     "proBadge": "PRO",
-    "preflightProUnavailable": "เอเจนต์วิดเจ็ต PRO ไม่พร้อมใช้งาน ตรวจสอบ PRO_WIDGET_KEY บนเซิร์ฟเวอร์",
+    "preflightProUnavailable": "Widget agent unavailable. Check the widget key on the server.",
     "preflightInvalidProKey": "ปฏิเสธคีย์ PRO อัปเดต wm-pro-key แล้วโหลดใหม่",
-    "preflightProSubscriptionRequired": "จำเป็นต้องมีการสมัครสมาชิก Pro หากคุณเพิ่งอัพเกรด ให้รีเฟรชหน้า มิฉะนั้นติดต่อฝ่ายสนับสนุน",
-    "preflightProRequired": "ต้องมีการสมัครสมาชิก Pro เพื่อใช้ Widget Builder กรุณาอัปเกรดเพื่อปลดล็อค",
+    "preflightProSubscriptionRequired": "Widget builder access is unavailable right now. If this persists, refresh the page or contact support.",
+    "preflightProRequired": "Widget builder access requires additional configuration. Refresh the page or contact support.",
     "examples": {
       "oilGold": "แสดงราคาน้ำมันดิบวันนี้เทียบกับทอง",
       "cryptoMovers": "สร้างวิดเจ็ตสำหรับ crypto ที่เคลื่อนไหวมากที่สุดใน 24 ชั่วโมงที่ผ่านมา",

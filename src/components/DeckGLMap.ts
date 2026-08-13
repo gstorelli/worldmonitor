@@ -114,10 +114,6 @@ import type { GulfInvestment } from '@/types';
 import { resolveTradeRouteSegments, TRADE_ROUTES as TRADE_ROUTES_LIST, type TradeRouteSegment, type TradeRouteStatus } from '@/config/trade-routes';
 import type { ScenarioVisualState } from '@/config/scenario-templates';
 import { getLayersForVariant, resolveLayerLabel, bindLayerSearch, type MapVariant } from '@/config/map-layer-definitions';
-import { getAuthState, subscribeAuthState } from '@/services/auth-state';
-import { onEntitlementChange } from '@/services/entitlements';
-import { hasPremiumAccess } from '@/services/panel-gating';
-import { trackGateHit } from '@/services/analytics';
 import { MapPopup, type PopupType } from './MapPopup';
 import type { GetChokepointStatusResponse } from '@/services/supply-chain';
 import {
@@ -428,8 +424,6 @@ export class DeckGLMap {
   private cyberThreats: CyberThreat[] = [];
   private aptGroups: import('@/types').APTGroup[] = [];
   private aptGroupsLoaded = false;
-  private _unsubscribeAuthState: (() => void) | null = null;
-  private _unsubscribeEntitlement: (() => void) | null = null;
   private aptGroupsLayerFailed = false;
   private satelliteImageryLayerFailed = false;
   private iranEvents: IranEvent[] = [];
@@ -4714,10 +4708,6 @@ export class DeckGLMap {
 
     if (layerId === 'trade-routes-layer') {
       const segment = info.object as TradeRouteSegment;
-      if (!hasPremiumAccess(getAuthState())) {
-        trackGateHit('trade-arc-intel');
-        return;
-      }
       const waypoints = ROUTE_WAYPOINTS_MAP.get(segment.routeId) ?? [];
       this.popup.showRouteBreakdown(segment, waypoints, info.x, info.y);
       this.onTradeArcClick?.(segment, waypoints, info.x, info.y);
@@ -4992,12 +4982,10 @@ export class DeckGLMap {
     toggles.className = 'layer-toggles deckgl-layer-toggles';
 
     const layerDefs = getLayersForVariant((SITE_VARIANT || 'full') as MapVariant, 'flat');
-    const premiumUnlocked = hasPremiumAccess(getAuthState());
     const layerConfig = layerDefs.map(def => ({
       key: def.key,
       label: resolveLayerLabel(def, t),
       icon: def.icon,
-      premium: def.premium,
     }));
 
     toggles.innerHTML = `
@@ -5008,14 +4996,12 @@ export class DeckGLMap {
       </div>
       <input type="text" class="layer-search" placeholder="${t('components.deckgl.layerSearch')}" autocomplete="off" spellcheck="false" />
       <div class="toggle-list" style="max-height: 32vh; overflow-y: auto; scrollbar-width: thin;">
-        ${layerConfig.map(({ key, label, icon, premium }) => {
-          const isLocked = premium === 'locked' && !premiumUnlocked;
-          const isEnhanced = premium === 'enhanced' && !premiumUnlocked;
+        ${layerConfig.map(({ key, label, icon }) => {
           return `
-          <label class="layer-toggle${isLocked ? ' layer-toggle-locked' : ''}" data-layer="${key}">
-            <input type="checkbox" ${this.state.layers[key as keyof MapLayers] ? 'checked' : ''}${isLocked ? ' disabled' : ''}>
+          <label class="layer-toggle" data-layer="${key}">
+            <input type="checkbox" ${this.state.layers[key as keyof MapLayers] ? 'checked' : ''}>
             <span class="toggle-icon">${icon}</span>
-            <span class="toggle-label">${label}${isLocked ? ' \uD83D\uDD12' : ''}${isEnhanced ? ' <span class="layer-pro-badge">PRO</span>' : ''}</span>
+            <span class="toggle-label">${label}</span>
           </label>`;
         }).join('')}
       </div>
@@ -5027,38 +5013,6 @@ export class DeckGLMap {
     toggles.appendChild(authorBadge);
 
     this.container.appendChild(toggles);
-
-    // Unlock premium layers when Pro status resolves. Pro can come from EITHER:
-    //   1. Clerk role === 'pro' (subscribeAuthState fires on Clerk changes)
-    //   2. Convex entitlement tier >= 1 (onEntitlementChange fires on Convex changes)
-    // Subscribing to BOTH covers Dodo subscribers whose Pro flag arrives via
-    // Convex (NOT via Clerk role). User-reported on energy.worldmonitor.app:
-    // "Pro Monthly" in settings UI but Resilience layer still showed the lock
-    // because subscribeAuthState alone never fires on Convex transitions.
-    //
-    // Whichever signal resolves Pro first does the unlock; the other becomes
-    // a no-op (early-return when not Pro; no-op .remove on already-removed
-    // class). queueMicrotask defers self-unsubscribe so both _unsubscribe*
-    // assignments complete before the unsubscribe runs. Greptile P2 fix:
-    // single helper instead of duplicated callback bodies.
-    const unlockIfPro = (): void => {
-      if (!hasPremiumAccess(getAuthState())) return;
-      toggles.querySelectorAll('.layer-toggle-locked').forEach(label => {
-        label.classList.remove('layer-toggle-locked');
-        const input = label.querySelector('input') as HTMLInputElement | null;
-        if (input) input.disabled = false;
-        const labelSpan = label.querySelector('.toggle-label');
-        if (labelSpan) labelSpan.textContent = labelSpan.textContent!.replace(' \uD83D\uDD12', '');
-      });
-      queueMicrotask(() => {
-        this._unsubscribeAuthState?.();
-        this._unsubscribeAuthState = null;
-        this._unsubscribeEntitlement?.();
-        this._unsubscribeEntitlement = null;
-      });
-    };
-    this._unsubscribeAuthState = subscribeAuthState(() => unlockIfPro());
-    this._unsubscribeEntitlement = onEntitlementChange(() => unlockIfPro());
 
     // Bind toggle events
     toggles.querySelectorAll('.layer-toggle input').forEach(input => {
@@ -5676,13 +5630,9 @@ export class DeckGLMap {
         const waypoints = ROUTE_WAYPOINTS_MAP.get(d.routeId);
         if (waypoints && waypoints.some(wp => scenarioDisrupted.has(wp))) {
           base = scenario;
-        } else if (!hasPremiumAccess(getAuthState())) {
-          base = active;
         } else {
           base = colorFor(d.status);
         }
-      } else if (!hasPremiumAccess(getAuthState())) {
-        base = active;
       } else {
         base = colorFor(d.status);
       }
@@ -5714,8 +5664,6 @@ export class DeckGLMap {
     const highRiskColor: [number, number, number, number] = [255, 180, 50, 160];
     const scenarioColor: [number, number, number, number] = [255, 140, 50, 170];
 
-    const isPremium = hasPremiumAccess(getAuthState());
-
     const scenarioDisrupted = this.scenarioState
       ? new Set(this.scenarioState.disruptedChokepointIds)
       : null;
@@ -5729,13 +5677,9 @@ export class DeckGLMap {
         const waypoints = ROUTE_WAYPOINTS_MAP.get(routeId);
         if (waypoints && waypoints.some(wp => scenarioDisrupted.has(wp))) {
           base = scenarioColor;
-        } else if (!isPremium) {
-          base = activeColor;
         } else {
           base = status === 'disrupted' ? disruptedColor : status === 'high_risk' ? highRiskColor : activeColor;
         }
-      } else if (!isPremium) {
-        base = activeColor;
       } else {
         base = status === 'disrupted' ? disruptedColor : status === 'high_risk' ? highRiskColor : activeColor;
       }
@@ -7144,10 +7088,6 @@ export class DeckGLMap {
     this.stopTradeAnimation();
     this.activeFlightTrails.clear();
     this.clearTrailsBtn = null;
-    this._unsubscribeAuthState?.();
-    this._unsubscribeAuthState = null;
-    this._unsubscribeEntitlement?.();
-    this._unsubscribeEntitlement = null;
     window.removeEventListener('theme-changed', this.handleThemeChange);
     window.removeEventListener('map-theme-changed', this.handleMapThemeChange);
     this.debouncedRebuildLayers.cancel();

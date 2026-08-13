@@ -5,7 +5,6 @@ import { t } from '../services/i18n';
 import { h, replaceChildren, safeHtml } from '../utils/dom-utils';
 import { trackPanelResized } from '@/services/analytics';
 import { getAiFlowSettings } from '@/services/ai-flow-settings';
-import { getSecretState } from '@/services/runtime-config';
 import { PanelGateReason } from '@/services/panel-gating';
 
 export type PanelSeverity = 'critical' | 'high' | 'medium' | 'low' | 'none';
@@ -307,11 +306,6 @@ export class Panel {
       this.newBadgeEl.className = 'panel-new-badge';
       this.newBadgeEl.style.display = 'none';
       headerLeft.appendChild(this.newBadgeEl);
-    }
-
-    if (options.premium && !getSecretState('WORLDMONITOR_API_KEY').present) {
-      const proBadge = h('span', { className: 'panel-pro-badge' }, t('premium.pro'));
-      headerLeft.appendChild(proBadge);
     }
 
     this.header.appendChild(headerLeft);
@@ -859,7 +853,7 @@ export class Panel {
 
     const lockedChildren: (HTMLElement | string)[] = [
       iconEl,
-      h('div', { className: 'panel-locked-desc' }, t('premium.lockedDesc')),
+      h('div', { className: 'panel-locked-desc' }, 'Pannello non disponibile in questa configurazione.'),
     ];
 
     if (features.length > 0) {
@@ -869,16 +863,6 @@ export class Panel {
       }
       lockedChildren.push(featureList);
     }
-
-    const ctaBtn = h('button', { type: 'button', className: 'panel-locked-cta' }, 'Upgrade to Pro');
-    if (isDesktopRuntime()) {
-      ctaBtn.addEventListener('click', () => void invokeTauri<void>('open_url', { url: 'https://worldmonitor.app/pro' }).catch(() => window.open('https://worldmonitor.app/pro', '_blank')));
-    } else {
-      ctaBtn.addEventListener('click', () => {
-        window.open('https://worldmonitor.app/pro', '_blank');
-      });
-    }
-    lockedChildren.push(ctaBtn);
 
     replaceChildren(this.content, h('div', { className: 'panel-locked-state' }, ...lockedChildren));
   }
@@ -896,13 +880,13 @@ export class Panel {
     const config: Record<string, { icon: string; desc: string; cta: string }> = {
       [PanelGateReason.ANONYMOUS]: {
         icon: lockSvg,
-        desc: t('premium.signInToUnlock'),
-        cta: t('premium.signIn'),
+        desc: 'Accesso richiesto per visualizzare questo pannello.',
+        cta: 'Accedi',
       },
       [PanelGateReason.FREE_TIER]: {
         icon: upgradeSvg,
-        desc: t('premium.upgradeDesc'),
-        cta: t('premium.upgradeToPro'),
+        desc: 'Pannello non disponibile in questa configurazione.',
+        cta: 'Attiva',
       },
     };
 

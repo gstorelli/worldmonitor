@@ -317,7 +317,7 @@ export class ChatAnalystPanel extends Panel {
       });
 
       if (!res.ok) {
-        const err = res.status === 403 ? 'Pro subscription required.' : `Error ${res.status}`;
+        const err = res.status === 403 ? 'Access to the analyst is unavailable.' : `Error ${res.status}`;
         this.finalizeStreamingBubble(streamingBody, `⚠ ${err}`, false);
         return;
       }

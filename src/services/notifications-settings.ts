@@ -19,7 +19,6 @@ import {
   type DigestMode,
 } from '@/services/notification-channels';
 import { getCurrentClerkUser } from '@/services/clerk';
-import { hasTier } from '@/services/entitlements';
 import { SITE_VARIANT } from '@/config/variant';
 
 const QUIET_HOURS_BATCH_ENABLED = import.meta.env.VITE_QUIET_HOURS_BATCH_ENABLED !== '0';
@@ -34,37 +33,18 @@ export interface NotificationsSettingsResult {
   attach: (container: HTMLElement) => () => void;
 }
 
-export function renderNotificationsSettings(host: NotificationsSettingsHost): NotificationsSettingsResult {
-  const isPro = !!host.isSignedIn && hasTier(1);
-
+export function renderNotificationsSettings(_host: NotificationsSettingsHost): NotificationsSettingsResult {
   let html = '';
-  if (isPro) {
-    html += `<div class="wm-pref-group-content wm-notif-tab-content">`;
-    html += `<div class="us-notif-loading" id="usNotifLoading">Loading...</div>`;
-    html += `<div class="us-notif-content" id="usNotifContent" style="display:none"></div>`;
-    html += `</div>`;
-  } else {
-    html += `<div class="wm-pref-group-content wm-notif-tab-content">`;
-    html += `<div class="ai-flow-toggle-desc">Get real-time intelligence alerts delivered to Telegram, Slack, Discord, and Email with configurable sensitivity, quiet hours, and digest scheduling.</div>`;
-    html += `<button type="button" class="panel-locked-cta" id="usNotifUpgradeBtn">Upgrade to Pro</button>`;
-    html += `</div>`;
-  }
+  html += `<div class="wm-pref-group-content wm-notif-tab-content">`;
+  html += `<div class="us-notif-loading" id="usNotifLoading">Loading...</div>`;
+  html += `<div class="us-notif-content" id="usNotifContent" style="display:none"></div>`;
+  html += `</div>`;
 
   return {
     html,
     attach(container: HTMLElement): () => void {
       const ac = new AbortController();
       const { signal } = ac;
-
-      if (!isPro) {
-        const upgradeBtn = container.querySelector<HTMLButtonElement>('#usNotifUpgradeBtn');
-        if (upgradeBtn) {
-          upgradeBtn.addEventListener('click', () => {
-            window.open('https://worldmonitor.app/pro', '_blank');
-          }, { signal });
-        }
-        return () => ac.abort();
-      }
 
       let notifPollInterval: ReturnType<typeof setInterval> | null = null;
 

@@ -3195,10 +3195,10 @@
     "previewErrorCopy": "Исправьте проблему и повторите попытку. Ваши существующие виджеты не затронуты.",
     "createInteractive": "Создать интерактивный виджет",
     "proBadge": "PRO",
-    "preflightProUnavailable": "PRO агент виджетов недоступен. Проверьте PRO_WIDGET_KEY на сервере.",
+    "preflightProUnavailable": "Widget agent unavailable. Check the widget key on the server.",
     "preflightInvalidProKey": "PRO ключ отклонен. Обновите wm-pro-key и перезагрузите.",
-    "preflightProSubscriptionRequired": "Требуется подписка Pro. Если вы недавно обновили подписку, обновите страницу; в противном случае обратитесь в поддержку.",
-    "preflightProRequired": "Требуется подписка Pro для использования Widget Builder. Обновитесь, чтобы разблокировать.",
+    "preflightProSubscriptionRequired": "Widget builder access is unavailable right now. If this persists, refresh the page or contact support.",
+    "preflightProRequired": "Widget builder access requires additional configuration. Refresh the page or contact support.",
     "examples": {
       "oilGold": "Показать мне цену сырой нефти на сегодня в сравнении с золотом",
       "cryptoMovers": "Создайте виджет для топ крипто-активов, выросших за последние 24 часа",

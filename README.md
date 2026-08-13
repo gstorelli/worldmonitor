@@ -662,11 +662,13 @@ Stato di copertura bootstrap: **19/25 dataset** popolati. I 6 mancanti:
   codice upstream né impostazioni (sincronizzazioni future non-disruptive).
 
 **Source Validation (fonti bibliografiche)** — pannello `source-validation`,
-endpoint `GET /api/zotero/library`. Serve la bibliografia curata della
-literature review (18 fonti con limite/bias, contributo e dimensioni 8D per
-ognuna — `data/zotero-sources.json`) e la libreria live Zotero (API v3,
-cache Redis 24h, `?refresh=1`). Env: `ZOTERO_API_KEY`, `ZOTERO_USER_ID`
-(già nel compose + `.env.example`). Prewarm opzionale: `node scripts/seed-zotero-library.mjs`.
+endpoint `GET /api/zotero/library`. Mindmap interattiva (d3-force) della
+literature review: hub "gap di ricerca" → 5 aree tematiche → 18 fonti, con
+zoom/pan, trascinamento nodi, ricerca testuale, filtri per le 8 dimensioni di
+rischio, pannello di dettaglio per fonte (limite, contributo, rilevanza,
+presenza in Zotero) e collegamento alla libreria Zotero live (API v3,
+cache Redis 24h, `?refresh=1`). Env: `ZOTERO_API_KEY`, `ZOTERO_USER_ID`.
+Prewarm opzionale: `node scripts/seed-zotero-library.mjs`.
 
 **Policy Analysis (normativa aperta)** — pannello `policy-analysis`, endpoint
 `GET /api/policy/registry`. Registry curato di atti UE/IT (`data/policy-registry.json`:

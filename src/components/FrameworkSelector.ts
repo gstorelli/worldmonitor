@@ -4,7 +4,6 @@ import {
   getActiveFrameworkForPanel,
   setActiveFrameworkForPanel,
 } from '../services/analysis-framework-store';
-import { PanelGateReason } from '../services/panel-gating';
 import type { Panel } from './Panel';
 import { t } from '../services/i18n';
 
@@ -33,33 +32,25 @@ export class FrameworkSelector {
     btn.innerHTML = '⚙';
     this.btn = btn;
 
-    if (opts.isPremium) {
-      const select = document.createElement('select');
-      select.className = 'framework-popup-select';
-      this.select = select;
-      this.populateOptions(select);
-      select.value = getActiveFrameworkForPanel(opts.panelId)?.id ?? '';
-      select.addEventListener('change', () => {
-        setActiveFrameworkForPanel(opts.panelId, select.value || null);
-        this.updateBtnTitle();
-        this.closePopup();
-      });
+    const select = document.createElement('select');
+    select.className = 'framework-popup-select';
+    this.select = select;
+    this.populateOptions(select);
+    select.value = getActiveFrameworkForPanel(opts.panelId)?.id ?? '';
+    select.addEventListener('change', () => {
+      setActiveFrameworkForPanel(opts.panelId, select.value || null);
+      this.updateBtnTitle();
+      this.closePopup();
+    });
 
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (this.popup) {
-          this.closePopup();
-        } else {
-          this.openPopup();
-        }
-      });
-    } else {
-      btn.classList.add('framework-settings-btn--locked');
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        opts.panel?.showGatedCta(PanelGateReason.FREE_TIER, () => {});
-      });
-    }
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (this.popup) {
+        this.closePopup();
+      } else {
+        this.openPopup();
+      }
+    });
 
     this.updateBtnTitle();
     this.el = btn;

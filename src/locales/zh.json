@@ -3195,10 +3195,10 @@
     "previewErrorCopy": "修复问题后重试。您现有的小组件不受影响。",
     "createInteractive": "创建交互式小组件",
     "proBadge": "PRO",
-    "preflightProUnavailable": "PRO 小组件代理不可用。请检查服务器上的 PRO_WIDGET_KEY。",
+    "preflightProUnavailable": "Widget agent unavailable. Check the widget key on the server.",
     "preflightInvalidProKey": "PRO 密钥被拒绝。请更新 wm-pro-key 并重新加载。",
-    "preflightProSubscriptionRequired": "需要 Pro 订阅。如果您刚升级，请刷新页面；否则请联系支持。",
-    "preflightProRequired": "需要 Pro 订阅才能使用小部件生成器。升级以解锁。",
+    "preflightProSubscriptionRequired": "Widget builder access is unavailable right now. If this persists, refresh the page or contact support.",
+    "preflightProRequired": "Widget builder access requires additional configuration. Refresh the page or contact support.",
     "examples": {
       "oilGold": "显示今天的原油价格与黄金价格对比",
       "cryptoMovers": "为过去 24 小时内涨跌幅最大的加密货币创建小部件",

@@ -1,14 +1,9 @@
 
 import { type AuthSession, getAuthState, subscribeAuthState } from '@/services/auth-state';
-import { openSignIn } from '@/services/clerk';
-import { PanelGateReason, getPanelGateReason } from '@/services/panel-gating';
 import { getResilienceScore, type ResilienceDomain, type ResilienceScoreResponse } from '@/services/resilience';
-import { isDesktopRuntime } from '@/services/runtime';
-import { invokeTauri } from '@/services/tauri-bridge';
 import { h, replaceChildren } from '@/utils/dom-utils';
 import {
   type DimensionConfidence,
-  LOCKED_PREVIEW,
   RESILIENCE_VISUAL_LEVEL_COLORS,
   collectDimensionConfidences,
   formatBaselineStress,
@@ -56,8 +51,7 @@ export class ResilienceWidget {
     this.element.className = 'cdp-card resilience-widget';
     this.unsubscribeAuth = subscribeAuthState((state) => {
       this.authState = state;
-      const gateReason = this.getGateReason();
-      if (gateReason === PanelGateReason.NONE && this.currentCountryCode && !this.loading && this.currentData?.countryCode !== this.currentCountryCode) {
+      if (this.currentCountryCode && !this.loading && this.currentData?.countryCode !== this.currentCountryCode) {
         void this.refresh();
         return;
       }
@@ -96,7 +90,7 @@ export class ResilienceWidget {
       return;
     }
 
-    if (this.authState.isPending || this.getGateReason() !== PanelGateReason.NONE) {
+    if (this.authState.isPending) {
       this.render();
       return;
     }
@@ -133,13 +127,8 @@ export class ResilienceWidget {
     this.unsubscribeAuth = null;
   }
 
-  private getGateReason(): PanelGateReason {
-    return getPanelGateReason(this.authState, true);
-  }
-
   private render(): void {
-    const gateReason = this.getGateReason();
-    const body = this.renderBody(gateReason);
+    const body = this.renderBody();
 
     replaceChildren(
       this.element,
@@ -161,17 +150,13 @@ export class ResilienceWidget {
     );
   }
 
-  private renderBody(gateReason: PanelGateReason): HTMLElement {
+  private renderBody(): HTMLElement {
     if (!this.currentCountryCode) {
       return h('div', { className: 'cdp-card-body' }, this.makeEmpty('Resilience data loads when a country is selected.'));
     }
 
     if (this.authState.isPending) {
       return h('div', { className: 'cdp-card-body' }, this.makeLoading('Checking access…'));
-    }
-
-    if (gateReason !== PanelGateReason.NONE) {
-      return this.renderLocked(gateReason);
     }
 
     if (this.loading) {
@@ -187,36 +172,6 @@ export class ResilienceWidget {
     }
 
     return this.renderScoreCard(this.currentData);
-  }
-
-  private renderLocked(gateReason: PanelGateReason): HTMLElement {
-    const description = gateReason === PanelGateReason.ANONYMOUS
-      ? 'Sign in to unlock premium resilience scores.'
-      : 'Upgrade to Pro to unlock resilience scores.';
-    const cta = gateReason === PanelGateReason.ANONYMOUS ? 'Sign In' : 'Upgrade to Pro';
-
-    const preview = this.renderScoreCard(LOCKED_PREVIEW, true);
-    preview.classList.add('resilience-widget__preview');
-
-    const button = h('button', {
-      type: 'button',
-      className: 'panel-locked-cta resilience-widget__cta',
-      onclick: () => {
-        if (gateReason === PanelGateReason.ANONYMOUS) {
-          openSignIn();
-          return;
-        }
-        this.openUpgradeFlow();
-      },
-    }, cta) as HTMLButtonElement;
-
-    return h(
-      'div',
-      { className: 'cdp-card-body resilience-widget__locked' },
-      preview,
-      h('div', { className: 'panel-locked-desc resilience-widget__gate-desc' }, description),
-      button,
-    );
   }
 
   private renderError(message: string): HTMLElement {
@@ -236,7 +191,7 @@ export class ResilienceWidget {
     );
   }
 
-  private renderScoreCard(data: ResilienceScoreResponse, preview = false): HTMLElement {
+  private renderScoreCard(data: ResilienceScoreResponse): HTMLElement {
     const visualLevel = getResilienceVisualLevel(data.overallScore);
     const levelLabel = visualLevel.replace('_', ' ').toUpperCase();
     const levelColor = RESILIENCE_VISUAL_LEVEL_COLORS[visualLevel];
@@ -276,7 +231,7 @@ export class ResilienceWidget {
       h(
         'div',
         { className: 'resilience-widget__domains' },
-        ...data.domains.map((domain) => this.renderDomainRow(domain, preview)),
+        ...data.domains.map((domain) => this.renderDomainRow(domain)),
       ),
       // T1.6 Phase 1 of the country-resilience reference-grade upgrade plan:
       // per-dimension confidence grid. Uses only the existing `coverage`,
@@ -292,7 +247,7 @@ export class ResilienceWidget {
           'span',
           {
             className: `resilience-widget__confidence${data.lowConfidence ? ' resilience-widget__confidence--low' : ''}`,
-            title: preview ? 'Preview only' : 'Coverage and imputation-based confidence signal.',
+            title: 'Coverage and imputation-based confidence signal.',
           },
           formatResilienceConfidence(data),
         ),
@@ -385,13 +340,13 @@ export class ResilienceWidget {
     );
   }
 
-  private renderDomainRow(domain: ResilienceDomain, preview = false): HTMLElement {
+  private renderDomainRow(domain: ResilienceDomain): HTMLElement {
     const score = clampScore(domain.score);
     const levelColor = RESILIENCE_VISUAL_LEVEL_COLORS[getResilienceVisualLevel(score)];
 
     const attrs: Record<string, string> = { className: 'resilience-widget__domain-row' };
 
-    if (!preview && domain.id === 'energy' && this.energyMixData?.mixAvailable) {
+    if (domain.id === 'energy' && this.energyMixData?.mixAvailable) {
       const d = this.energyMixData;
       const parts = [
         `Import dep: ${d.importShare.toFixed(1)}%`,
@@ -443,15 +398,5 @@ export class ResilienceWidget {
 
   private makeEmpty(text: string): HTMLElement {
     return h('div', { className: 'cdp-empty' }, text);
-  }
-
-  private openUpgradeFlow(): void {
-    if (isDesktopRuntime()) {
-      void invokeTauri<void>('open_url', { url: 'https://worldmonitor.app/pro' })
-        .catch(() => window.open('https://worldmonitor.app/pro', '_blank'));
-      return;
-    }
-
-    window.open('https://worldmonitor.app/pro', '_blank');
   }
 }

@@ -14,9 +14,6 @@ import { toFlagEmoji } from '@/utils/country-flag';
 import { PORTS } from '@/config/ports';
 import { getChokepointRoutes } from '@/config/trade-routes';
 import { STRATEGIC_WATERWAYS } from '@/config/geo';
-import { hasPremiumAccess } from '@/services/panel-gating';
-import { getAuthState } from '@/services/auth-state';
-import { trackGateHit } from '@/services/analytics';
 import { fetchBypassOptions, fetchChokepointStatus } from '@/services/supply-chain';
 import { haversineDistanceKm } from '@/services/related-assets';
 import type {
@@ -820,15 +817,6 @@ export class CountryDeepDivePanel implements CountryBriefPanel {
     } catch {
       // Ignore — either aborted or transient network; leave prior values visible.
     }
-  }
-
-  private makeProLocked(text: string): HTMLElement {
-    const wrap = this.el('div', 'cdp-pro-locked');
-    wrap.append(
-      this.el('span', 'cdp-pro-lock-icon', '\uD83D\uDD12'),
-      this.el('span', 'cdp-pro-lock-text', text),
-    );
-    return wrap;
   }
 
   private proMetricBox(label: string, value: string): HTMLElement {
@@ -1909,16 +1897,10 @@ export class CountryDeepDivePanel implements CountryBriefPanel {
     bypassSection.append(bypassHeading);
     const bypassContent = this.el('div');
 
-    const isPro = hasPremiumAccess(getAuthState());
-    if (!isPro) {
-      const gateEl = this.makeProLocked('Bypass corridors available with PRO');
-      gateEl.addEventListener('click', () => trackGateHit('sector-bypass-corridors'), { once: true });
-      bypassContent.append(gateEl);
-    } else {
-      bypassContent.append(this.makeLoading('Loading bypass options\u2026'));
-      this.sectorBypassAbort = new AbortController();
-      const signal = this.sectorBypassAbort.signal;
-      void fetchBypassOptions(sector.primaryChokepointId, 'container', 100).then(resp => {
+    bypassContent.append(this.makeLoading('Loading bypass options\u2026'));
+    this.sectorBypassAbort = new AbortController();
+    const signal = this.sectorBypassAbort.signal;
+    void fetchBypassOptions(sector.primaryChokepointId, 'container', 100).then(resp => {
         if (signal.aborted) return;
         bypassContent.replaceChildren();
         const top3 = resp.options.slice(0, 3);
@@ -1958,7 +1940,6 @@ export class CountryDeepDivePanel implements CountryBriefPanel {
         bypassContent.replaceChildren();
         bypassContent.append(this.el('div', 'cdp-route-path', 'Bypass data unavailable'));
       });
-    }
 
     bypassSection.append(bypassContent);
     wrap.append(bypassSection);
@@ -2438,36 +2419,32 @@ export class CountryDeepDivePanel implements CountryBriefPanel {
     this.tradeExposureBody = tradeBody;
     tradeBody.append(this.makeLoading('Loading trade exposure\u2026'));
 
-    const isPro = hasPremiumAccess(getAuthState());
-
     const [costShockCalcCard, costShockCalcBody] = this.sectionCard(
       'Cost Shock Calculator',
       'Model the per-sector added cost of a prolonged chokepoint closure. Drag the slider to change closure duration (1-90 days). Uses war risk premium + best bypass freight uplift × annual import value.',
     );
     this.costShockCalcBody = costShockCalcBody;
-    costShockCalcBody.append(
-      isPro ? this.makeLoading('Loading cost shock calculator\u2026') : this.makeProLocked('Upgrade to PRO for multi-sector cost shock modelling'),
-    );
+    costShockCalcBody.append(this.makeLoading('Loading cost shock calculator\u2026'));
 
     const [productImportsCard, productImportsCardBody] = this.sectionCard('Product Imports', 'Top imported products by HS4 code with supplier breakdown and concentration risk.');
     this.productImportsBody = productImportsCardBody;
-    productImportsCardBody.append(isPro ? this.makeLoading('Loading product data\u2026') : this.makeProLocked('Upgrade to PRO for product import data'));
+    productImportsCardBody.append(this.makeLoading('Loading product data\u2026'));
 
     const [debtCard, debtBody] = this.sectionCard('National Debt', 'Government debt-to-GDP ratio, total debt, and year-over-year growth.');
     this.debtBody = debtBody;
-    debtBody.append(isPro ? this.makeLoading('Loading debt data\u2026') : this.makeProLocked('Upgrade to PRO for national debt data'));
+    debtBody.append(this.makeLoading('Loading debt data\u2026'));
 
     const [sanctionsCard, sanctionsBody] = this.sectionCard('Sanctions Pressure', 'Sanctioned entities, vessels, and aircraft linked to this country.');
     this.sanctionsBody = sanctionsBody;
-    sanctionsBody.append(isPro ? this.makeLoading('Loading sanctions data\u2026') : this.makeProLocked('Upgrade to PRO for sanctions data'));
+    sanctionsBody.append(this.makeLoading('Loading sanctions data\u2026'));
 
     const [comtradeCard, comtradeBody] = this.sectionCard('Trade Flows', 'Top Comtrade trade flows sorted by value, with partner and commodity.');
     this.comtradeBody = comtradeBody;
-    comtradeBody.append(isPro ? this.makeLoading('Loading trade flows\u2026') : this.makeProLocked('Upgrade to PRO for trade flow data'));
+    comtradeBody.append(this.makeLoading('Loading trade flows\u2026'));
 
     const [tariffCard, tariffBody] = this.sectionCard('Tariff Trends', 'Effective tariff rate and historical trend direction.');
     this.tariffBody = tariffBody;
-    tariffBody.append(isPro ? this.makeLoading('Loading tariff data\u2026') : this.makeProLocked('Upgrade to PRO for tariff trend data'));
+    tariffBody.append(this.makeLoading('Loading tariff data\u2026'));
 
 
     this.signalsBody = signalBody;

@@ -3195,10 +3195,10 @@
     "previewErrorCopy": "問題を修正して再試行してください。既存のウィジェットは影響を受けません。",
     "createInteractive": "インタラクティブウィジェットを作成",
     "proBadge": "PRO",
-    "preflightProUnavailable": "PROウィジェットエージェントが利用できません。サーバーのPRO_WIDGET_KEYを確認してください。",
+    "preflightProUnavailable": "Widget agent unavailable. Check the widget key on the server.",
     "preflightInvalidProKey": "PROキーが拒否されました。wm-pro-keyを更新して再読み込みしてください。",
-    "preflightProSubscriptionRequired": "Proサブスクリプションが必要です。アップグレード直後の場合はページを更新してください。それ以外の場合はサポートに連絡してください。",
-    "preflightProRequired": "Pro サブスクリプションが必要です。Widget Builder を使用するにはアップグレードしてください。",
+    "preflightProSubscriptionRequired": "Widget builder access is unavailable right now. If this persists, refresh the page or contact support.",
+    "preflightProRequired": "Widget builder access requires additional configuration. Refresh the page or contact support.",
     "examples": {
       "oilGold": "今日の原油価格と金の比較を表示",
       "cryptoMovers": "過去 24 時間のトップ暗号資産変動ウィジェットを作成",

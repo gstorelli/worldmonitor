@@ -4,7 +4,7 @@ import { t } from '@/services/i18n';
 import { h } from '@/utils/dom-utils';
 import { proxyUrl, widgetAgentUrl } from '@/utils/proxy';
 import { escapeHtml } from '@/utils/sanitize';
-import { isProWidgetEnabled, getBrowserTesterKey, getWidgetAgentKey, getProWidgetKey } from '@/services/widget-store';
+import { getBrowserTesterKey, getWidgetAgentKey, getProWidgetKey } from '@/services/widget-store';
 import { wrapProWidgetHtml } from '@/utils/widget-sanitizer';
 
 type McpResult = {
@@ -113,7 +113,7 @@ export class McpDataPanel extends Panel {
   private renderResult(result: McpResult): void {
     const jsonData = this.extractJsonData(result);
 
-    if (jsonData !== null && isProWidgetEnabled()) {
+    if (jsonData !== null) {
       const hash = JSON.stringify(jsonData).slice(0, 8192);
       if (hash === this.lastJsonHash && this.cachedWidgetHtml) {
         this.setContent(`
@@ -185,7 +185,7 @@ export class McpDataPanel extends Panel {
       const res = await fetch(widgetAgentUrl(), {
         method: 'POST',
         headers,
-        body: JSON.stringify({ prompt, mode: 'create', tier: 'pro' }),
+        body: JSON.stringify({ prompt, mode: 'create', tier: 'basic' }),
         signal: this.destroyController.signal.aborted
           ? this.destroyController.signal
           : timeoutController.signal,

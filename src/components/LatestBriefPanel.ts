@@ -105,8 +105,8 @@ export class LatestBriefPanel extends Panel {
       // handles the ANONYMOUS + FREE_TIER overlay via
       // panel-gating.ts's getPanelGateReason. No story content,
       // headline, or greeting leaks through DOM attributes on the
-      // locked state — the base renders a generic "Upgrade to Pro"
-      // card without touching our `content` element.
+      // locked state — the base renders a generic locked card
+      // without touching our `content` element.
       premium: 'locked',
     });
 
@@ -344,8 +344,7 @@ export class LatestBriefPanel extends Panel {
 
   /**
    * Free Clerk account (either via local authState or via a 403
-   * from the server). Render an upgrade CTA instead of retrying —
-   * the user needs a plan change, not a fresh fetch.
+   * from the server). Render a neutral CTA instead of retrying.
    */
   private renderUpgradeRequired(): void {
     clearChildren(this.content);
@@ -354,9 +353,9 @@ export class LatestBriefPanel extends Panel {
     this.content.appendChild(
       h('div', { className: 'latest-brief-card latest-brief-card--composing' },
         logo,
-        h('div', { className: 'latest-brief-empty-title' }, 'Pro required.'),
+        h('div', { className: 'latest-brief-empty-title' }, 'The WorldMonitor Brief is unavailable.'),
         h('div', { className: 'latest-brief-empty-body' },
-          'The WorldMonitor Brief is included with the Pro plan. Upgrade to unlock today\u2019s issue.',
+          'The daily brief could not be generated right now. Please try again later.',
         ),
       ),
     );

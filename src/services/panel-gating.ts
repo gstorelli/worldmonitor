@@ -5,7 +5,7 @@ import { isProUser } from './widget-store';
 export enum PanelGateReason {
   NONE = 'none',           // show content (pro user, or desktop with API key, or non-premium panel)
   ANONYMOUS = 'anonymous', // "Sign In to Unlock"
-  FREE_TIER = 'free_tier', // "Upgrade to Pro"
+  FREE_TIER = 'free_tier', // get stuck at the paywall
 }
 
 /**
@@ -18,7 +18,7 @@ export enum PanelGateReason {
  * pipeline, so a user with a valid Dodo subscription would otherwise show
  * as free here even though isPanelEntitled() already allowed them past
  * the panel-rendering gate. That split caused paying users to see the
- * "Upgrade to Pro" paywall overlay on top of panels they were entitled to,
+ * gated overlay on top of panels they were entitled to,
  * reproducing the 2026-04-17/18 duplicate-subscription incident.
  *
  * isEntitled() is folded into isProUser() (see widget-store.ts) so every

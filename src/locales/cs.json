@@ -3195,10 +3195,10 @@
     "previewErrorCopy": "Vyřešte problém a zkuste znovu. Vaše stávající widgety nejsou ovlivněny.",
     "createInteractive": "Vytvořit interaktivní widget",
     "proBadge": "PRO",
-    "preflightProUnavailable": "Agent PRO widgetu není dostupný. Zkontrolujte PRO_WIDGET_KEY na serveru.",
+    "preflightProUnavailable": "Widget agent unavailable. Check the widget key on the server.",
     "preflightInvalidProKey": "Klíč PRO odmítnut. Aktualizujte wm-pro-key a načtěte znovu.",
-    "preflightProSubscriptionRequired": "Vyžaduje se předplatné Pro. Pokud jste se právě upgradovali, obnovte stránku; jinak se obraťte na podporu.",
-    "preflightProRequired": "Pro předplatné je vyžadováno k používání Widget Builderu. Upgradujte pro odemknutí.",
+    "preflightProSubscriptionRequired": "Widget builder access is unavailable right now. If this persists, refresh the page or contact support.",
+    "preflightProRequired": "Widget builder access requires additional configuration. Refresh the page or contact support.",
     "examples": {
       "oilGold": "Zobrazit dnešní cenu surové ropy versus zlata",
       "cryptoMovers": "Vytvořit widget pro top krytpoměny za posledních 24 hodin",

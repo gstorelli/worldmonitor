@@ -3195,10 +3195,10 @@
     "previewErrorCopy": "Soluciona el problema e inténtalo de nuevo. Tus widgets existentes no se ven afectados.",
     "createInteractive": "Crear Widget Interactivo",
     "proBadge": "PRO",
-    "preflightProUnavailable": "Agente de widget PRO no disponible. Verifica PRO_WIDGET_KEY en el servidor.",
+    "preflightProUnavailable": "Widget agent unavailable. Check the widget key on the server.",
     "preflightInvalidProKey": "Clave PRO rechazada. Actualiza wm-pro-key y recarga.",
-    "preflightProSubscriptionRequired": "Se requiere suscripción Pro. Si acabas de actualizar, actualiza la página; de lo contrario, contacta con soporte.",
-    "preflightProRequired": "Se requiere suscripción Pro para usar el Generador de Widgets. Actualiza tu plan para desbloquear.",
+    "preflightProSubscriptionRequired": "Widget builder access is unavailable right now. If this persists, refresh the page or contact support.",
+    "preflightProRequired": "Widget builder access requires additional configuration. Refresh the page or contact support.",
     "examples": {
       "oilGold": "Muéstrame el precio del petróleo crudo de hoy versus el oro",
       "cryptoMovers": "Crear un widget para los principales movimientos de criptomonedas en las últimas 24 horas",

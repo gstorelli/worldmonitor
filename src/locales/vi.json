@@ -3195,10 +3195,10 @@
     "previewErrorCopy": "Khắc phục sự cố, sau đó thử lại. Các tiện ích hiện tại của bạn không bị ảnh hưởng.",
     "createInteractive": "Tạo tiện ích tương tác",
     "proBadge": "PRO",
-    "preflightProUnavailable": "Đại lý tiện ích PRO không khả dụng. Kiểm tra PRO_WIDGET_KEY trên máy chủ.",
+    "preflightProUnavailable": "Widget agent unavailable. Check the widget key on the server.",
     "preflightInvalidProKey": "Khóa PRO bị từ chối. Cập nhật wm-pro-key và tải lại.",
-    "preflightProSubscriptionRequired": "Yêu cầu đăng ký Pro. Nếu bạn vừa nâng cấp, hãy làm mới trang; nếu không, hãy liên hệ hỗ trợ.",
-    "preflightProRequired": "Yêu cầu gói Pro để sử dụng Widget Builder. Nâng cấp để mở khóa.",
+    "preflightProSubscriptionRequired": "Widget builder access is unavailable right now. If this persists, refresh the page or contact support.",
+    "preflightProRequired": "Widget builder access requires additional configuration. Refresh the page or contact support.",
     "examples": {
       "oilGold": "Hiển thị giá dầu thô so với vàng hôm nay",
       "cryptoMovers": "Tạo widget cho những tiền điện tử tăng giảm hàng đầu trong 24 giờ qua",

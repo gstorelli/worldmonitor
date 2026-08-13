@@ -836,13 +836,11 @@ export class PanelLayoutManager implements AppModule {
       );
     }
 
-    if (isProUser()) {
-      for (const spec of loadWidgets()) {
-        const panel = new CustomWidgetPanel(spec);
-        this.ctx.panels[spec.id] = panel;
-        if (!this.ctx.panelSettings[spec.id]) {
-          this.ctx.panelSettings[spec.id] = { name: spec.title, enabled: true, priority: 3 };
-        }
+    for (const spec of loadWidgets()) {
+      const panel = new CustomWidgetPanel(spec);
+      this.ctx.panels[spec.id] = panel;
+      if (!this.ctx.panelSettings[spec.id]) {
+        this.ctx.panelSettings[spec.id] = { name: spec.title, enabled: true, priority: 3 };
       }
     }
 
@@ -952,7 +950,7 @@ export class PanelLayoutManager implements AppModule {
     });
     panelsGrid.appendChild(addPanelBlock);
 
-    if (isProUser()) {
+    {
       const proBlock = document.createElement('button');
       proBlock.className = 'add-panel-block ai-widget-block ai-widget-block-pro';
       proBlock.setAttribute('aria-label', t('widgets.createInteractive'));
@@ -962,16 +960,11 @@ export class PanelLayoutManager implements AppModule {
       const proLabel = document.createElement('span');
       proLabel.className = 'add-panel-block-label';
       proLabel.textContent = t('widgets.createInteractive');
-      const proBadge = document.createElement('span');
-      proBadge.className = 'widget-pro-badge';
-      proBadge.textContent = t('widgets.proBadge');
       proBlock.appendChild(proIcon);
       proBlock.appendChild(proLabel);
-      proBlock.appendChild(proBadge);
       proBlock.addEventListener('click', () => {
         openWidgetChatModal({
           mode: 'create',
-          tier: 'pro',
           onComplete: (spec) => this.addCustomWidget(spec),
         });
       });

@@ -8,7 +8,6 @@ import DOMPurify from 'dompurify';
 import type { NewsItem, DeductContextDetail } from '@/types';
 import { buildNewsContext } from '@/utils/news-context';
 import { getActiveFrameworkForPanel } from '@/services/analysis-framework-store';
-import { hasPremiumAccess } from '@/services/panel-gating';
 import { FrameworkSelector } from './FrameworkSelector';
 
 // deduct-situation + list-market-implications are premium-gated.
@@ -100,7 +99,7 @@ export class DeductionPanel extends Panel {
         }) as EventListener;
         document.addEventListener('wm:deduct-context', this.contextHandler);
 
-        this.fwSelector = new FrameworkSelector({ panelId: 'deduction', isPremium: hasPremiumAccess(), panel: this });
+        this.fwSelector = new FrameworkSelector({ panelId: 'deduction', isPremium: true, panel: this });
         this.header.appendChild(this.fwSelector.el);
     }
 

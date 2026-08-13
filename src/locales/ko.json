@@ -3195,10 +3195,10 @@
     "previewErrorCopy": "문제를 해결한 후 다시 시도하세요. 기존 위젯은 영향을 받지 않습니다.",
     "createInteractive": "인터랙티브 위젯 생성",
     "proBadge": "PRO",
-    "preflightProUnavailable": "PRO 위젯 에이전트를 사용할 수 없습니다. 서버의 PRO_WIDGET_KEY를 확인하세요.",
+    "preflightProUnavailable": "Widget agent unavailable. Check the widget key on the server.",
     "preflightInvalidProKey": "PRO 키가 거부되었습니다. wm-pro-key를 업데이트하고 다시 로드하세요.",
-    "preflightProSubscriptionRequired": "Pro 구독이 필요합니다. 최근 업그레이드하신 경우 페이지를 새로고침하세요. 그 외에는 지원팀에 문의하세요.",
-    "preflightProRequired": "Pro 구독이 필요합니다. 업그레이드하여 Widget Builder를 사용하세요.",
+    "preflightProSubscriptionRequired": "Widget builder access is unavailable right now. If this persists, refresh the page or contact support.",
+    "preflightProRequired": "Widget builder access requires additional configuration. Refresh the page or contact support.",
     "examples": {
       "oilGold": "오늘의 원유 가격과 금 가격을 비교해 보세요",
       "cryptoMovers": "지난 24시간 암호화폐 상위 변동 자산에 대한 위젯 생성",

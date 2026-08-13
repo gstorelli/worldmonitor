@@ -3195,10 +3195,10 @@
     "previewErrorCopy": "Поправи проблема, след което повтори. Твоите съществуващи уиджети не са засегнати.",
     "createInteractive": "Създай интерактивен уиджет",
     "proBadge": "PRO",
-    "preflightProUnavailable": "PRO агент за уиджети недостъпен. Провери PRO_WIDGET_KEY на сървъра.",
+    "preflightProUnavailable": "Widget agent unavailable. Check the widget key on the server.",
     "preflightInvalidProKey": "PRO ключ отхвърлен. Актуализирай wm-pro-key и презареди.",
-    "preflightProSubscriptionRequired": "Wymagana subskrypcja Pro. Ако щe си модернизирал, опресни страницата; в противен случай се свържи със поддръжка.",
-    "preflightProRequired": "Wymagana subskrypcja Pro, aby korzystać z Widget Builder. Uaktualnij, aby odblokować.",
+    "preflightProSubscriptionRequired": "Widget builder access is unavailable right now. If this persists, refresh the page or contact support.",
+    "preflightProRequired": "Widget builder access requires additional configuration. Refresh the page or contact support.",
     "examples": {
       "oilGold": "Pokaż mi dzisiejszą cenę ropy naftowej w stosunku do złota",
       "cryptoMovers": "Utwórz widżet dla największych zmian kryptowalut w ostatnich 24 godzinach",

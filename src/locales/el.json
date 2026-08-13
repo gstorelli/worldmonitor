@@ -3195,10 +3195,10 @@
     "previewErrorCopy": "Διορθώστε το πρόβλημα και δοκιμάστε ξανά. Τα υπάρχοντα widget δεν επηρεάζονται.",
     "createInteractive": "Δημιουργία Διαδραστικού Widget",
     "proBadge": "PRO",
-    "preflightProUnavailable": "Ο παράγοντας PRO widget είναι μη διαθέσιμος. Ελέγξτε PRO_WIDGET_KEY στον διακομιστή.",
+    "preflightProUnavailable": "Widget agent unavailable. Check the widget key on the server.",
     "preflightInvalidProKey": "Κλειδί PRO απορρίφθηκε. Ενημερώστε wm-pro-key και επαναφορτώστε.",
-    "preflightProSubscriptionRequired": "Απαιτείται συνδρομή Pro. Εάν μόλις αναβαθμίστηκε, ανανεώστε τη σελίδα. διαφορετικά επικοινωνήστε με την υποστήριξη.",
-    "preflightProRequired": "Απαιτείται συνδρομή Pro για χρήση του Widget Builder. Αναβαθμίστε για ξεκλείδωμα.",
+    "preflightProSubscriptionRequired": "Widget builder access is unavailable right now. If this persists, refresh the page or contact support.",
+    "preflightProRequired": "Widget builder access requires additional configuration. Refresh the page or contact support.",
     "examples": {
       "oilGold": "Δείξτε μου την τιμή του ακατέργαστου πετρελαίου σήμερα έναντι του χρυσού",
       "cryptoMovers": "Δημιουργήστε ένα widget για τους κορυφαίους κινητήρες κρυπτογράφησης τις τελευταίες 24 ώρες",

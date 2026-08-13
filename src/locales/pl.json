@@ -3195,10 +3195,10 @@
     "previewErrorCopy": "Napraw problem, a następnie spróbuj ponownie. Twoje istniejące widgety nie zostaną zmienione.",
     "createInteractive": "Utwórz interaktywny widget",
     "proBadge": "PRO",
-    "preflightProUnavailable": "Agent widgetu PRO niedostępny. Sprawdź PRO_WIDGET_KEY na serwerze.",
+    "preflightProUnavailable": "Widget agent unavailable. Check the widget key on the server.",
     "preflightInvalidProKey": "Klucz PRO odrzucony. Zaktualizuj wm-pro-key i przeładuj.",
-    "preflightProSubscriptionRequired": "Wymagana subskrypcja Pro. Jeśli właśnie dokonałeś aktualizacji, odśwież stronę; w innym razie skontaktuj się z pomocą techniczną.",
-    "preflightProRequired": "Wymagana subskrypcja Pro, aby korzystać z Konstruktora Widgetów. Uaktualnij, aby odblokować.",
+    "preflightProSubscriptionRequired": "Widget builder access is unavailable right now. If this persists, refresh the page or contact support.",
+    "preflightProRequired": "Widget builder access requires additional configuration. Refresh the page or contact support.",
     "examples": {
       "oilGold": "Pokaż mi dzisiejszą cenę ropy naftowej w stosunku do złota",
       "cryptoMovers": "Utwórz widget dla głównych zmian kryptowalut w ciągu ostatnich 24 godzin",

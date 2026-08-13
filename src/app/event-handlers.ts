@@ -52,7 +52,6 @@ import {
   trackMapLayerToggle,
   trackPanelToggled,
   trackDownloadClicked,
-  trackGateHit,
 } from '@/services/analytics';
 import { detectPlatform, allButtons, buttonsForPlatform } from '@/components/DownloadBanner';
 import type { Platform } from '@/components/DownloadBanner';
@@ -65,7 +64,6 @@ import { AuthLauncher } from '@/components/AuthLauncher';
 import { AuthHeaderWidget } from '@/components/AuthHeaderWidget';
 import { t } from '@/services/i18n';
 import { TvModeController } from '@/services/tv-mode';
-import { getAuthState, subscribeAuthState } from '@/services/auth-state';
 
 export interface EventHandlerCallbacks {
   updateSearchIndex: () => void;
@@ -107,7 +105,6 @@ export class EventHandlerManager implements AppModule {
   private boundPanelCloseHandler: ((e: Event) => void) | null = null;
   private boundWidgetModifyHandler: ((e: Event) => void) | null = null;
   private boundUndoHandler: ((e: KeyboardEvent) => void) | null = null;
-  private proGateUnsubscribers: Array<() => void> = [];
   private closedPanelStack: string[] = []; // max-items: 20
   private idleTimeoutId: ReturnType<typeof setTimeout> | null = null;
   private snapshotIntervalId: ReturnType<typeof setInterval> | null = null;
@@ -301,8 +298,6 @@ export class EventHandlerManager implements AppModule {
       document.removeEventListener('keydown', this.boundUndoHandler);
       this.boundUndoHandler = null;
     }
-    for (const unsub of this.proGateUnsubscribers) unsub();
-    this.proGateUnsubscribers = [];
     this.ctx.tvMode?.destroy();
     this.ctx.tvMode = null;
     this.ctx.unifiedSettings?.destroy();
@@ -1020,13 +1015,6 @@ export class EventHandlerManager implements AppModule {
     if (headerRight) {
       headerRight.insertBefore(el, headerRight.firstChild);
     }
-
-    const applyProGate = (isPro: boolean, initial = false) => {
-      el.style.display = isPro ? '' : 'none';
-      if (initial && !isPro) trackGateHit('export');
-    };
-    applyProGate(getAuthState().user?.role === 'pro', true);
-    this.proGateUnsubscribers.push(subscribeAuthState(state => applyProGate(state.user?.role === 'pro')));
   }
 
   setupUnifiedSettings(): void {
@@ -1127,13 +1115,6 @@ export class EventHandlerManager implements AppModule {
     if (headerRight) {
       headerRight.insertBefore(el, headerRight.firstChild);
     }
-
-    const applyProGate = (isPro: boolean, initial = false) => {
-      el.style.display = isPro ? '' : 'none';
-      if (initial && !isPro) trackGateHit('playback');
-    };
-    applyProGate(getAuthState().user?.role === 'pro', true);
-    this.proGateUnsubscribers.push(subscribeAuthState(state => applyProGate(state.user?.role === 'pro')));
   }
 
   setupSnapshotSaving(): void {

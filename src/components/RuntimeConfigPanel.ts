@@ -243,9 +243,6 @@ export class RuntimeConfigPanel extends Panel {
             ${availableFeatures}/${totalFeatures} ${t('modals.runtimeConfig.summary.available')}${configuredCount > 0 ? ` · ${configuredCount} ${t('modals.runtimeConfig.summary.secrets')}` : ''}.
           </p>
           <p class="runtime-alert-skip">${t('modals.runtimeConfig.skipSetup')}</p>
-          <button type="button" class="runtime-early-access-btn" data-early-access>
-            ${t('modals.runtimeConfig.reserveEarlyAccess')}
-          </button>
         </section>
       `;
       this.attachListeners();
@@ -367,18 +364,6 @@ export class RuntimeConfigPanel extends Panel {
     });
 
     if (!isDesktopRuntime()) return;
-
-    if (this.mode === 'alert') {
-      this.content.querySelector<HTMLButtonElement>('[data-early-access]')?.addEventListener('click', () => {
-        const url = 'https://www.worldmonitor.app/pro';
-        if (isDesktopRuntime()) {
-          void invokeTauri<void>('open_url', { url }).catch(() => window.open(url, '_blank'));
-        } else {
-          window.open(url, '_blank');
-        }
-      });
-      return;
-    }
 
     // Ollama model dropdown: fetch models and handle selection
     const modelSelect = this.content.querySelector<HTMLSelectElement>('select[data-model-select]');
