@@ -1,7 +1,6 @@
 import './styles/base-layer.css';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import * as Sentry from '@sentry/browser';
-import { inject } from '@vercel/analytics';
 import { App } from './App';
 import { installUtmInterceptor } from './utils/utm';
 
@@ -720,10 +719,8 @@ import { installSwUpdateHandler } from '@/bootstrap/sw-update';
 // Auto-reload on stale chunk 404s after deployment (Vite fires this for modulepreload failures).
 const chunkReloadStorageKey = installChunkReloadGuard(__APP_VERSION__);
 
-// Initialize Vercel Analytics (10% sampling to reduce costs)
-inject({
-  beforeSend: (event) => (Math.random() > 0.1 ? null : event),
-});
+// Vercel Analytics inject removed — the de-clouded self-hosted deployment has
+// no /_vercel/insights endpoint, so the script load 404'd with a MIME error.
 
 // Initialize dynamic meta tags for sharing
 initMetaTags();
