@@ -63,6 +63,9 @@ services:
       # POST /api/wm-session and sends it as X-WorldMonitor-Key. Without this
       # secret every data endpoint 401s ("API key required"). Min 32 chars.
       WM_SESSION_SECRET: "${WM_SESSION_SECRET:-}"
+      # Self-hosted anonymous access: the de-clouded fork has no premium
+      # gating, so API endpoints accept requests without an API key.
+      ALLOW_ANONYMOUS_API: "${ALLOW_ANONYMOUS_API:-true}"
       # Data source API keys (optional — features degrade gracefully)
       AISSTREAM_API_KEY: "${AISSTREAM_API_KEY:-}"
       FINNHUB_API_KEY: "${FINNHUB_API_KEY:-}"

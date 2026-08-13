@@ -39,9 +39,14 @@ WORKDIR /app
 # docker/build-handlers.mjs, so they still need these package imports at
 # runtime, but the frontend/server-only production deps do not belong in the
 # final image.
+# better-sqlite3 (Risk Sentinel sidecar) is a native module: Alpine/musl has
+# no prebuilds, so install the toolchain and compile it after npm ci.
 COPY docker/runtime-package.json ./package.json
 COPY docker/runtime-package-lock.json ./package-lock.json
-RUN npm ci --omit=dev --omit=optional --ignore-scripts
+RUN apk add --no-cache python3 make g++ && \
+    npm ci --omit=dev --omit=optional --ignore-scripts && \
+    npm rebuild better-sqlite3 && \
+    apk del python3 make g++
 
 # ── Stage 3: Runtime ─────────────────────────────────────────────────────────
 FROM node:24-alpine@sha256:a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a95432d679c54fbfd AS final
@@ -57,6 +62,10 @@ WORKDIR /app
 # API server
 COPY --from=builder /app/src-tauri/sidecar/local-api-server.mjs ./local-api-server.mjs
 COPY --from=builder /app/src-tauri/sidecar/package.json ./package.json
+# Risk Sentinel sidecar modules (SQLite events DB + ingestion/scoring) —
+# imported lazily by local-api-server.mjs at request time.
+COPY --from=builder /app/src-tauri/sidecar/database ./database
+COPY --from=builder /app/src-tauri/sidecar/services ./services
 
 # Minimal runtime node_modules — required by raw .js handlers that aren't
 # bundled by build-handlers.mjs. Without this the Node sidecar dispatches
