@@ -24,13 +24,13 @@
     { "symbol": "ORCL", "name": "Oracle", "display": "ORCL", "region": "us" },
     { "symbol": "PG", "name": "P&G", "display": "PG", "region": "us" },
     { "symbol": "COST", "name": "Costco", "display": "COST", "region": "us" },
+    { "symbol": "JNJ", "name": "J&J", "display": "JNJ", "region": "us" },
     { "symbol": "INTC", "name": "Intel Corp", "display": "INTC", "region": "us" },
     { "symbol": "NTR", "name": "Nutrien (Fertilizers)", "display": "NTR", "region": "us" },
     { "symbol": "MOS", "name": "The Mosaic Company", "display": "MOS", "region": "us" },
     { "symbol": "VALE", "name": "Vale S.A. (Nickel/Metals)", "display": "VALE", "region": "americas" },
     { "symbol": "BHP", "name": "BHP Group (Metals)", "display": "BHP", "region": "asia" },
     { "symbol": "RIO", "name": "Rio Tinto (Metals)", "display": "RIO", "region": "asia" },
-    { "symbol": "JNJ", "name": "J&J", "display": "JNJ", "region": "us" },
     { "symbol": "HD", "name": "Home Depot", "display": "HD", "region": "us" },
     { "symbol": "NFLX", "name": "Netflix", "display": "NFLX", "region": "us" },
     { "symbol": "BAC", "name": "BofA", "display": "BAC", "region": "us" },
@@ -127,5 +127,6 @@
     "^NSEI", "^BSESN", "RELIANCE.NS", "TCS.NS", "HDFCBANK.NS", "ICICIBANK.NS", "BHARTIARTL.NS", "INFY.NS", "SBIN.NS", "LICI.NS",
     "ITC.NS", "HINDUNILVR.NS", "LT.NS", "BAJFINANCE.NS", "ADANIENT.NS", "SUNPHARMA.NS", "TITAN.NS", "M&M.NS", "TATASTEEL.NS", "KOTAKBANK.NS",
     "INTC", "NTR", "MOS", "VALE", "BHP", "RIO"
-  ]}
+  ]
+}
 

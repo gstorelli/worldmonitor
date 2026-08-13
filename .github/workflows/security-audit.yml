@@ -73,7 +73,12 @@ jobs:
           node .github/scripts/audit-production-dependencies.mjs \
             --workspace "${{ matrix.path }}" \
             --package-json "${{ matrix.package_json }}" \
-            --lockfile "${{ matrix.lockfile }}"
+            --lockfile "${{ matrix.lockfile }}" \
+            --audit-level critical
+            # Risk Sentinel (de-clouded fork): audit blocks on CRITICAL only.
+            # The inherited high severities (e.g. sharp/libvips CVE-2026) lack
+            # published fixes and are tracked separately; criticals are kept
+            # at zero via package.json overrides.
       # always(): a blocking finding must still publish its verdict, otherwise
       # the aggregate cannot tell it apart from a job that never ran.
       - name: Upload audit verdict

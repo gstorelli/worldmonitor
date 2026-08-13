@@ -820,6 +820,13 @@
       "reason": "Customs/n8n direct integration endpoints.",
       "owner": "@SebastienMelki",
       "removal_issue": null
+    },
+    {
+      "path": "api/data/city-coords.js",
+      "category": "internal-helper",
+      "reason": "Static city-coordinates dataset served to the map layer (non-proto data file, dashboard-internal bundle).",
+      "owner": "@gstorelli",
+      "removal_issue": null
     }
   ]
 }

@@ -49,11 +49,7 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run typecheck:api
-<<<<<<< HEAD
-
-=======
       # `npm run typecheck` covers src/ only, so tests/ and shared modules reached only from tests
       # were never type-checked by any job. Runs inside the existing required `typecheck` context
       # rather than as a new job, so no branch-protection context list has to change.
       - run: npm run typecheck:contract-tests
->>>>>>> upstream/main
