@@ -650,6 +650,7 @@ Stato di copertura bootstrap: **19/25 dataset** popolati. I 6 mancanti:
 ### Nuove aree del dottorato (Risk Sentinel)
 
 **Selettore pannelli a 3 livelli** (`src/config/panel-tiers.ts`):
+
 - **Livello 1 (badge verde "CORE" + bordo laterale verde)**: pannelli core del
   dottorato — alert-feed, commodities, cascade, cii, supply-chain, trade-policy,
   strategic-risk/posture, gdelt-intel, events, heatmap, monitors, sanctions,
