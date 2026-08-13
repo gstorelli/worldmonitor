@@ -51,8 +51,22 @@ function readCuratedSources() {
   }
 }
 
+async function resolveZoteroUserId(userId, apiKey) {
+  if (/^\d+$/.test(userId)) return userId;
+  // Non-numeric (username): resolve the numeric userID via the key endpoint.
+  const resp = await fetch(`https://api.zotero.org/keys/${encodeURIComponent(apiKey)}`, {
+    headers: { Authorization: `Bearer ${apiKey}` },
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!resp.ok) throw new Error(`Zotero key resolution HTTP ${resp.status}`);
+  const data = await resp.json();
+  return data?.userID ? String(data.userID) : null;
+}
+
 async function fetchZoteroLibrary(userId, apiKey) {
-  const url = `https://api.zotero.org/users/${encodeURIComponent(userId)}/items?format=json&limit=100&sort=dateAdded&direction=desc`;
+  const numericId = await resolveZoteroUserId(userId, apiKey);
+  if (!numericId) throw new Error('Zotero userID could not be resolved');
+  const url = `https://api.zotero.org/users/${numericId}/items?format=json&limit=100&sort=dateAdded&direction=desc`;
   const resp = await fetch(url, {
     headers: { 'Zotero-API-Key': apiKey, 'Zotero-API-Version': '3' },
     signal: AbortSignal.timeout(20_000),

@@ -43,8 +43,19 @@ const userId = process.env.ZOTERO_USER_ID || '';
 const apiKey = process.env.ZOTERO_API_KEY || '';
 if (userId && apiKey) {
   try {
+    const numericId = /^\d+$/.test(userId)
+      ? userId
+      : (async () => {
+          const keyResp = await fetch(`https://api.zotero.org/keys/${encodeURIComponent(apiKey)}`, {
+            headers: { Authorization: `Bearer ${apiKey}` },
+            signal: AbortSignal.timeout(15_000),
+          });
+          if (!keyResp.ok) throw new Error(`Zotero key resolution HTTP ${keyResp.status}`);
+          const keyData = await keyResp.json();
+          return keyData?.userID ? String(keyData.userID) : null;
+        })();
     const resp = await fetch(
-      `https://api.zotero.org/users/${encodeURIComponent(userId)}/items?format=json&limit=100&sort=dateAdded&direction=desc`,
+      `https://api.zotero.org/users/${encodeURIComponent(await numericId)}/items?format=json&limit=100&sort=dateAdded&direction=desc`,
       { headers: { 'Zotero-API-Key': apiKey, 'Zotero-API-Version': '3' }, signal: AbortSignal.timeout(30_000) },
     );
     if (!resp.ok) throw new Error(`Zotero API HTTP ${resp.status}`);
