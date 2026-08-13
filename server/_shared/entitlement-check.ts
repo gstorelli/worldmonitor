@@ -830,6 +830,11 @@ export async function checkEntitlementDetailed(
   corsHeaders: Record<string, string>,
   options: EntitlementCheckOptions = {},
 ): Promise<EntitlementCheckResult> {
+  // Self-hosted de-clouded mode (ALLOW_ANONYMOUS_API): premium entitlement
+  // gates are disabled — every endpoint serves anonymous callers.
+  if (process.env.ALLOW_ANONYMOUS_API === 'true') {
+    return { response: null, entitlements: null };
+  }
   const requiredTier = getRequiredTier(pathname);
   if (requiredTier === null) {
     // Unrestricted endpoint -- no check needed
