@@ -1159,10 +1159,11 @@ export function createDomainGateway(
       || isPublicSharedRpcRequest(request.url, request.method);
     const seedRefreshVerified = await isResilienceRankingSeedRefreshRequest(request, pathname);
     const relayWarmPingVerified = await isRelayWarmPingRequest(request, pathname);
-    const requiresDirectLlmQuota = !internalMcpVerified && await shouldReserveGatewayDirectLlmQuota(request, pathname);
-    // Self-hosted de-clouded mode (ALLOW_ANONYMOUS_API): premium tier gates
-    // are disabled — every endpoint serves anonymous callers.
+    // Self-hosted de-clouded mode (ALLOW_ANONYMOUS_API): premium tier gates,
+    // entitlement checks and direct-LLM quota auth are all disabled — every
+    // endpoint serves anonymous callers.
     const anonymousSelfHosted = process.env.ALLOW_ANONYMOUS_API === 'true';
+    const requiresDirectLlmQuota = !anonymousSelfHosted && !internalMcpVerified && await shouldReserveGatewayDirectLlmQuota(request, pathname);
     const isTierGated = !anonymousSelfHosted && !internalMcpVerified && !isPublicNoAuthRpc && !seedRefreshVerified && !relayWarmPingVerified && getRequiredTier(pathname) !== null;
     const needsLegacyProBearerGate = !anonymousSelfHosted && !internalMcpVerified && !isPublicNoAuthRpc && PREMIUM_RPC_PATHS.has(pathname) && !isTierGated;
     const isProFreshCacheRpc = PRO_FRESH_CACHE_RPC_PATHS.has(pathname);
