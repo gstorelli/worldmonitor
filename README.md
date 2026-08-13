@@ -25,6 +25,7 @@
 - [Quick Start](#quick-start)
 - [Configurazione Variabili d'Ambiente](#configurazione-variabili-dambiente)
 - [Deployment di Produzione (Contabo VPS)](#deployment-di-produzione-contabo-vps)
+- [Self-Hosting Operations (stato operativo)](#self-hosting-operations-contabo-vps--stato-operativo)
 - [Sincronizzazione con il repository upstream (koala73/worldmonitor)](#sincronizzazione-con-il-repository-upstream-koala73worldmonitor)
 - [Struttura Repository](#struttura-repository)
 - [Pannelli Disponibili](#pannelli-disponibili)
@@ -549,6 +550,93 @@ API_MCP_N8N=xxx node scripts/n8n-mcp.mjs call "esegui-workflow-customs" '{"sourc
   del sidecar API, così client web e integrazioni possono interrogare gli
   endpoint API; SPA e API condividono comunque lo stesso origin, quindi le
   chiamate interne non richiedono CORS.
+
+---
+
+## Self-Hosting Operations (Contabo VPS — stato operativo)
+
+Questa sezione documenta lo stato operativo del deployment self-hosted e le
+decisioni operative prese durante l'allestimento.
+
+### Accesso API anonimo (modalità self-hosted)
+
+Il fork è **de-clouded**: non ha gating premium. In modalità Docker l'env
+`ALLOW_ANONYMOUS_API=true` (default nel compose) disabilita, nell'API layer:
+
+1. il requisito di API key (`api/_api-key.js` → kind `anonymous-selfhosted`)
+2. i tier gate premium (`server/gateway.ts`)
+3. i check di entitlement (`server/_shared/entitlement-check.ts`)
+4. l'auth per gli endpoint a quota-LLM diretta (es. `analyze-stock`)
+
+Senza questo flag, il SPA (che non invia API key su tutti gli RPC) riceverebbe
+`401 API key required` / `403 Authentication required` ovunque. Per ripristinare
+l'auth obbligatoria: `ALLOW_ANONYMOUS_API=false` + `WORLDMONITOR_VALID_KEYS`.
+
+### Domini API ripristinati dall'upstream
+
+Durante il sync col fork erano stati eliminati i domini `market/v1`,
+`prediction/v1`, `giving/v1`, `research/v1` (handler + proto + stub generati),
+ma i pannelli del SPA continuavano a chiamarli (404). Ripristinati da
+`upstream/main`: `api/{market,prediction,giving,research}`, `server/worldmonitor/{...}`,
+`proto/worldmonitor/{...}`, `src/generated/{client,server}/worldmonitor/{...}`.
+
+### Sidecar Risk Sentinel (SQLite) nel container
+
+`/api/customs-events` falliva con `Cannot find module /app/database/sqlite.js`:
+il Dockerfile non copiava i moduli del sidecar. Ora copia `database/` +
+`services/`, e `better-sqlite3` è installato/compilato per Alpine nel
+runtime (`docker/runtime-package.json`, `npm rebuild better-sqlite3`).
+Rimosso anche il residuo `convex` dal runtime package.
+
+### SPA de-clouded
+
+- Rimossa l'iniezione di Vercel Analytics (`/_vercel/insights` → MIME error).
+- Boundary geografiche ad alta risoluzione servite **same-origin** da
+  `/data/country-boundary-overrides.geojson` (evita il CORS di
+  maps.worldmonitor.app).
+
+### Credenziali installate sul server (via SSH, nel `.env` del VPS)
+
+| Variabile | Stato |
+|-----------|-------|
+| `REDIS_PASSWORD` / `REDIS_TOKEN` | ruotate a 64 hex casuali |
+| `RELAY_SHARED_SECRET` | ruotato a 64 hex |
+| `N8N_INGEST_SECRET` | generato e installato; i workflow n8n lo inviano come `Authorization: Bearer` |
+| `WM_SESSION_SECRET` | 64 hex — abilita i session token anonimi del browser |
+| `ALLOW_ANONYMOUS_API` | `true` (compose default) |
+
+### Integrazione n8n via MCP
+
+- Config MCP: [`.mcp/n8n-mcp.json`](.mcp/n8n-mcp.json) (server `automata.opencyber.org/mcp-server/http`, token `API_MCP_N8N`).
+- CLI: `node scripts/n8n-mcp.mjs list-tools` / `call <tool> '<json>'`.
+- I 6 workflow Risk Sentinel su n8n erano attivi ma il nodo "Push to Risk
+  Sentinel API" era uno stub Code (solo log). Via MCP sono stati aggiunti i
+  nodi HTTP reali (`POST https://risksentinel.opencyber.org/api/n8n/ingest`)
+  con header `Authorization` e `sendHeaders:true`, poi pubblicati.
+  **Pipeline provata end-to-end** (esecuzione → POST autenticato → Redis).
+
+### Errori residui noti (sorgenti dati esterne)
+
+| Sintomo | Causa |
+|---------|-------|
+| `/api/gpsjam` 503 | gpsjam.org non raggiungibile dal VPS — il pannello degrada |
+| Polymarket "No markets returned" | API Polymarket bloccata/vuota verso il VPS |
+| Military Flight Tracking "No flights" | adsb.lol/OpenSky vuoti al momento del fetch |
+| `seismology:earthquakes:v1` vuoto da n8n | il nodo Process del workflow USGS in n8n non emette item — da correggere nell'editor n8n |
+
+### Diagnostica rapida
+
+```bash
+# console errori dal browser: F12 → Console (ora ~3 errori residui)
+# container
+docker compose ps && docker logs --tail 50 worldmonitor
+# auth anonimo
+curl -s -o /dev/null -w '%{http_code}\n' https://risksentinel.opencyber.org/api/economic/v1/get-macro-signals
+# ingestion n8n (secret errato → 401; corretto → 200)
+curl -s -o /dev/null -w '%{http_code}\n' -X POST https://risksentinel.opencyber.org/api/n8n/ingest \
+  -H "Authorization: Bearer <N8N_INGEST_SECRET>" -H "Content-Type: application/json" \
+  -d '{"pipeline":"customs-intelligence","alerts":[]}'
+```
 
 ---
 
