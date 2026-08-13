@@ -68,3 +68,5 @@ export * from './ConsumerPricesPanel';
 export { NationalDebtPanel } from './NationalDebtPanel';
 
 export { AlertFeedPanel } from './AlertFeedPanel';
+export { SourceValidationPanel } from './SourceValidationPanel';
+export { PolicyAnalysisPanel } from './PolicyAnalysisPanel';

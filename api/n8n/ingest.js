@@ -166,6 +166,31 @@ const PIPELINE_CONFIG = {
     }),
     count: (data) => (data.events || []).length,
   },
+
+  'policy-monitor': {
+    redisKey: 'policy:monitor:v1',
+    ttl: 604800,        // 7 days
+    domain: 'policy',
+    resource: 'monitor',
+    transform: (data) => ({
+      items: (data.items || []).map((i) => ({
+        id: i.id || '',
+        title: i.title || '',
+        reference: i.reference || '',
+        url: i.url || '',
+        jurisdiction: i.jurisdiction || 'eu',
+        topic: i.topic || '',
+        riskCategories: i.riskCategories || [],
+        chokepoints: i.chokepoints || [],
+        summary: i.summary || '',
+        gap: i.gap || '',
+        publishedAt: i.publishedAt || '',
+        fetchedAt: i.fetchedAt || new Date().toISOString(),
+      })),
+      fetchedAt: new Date().toISOString(),
+    }),
+    count: (data) => (data.items || []).length,
+  },
 };
 
 // ─── Handler ───

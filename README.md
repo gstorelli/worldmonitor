@@ -647,6 +647,47 @@ Stato di copertura bootstrap: **19/25 dataset** popolati. I 6 mancanti:
 | `socialVelocity`, `wsbTickers` | Sorgente Reddit — IP del VPS rate-limitato/bloccato | Degradazione graziosa; riprovare il seed periodicamente |
 | Ritardi voli (AviationStack) | `AVIATIONSTACK_API` 403 → chiave invalida/scaduta o IP bloccato | Verificare/ruotare la chiave API nel `.env` |
 
+### Nuove aree del dottorato (Risk Sentinel)
+
+**Selettore pannelli a 3 livelli** (`src/config/panel-tiers.ts`):
+- **Livello 1 (badge verde "CORE" + bordo laterale verde)**: pannelli core del
+  dottorato — alert-feed, commodities, cascade, cii, supply-chain, trade-policy,
+  strategic-risk/posture, gdelt-intel, events, heatmap, monitors, sanctions,
+  ucdp-events, service-status, internet-disruptions, satellite-fires,
+  energy-complex, insights, correlation, source-validation, policy-analysis.
+- **Livello 2 (badge grigio "CONTESTO")**: tutto il resto (default).
+- **Livello 3 (disabilitati)**: crypto, crypto-heatmap, defi-tokens, ai-tokens,
+  other-tokens, stablecoins, polymarket — esclusi nel layout senza toccare
+  codice upstream né impostazioni (sincronizzazioni future non-disruptive).
+
+**Source Validation (fonti bibliografiche)** — pannello `source-validation`,
+endpoint `GET /api/zotero/library`. Serve la bibliografia curata della
+literature review (18 fonti con limite/bias, contributo e dimensioni 8D per
+ognuna — `data/zotero-sources.json`) e la libreria live Zotero (API v3,
+cache Redis 24h, `?refresh=1`). Env: `ZOTERO_API_KEY`, `ZOTERO_USER_ID`
+(già nel compose + `.env.example`). Prewarm opzionale: `node scripts/seed-zotero-library.mjs`.
+
+**Policy Analysis (normativa aperta)** — pannello `policy-analysis`, endpoint
+`GET /api/policy/registry`. Registry curato di atti UE/IT (`data/policy-registry.json`:
+CRMA, AI Act, UCC, CRMF, NZIA, gas storage, energy emergency, MCM, FDI screening,
+TULD, Golden Power, Climate Law) con per ciascuno: rischio, chokepoint, sintesi,
+**lacuna normativa** e implicazione doganale. Il workflow n8n
+`06-policy-monitor` (EUR-Lex, giornaliero) alimenta `policy:monitor:v1` via la
+pipeline di ingest `policy-monitor`.
+
+**HS ↔ Commodity** — endpoint `GET /api/trade/hs-map` (dataset strategico
+`data/hs-commodity-map.json`: nickel 7501/7502, semiconduttori 8541/8542,
+fertilizzanti 3102-3105, petrolio/GNL 2709-2711, terre rare 2805/2846/8103/8112,
+cereali 1001/1005/1006, alluminio 7601, rame 7403) con nodi industriali chiave
+(IMIP, Hsinchu) e applicazioni a valle — base per l'analisi traffici/prezzi per
+codice doganale (UN Comtrade v2).
+
+**Centro notifiche** — `GET/POST /api/notify/config` (config in Redis:
+endpoint Telegram/email, frequenza realtime/hourly/daily/weekly, temi,
+arricchimento fact/analysis/regulatory). Il workflow n8n
+`07-intelligence-notifications` (orario) legge la config e consegna i digest
+via Telegram/SMTP — la piattaforma decide cosa, n8n consegna dove.
+
 ### Diagnostica rapida
 
 ```bash

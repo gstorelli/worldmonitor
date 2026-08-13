@@ -53,6 +53,10 @@ export const FULL_PANELS: Record<string, PanelConfig> = {
   layoffs: { name: 'Layoffs Tracker', enabled: false, priority: 2 },
   monitors: { name: 'My Monitors', enabled: false, priority: 2 },
   'satellite-fires': { name: 'Fires', enabled: true, priority: 2 },
+  // Risk Sentinel doctoral additions
+  'alert-feed': { name: 'Global Risk Alerts', enabled: true, priority: 1 },
+  'source-validation': { name: 'Sources & Validation', enabled: true, priority: 1 },
+  'policy-analysis': { name: 'Policy & Compliance', enabled: true, priority: 1 },
   'macro-signals': { name: 'Market Regime', enabled: false, priority: 2 },
   'fear-greed': { name: 'Fear & Greed', enabled: false, priority: 2 },
   'macro-tiles': { name: 'Macro Indicators', enabled: false, priority: 2 },
@@ -243,6 +247,7 @@ export const LAYER_TO_SOURCE: Partial<Record<keyof MapLayers, DataSourceId[]>> =
 export const PANEL_CATEGORY_MAP: Record<string, { labelKey: string; panelKeys: string[]; variants?: string[] }> = {
   core: { labelKey: 'header.panelCatCore', panelKeys: ['map', 'live-news', 'insights', 'strategic-posture'] },
   customs: { labelKey: 'Customs & Trade', panelKeys: ['alert-feed', 'trade-policy', 'supply-chain', 'sanctions-pressure', 'commodities', 'economic-correlation'] },
+  research: { labelKey: 'Research & Compliance', panelKeys: ['source-validation', 'policy-analysis'] },
   intelligence: { labelKey: 'Intelligence', panelKeys: ['cii', 'strategic-risk', 'intel', 'gdelt-intel', 'cascade', 'military-correlation'] },
 };
 

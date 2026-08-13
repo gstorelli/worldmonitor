@@ -1,5 +1,6 @@
 import { isDesktopRuntime } from '../services/runtime';
 import { invokeTauri } from '../services/tauri-bridge';
+import { getPanelTier, TIER_META } from '@/config/panel-tiers';
 import { t } from '../services/i18n';
 import { h, replaceChildren, safeHtml } from '../utils/dom-utils';
 import { trackPanelResized } from '@/services/analytics';
@@ -257,6 +258,22 @@ export class Panel {
     title.className = 'panel-title';
     title.textContent = options.title;
     headerLeft.appendChild(title);
+
+    // Risk Sentinel tier badge: green CORE for doctoral-focus panels,
+    // neutral CONTESTO for collateral context (see src/config/panel-tiers.ts).
+    const tier = getPanelTier(options.id);
+    const tierMeta = TIER_META[tier];
+    if (tier !== 3) {
+      const tierBadge = document.createElement('span');
+      tierBadge.className = `panel-tier-badge ${tierMeta.className}`;
+      tierBadge.textContent = tierMeta.label;
+      tierBadge.title =
+        tier === 1
+          ? 'Panello core del progetto di dottorato (Risk Sentinel)'
+          : 'Panello di contesto, riutilizzabile collateralmente';
+      headerLeft.appendChild(tierBadge);
+      this.element.dataset.tier = String(tier);
+    }
 
     this.severityDotEl = document.createElement('span');
     this.severityDotEl.className = 'panel-severity-dot';

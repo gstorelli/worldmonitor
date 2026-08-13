@@ -1,0 +1,121 @@
+{
+  "name": "Risk Sentinel — Policy Monitor (EUR-Lex)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "daysInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "19fca1f1-0001-4001-8001-policysched",
+      "name": "Schedule (Every day)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://eur-lex.europa.eu/search.html?type=quick&q=chokepoint+OR+%22critical+raw+materials%22+OR+%22customs+risk%22+OR+%22energy+security%22&DTS_SUBDOM=ALL_LATEST&DTS_PUBLISHED_FROM=' + $now.minus(1, 'day').toFormat('yyyy-MM-dd') + '&lang=it' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "RiskSentinelPolicyMonitor/1.0"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "19fca1f1-0002-4001-8001-policyfetch",
+      "name": "Fetch EUR-Lex latest",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [220, 0],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = [];\nconst matches = $input.item.json.responseText\n  ? $input.item.json.responseText.match(/<a[^>]*href=\"([^\"]*celex[^\"]*)\"[^>]*>(.*?)<\\/a>/gi) || []\n  : [];\nfor (const m of matches.slice(0, 10)) {\n  const href = m.match(/href=\"([^\"]*)\"/i)?.[1] || '';\n  const label = m.replace(/<[^>]*>/g, '').trim().slice(0, 160);\n  if (!label) continue;\n  items.push({\n    json: {\n      id: 'policy-' + ($now.toMillis() + items.length),\n      title: label,\n      reference: 'EUR-Lex (monitor)',\n      url: href.startsWith('http') ? href : 'https://eur-lex.europa.eu' + href,\n      jurisdiction: 'eu',\n      topic: 'Aggiornamento normativo (monitor)',\n      riskCategories: [],\n      chokepoints: [],\n      summary: label,\n      gap: '',\n      publishedAt: $now.toISO(),\n      fetchedAt: $now.toISO()\n    }\n  });\n}\nreturn items;\n"
+      },
+      "id": "19fca1f1-0003-4001-8001-policyparse",
+      "name": "Parse EUR-Lex results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "{{ $env.RISK_SENTINEL_WEBHOOK_URL || 'https://risksentinel.opencyber.org/api/n8n/ingest' }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ pipeline: 'policy-monitor', items: $json }) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.N8N_INGEST_SECRET }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "19fca1f1-0004-4001-8001-policypush",
+      "name": "Push to Risk Sentinel API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [660, 0]
+    }
+  ],
+  "connections": {
+    "Schedule (Every day)": {
+      "main": [
+        [
+          {
+            "node": "Fetch EUR-Lex latest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch EUR-Lex latest": {
+      "main": [
+        [
+          {
+            "node": "Parse EUR-Lex results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse EUR-Lex results": {
+      "main": [
+        [
+          {
+            "node": "Push to Risk Sentinel API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}

@@ -1,4 +1,5 @@
 import type { AppContext, AppModule } from '@/app/app-context';
+import { isPanelDisabled } from '@/config/panel-tiers';
 import { replayPendingCalls, clearAllPendingCalls } from '@/app/pending-panel-data';
 import type { RelatedAsset } from '@/types';
 import type { TheaterPostureSummary } from '@/services/military-surge';
@@ -21,6 +22,8 @@ import {
   ConsumerPricesPanel,
   EnergyComplexPanel,
   GdeltIntelPanel,
+  SourceValidationPanel,
+  PolicyAnalysisPanel,
   LiveNewsPanel,
   getDefaultLiveChannels,
   loadChannelsFromStorage,
@@ -431,6 +434,10 @@ export class PanelLayoutManager implements AppModule {
   }
 
   private shouldCreatePanel(key: string): boolean {
+    // Risk Sentinel tier-3 panels (crypto/startup/speculative) are disabled at
+    // the layout level regardless of settings — upstream code and settings
+    // stay untouched so future syncs remain non-disruptive.
+    if (isPanelDisabled(key)) return false;
     return Object.prototype.hasOwnProperty.call(this.ctx.panelSettings, key);
   }
 
@@ -484,6 +491,9 @@ export class PanelLayoutManager implements AppModule {
     });
 
     this.createPanel('commodities', () => new CommoditiesPanel());
+    // Risk Sentinel doctoral additions (tier 1, see src/config/panel-tiers.ts)
+    this.createPanel('source-validation', () => new SourceValidationPanel());
+    this.createPanel('policy-analysis', () => new PolicyAnalysisPanel());
     this.createPanel('energy-complex', () => new EnergyComplexPanel());
     this.createPanel('polymarket', () => new PredictionPanel());
 

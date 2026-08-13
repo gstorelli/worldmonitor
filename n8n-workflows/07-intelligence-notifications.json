@@ -1,0 +1,131 @@
+{
+  "name": "Risk Sentinel — Intelligence Notifications (Telegram/Email)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "19fca2f2-0001-4002-8002-notifysched",
+      "name": "Schedule (Every hour)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://risksentinel.opencyber.org/api/notify/config",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "19fca2f2-0002-4002-8002-notifycfg",
+      "name": "Read notification config",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $json.config || null;\nif (!cfg) return [];\n// The digest payload is provided by the platform: the workflow merely\n// re-sends what the config-driven digest endpoint returns. Operators can\n// swap this node for a direct Redis/digest fetch if they prefer n8n-side\n// aggregation. Frequency gating is expected on the schedule side.\nconst freq = cfg.frequency || 'hourly';\nreturn [{ json: { config: cfg, frequency: freq } }];\n"
+      },
+      "id": "19fca2f2-0003-4002-8002-notifygate",
+      "name": "Gate on config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://api.telegram.org/bot' + ($json.config?.endpoints?.telegram?.botToken || '') + '/sendMessage' }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chat_id: $json.config?.endpoints?.telegram?.chatId, text: '[Risk Sentinel] Digest ' + ($json.frequency || 'hourly') + ' — configurare il contenuto nel centro notifiche della piattaforma.' }) }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "19fca2f2-0004-4002-8002-notifytg",
+      "name": "Send Telegram",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [660, -60],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $json.config?.endpoints?.email?.from || 'risk-sentinel@opencyber.org' }}",
+        "toEmail": "={{ $json.config?.endpoints?.email?.to || '' }}",
+        "subject": "[Risk Sentinel] Intelligence Digest",
+        "text": "Digest di intelligence Risk Sentinel. Configurare il contenuto nel centro notifiche della piattaforma.",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "19fca2f2-0005-4002-8002-notifymail",
+      "name": "Send Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [660, 60],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "smtp": {
+          "id": "smtp-risk-sentinel",
+          "name": "SMTP account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule (Every hour)": {
+      "main": [
+        [
+          {
+            "node": "Read notification config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read notification config": {
+      "main": [
+        [
+          {
+            "node": "Gate on config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gate on config": {
+      "main": [
+        [
+          {
+            "node": "Send Telegram",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}
