@@ -624,6 +624,29 @@ Rimosso anche il residuo `convex` dal runtime package.
 | Military Flight Tracking "No flights" | adsb.lol/OpenSky vuoti al momento del fetch |
 | `seismology:earthquakes:v1` vuoto da n8n | il nodo Process del workflow USGS in n8n non emette item — da correggere nell'editor n8n |
 
+### Popolamento dati (seeding self-hosted)
+
+I pannelli leggono dati da Redis. In upstream il cron Railway semina i ~170
+dataset; in self-hosted si esegue **una volta** (e dopo ogni svuotamento Redis):
+
+```bash
+./scripts/seed-all.sh /srv/worldmonitor   # sul VPS
+```
+
+Lo script esegue tutti i `scripts/seed-*.mjs` in un container usa-e-getta sulla
+rete interna, con `UPSTASH_REDIS_REST_*` derivate da `REDIS_TOKEN` e
+`API_BASE_URL=http://worldmonitor:8080` (i seed derivati come insights/forecasts
+si scaldano contro il gateway locale, non l'API cloud upstream).
+
+Stato di copertura bootstrap: **19/25 dataset** popolati. I 6 mancanti:
+
+| Dataset | Causa | Fix |
+|---------|-------|-----|
+| `outages`, `ddosAttacks`, `trafficAnomalies` | Richiedono `CLOUDFLARE_API_TOKEN` (Cloudflare Radar) | Inserire il token nel `.env` e rieseguire il seed |
+| `chokepoints` | Dataset derivato dallo `scenario-worker` upstream, non da un seed | Non disponibile self-hosted (degradazione graziosa) |
+| `socialVelocity`, `wsbTickers` | Sorgente Reddit — IP del VPS rate-limitato/bloccato | Degradazione graziosa; riprovare il seed periodicamente |
+| Ritardi voli (AviationStack) | `AVIATIONSTACK_API` 403 → chiave invalida/scaduta o IP bloccato | Verificare/ruotare la chiave API nel `.env` |
+
 ### Diagnostica rapida
 
 ```bash
