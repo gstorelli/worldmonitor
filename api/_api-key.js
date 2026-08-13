@@ -117,5 +117,11 @@ export async function validateApiKey(req, options = {}) {
   }
 
   // No credentials at all.
+  // Self-hosted (de-clouded) deployments opt in via ALLOW_ANONYMOUS_API=true:
+  // the fork ships no premium gating and its SPA baseline does not attach a
+  // session token to every RPC — anonymous access keeps all panels working.
+  if (process.env.ALLOW_ANONYMOUS_API === 'true') {
+    return { valid: true, required: false, kind: 'anonymous-selfhosted' };
+  }
   return { valid: false, required: true, error: 'API key required' };
 }
