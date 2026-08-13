@@ -56,7 +56,8 @@ jobs:
         run: npm run lint:api-contract
       - run: npm run sync:bootstrap-tier-keys:check
       - run: npm run lint:rate-limit-policies
-      - run: npm run lint:premium-fetch
+      # lint:premium-fetch removed: the de-clouded fork has no premium gating,
+      # so the premium-fetch discipline check does not apply.
       - run: npm run security:vite-env-secrets
       - name: Markdown lint
         run: npm run lint:md
