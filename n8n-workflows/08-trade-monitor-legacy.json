@@ -1,0 +1,224 @@
+{
+  "name": "Risk Sentinel — Trade Monitor (LEGACY RSS, dead-end output)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 3
+            }
+          ]
+        }
+      },
+      "name": "Schedule (3h)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        208,
+        304
+      ],
+      "id": "2ea9fdae-d316-4e7b-92f7-93ff348526ff"
+    },
+    {
+      "parameters": {
+        "url": "https://news.google.com/rss/search?q=(tariff+OR+\"trade+war\"+OR+sanctions)+when:2d&hl=en-US&gl=IT&ceid=IT:en",
+        "options": {}
+      },
+      "name": "Feed: Trade",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        432,
+        112
+      ],
+      "id": "e6326dd2-d086-40e4-8aa5-40db47d6688a"
+    },
+    {
+      "parameters": {
+        "url": "https://news.google.com/rss/search?q=(Suez+OR+\"Red+Sea\"+OR+Houthi+OR+\"shipping+disruption\")+when:2d&hl=en-US&gl=US&ceid=US:en",
+        "options": {}
+      },
+      "name": "Feed: Shipping",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        432,
+        256
+      ],
+      "id": "11e13e62-9a90-44db-8501-a57784f96129"
+    },
+    {
+      "parameters": {
+        "url": "https://news.google.com/rss/search?q=(\"Panama+Canal\"+OR+\"Strait+of+Hormuz\"+OR+Malacca+OR+\"Taiwan+Strait\")+when:2d&hl=en-US&gl=US&ceid=US:en",
+        "options": {}
+      },
+      "name": "Feed: Chokepoints",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1,
+      "position": [
+        432,
+        400
+      ],
+      "id": "82d0076f-bf53-4651-a261-fbe2c93d5f8a"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "fieldsToMatchString": "title,link, pubDate, content, contentSnippet, guid, isoDate",
+        "joinMode": "keepNonMatches",
+        "options": {}
+      },
+      "name": "Merge Feeds",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        688,
+        304
+      ],
+      "id": "8204aa14-12da-4610-8fed-ea9c6db147c1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const CRITICAL=[\"blockade\",\"closure\",\"attack\",\"severe\",\"crisis\",\"war\"];const HIGH=[\"disruption\",\"shortage\",\"strike\",\"surge\",\"tension\",\"conflict\",\"ban\"];const MEDIUM=[\"delay\",\"congestion\",\"volatility\",\"concern\",\"warning\",\"risk\"];const ROUTES=[\"Suez\",\"Panama\",\"Hormuz\",\"Malacca\",\"Taiwan\",\"Red Sea\",\"Black Sea\"];return items.map(i=>{const t=JSON.stringify(i.json||\"\").toLowerCase();let l=\"LOW\",s=10;for(const k of CRITICAL)if(t.includes(k)){l=\"CRITICAL\";s=90;break}if(s<70)for(const k of HIGH)if(t.includes(k)){l=\"HIGH\";s=60}if(s<40)for(const k of MEDIUM)if(t.includes(k)){l=\"MEDIUM\";s=35}for(const r of ROUTES)if(t.includes(r.toLowerCase()))s=Math.min(100,s+15);return{json:{...i.json,risk_level:l,risk_score:s}}})"
+      },
+      "name": "Risk Classify",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        864,
+        304
+      ],
+      "id": "966b1cce-4824-4892-9ee4-4f4516c996e1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{$json.risk_score}}",
+              "operation": "larger",
+              "value2": 40
+            }
+          ]
+        }
+      },
+      "name": "Filter >40",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1088,
+        304
+      ],
+      "id": "97abde5c-a8e9-4353-90b6-0034d1c11296"
+    },
+    {
+      "parameters": {
+        "jsCode": "return $('Filter >40').all().map(i=>({json:{alert:{type:\"risk_sentinel\",level:i.json.risk_level,score:i.json.risk_score,title:i.json.title||\"\",link:i.json.link||\"\",source:i.json.creator||\"\",date:i.json.isoDate||new Date().toISOString()}}}))"
+      },
+      "name": "Format Alert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        1264,
+        496
+      ],
+      "id": "ca2bd5ea-2b9f-4499-b853-86be5616b107"
+    }
+  ],
+  "connections": {
+    "Schedule (3h)": {
+      "main": [
+        [
+          {
+            "node": "Feed: Trade",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Feed: Shipping",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Feed: Chokepoints",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Feed: Trade": {
+      "main": [
+        [
+          {
+            "node": "Merge Feeds",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Feed: Shipping": {
+      "main": [
+        [
+          {
+            "node": "Merge Feeds",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Feed: Chokepoints": {
+      "main": [
+        [
+          {
+            "node": "Merge Feeds",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Merge Feeds": {
+      "main": [
+        [
+          {
+            "node": "Risk Classify",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Risk Classify": {
+      "main": [
+        [
+          {
+            "node": "Filter >40",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter >40": {
+      "true": [
+        [
+          {
+            "node": "Format Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true
+  }
+}

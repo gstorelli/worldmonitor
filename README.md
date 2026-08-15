@@ -46,7 +46,7 @@ Il sistema integra **30+ sorgenti OSINT** (Open Source Intelligence) — tra cui
 - 🌍 **Mappa globale duale** — Globe 3D (globe.gl + Three.js) e mappa 2D (deck.gl + MapLibre GL) con 45+ layer sovrapposti
 - 🧠 **AI-Powered Synthesis** — Generazione narrativa spiegabile tramite LLM (OpenRouter)
 - 📊 **86 pannelli informativi** — moduli componibili per geopolitica, finanza, climate, intelligence
-- 🔄 **Pipeline n8n** — 5 workflow low-code per data ingestion con risk scoring integrato
+- 🔄 **Pipeline n8n** — 7 workflow low-code (5 ingestion + monitor normativo + notifiche) con risk scoring integrato
 - 🚢 **Critical Trade Routes Monitor** — monitoraggio real-time di Suez, Hormuz, Panama, Taiwan, Malacca, Gibilterra
 - 📦 **Commodity Risk Tracker** — tracking prezzi e volatilità con codici HS doganali (8542, 7502, 2709, 1001, 3105)
 - ⚡ **Cross-source correlation** — convergenza segnali militari, economici, climatici e infrastrutturali
@@ -348,7 +348,7 @@ FINNHUB_API_KEY=your-key                    # Stock quotes
 
 ### Endpoint di Ingestion n8n (self-hosted)
 
-I 5 workflow in [`n8n-workflows/`](./n8n-workflows/) inviano i payload a
+I 7 workflow attivi in [`n8n-workflows/`](./n8n-workflows/) inviano i payload a
 
 ```
 POST http://<HOST>:3000/api/n8n/ingest
@@ -359,7 +359,10 @@ Il filtro `/api/*` di Nginx inoltra le richieste al `local-api-server` Node.js, 
 esegue l'handler `api/n8n/ingest.js` e scrive i dati trasformati su Redis (via
 `UPSTASH_REDIS_REST_URL`). Le pipeline supportate: `customs-intelligence`,
 `seismic-trade-impact`, `climate-trade-anomalies`, `commodity-customs-tracker`,
-`conflict-trade-impact`.
+`conflict-trade-impact`, `policy-monitor`. Ogni pipeline scrive su una chiave
+dedicata `risk_sentinel:n8n:*` (o su `policy:monitor:v1`), mai sulle chiavi
+canoniche dei seeder nativi; il test `tests/n8n-workflows-contract.test.mjs`
+vincola questo contratto in CI.
 
 ---
 
@@ -381,7 +384,7 @@ Il sync viene eseguito periodicamente con un merge di `upstream/main` nel branch
 
 - **Vengono adottati dall'upstream**: bug fix e performance su backend/API, nuovi
   endpoint, miglioramenti infrastrutturali, aggiornamenti di configurazione dati.
-- **Vengono protette (mai sovrascritte)**: `api/n8n/ingest.js`, le 5 pipeline
+- **Vengono protette (mai sovrascritte)**: `api/n8n/ingest.js`, le pipeline
   `n8n-workflows/`, il Risk Scoring Engine 8D (`src/services/CustomsRiskScorer.ts`),
   gli stub de-clouded (`entitlements.ts`, `api-keys.ts`, `mcp-clients.ts`), il
   branding Risk Sentinel e l'integrazione HS2 (`Hs2Picker`, `CommoditiesPanel`).
@@ -609,11 +612,16 @@ Rimosso anche il residuo `convex` dal runtime package.
 
 - Config MCP: [`.mcp/n8n-mcp.json`](.mcp/n8n-mcp.json) (server `automata.opencyber.org/mcp-server/http`, token `API_MCP_N8N`).
 - CLI: `node scripts/n8n-mcp.mjs list-tools` / `call <tool> '<json>'`.
-- I 6 workflow Risk Sentinel su n8n erano attivi ma il nodo "Push to Risk
-  Sentinel API" era uno stub Code (solo log). Via MCP sono stati aggiunti i
-  nodi HTTP reali (`POST https://risksentinel.opencyber.org/api/n8n/ingest`)
-  con header `Authorization` e `sendHeaders:true`, poi pubblicati.
-  **Pipeline provata end-to-end** (esecuzione → POST autenticato → Redis).
+- I workflow Risk Sentinel su n8n spingono con nodi HTTP reali
+  (`POST https://risksentinel.opencyber.org/api/n8n/ingest`) con header
+  `Authorization: Bearer $N8N_INGEST_SECRET`.
+- **Stato operativo (15/08/2026)**: attivi USGS, Climate, Commodity, ACLED,
+  Policy Monitor (trigger riparato) e Notifications; disattivati i due workflow
+  legacy ("Trade Monitor" RSS — output a vicolo cieco — e "AI Enhanced" — LLM,
+  parser instabile), esportati in `n8n-workflows/08-*` e `09-*` come riferimento.
+- Le pipeline scrivono SOLO su chiavi dedicate `risk_sentinel:n8n:*` (lette da
+  `api/customs/*`) e su `policy:monitor:v1` (letta da `api/policy/registry.js`);
+  le chiavi canoniche dei seeder nativi non vengono mai sovrascritte da n8n.
 
 ### Errori residui noti (sorgenti dati esterne)
 
@@ -622,7 +630,7 @@ Rimosso anche il residuo `convex` dal runtime package.
 | `/api/gpsjam` 503 | gpsjam.org non raggiungibile dal VPS — il pannello degrada |
 | Polymarket "No markets returned" | API Polymarket bloccata/vuota verso il VPS |
 | Military Flight Tracking "No flights" | adsb.lol/OpenSky vuoti al momento del fetch |
-| `seismology:earthquakes:v1` vuoto da n8n | il nodo Process del workflow USGS in n8n non emette item — da correggere nell'editor n8n |
+| ACLED `403 Forbidden` | token ACLED servito dal webhook Token Manager con race refresh/ingest — mitigato con `retryOnFail` sul nodo di fetch |
 
 ### Popolamento dati (seeding self-hosted)
 
@@ -722,7 +730,7 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST https://risksentinel.opencyber.
 ├── api/                        # Endpoint API (Node.js, self-contained)
 ├── server/                     # Server-side code (Redis, rate-limit, gateway)
 ├── scripts/                    # Seed scripts per Redis (30+ file)
-├── n8n-workflows/              # ← 5 workflow JSON + README
+├── n8n-workflows/              # ← 7 workflow JSON attivi + 2 legacy + README
 │   ├── 01-gdelt-customs-ingestion.json
 │   ├── 02-usgs-seismic-ingestion.json
 │   ├── 03-climate-anomalies-ingestion.json
@@ -792,7 +800,7 @@ Il sistema include **86 pannelli** organizzati per dominio. Quelli rilevanti per
 - [x] Rimozione UI premium/Pro/locked
 - [x] Integrazione sistema di pannelli completo (86 pannelli)
 - [x] Progettazione Risk Scoring Engine (8 dimensioni)
-- [x] Creazione 5 workflow n8n per data ingestion
+- [x] Creazione 7 workflow n8n (5 ingestion + policy monitor + notifiche)
 - [x] Build pipeline funzionante (Docker Compose self-hosted)
 
 ### Fase 2 — Completata ✅ (Stabilizzazione & Commodity Tracker)
@@ -810,9 +818,9 @@ Il sistema include **86 pannelli** organizzati per dominio. Quelli rilevanti per
 
 - [ ] **Deployment Infrastruttura Live**:
   - [ ] Deploy dell'app web **self-hosted via Docker Compose** (`docker compose up -d`) su VPS/server dedicato.
-  - [ ] Deploy di n8n su un server/VPS dedicato (es. Railway, DigitalOcean, oppure container n8n).
-  - [ ] Configurazione dei Webhook n8n affinché puntino all'endpoint `POST /api/n8n/ingest` dell'app live (variabile `RISK_SENTINEL_WEBHOOK_URL`).
-- [ ] **Validazione Dati Live**: Test in produzione dei pannelli con dati freschi inseriti su Redis dalle pipeline n8n.
+  - [x] Deploy di n8n su server dedicato (istanza `automata.opencyber.org`).
+  - [x] Configurazione dei workflow n8n affinché puntino all'endpoint `POST /api/n8n/ingest` dell'app live (variabile `RISK_SENTINEL_WEBHOOK_URL`).
+- [ ] **Validazione Dati Live** (in corso): test in produzione dei pannelli con dati freschi inseriti su Redis dalle pipeline n8n — bloccata finché l'API layer prod non risponde su `/api/*` (vedi sezione Integrazione n8n).
 - [ ] **Implementazione Ontologia Doganale (Knowledge Graph)**:
   - Entità: `EventoGeopolitico`, `EventoSismico`, `EventoClimatico`, `RottaCommerciale`, `CommoditySensibile`, `NodoLogistico`, `Paese`, `FlussoCommerciale`
   - Relazioni: `affects_route`, `involves_commodity`, `located_in`, `flows_between`, `transits_route`, `exposes_to`

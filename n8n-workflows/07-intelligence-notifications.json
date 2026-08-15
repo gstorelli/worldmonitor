@@ -21,7 +21,16 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "https://risksentinel.opencyber.org/api/notify/config",
+        "url": "={{ ($env.RISK_SENTINEL_WEBHOOK_URL ? $env.RISK_SENTINEL_WEBHOOK_URL.replace(/\\/api\\/n8n\\/ingest$/, '') : 'https://risksentinel.opencyber.org') + '/api/notify/config' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "RiskSentinelNotifications/1.0"
+            }
+          ]
+        },
         "options": {
           "timeout": 20000
         }

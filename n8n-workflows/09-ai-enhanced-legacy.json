@@ -1,0 +1,397 @@
+{
+  "name": "Risk Sentinel — AI Enhanced (LEGACY LLM, deprecated)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 3
+            }
+          ]
+        }
+      },
+      "id": "bfe1779d-ff37-4498-bcd5-8c41923c10af",
+      "name": "Schedule (3h)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://news.google.com/rss/search?q=(tariff+OR+\"trade+war\"+OR+sanctions)+when:2d&hl=en-US&gl=IT&ceid=IT:en",
+        "options": {}
+      },
+      "id": "23ced143-e31e-4052-907c-13d567b644fb",
+      "name": "Feed: Trade",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [
+        224,
+        0
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "b5160473-4777-4e8b-9c11-c77d7271cb4c",
+      "name": "Merge Feeds",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        448,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://news.google.com/rss/search?q=(Suez+OR+\"Red+Sea\"+OR+Houthi+OR+\"shipping+disruption\")+when:2d&hl=en-US&gl=US&ceid=US:en",
+        "options": {}
+      },
+      "id": "72b37a3c-3bd2-4fa6-9e77-4dd5a6b0bf95",
+      "name": "Feed: Shipping",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [
+        224,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://news.google.com/rss/search?q=(\"Panama+Canal\"+OR+\"Strait+of+Hormuz\"+OR+Malacca+OR+\"Taiwan+Strait\")+when:2d&hl=en-US&gl=US&ceid=US:en",
+        "options": {}
+      },
+      "id": "51f04322-0423-4609-9aa4-b42431367f28",
+      "name": "Feed: Chokepoints",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [
+        224,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.title }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "Sei un analista di rischi doganali e supply chain. Analizza il titolo della notizia e produci un assessment di rischio. CRITICAL: chiusura/blocco immediato. HIGH: disruption grave in corso. MEDIUM: tensione/preoccupazione. LOW: news informativa. Output SOLO JSON valido.",
+          "maxIterations": 1
+        }
+      },
+      "id": "3d22e365-86ff-4f4a-9aad-180bb6967c0e",
+      "name": "LLM Risk Analyzer",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        672,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "model": "deepseek/deepseek-v4-flash",
+        "options": {
+          "maxTokens": 300,
+          "responseFormat": "json_object",
+          "temperature": 0.1
+        }
+      },
+      "id": "a64786a4-7cfe-47df-96da-fe8986e42863",
+      "name": "DeepSeek V4 Flash",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        688,
+        416
+      ],
+      "credentials": {
+        "openRouterApi": {
+          "id": "f3zGtD9qJ3lDDtCe",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\"risk_level\":\"MEDIUM\",\"risk_score\":45,\"summary_it\":\"Riassunto in italiano della notizia\",\"chokepoint\":\"Nessuno\",\"entities\":[\"Iran\",\"tanker\"],\"recommendation\":\"Monitorare\"}",
+        "autoFix": true
+      },
+      "id": "1de8813d-06ae-450b-9b02-4431fe968b2f",
+      "name": "Risk Output Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        864,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const out = $json.output || $json;\nreturn [{\n  json: {\n    title: $json.title || '',\n    link: $json.link || '',\n    risk_level: out.risk_level || 'MEDIUM',\n    risk_score: out.risk_score || 30,\n    summary_it: out.summary_it || '',\n    chokepoint: out.chokepoint || 'Nessuno',\n    entities: (out.entities || []).join(', '),\n    recommendation: out.recommendation || 'Monitor',\n    isoDate: $json.isoDate || new Date().toISOString()\n  }\n}];"
+      },
+      "id": "935e3f30-44b1-48c8-97aa-646ae8e71bb1",
+      "name": "Format Alert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1024,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.risk_score }}",
+              "rightValue": 40,
+              "operator": {
+                "type": "number",
+                "operation": "larger"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "0b1bdd6e-e1f9-480e-a11a-eefd909dc22a",
+      "name": "Filter >=40",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1248,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "console.log('[Risk Sentinel]', $json.risk_level, '(' + $json.risk_score + '/100) -', $json.summary_it);\nreturn [{ json: $json }];"
+      },
+      "id": "d7afa436-cca6-4b2f-852d-95f3b8da55c8",
+      "name": "Log Alerts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1472,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "https://docs.google.com/spreadsheets/d/1Rckb4SQUGK7koBWuC9scgFTK3DqxJHuwxkmgfbFExPE/edit"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Foglio1"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {}
+        },
+        "options": {}
+      },
+      "id": "950e34a6-9ce6-4a55-bb5a-d34ba8c3fcd6",
+      "name": "Save to Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2000,
+        208
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "bE05qOTsRToAV70G",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "🚨 *Risk Sentinel Alert*\n\n*Livello:* {{ $json.risk_level }} ({{ $json.risk_score }}/100)\n*Analisi:* {{ $json.summary_it }}\n\n📌 Chokepoint: {{ $json.chokepoint }}\n🔗 {{ $json.link }}",
+        "additionalFields": {
+          "disable_web_page_preview": true,
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "e2eb6a16-355c-4c6d-93ec-f14a6e01d69c",
+      "name": "Telegram Alert",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2208,
+        208
+      ],
+      "webhookId": "441e6ae6-81ed-489b-9429-414ed03a73d3",
+      "credentials": {
+        "telegramApi": {
+          "id": "NCNkx6dqqRyx9pCc",
+          "name": "Telegram account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule (3h)": {
+      "main": [
+        [
+          {
+            "node": "Feed: Trade",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Feed: Shipping",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Feed: Chokepoints",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Feed: Trade": {
+      "main": [
+        [
+          {
+            "node": "Merge Feeds",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Feeds": {
+      "main": [
+        [
+          {
+            "node": "LLM Risk Analyzer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Feed: Shipping": {
+      "main": [
+        [
+          {
+            "node": "Merge Feeds",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Feed: Chokepoints": {
+      "main": [
+        [
+          {
+            "node": "Merge Feeds",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "LLM Risk Analyzer": {
+      "main": [
+        [
+          {
+            "node": "Format Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DeepSeek V4 Flash": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "LLM Risk Analyzer",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Risk Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "LLM Risk Analyzer",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Alert": {
+      "main": [
+        [
+          {
+            "node": "Filter >=40",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter >=40": {
+      "main": [
+        [
+          {
+            "node": "Log Alerts",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Save to Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save to Sheets": {
+      "main": [
+        [
+          {
+            "node": "Telegram Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true,
+    "binaryMode": "separate"
+  }
+}

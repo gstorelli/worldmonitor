@@ -32,7 +32,12 @@
           ]
         },
         "options": {
-          "timeout": 30000
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          }
         }
       },
       "id": "19fca1f1-0002-4001-8001-policyfetch",
@@ -44,7 +49,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const items = [];\nconst matches = $input.item.json.responseText\n  ? $input.item.json.responseText.match(/<a[^>]*href=\"([^\"]*celex[^\"]*)\"[^>]*>(.*?)<\\/a>/gi) || []\n  : [];\nfor (const m of matches.slice(0, 10)) {\n  const href = m.match(/href=\"([^\"]*)\"/i)?.[1] || '';\n  const label = m.replace(/<[^>]*>/g, '').trim().slice(0, 160);\n  if (!label) continue;\n  items.push({\n    json: {\n      id: 'policy-' + ($now.toMillis() + items.length),\n      title: label,\n      reference: 'EUR-Lex (monitor)',\n      url: href.startsWith('http') ? href : 'https://eur-lex.europa.eu' + href,\n      jurisdiction: 'eu',\n      topic: 'Aggiornamento normativo (monitor)',\n      riskCategories: [],\n      chokepoints: [],\n      summary: label,\n      gap: '',\n      publishedAt: $now.toISO(),\n      fetchedAt: $now.toISO()\n    }\n  });\n}\nreturn items;\n"
+        "jsCode": "// With responseFormat 'text', $input.item.json is the raw HTML string.\nconst html = typeof $input.item.json === 'string' ? $input.item.json : '';\nconst items = [];\nconst matches = html\n  ? html.match(/<a[^>]*href=\"([^\"]*celex[^\"]*)\"[^>]*>(.*?)<\\/a>/gi) || []\n  : [];\nfor (const m of matches.slice(0, 10)) {\n  const href = m.match(/href=\"([^\"]*)\"/i)?.[1] || '';\n  const label = m.replace(/<[^>]*>/g, '').trim().slice(0, 160);\n  if (!label) continue;\n  items.push({\n    json: {\n      id: 'policy-' + ($now.toMillis() + items.length),\n      title: label,\n      reference: 'EUR-Lex (monitor)',\n      url: href.startsWith('http') ? href : 'https://eur-lex.europa.eu' + href,\n      jurisdiction: 'eu',\n      topic: 'Aggiornamento normativo (monitor)',\n      riskCategories: [],\n      chokepoints: [],\n      summary: label,\n      gap: '',\n      publishedAt: $now.toISO(),\n      fetchedAt: $now.toISO()\n    }\n  });\n}\nreturn items;\n"
       },
       "id": "19fca1f1-0003-4001-8001-policyparse",
       "name": "Parse EUR-Lex results",
@@ -55,7 +60,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "{{ $env.RISK_SENTINEL_WEBHOOK_URL || 'https://risksentinel.opencyber.org/api/n8n/ingest' }}",
+        "url": "={{ $env.RISK_SENTINEL_WEBHOOK_URL || 'https://risksentinel.opencyber.org/api/n8n/ingest' }}",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ pipeline: 'policy-monitor', items: $json }) }}",

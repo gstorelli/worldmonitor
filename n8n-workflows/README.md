@@ -11,6 +11,15 @@ Questa cartella contiene i workflow n8n per l'ingestion e il risk scoring dei da
 | 03 | `03-climate-anomalies-ingestion.json` | Open-Meteo Archive | Ogni 3h | Anomalie climatiche in 15 zone critiche per il commercio |
 | 04 | `04-commodity-prices-ingestion.json` | Yahoo Finance | Ogni 30min | Prezzi commodity con codici HS doganali |
 | 05 | `05-acled-conflict-ingestion.json` | ACLED API | Ogni 6h | Conflitti armati con prossimità ai chokepoint marittimi |
+| 06 | `06-policy-monitor.json` | EUR-Lex (search) | Ogni giorno | Aggiornamenti normativi UE → `policy:monitor:v1` (Policy Analysis panel) |
+| 07 | `07-intelligence-notifications.json` | Notify config API | Ogni 1h | Delivery Telegram/email dei digest di intelligence |
+
+### Workflow Legacy (riferimento, disattivati in produzione)
+
+| # | File | Note |
+|---|------|------|
+| 08 | `08-trade-monitor-legacy.json` | Prima generazione (RSS Google News). Output a vicolo cieco: il nodo finale "Format Alert" non spinge verso l'endpoint di ingestion. Sostituito da `01-gdelt-customs-ingestion.json`. |
+| 09 | `09-ai-enhanced-legacy.json` | Workflow LLM (DeepSeek via OpenRouter) con structured output parser instabile. Disattivato: la funzionalità di LLM-adjudication va portata nel backend nativo della piattaforma. |
 
 ## Come Importare
 
@@ -26,7 +35,12 @@ Configura queste variabili nella sezione **Settings → Environment Variables** 
 
 | Variabile | Descrizione | Obbligatoria |
 |-----------|-------------|:------------:|
-| `RISK_SENTINEL_WEBHOOK_URL` | URL dell'endpoint di ingestion di Risk Sentinel (es: `https://your-site.netlify.app/api/n8n-ingest`) | ✅ |
+| `RISK_SENTINEL_WEBHOOK_URL` | URL dell'endpoint di ingestion di Risk Sentinel (es: `https://risksentinel.opencyber.org/api/n8n/ingest`) | ✅ |
+| `N8N_INGEST_SECRET` | Segreto condiviso inviato come `Authorization: Bearer` all'endpoint di ingestion (deve coincidere con `N8N_INGEST_SECRET` lato server) | ✅ |
+
+> I workflow scrivono solo su chiavi Redis dedicate `risk_sentinel:n8n:*` (consumate dagli
+> endpoint `api/customs/*`) e su `policy:monitor:v1` (consumata da `api/policy/registry.js`).
+> Non scrivono MAI sulle chiavi canoniche dei seeder nativi della piattaforma.
 
 ### Credenziali per Workflow Specifici
 

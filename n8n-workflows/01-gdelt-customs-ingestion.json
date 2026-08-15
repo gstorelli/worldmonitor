@@ -2,15 +2,6 @@
   "name": "Risk Sentinel — GDELT Customs Intelligence Ingestion",
   "nodes": [
     {
-      "parameters": {},
-      "id": "trigger-cron",
-      "name": "Cron Trigger (Every 2h)",
-      "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.2,
-      "position": [250, 300],
-      "notes": "Runs every 2 hours to fetch fresh GDELT customs-relevant articles"
-    },
-    {
       "parameters": {
         "rule": {
           "interval": [{ "field": "hours", "hoursInterval": 2 }]
@@ -124,7 +115,7 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "// Filter articles by minimum risk threshold and prepare final output\nconst MIN_RISK_SCORE = 25;\nconst data = $input.item.json;\nconst filtered = (data.scoredArticles || []).filter(a => a.riskScore >= MIN_RISK_SCORE);\n\n// Group by risk level\nconst byLevel = { Critical: [], High: [], Elevated: [], Moderate: [] };\nfor (const a of filtered) {\n  if (byLevel[a.riskLevel]) byLevel[a.riskLevel].push(a);\n}\n\nreturn {\n  json: {\n    alerts: filtered,\n    summary: {\n      total: filtered.length,\n      critical: byLevel.Critical.length,\n      high: byLevel.High.length,\n      elevated: byLevel.Elevated.length,\n      moderate: byLevel.Moderate.length,\n    },\n    processedAt: new Date().toISOString(),\n  }\n};"
+        "jsCode": "// Filter articles by minimum risk threshold and prepare final output\nconst MIN_RISK_SCORE = 25;\nconst data = $input.item.json;\nconst filtered = (data.scoredArticles || []).filter(a => a.riskScore >= MIN_RISK_SCORE);\n\n// Group by risk level\nconst byLevel = { Critical: [], High: [], Elevated: [], Moderate: [] };\nfor (const a of filtered) {\n  if (byLevel[a.riskLevel]) byLevel[a.riskLevel].push(a);\n}\n\nreturn {\n  json: {\n    source: 'gdelt',\n    pipeline: 'customs-intelligence',\n    alerts: filtered,\n    summary: {\n      total: filtered.length,\n      critical: byLevel.Critical.length,\n      high: byLevel.High.length,\n      elevated: byLevel.Elevated.length,\n      moderate: byLevel.Moderate.length,\n    },\n    processedAt: new Date().toISOString(),\n  }\n};"
       },
       "id": "filter-and-classify",
       "name": "Filter & Classify Alerts",
@@ -138,28 +129,22 @@
         "method": "POST",
         "url": "={{ $env.RISK_SENTINEL_WEBHOOK_URL || 'https://risksentinel.opencyber.org/api/n8n/ingest' }}",
         "sendBody": true,
-        "bodyParameters": {
-          "parameters": [
-            { "name": "source", "value": "gdelt" },
-            { "name": "pipeline", "value": "customs-intelligence" }
-          ]
-        },
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify($input.item.json) }}",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.N8N_INGEST_SECRET }}"
+            }
+          ]
+        },
         "options": {
           "timeout": 10000
         }
       },
       "id": "push-to-risk-sentinel",
       "name": "Push to Risk Sentinel API",
-      "headerParameters": {
-        "parameters": [
-          {
-            "name": "Authorization",
-            "value": "={{ 'Bearer ' + $env.N8N_INGEST_SECRET }}"
-          }
-        ]
-      },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [1200, 300],

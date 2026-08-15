@@ -68,18 +68,18 @@
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify($input.item.json) }}",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.N8N_INGEST_SECRET }}"
+            }
+          ]
+        },
         "options": { "timeout": 10000 }
       },
       "id": "push-acled",
       "name": "Push to Risk Sentinel API",
-      "headerParameters": {
-        "parameters": [
-          {
-            "name": "Authorization",
-            "value": "={{ 'Bearer ' + $env.N8N_INGEST_SECRET }}"
-          }
-        ]
-      },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [1250, 300]
