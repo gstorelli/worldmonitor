@@ -12,7 +12,7 @@
  */
 
 import { getPublicCorsHeaders } from '../_cors.js';
-import { readFileSync } from 'node:fs';
+import zoteroSources from './_sources-data.js';
 
 const ZOTERO_CACHE_KEY = 'zotero:library:v1';
 const ZOTERO_CACHE_TTL = 86400;
@@ -42,13 +42,7 @@ async function redisSet(url, token, key, value, ttlSeconds) {
 }
 
 function readCuratedSources() {
-  try {
-    const raw = readFileSync(new URL('../../data/zotero-sources.json', import.meta.url), 'utf8');
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed.sources) ? parsed.sources : [];
-  } catch {
-    return [];
-  }
+  return Array.isArray(zoteroSources) ? zoteroSources : [];
 }
 
 async function resolveZoteroUserId(userId, apiKey) {

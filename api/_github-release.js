@@ -17,11 +17,14 @@ export async function fetchLatestRelease(userAgent) {
     // fall through to the live fetch
   }
 
+  // Timeout so an unreachable GitHub API can never pin the handler open:
+  // /api/version and /api/download must answer (or 502) promptly.
   const res = await fetch(RELEASES_URL, {
     headers: {
       'Accept': 'application/vnd.github+json',
       'User-Agent': userAgent,
     },
+    signal: AbortSignal.timeout(10_000),
   });
   if (!res.ok) return null;
   const release = await res.json();

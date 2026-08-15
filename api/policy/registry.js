@@ -11,7 +11,7 @@
  */
 
 import { getPublicCorsHeaders } from '../_cors.js';
-import { readFileSync } from 'node:fs';
+import registryEntries from './_registry-data.js';
 
 const MONITOR_KEY = 'policy:monitor:v1';
 
@@ -27,19 +27,13 @@ async function redisGet(url, token, key) {
   return data?.result ?? null;
 }
 
-export default async function handler(request, context = {}) {
+export default async function handler(request) {
   const corsHeaders = getPublicCorsHeaders('GET, OPTIONS');
   if (request.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 
-  let entries = [];
-  try {
-    const raw = readFileSync(new URL('../../data/policy-registry.json', import.meta.url), 'utf8');
-    entries = JSON.parse(raw).entries ?? [];
-  } catch (err) {
-    context.logger?.warn?.(`[policy] registry read failed: ${err.message}`);
-  }
+  const entries = Array.isArray(registryEntries) ? registryEntries : [];
 
   let monitor = [];
   const restUrl = process.env.UPSTASH_REDIS_REST_URL || '';

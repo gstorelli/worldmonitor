@@ -10,21 +10,15 @@
  */
 
 import { getPublicCorsHeaders } from '../_cors.js';
-import { readFileSync } from 'node:fs';
+import hsGroups from './_hs-map-data.js';
 
-export default async function handler(request, context = {}) {
+export default async function handler(request) {
   const corsHeaders = getPublicCorsHeaders('GET, OPTIONS');
   if (request.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 
-  let groups = [];
-  try {
-    const raw = readFileSync(new URL('../../data/hs-commodity-map.json', import.meta.url), 'utf8');
-    groups = JSON.parse(raw).groups ?? [];
-  } catch (err) {
-    context.logger?.warn?.(`[hs-map] dataset read failed: ${err.message}`);
-  }
+  const groups = Array.isArray(hsGroups) ? hsGroups : [];
 
   return new Response(
     JSON.stringify({ groups, fetchedAt: new Date().toISOString() }),
