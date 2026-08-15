@@ -3,4 +3,9 @@ WORKDIR /app
 RUN npm init -y && npm install redis@4
 COPY redis-rest-proxy.mjs .
 EXPOSE 80
+# Busybox wget ships with alpine: probe the auth-exempt /health route so
+# compose `depends_on: service_healthy` gates the worldmonitor container
+# on a proxy that can actually reach Redis.
+HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \
+  CMD wget -qO- http://127.0.0.1:80/health 2>/dev/null | grep -q '"ok":true' || exit 1
 CMD ["node", "redis-rest-proxy.mjs"]

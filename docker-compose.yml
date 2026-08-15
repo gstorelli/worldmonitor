@@ -92,7 +92,7 @@ services:
     #   - LLM_API_KEY
     depends_on:
       redis-rest:
-        condition: service_started
+        condition: service_healthy
       ais-relay:
         condition: service_started
     restart: unless-stopped
@@ -117,7 +117,7 @@ services:
       PORT: "3004"
     depends_on:
       redis-rest:
-        condition: service_started
+        condition: service_healthy
     restart: unless-stopped
 
   redis:

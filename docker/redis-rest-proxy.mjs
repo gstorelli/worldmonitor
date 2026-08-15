@@ -5,6 +5,7 @@
  *
  * Supports:
  *   GET  /{command}/{arg1}/{arg2}/...  → Redis command
+ *   GET  /health                       → auth-exempt liveness + Redis PING probe
  *   POST /                            → JSON body ["COMMAND", "arg1", ...]
  *   POST /pipeline                    → JSON body [["CMD1",...], ["CMD2",...]]
  *   POST /multi-exec                  → JSON body [["CMD1",...], ["CMD2",...]]
@@ -96,6 +97,21 @@ async function readBody(req) {
 
 const server = http.createServer(async (req, res) => {
   res.setHeader('content-type', 'application/json');
+
+  // Health probe (auth-exempt): verifies this proxy AND the upstream Redis
+  // connection, so a container restart loop or a lost redis link shows up in
+  // `docker compose ps` health instead of hanging API handlers.
+  if (req.method === 'GET' && req.url === '/health') {
+    try {
+      await client.ping();
+      res.writeHead(200);
+      res.end(JSON.stringify({ ok: true }));
+    } catch (err) {
+      res.writeHead(503);
+      res.end(JSON.stringify({ ok: false, error: err.message }));
+    }
+    return;
+  }
 
   if (!checkAuth(req)) {
     res.writeHead(401);
