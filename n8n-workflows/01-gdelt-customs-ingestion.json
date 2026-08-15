@@ -4,14 +4,22 @@
     {
       "parameters": {
         "rule": {
-          "interval": [{ "field": "hours", "hoursInterval": 2 }]
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 2
+            }
+          ]
         }
       },
       "id": "trigger-cron-config",
       "name": "Schedule",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [250, 300]
+      "position": [
+        250,
+        300
+      ]
     },
     {
       "parameters": {
@@ -19,12 +27,30 @@
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
-            { "name": "query", "value": "(customs OR tariff OR \"trade war\" OR embargo OR sanction OR \"supply chain\" OR \"trade route\" OR \"port disruption\") sourcelang:eng" },
-            { "name": "mode", "value": "artlist" },
-            { "name": "maxrecords", "value": "250" },
-            { "name": "format", "value": "json" },
-            { "name": "sort", "value": "date" },
-            { "name": "timespan", "value": "1d" }
+            {
+              "name": "query",
+              "value": "(customs OR tariff OR \"trade war\" OR embargo OR sanction OR \"supply chain\" OR \"trade route\" OR \"port disruption\") sourcelang:eng"
+            },
+            {
+              "name": "mode",
+              "value": "artlist"
+            },
+            {
+              "name": "maxrecords",
+              "value": "250"
+            },
+            {
+              "name": "format",
+              "value": "json"
+            },
+            {
+              "name": "sort",
+              "value": "date"
+            },
+            {
+              "name": "timespan",
+              "value": "1d"
+            }
           ]
         },
         "options": {
@@ -35,7 +61,10 @@
       "name": "GDELT — Customs & Trade Intelligence",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [500, 200],
+      "position": [
+        500,
+        200
+      ],
       "notes": "Fetches last 24h of customs/tariff/trade articles from GDELT Doc API. Rate limit: 1 request per 5 seconds."
     },
     {
@@ -44,12 +73,30 @@
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
-            { "name": "query", "value": "(\"strait of hormuz\" OR \"suez canal\" OR \"panama canal\" OR \"malacca strait\" OR \"taiwan strait\" OR gibraltar OR \"bab el mandeb\" OR piracy OR \"naval blockade\") sourcelang:eng" },
-            { "name": "mode", "value": "artlist" },
-            { "name": "maxrecords", "value": "100" },
-            { "name": "format", "value": "json" },
-            { "name": "sort", "value": "date" },
-            { "name": "timespan", "value": "1d" }
+            {
+              "name": "query",
+              "value": "(\"strait of hormuz\" OR \"suez canal\" OR \"panama canal\" OR \"malacca strait\" OR \"taiwan strait\" OR gibraltar OR \"bab el mandeb\" OR piracy OR \"naval blockade\") sourcelang:eng"
+            },
+            {
+              "name": "mode",
+              "value": "artlist"
+            },
+            {
+              "name": "maxrecords",
+              "value": "100"
+            },
+            {
+              "name": "format",
+              "value": "json"
+            },
+            {
+              "name": "sort",
+              "value": "date"
+            },
+            {
+              "name": "timespan",
+              "value": "1d"
+            }
           ]
         },
         "options": {
@@ -60,7 +107,10 @@
       "name": "GDELT — Critical Trade Routes",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [500, 400],
+      "position": [
+        500,
+        400
+      ],
       "notes": "Fetches articles about critical maritime chokepoints (Suez, Hormuz, Panama, etc.)"
     },
     {
@@ -69,12 +119,30 @@
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
-            { "name": "query", "value": "(semiconductor OR chip OR \"rare earth\" OR lithium OR nickel OR oil OR LNG OR grain OR wheat OR fertilizer OR pharma) (shortage OR disruption OR price OR export OR ban) sourcelang:eng" },
-            { "name": "mode", "value": "artlist" },
-            { "name": "maxrecords", "value": "100" },
-            { "name": "format", "value": "json" },
-            { "name": "sort", "value": "date" },
-            { "name": "timespan", "value": "1d" }
+            {
+              "name": "query",
+              "value": "(semiconductor OR chip OR \"rare earth\" OR lithium OR nickel OR oil OR LNG OR grain OR wheat OR fertilizer OR pharma) (shortage OR disruption OR price OR export OR ban) sourcelang:eng"
+            },
+            {
+              "name": "mode",
+              "value": "artlist"
+            },
+            {
+              "name": "maxrecords",
+              "value": "100"
+            },
+            {
+              "name": "format",
+              "value": "json"
+            },
+            {
+              "name": "sort",
+              "value": "date"
+            },
+            {
+              "name": "timespan",
+              "value": "1d"
+            }
           ]
         },
         "options": {
@@ -85,7 +153,10 @@
       "name": "GDELT — Commodity Disruptions",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [500, 600],
+      "position": [
+        500,
+        600
+      ],
       "notes": "Fetches articles about critical commodity disruptions relevant to customs risk."
     },
     {
@@ -97,7 +168,10 @@
       "name": "Risk Scoring Engine (8 Dimensions)",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [800, 300],
+      "position": [
+        800,
+        300
+      ],
       "notes": "Implements the 8-dimension risk scoring algorithm from the PhD spec. Weights: EventSeverity 0.18, SourceConfidence 0.10, TradeExposure 0.18, RouteCriticality 0.14, CommoditySensitivity 0.12, EscalationMomentum 0.10, CustomsRelevance 0.12, GeophysicalImpact 0.06."
     },
     {
@@ -109,7 +183,10 @@
       "name": "Merge & Deduplicate Articles",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [650, 300],
+      "position": [
+        650,
+        300
+      ],
       "notes": "Merges articles from all 3 GDELT queries and deduplicates by URL"
     },
     {
@@ -121,63 +198,129 @@
       "name": "Filter & Classify Alerts",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1000, 300],
+      "position": [
+        1000,
+        300
+      ],
       "notes": "Filters out Low-risk articles (score < 25) and groups remaining by risk level"
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.RISK_SENTINEL_WEBHOOK_URL || 'https://risksentinel.opencyber.org/api/n8n/ingest' }}",
+        "url": "https://risksentinel.opencyber.org/api/n8n/ingest",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify($input.item.json) }}",
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Authorization",
-              "value": "={{ 'Bearer ' + $env.N8N_INGEST_SECRET }}"
-            }
-          ]
-        },
         "options": {
           "timeout": 10000
-        }
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
       },
       "id": "push-to-risk-sentinel",
       "name": "Push to Risk Sentinel API",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1200, 300],
-      "notes": "Sends scored and filtered alerts to Risk Sentinel's ingestion endpoint. Set RISK_SENTINEL_WEBHOOK_URL in n8n environment variables."
+      "position": [
+        1200,
+        300
+      ],
+      "notes": "Sends scored and filtered alerts to Risk Sentinel's ingestion endpoint. Uses the shared \"Risk Sentinel Ingest Bearer\" header-auth credential (Authorization: Bearer <N8N_INGEST_SECRET>).",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "Risk Sentinel Ingest Bearer"
+        }
+      }
     }
   ],
   "connections": {
     "Schedule": {
       "main": [
         [
-          { "node": "GDELT — Customs & Trade Intelligence", "type": "main", "index": 0 },
-          { "node": "GDELT — Critical Trade Routes", "type": "main", "index": 0 },
-          { "node": "GDELT — Commodity Disruptions", "type": "main", "index": 0 }
+          {
+            "node": "GDELT — Customs & Trade Intelligence",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "GDELT — Critical Trade Routes",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "GDELT — Commodity Disruptions",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "GDELT — Customs & Trade Intelligence": {
-      "main": [[ { "node": "Merge & Deduplicate Articles", "type": "main", "index": 0 } ]]
+      "main": [
+        [
+          {
+            "node": "Merge & Deduplicate Articles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "GDELT — Critical Trade Routes": {
-      "main": [[ { "node": "Merge & Deduplicate Articles", "type": "main", "index": 0 } ]]
+      "main": [
+        [
+          {
+            "node": "Merge & Deduplicate Articles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "GDELT — Commodity Disruptions": {
-      "main": [[ { "node": "Merge & Deduplicate Articles", "type": "main", "index": 0 } ]]
+      "main": [
+        [
+          {
+            "node": "Merge & Deduplicate Articles",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Merge & Deduplicate Articles": {
-      "main": [[ { "node": "Risk Scoring Engine (8 Dimensions)", "type": "main", "index": 0 } ]]
+      "main": [
+        [
+          {
+            "node": "Risk Scoring Engine (8 Dimensions)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Risk Scoring Engine (8 Dimensions)": {
-      "main": [[ { "node": "Filter & Classify Alerts", "type": "main", "index": 0 } ]]
+      "main": [
+        [
+          {
+            "node": "Filter & Classify Alerts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Filter & Classify Alerts": {
-      "main": [[ { "node": "Push to Risk Sentinel API", "type": "main", "index": 0 } ]]
+      "main": [
+        [
+          {
+            "node": "Push to Risk Sentinel API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {

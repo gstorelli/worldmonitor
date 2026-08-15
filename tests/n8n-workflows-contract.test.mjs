@@ -86,7 +86,7 @@ describe('n8n workflow JSON contract', () => {
       }
     });
 
-    it(`${file}: Authorization headers are nested inside "parameters" on push nodes`, () => {
+    it(`${file}: push nodes use the shared header-auth credential (no $env, no hardcoded bearer)`, () => {
       for (const node of json.nodes) {
         if (node.type !== 'n8n-nodes-base.httpRequest') continue;
         // A headerParameters SIBLING of parameters is silently ignored by n8n:
@@ -95,19 +95,31 @@ describe('n8n workflow JSON contract', () => {
           `node "${node.name}" has headerParameters OUTSIDE parameters — move it inside`);
         const url = node.parameters?.url || '';
         if (!url.includes('/api/n8n/ingest')) continue;
-        const headers = node.parameters?.headerParameters?.parameters || [];
-        assert.ok(headers.some((h) => h.name?.toLowerCase() === 'authorization'),
-          `push node "${node.name}" declares no Authorization header`);
+        assert.equal(url, 'https://risksentinel.opencyber.org/api/n8n/ingest',
+          `push node "${node.name}" URL must be the literal production ingest URL`);
+        assert.equal(node.parameters.authentication, 'genericCredentialType',
+          `push node "${node.name}" must authenticate via a credential`);
+        assert.equal(node.parameters.genericAuthType, 'httpHeaderAuth',
+          `push node "${node.name}" must use httpHeaderAuth`);
+        assert.ok(node.credentials?.httpHeaderAuth, `push node "${node.name}" references no httpHeaderAuth credential`);
+        assert.equal(node.credentials.httpHeaderAuth.name, 'Risk Sentinel Ingest Bearer',
+          `push node "${node.name}" must reference the "Risk Sentinel Ingest Bearer" credential`);
       }
     });
 
-    it(`${file}: push URLs are n8n expressions pointing at /api/n8n/ingest`, () => {
+    it(`${file}: no $env references (production instance blocks env access)`, () => {
+      if (file.startsWith('08-') || file.startsWith('09-')) return; // legacy reference exports
+      const raw = JSON.stringify(json);
+      assert.ok(!raw.includes('$env.'), `${file} must not use $env expressions — use n8n credentials`);
+    });
+
+    it(`${file}: push URLs point at the production ingest endpoint`, () => {
       for (const node of json.nodes) {
         if (node.type !== 'n8n-nodes-base.httpRequest') continue;
         const url = node.parameters?.url;
         if (typeof url === 'string' && url.includes('/api/n8n/ingest')) {
-          assert.match(url, /^=/,
-            `node "${node.name}" URL is missing the leading '=' — n8n would treat it as a literal string`);
+          assert.equal(url, 'https://risksentinel.opencyber.org/api/n8n/ingest',
+            `node "${node.name}" URL must be the literal production ingest endpoint`);
         }
       }
     });

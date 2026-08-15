@@ -16,7 +16,10 @@
       "name": "Schedule (Every day)",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [0, 0]
+      "position": [
+        0,
+        0
+      ]
     },
     {
       "parameters": {
@@ -44,7 +47,10 @@
       "name": "Fetch EUR-Lex latest",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [220, 0],
+      "position": [
+        220,
+        0
+      ],
       "onError": "continueRegularOutput"
     },
     {
@@ -55,33 +61,39 @@
       "name": "Parse EUR-Lex results",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [440, 0]
+      "position": [
+        440,
+        0
+      ]
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.RISK_SENTINEL_WEBHOOK_URL || 'https://risksentinel.opencyber.org/api/n8n/ingest' }}",
+        "url": "https://risksentinel.opencyber.org/api/n8n/ingest",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ pipeline: 'policy-monitor', items: $json }) }}",
         "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Authorization",
-              "value": "={{ 'Bearer ' + $env.N8N_INGEST_SECRET }}"
-            }
-          ]
-        },
         "options": {
           "timeout": 30000
-        }
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
       },
       "id": "19fca1f1-0004-4001-8001-policypush",
       "name": "Push to Risk Sentinel API",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [660, 0]
+      "position": [
+        660,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "Risk Sentinel Ingest Bearer"
+        }
+      }
     }
   ],
   "connections": {

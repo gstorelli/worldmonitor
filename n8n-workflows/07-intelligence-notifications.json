@@ -16,12 +16,15 @@
       "name": "Schedule (Every hour)",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [0, 0]
+      "position": [
+        0,
+        0
+      ]
     },
     {
       "parameters": {
         "method": "GET",
-        "url": "={{ ($env.RISK_SENTINEL_WEBHOOK_URL ? $env.RISK_SENTINEL_WEBHOOK_URL.replace(/\\/api\\/n8n\\/ingest$/, '') : 'https://risksentinel.opencyber.org') + '/api/notify/config' }}",
+        "url": "https://risksentinel.opencyber.org/api/notify/config",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -39,7 +42,10 @@
       "name": "Read notification config",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [220, 0]
+      "position": [
+        220,
+        0
+      ]
     },
     {
       "parameters": {
@@ -49,7 +55,10 @@
       "name": "Gate on config",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [440, 0]
+      "position": [
+        440,
+        0
+      ]
     },
     {
       "parameters": {
@@ -66,7 +75,10 @@
       "name": "Send Telegram",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [660, -60],
+      "position": [
+        660,
+        -60
+      ],
       "onError": "continueRegularOutput"
     },
     {
@@ -83,7 +95,10 @@
       "name": "Send Email",
       "type": "n8n-nodes-base.emailSend",
       "typeVersion": 2.1,
-      "position": [660, 60],
+      "position": [
+        660,
+        60
+      ],
       "onError": "continueRegularOutput",
       "credentials": {
         "smtp": {

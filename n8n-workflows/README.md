@@ -26,21 +26,31 @@ Questa cartella contiene i workflow n8n per l'ingestion e il risk scoring dei da
 1. Apri la dashboard n8n (`http://tuo-server:5678`)
 2. Vai su **Workflows → Import from File**
 3. Seleziona il file `.json` desiderato
-4. Configura le **variabili d'ambiente** (vedi sotto)
+4. Collega la credential **Risk Sentinel Ingest Bearer** (vedi sotto)
 5. Attiva il workflow
-
-## Variabili d'Ambiente Richieste
-
-Configura queste variabili nella sezione **Settings → Environment Variables** di n8n:
-
-| Variabile | Descrizione | Obbligatoria |
-|-----------|-------------|:------------:|
-| `RISK_SENTINEL_WEBHOOK_URL` | URL dell'endpoint di ingestion di Risk Sentinel (es: `https://risksentinel.opencyber.org/api/n8n/ingest`) | ✅ |
-| `N8N_INGEST_SECRET` | Segreto condiviso inviato come `Authorization: Bearer` all'endpoint di ingestion (deve coincidere con `N8N_INGEST_SECRET` lato server) | ✅ |
 
 > I workflow scrivono solo su chiavi Redis dedicate `risk_sentinel:n8n:*` (consumate dagli
 > endpoint `api/customs/*`) e su `policy:monitor:v1` (consumata da `api/policy/registry.js`).
 > Non scrivono MAI sulle chiavi canoniche dei seeder nativi della piattaforma.
+
+## Credenziali e Segreti
+
+> L'istanza n8n di produzione (`automata.opencyber.org`) blocca l'accesso a `$env`
+> nelle espressioni. I workflow usano quindi **esclusivamente** la credential n8n
+> condivisa **"Risk Sentinel Ingest Bearer"** (tipo `Header Auth`, header
+> `Authorization`, valore `Bearer <N8N_INGEST_SECRET>`), con URL dell'endpoint
+> fisso `https://risksentinel.opencyber.org/api/n8n/ingest`.
+
+Dopo l'import di un file `.json`:
+
+1. Crea (o importa) la credential `Header Auth` **Risk Sentinel Ingest Bearer**
+   con header name `Authorization` e valore `Bearer <N8N_INGEST_SECRET>`
+   (il segreto condiviso con il server, generato con `openssl rand -hex 32`).
+2. Apri ogni nodo HTTP di push e conferma che la credential sia collegata.
+3. Attiva il workflow.
+
+I file nel repository NON contengono segreti né espressioni `$env`: il test
+`tests/n8n-workflows-contract.test.mjs` lo garantisce in CI.
 
 ### Credenziali per Workflow Specifici
 

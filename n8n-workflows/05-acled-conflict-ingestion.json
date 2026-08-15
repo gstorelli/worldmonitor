@@ -4,14 +4,22 @@
     {
       "parameters": {
         "rule": {
-          "interval": [{ "field": "hours", "hoursInterval": 6 }]
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 6
+            }
+          ]
         }
       },
       "id": "schedule-acled",
       "name": "Schedule (Every 6h)",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [250, 300],
+      "position": [
+        250,
+        300
+      ],
       "notes": "ACLED data updates daily; polling every 6h ensures freshness without excess API calls"
     },
     {
@@ -23,7 +31,10 @@
       "name": "Build ACLED Query",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [500, 300]
+      "position": [
+        500,
+        300
+      ]
     },
     {
       "parameters": {
@@ -31,22 +42,42 @@
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
-            { "name": "event_type", "value": "={{ $json.eventTypes }}" },
-            { "name": "event_date", "value": "={{ $json.startDate }}|{{ $json.endDate }}" },
-            { "name": "event_date_where", "value": "BETWEEN" },
-            { "name": "limit", "value": "500" },
-            { "name": "_format", "value": "json" }
+            {
+              "name": "event_type",
+              "value": "={{ $json.eventTypes }}"
+            },
+            {
+              "name": "event_date",
+              "value": "={{ $json.startDate }}|{{ $json.endDate }}"
+            },
+            {
+              "name": "event_date_where",
+              "value": "BETWEEN"
+            },
+            {
+              "name": "limit",
+              "value": "500"
+            },
+            {
+              "name": "_format",
+              "value": "json"
+            }
           ]
         },
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
-        "options": { "timeout": 15000 }
+        "options": {
+          "timeout": 15000
+        }
       },
       "id": "acled-fetch",
       "name": "ACLED — Conflict Events (30d)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [750, 300],
+      "position": [
+        750,
+        300
+      ],
       "notes": "Fetches last 30 days of armed conflict events from ACLED. Requires ACLED API credentials configured in n8n (Header Auth with Bearer token)."
     },
     {
@@ -58,47 +89,92 @@
       "name": "Process Conflicts & Trade Impact",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1000, 300],
+      "position": [
+        1000,
+        300
+      ],
       "notes": "Maps ACLED events to trade chokepoint proximity and computes severity scores"
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.RISK_SENTINEL_WEBHOOK_URL || 'https://risksentinel.opencyber.org/api/n8n/ingest' }}",
+        "url": "https://risksentinel.opencyber.org/api/n8n/ingest",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify($input.item.json) }}",
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Authorization",
-              "value": "={{ 'Bearer ' + $env.N8N_INGEST_SECRET }}"
-            }
-          ]
+        "options": {
+          "timeout": 10000
         },
-        "options": { "timeout": 10000 }
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
       },
       "id": "push-acled",
       "name": "Push to Risk Sentinel API",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1250, 300]
+      "position": [
+        1250,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "Risk Sentinel Ingest Bearer"
+        }
+      }
     }
   ],
   "connections": {
     "Schedule (Every 6h)": {
-      "main": [[ { "node": "Build ACLED Query", "type": "main", "index": 0 } ]]
+      "main": [
+        [
+          {
+            "node": "Build ACLED Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Build ACLED Query": {
-      "main": [[ { "node": "ACLED — Conflict Events (30d)", "type": "main", "index": 0 } ]]
+      "main": [
+        [
+          {
+            "node": "ACLED — Conflict Events (30d)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "ACLED — Conflict Events (30d)": {
-      "main": [[ { "node": "Process Conflicts & Trade Impact", "type": "main", "index": 0 } ]]
+      "main": [
+        [
+          {
+            "node": "Process Conflicts & Trade Impact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Process Conflicts & Trade Impact": {
-      "main": [[ { "node": "Push to Risk Sentinel API", "type": "main", "index": 0 } ]]
+      "main": [
+        [
+          {
+            "node": "Push to Risk Sentinel API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
-  "settings": { "executionOrder": "v1" },
-  "meta": { "templateCredsSetupCompleted": true, "instanceId": "risk-sentinel-phd" }
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "risk-sentinel-phd"
+  }
 }

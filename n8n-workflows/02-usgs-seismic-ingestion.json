@@ -4,14 +4,22 @@
     {
       "parameters": {
         "rule": {
-          "interval": [{ "field": "hours", "hoursInterval": 1 }]
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 1
+            }
+          ]
         }
       },
       "id": "schedule-seismic",
       "name": "Schedule (Every 1h)",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [250, 300],
+      "position": [
+        250,
+        300
+      ],
       "notes": "Polls USGS earthquake feed every hour"
     },
     {
@@ -25,7 +33,10 @@
       "name": "USGS — Earthquakes M4.5+ (24h)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [500, 300],
+      "position": [
+        500,
+        300
+      ],
       "notes": "Fetches all earthquakes magnitude ≥ 4.5 in the last 24 hours from USGS GeoJSON feed"
     },
     {
@@ -37,45 +48,82 @@
       "name": "Process & Score Trade Impact",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [750, 300],
+      "position": [
+        750,
+        300
+      ],
       "notes": "Enriches earthquakes with proximity to trade routes and nuclear test sites, computes trade impact score"
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.RISK_SENTINEL_WEBHOOK_URL || 'https://risksentinel.opencyber.org/api/n8n/ingest' }}",
+        "url": "https://risksentinel.opencyber.org/api/n8n/ingest",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify($input.item.json) }}",
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Authorization",
-              "value": "={{ 'Bearer ' + $env.N8N_INGEST_SECRET }}"
-            }
-          ]
+        "options": {
+          "timeout": 10000
         },
-        "options": { "timeout": 10000 }
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
       },
       "id": "push-seismic",
       "name": "Push to Risk Sentinel API",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1000, 300],
-      "notes": "Sends processed earthquake data to Risk Sentinel ingestion endpoint"
+      "position": [
+        1000,
+        300
+      ],
+      "notes": "Sends processed earthquake data to Risk Sentinel ingestion endpoint",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "Risk Sentinel Ingest Bearer"
+        }
+      }
     }
   ],
   "connections": {
     "Schedule (Every 1h)": {
-      "main": [[ { "node": "USGS — Earthquakes M4.5+ (24h)", "type": "main", "index": 0 } ]]
+      "main": [
+        [
+          {
+            "node": "USGS — Earthquakes M4.5+ (24h)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "USGS — Earthquakes M4.5+ (24h)": {
-      "main": [[ { "node": "Process & Score Trade Impact", "type": "main", "index": 0 } ]]
+      "main": [
+        [
+          {
+            "node": "Process & Score Trade Impact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Process & Score Trade Impact": {
-      "main": [[ { "node": "Push to Risk Sentinel API", "type": "main", "index": 0 } ]]
+      "main": [
+        [
+          {
+            "node": "Push to Risk Sentinel API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
-  "settings": { "executionOrder": "v1" },
-  "meta": { "templateCredsSetupCompleted": true, "instanceId": "risk-sentinel-phd" }
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "risk-sentinel-phd"
+  }
 }

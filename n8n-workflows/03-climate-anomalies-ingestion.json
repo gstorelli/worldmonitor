@@ -4,14 +4,22 @@
     {
       "parameters": {
         "rule": {
-          "interval": [{ "field": "hours", "hoursInterval": 3 }]
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 3
+            }
+          ]
         }
       },
       "id": "schedule-climate",
       "name": "Schedule (Every 3h)",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [250, 300],
+      "position": [
+        250,
+        300
+      ],
       "notes": "Polls Open-Meteo every 3 hours for climate anomaly data across trade-critical zones"
     },
     {
@@ -23,19 +31,27 @@
       "name": "Generate Zone Requests",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [500, 300],
+      "position": [
+        500,
+        300
+      ],
       "notes": "Generates Open-Meteo API requests for 15 trade-critical climate zones"
     },
     {
       "parameters": {
         "url": "={{ $json.url }}",
-        "options": { "timeout": 20000 }
+        "options": {
+          "timeout": 20000
+        }
       },
       "id": "open-meteo-fetch",
       "name": "Open-Meteo — Archive Data",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [750, 300],
+      "position": [
+        750,
+        300
+      ],
       "notes": "Fetches 21-day temperature and precipitation archive for each zone"
     },
     {
@@ -47,7 +63,10 @@
       "name": "Detect Climate Anomalies",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1000, 300],
+      "position": [
+        1000,
+        300
+      ],
       "notes": "Detects temperature/precipitation anomalies and assesses trade impact per zone"
     },
     {
@@ -59,49 +78,102 @@
       "name": "Aggregate All Zones",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1250, 300]
+      "position": [
+        1250,
+        300
+      ]
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.RISK_SENTINEL_WEBHOOK_URL || 'https://risksentinel.opencyber.org/api/n8n/ingest' }}",
+        "url": "https://risksentinel.opencyber.org/api/n8n/ingest",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify($input.item.json) }}",
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Authorization",
-              "value": "={{ 'Bearer ' + $env.N8N_INGEST_SECRET }}"
-            }
-          ]
+        "options": {
+          "timeout": 10000
         },
-        "options": { "timeout": 10000 }
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
       },
       "id": "push-climate",
       "name": "Push to Risk Sentinel API",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1500, 300]
+      "position": [
+        1500,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "Risk Sentinel Ingest Bearer"
+        }
+      }
     }
   ],
   "connections": {
     "Schedule (Every 3h)": {
-      "main": [[ { "node": "Generate Zone Requests", "type": "main", "index": 0 } ]]
+      "main": [
+        [
+          {
+            "node": "Generate Zone Requests",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Generate Zone Requests": {
-      "main": [[ { "node": "Open-Meteo — Archive Data", "type": "main", "index": 0 } ]]
+      "main": [
+        [
+          {
+            "node": "Open-Meteo — Archive Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Open-Meteo — Archive Data": {
-      "main": [[ { "node": "Detect Climate Anomalies", "type": "main", "index": 0 } ]]
+      "main": [
+        [
+          {
+            "node": "Detect Climate Anomalies",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Detect Climate Anomalies": {
-      "main": [[ { "node": "Aggregate All Zones", "type": "main", "index": 0 } ]]
+      "main": [
+        [
+          {
+            "node": "Aggregate All Zones",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Aggregate All Zones": {
-      "main": [[ { "node": "Push to Risk Sentinel API", "type": "main", "index": 0 } ]]
+      "main": [
+        [
+          {
+            "node": "Push to Risk Sentinel API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
-  "settings": { "executionOrder": "v1" },
-  "meta": { "templateCredsSetupCompleted": true, "instanceId": "risk-sentinel-phd" }
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "risk-sentinel-phd"
+  }
 }
