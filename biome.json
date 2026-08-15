@@ -18,6 +18,10 @@
 			"linter": { "enabled": false }
 		},
 		{
+			"includes": ["api/**/\\[rpc\\].js"],
+			"linter": { "enabled": false }
+		},
+		{
 			"includes": ["public/**"],
 			"linter": { "enabled": false }
 		},

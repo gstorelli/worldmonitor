@@ -269,6 +269,7 @@ export function __setSleepForTests(fn) {
  * @param {number} [timeoutMs]
  * @param {(() => void) | undefined} [reserveRequest]
  */
+// biome-ignore lint/style/useDefaultParameterLast: internal helper — the timeout default predates the trailing reserve callback; reordering would break the (url, timeoutMs, reserveRequest) call shape
 async function fetchBilateralOnce(url, timeoutMs = 45_000, reserveRequest) {
   // Reserve immediately before the network call so retries count against the
   // same hard quota budget as first attempts. A logical batch fetch may issue
@@ -302,6 +303,7 @@ function buildFetchUrl(reporterCode, hs4Batch, key, period) {
  * @param {(() => void) | undefined} [reserveRequest]
  * @returns {Promise<Array<{cmdCode: string, partnerCode: string, primaryValue: number, year: number}>>}
  */
+// biome-ignore lint/style/useDefaultParameterLast: exported signature — the period default predates the trailing reserve callback; reordering would break positional callers (tests pass '2023' as 3rd arg)
 export async function fetchBilateral(reporterCode, hs4Batch, period = recentPeriod(), reserveRequest) {
   let rateLimitedOnce = false;
   let transientRetries = 0;

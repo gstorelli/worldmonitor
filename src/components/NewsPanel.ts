@@ -36,6 +36,7 @@ export class NewsPanel extends Panel {
   private isFirstRender = true;
   private windowedList: WindowedList<PreparedCluster> | null = null;
   private useVirtualScroll = true;
+  // biome-ignore lint/correctness/noUnusedPrivateClassMembers: consumed by the render throttle guard in requestWindowedRender (noUnusedPrivateClassMembers misses the usage pattern)
   private renderRequestId = 0;
   private boundScrollHandler: (() => void) | null = null;
   private boundClickHandler: (() => void) | null = null;
