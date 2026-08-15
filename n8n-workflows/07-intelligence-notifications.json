@@ -12,14 +12,11 @@
           ]
         }
       },
-      "id": "19fca2f2-0001-4002-8002-notifysched",
+      "id": "notif-schedule",
       "name": "Schedule (Every hour)",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [
-        0,
-        0
-      ]
+      "position": [0, 0]
     },
     {
       "parameters": {
@@ -30,7 +27,7 @@
           "parameters": [
             {
               "name": "User-Agent",
-              "value": "RiskSentinelNotifications/1.0"
+              "value": "RiskSentinelNotifications/2.0"
             }
           ]
         },
@@ -38,74 +35,195 @@
           "timeout": 20000
         }
       },
-      "id": "19fca2f2-0002-4002-8002-notifycfg",
+      "id": "notif-read-config",
       "name": "Read notification config",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [
-        220,
-        0
-      ]
+      "position": [220, 0]
     },
     {
       "parameters": {
-        "jsCode": "const cfg = $json.config || null;\nif (!cfg) return [];\n// The digest payload is provided by the platform: the workflow merely\n// re-sends what the config-driven digest endpoint returns. Operators can\n// swap this node for a direct Redis/digest fetch if they prefer n8n-side\n// aggregation. Frequency gating is expected on the schedule side.\nconst freq = cfg.frequency || 'hourly';\nreturn [{ json: { config: cfg, frequency: freq } }];\n"
+        "jsCode": "// Decide whether this hourly tick is inside the configured send window.\nconst cfg = $input.item.json.config;\nif (!cfg || !cfg.endpoints) return [{ json: { shouldSend: false, reason: 'no-config' } }];\nconst tg = cfg.endpoints.telegram || {};\nconst email = cfg.endpoints.email || {};\nconst tgOn = Boolean(tg.enabled && tg.chatId);\nconst emailOn = Boolean(email.enabled && email.to);\nif (!tgOn && !emailOn) return [{ json: { shouldSend: false, reason: 'no-channels' } }];\n\nconst freq = cfg.frequency || 'hourly';\nconst hour = new Date().getUTCHours();\nconst day = new Date().getUTCDay();\nlet shouldSend = true;\nif (freq === 'daily') shouldSend = hour === 7;\nif (freq === 'weekly') shouldSend = day === 1 && hour === 7;\n// realtime/hourly send on every tick\n\nreturn [{\n  json: {\n    shouldSend,\n    reason: shouldSend ? '' : 'outside-window',\n    frequency: freq,\n    topics: Array.isArray(cfg.topics) ? cfg.topics : ['chokepoints', 'conflicts', 'commodities', 'climate', 'seismic', 'policy'],\n    enrichment: cfg.enrichment || 'fact',\n    telegram: { enabled: tgOn, chatId: tg.chatId || '' },\n    email: { enabled: emailOn, to: email.to || '', from: email.from || 'alert@risksentinel.opencyber.org' },\n  }\n}];"
       },
-      "id": "19fca2f2-0003-4002-8002-notifygate",
-      "name": "Gate on config",
+      "id": "notif-decide",
+      "name": "Decide send window",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        440,
-        0
-      ]
+      "position": [440, 0]
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "={{ 'https://api.telegram.org/bot' + ($json.config?.endpoints?.telegram?.botToken || '') + '/sendMessage' }}",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ chat_id: $json.config?.endpoints?.telegram?.chatId, text: '[Risk Sentinel] Digest ' + ($json.frequency || 'hourly') + ' — configurare il contenuto nel centro notifiche della piattaforma.' }) }}",
-        "options": {
-          "timeout": 20000
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.shouldSend }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
         }
       },
-      "id": "19fca2f2-0004-4002-8002-notifytg",
-      "name": "Send Telegram",
+      "id": "notif-if-window",
+      "name": "In send window?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [660, 0]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'https://risksentinel.opencyber.org/api/notify/digest?topics=' + $('Decide send window').item.json.topics.join(',') + '&limit=5' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "RiskSentinelNotifications/2.0"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "notif-fetch-digest",
+      "name": "Fetch intelligence digest",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [
-        660,
-        -60
-      ],
+      "position": [880, 0],
       "onError": "continueRegularOutput"
     },
     {
       "parameters": {
-        "fromEmail": "={{ $json.config?.endpoints?.email?.from || 'risk-sentinel@opencyber.org' }}",
-        "toEmail": "={{ $json.config?.endpoints?.email?.to || '' }}",
-        "subject": "[Risk Sentinel] Intelligence Digest",
-        "text": "Digest di intelligence Risk Sentinel. Configurare il contenuto nel centro notifiche della piattaforma.",
-        "options": {
-          "appendAttribution": false
+        "jsCode": "// Compose Telegram (HTML) and email (plain text) messages from the digest.\nconst decide = $('Decide send window').item.json;\nconst digest = $input.item.json.digest || { sections: [] };\nconst lines = [];\nfor (const section of digest.sections) {\n  lines.push(`<b>${section.title}</b>`);\n  for (const item of section.items.slice(0, 5)) {\n    const sev = (item.severity || 'moderate').toUpperCase();\n    const url = item.url ? ` <a href=\"${item.url}\">fonte</a>` : '';\n    lines.push(`• [${sev}] ${item.title}${url}`);\n  }\n}\nconst tgText = lines.length > 0 ? lines.join('\\n') : 'Nessun segnale rilevante nelle ultime ore.';\n\nconst plainLines = [];\nfor (const section of digest.sections) {\n  plainLines.push(section.title);\n  for (const item of section.items.slice(0, 5)) {\n    plainLines.push(`- [${(item.severity || 'moderate').toUpperCase()}] ${item.title}${item.url ? ' ' + item.url : ''}`);\n  }\n}\nconst emailText = plainLines.length > 0 ? plainLines.join('\\n') : 'Nessun segnale rilevante nelle ultime ore.';\n\nreturn [{\n  json: {\n    ...decide,\n    telegramText: tgText,\n    emailText,\n    subject: 'Risk Sentinel — Intelligence digest ' + new Date().toISOString().slice(0, 10),\n  }\n}];"
+      },
+      "id": "notif-format",
+      "name": "Format messages",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1100, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.telegram.enabled }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
         }
       },
-      "id": "19fca2f2-0005-4002-8002-notifymail",
+      "id": "notif-if-tg",
+      "name": "Telegram enabled?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1320, 0]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.telegram.chatId }}",
+        "text": "={{ $json.telegramText }}",
+        "additionalFields": {
+          "parse_mode": "HTML",
+          "disable_web_page_preview": true
+        }
+      },
+      "id": "notif-tg-send",
+      "name": "Send Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1540, 0],
+      "credentials": {
+        "telegramApi": {
+          "id": "",
+          "name": "Telegram account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.email.enabled }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "notif-if-email",
+      "name": "Email enabled?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1320, 220]
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $json.email.from }}",
+        "toEmail": "={{ $json.email.to }}",
+        "subject": "={{ $json.subject }}",
+        "text": "={{ $json.emailText }}",
+        "options": {}
+      },
+      "id": "notif-email-send",
       "name": "Send Email",
       "type": "n8n-nodes-base.emailSend",
-      "typeVersion": 2.1,
-      "position": [
-        660,
-        60
-      ],
-      "onError": "continueRegularOutput",
+      "typeVersion": 2,
+      "position": [1540, 220],
       "credentials": {
         "smtp": {
-          "id": "smtp-risk-sentinel",
+          "id": "",
           "name": "SMTP account"
         }
-      }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { ok: true, deliveredAt: new Date().toISOString(), skipped: $json.reason || '' } }];"
+      },
+      "id": "notif-log",
+      "name": "Log outcome",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1760, 0]
     }
   ],
   "connections": {
@@ -124,23 +242,121 @@
       "main": [
         [
           {
-            "node": "Gate on config",
+            "node": "Decide send window",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Gate on config": {
+    "Decide send window": {
+      "main": [
+        [
+          {
+            "node": "In send window?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "In send window?": {
+      "main": [
+        [
+          {
+            "node": "Fetch intelligence digest",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log outcome",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch intelligence digest": {
+      "main": [
+        [
+          {
+            "node": "Format messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format messages": {
+      "main": [
+        [
+          {
+            "node": "Telegram enabled?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Email enabled?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram enabled?": {
       "main": [
         [
           {
             "node": "Send Telegram",
             "type": "main",
             "index": 0
-          },
+          }
+        ],
+        [
+          {
+            "node": "Log outcome",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Telegram": {
+      "main": [
+        [
+          {
+            "node": "Log outcome",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email enabled?": {
+      "main": [
+        [
           {
             "node": "Send Email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log outcome",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email": {
+      "main": [
+        [
+          {
+            "node": "Log outcome",
             "type": "main",
             "index": 0
           }

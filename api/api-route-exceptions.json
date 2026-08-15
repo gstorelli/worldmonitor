@@ -822,9 +822,37 @@
       "removal_issue": null
     },
     {
-      "path": "api/data/city-coords.js",
-      "category": "internal-helper",
-      "reason": "Static city-coordinates dataset served to the map layer (non-proto data file, dashboard-internal bundle).",
+      "path": "api/notify/config.js",
+      "category": "upstream-proxy",
+      "reason": "Risk Sentinel fork-native notification configuration (Redis notify:config:v1). Operator plumbing consumed by the n8n notifications workflow and the fork settings UI.",
+      "owner": "@gstorelli",
+      "removal_issue": null
+    },
+    {
+      "path": "api/notify/digest.js",
+      "category": "upstream-proxy",
+      "reason": "Risk Sentinel fork-native intelligence digest aggregation for n8n notification delivery. Aggregates dedicated risk_sentinel:n8n:* keys into a delivery-ready digest.",
+      "owner": "@gstorelli",
+      "removal_issue": null
+    },
+    {
+      "path": "api/policy/registry.js",
+      "category": "upstream-proxy",
+      "reason": "Risk Sentinel PhD policy analysis endpoint (static normative registry + policy:monitor:v1). Hand-written JS data API on the fork-native stack.",
+      "owner": "@gstorelli",
+      "removal_issue": null
+    },
+    {
+      "path": "api/trade/hs-map.js",
+      "category": "upstream-proxy",
+      "reason": "Risk Sentinel PhD HS commodity map endpoint (static data mirror). Hand-written JS data API on the fork-native stack.",
+      "owner": "@gstorelli",
+      "removal_issue": null
+    },
+    {
+      "path": "api/zotero/library.js",
+      "category": "upstream-proxy",
+      "reason": "Risk Sentinel PhD source-validation library endpoint (curated Zotero sources). Hand-written JS data API on the fork-native stack.",
       "owner": "@gstorelli",
       "removal_issue": null
     }

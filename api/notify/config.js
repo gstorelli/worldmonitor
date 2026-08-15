@@ -34,7 +34,14 @@ async function redisGet(url, token, key) {
   });
   if (!resp.ok) return null;
   const data = await resp.json();
-  return data?.result ?? null;
+  const rawValue = data?.result ?? null;
+  if (rawValue === null) return null;
+  if (typeof rawValue !== 'string') return rawValue;
+  try {
+    return JSON.parse(rawValue);
+  } catch {
+    return null;
+  }
 }
 
 async function redisSet(url, token, key, value) {

@@ -9,6 +9,7 @@ import { escapeHtml } from '@/utils/sanitize';
 import type { PanelConfig } from '@/types';
 import { renderPreferences } from '@/services/preferences-content';
 import { renderNotificationsSettings, type NotificationsSettingsResult } from '@/services/notifications-settings';
+import { renderRiskNotifySettings } from '@/services/risk-notify-settings';
 import { getAuthState } from '@/services/auth-state';
 import { track } from '@/services/analytics';
 import { hasFeature } from '@/services/entitlements';
@@ -292,7 +293,7 @@ export class UnifiedSettings {
     });
     const showNotificationsTab = !this.config.isDesktopApp;
     const notifs = showNotificationsTab
-      ? renderNotificationsSettings({ isSignedIn })
+      ? (isSignedIn ? renderNotificationsSettings({ isSignedIn }) : renderRiskNotifySettings())
       : null;
 
     this.overlay.innerHTML = `
