@@ -3,11 +3,11 @@
 	"vcs": {
 		"enabled": true,
 		"clientKind": "git",
-		"useIgnoreFile": true
+		"useIgnoreFile": false
 	},
 	"files": {
 		"ignoreUnknown": true,
-		"includes": ["**", "!tests/fixtures/**"]
+		"includes": ["**", "!tests/fixtures/**", "!**/node_modules/**", "!dist/**", "!src/generated/**", "!api/*/v1/\\[rpc\\].js", "!api/\\[\\[...path\\]\\].js", "!public/**", "!dottorato/**", "!.playwright-mcp/**", "!docs/**", "!blog-site/**", "!pro-test/**"]
 	},
 	"formatter": {
 		"enabled": false
@@ -15,10 +15,6 @@
 	"overrides": [
 		{
 			"includes": ["src/generated/**"],
-			"linter": { "enabled": false }
-		},
-		{
-			"includes": ["api/**/\\[rpc\\].js"],
 			"linter": { "enabled": false }
 		},
 		{
