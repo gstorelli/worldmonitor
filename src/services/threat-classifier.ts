@@ -379,8 +379,12 @@ import {
   type ClassifyEventResponse,
 } from '@/generated/client/worldmonitor/intelligence/v1/service_client';
 import { createCircuitBreaker } from '@/utils';
+import { premiumFetch } from '@/services/premium-fetch';
 
-const classifyClient = new IntelligenceServiceClient(getRpcBaseUrl(), { fetch: (...args) => globalThis.fetch(...args) });
+// classifyEvent is in PREMIUM_RPC_PATHS: premiumFetch injects WM key / Clerk
+// bearer when available and no-ops safely otherwise (see
+// scripts/enforce-premium-fetch.mjs).
+const classifyClient = new IntelligenceServiceClient(getRpcBaseUrl(), { fetch: premiumFetch });
 
 const classifyBreaker = createCircuitBreaker<ThreatClassification | null>({
   name: 'AIClassify',

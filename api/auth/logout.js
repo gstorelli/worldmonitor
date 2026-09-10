@@ -1,5 +1,5 @@
 import { getPublicCorsHeaders } from '../_cors.js';
-import { clearSessionCookie, useSecureCookie } from '../_session.js';
+import { clearSessionCookie, useSecureCookie } from '../_user-session.js';
 
 /** POST /api/auth/logout → clears the session cookie. */
 export default async function handler(request) {

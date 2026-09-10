@@ -1,6 +1,6 @@
 import { getPublicCorsHeaders } from '../_cors.js';
 import { getUserById, publicUser } from '../_users.js';
-import { clearSessionCookie, getSessionFromRequest, useSecureCookie } from '../_session.js';
+import { clearSessionCookie, getSessionFromRequest, useSecureCookie } from '../_user-session.js';
 
 /**
  * GET /api/auth/me →

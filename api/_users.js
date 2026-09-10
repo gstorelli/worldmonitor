@@ -10,7 +10,7 @@
  * always map through `publicUser()`.
  */
 
-import { constantTimeEqual } from './_session.js';
+import { constantTimeEqual } from './_user-session.js';
 
 export const USERS_KEY = 'rs:users';
 export const ROLES = ['admin', 'user'];

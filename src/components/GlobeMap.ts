@@ -1830,7 +1830,7 @@ export class GlobeMap {
       </div>`;
     const authorBadge = document.createElement('div');
     authorBadge.className = 'map-author-badge';
-    authorBadge.textContent = '© Elie Habib · Someone™';
+    authorBadge.textContent = '© Risk Sentinel · PhD Research';
     el.appendChild(authorBadge);
     this.container.appendChild(el);
 
@@ -2545,15 +2545,20 @@ export class GlobeMap {
 
   private layerWarningShown = false;
   private lastActiveLayerCount = 0;
+  private layersInitialized = false;
 
   private enforceLayerLimit(): void {
     if (!this.layerTogglesEl) return;
     const WARN_THRESHOLD = 13;
     const activeCount = Array.from(this.layerTogglesEl.querySelectorAll<HTMLInputElement>('.layer-toggle input'))
       .filter(i => i.checked).length;
+    // Defaults already exceed the threshold, so don't block the first paint
+    // with a modal — only warn when the user actually adds layers.
+    const firstPass = !this.layersInitialized;
+    this.layersInitialized = true;
     const increasing = activeCount > this.lastActiveLayerCount;
     this.lastActiveLayerCount = activeCount;
-    if (activeCount >= WARN_THRESHOLD && increasing && !this.layerWarningShown) {
+    if (!firstPass && activeCount >= WARN_THRESHOLD && increasing && !this.layerWarningShown) {
       this.layerWarningShown = true;
       showLayerWarning(WARN_THRESHOLD);
     } else if (activeCount < WARN_THRESHOLD) {

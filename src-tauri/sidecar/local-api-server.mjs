@@ -1034,6 +1034,33 @@ async function validateSecretAgainstProvider(key, rawValue, context = {}) {
   }
 }
 
+// ── Session auth (Risk Sentinel) ────────────────────────────────────────────
+// Paths that must stay reachable without a user session: auth bootstrap,
+// monitoring/health probes (Docker healthcheck, deploy gate) and service
+// status. Everything else under /api/ requires a signed session cookie unless
+// the caller presents the n8n ingest bearer.
+const AUTH_EXEMPT_PATHS = new Set([
+  '/api/auth/login',
+  '/api/auth/me',
+  '/api/auth/logout',
+  '/api/sidecar-health',
+  '/api/service-status',
+  '/api/version',
+  '/api/health',
+]);
+
+let sessionModulePromise = null;
+
+function loadSessionModule(context) {
+  if (!sessionModulePromise) {
+    sessionModulePromise = import(pathToFileURL(path.join(context.apiDir, '_user-session.js')).href).catch((error) => {
+      context.logger.error('[local-api] auth module unavailable:', error?.message || error);
+      return null;
+    });
+  }
+  return sessionModulePromise;
+}
+
 async function dispatch(requestUrl, req, routes, context) {
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: makeCorsHeaders(req) });
@@ -1159,6 +1186,36 @@ async function dispatch(requestUrl, req, routes, context) {
     if (authHeader !== `Bearer ${expectedToken}` && localTokenHeader !== expectedToken) {
       context.logger.warn(`[local-api] unauthorized request to ${requestUrl.pathname}`);
       return json({ error: 'Unauthorized' }, 401);
+    }
+  }
+
+  // ── User session gate (AUTH_REQUIRED) ───────────────────────────────────
+  // Opt-in per self-hosted deployment. When enabled, every non-exempt /api/
+  // request needs a valid `rs_session` cookie; machine callers (n8n) may
+  // instead present the N8N_INGEST_SECRET bearer. Fails closed when the
+  // session secret is missing.
+  if (process.env.AUTH_REQUIRED === 'true' && !AUTH_EXEMPT_PATHS.has(requestUrl.pathname)) {
+    const headerOf = (name) => {
+      const h = req.headers;
+      if (h && typeof h.get === 'function') return h.get(name);
+      return h ? h[name.toLowerCase()] ?? null : null;
+    };
+    const sessionModule = await loadSessionModule(context);
+    if (!sessionModule) return json({ error: 'Auth module unavailable' }, 503);
+
+    const bearerToken = String(headerOf('authorization') || '').replace(/^Bearer\s+/i, '');
+    const ingestSecret = process.env.N8N_INGEST_SECRET || '';
+    const machineAuthorized = Boolean(ingestSecret) && sessionModule.constantTimeEqual(bearerToken, ingestSecret);
+
+    if (!machineAuthorized) {
+      const sessionSecret = process.env.WM_SESSION_SECRET || '';
+      const requestLike = { headers: { get: (name) => headerOf(name) } };
+      const session = sessionSecret
+        ? await sessionModule.getSessionFromRequest(requestLike, sessionSecret)
+        : null;
+      if (!session) {
+        return json({ error: 'Unauthorized' }, 401);
+      }
     }
   }
 

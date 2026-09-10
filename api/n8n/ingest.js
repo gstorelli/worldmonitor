@@ -30,6 +30,7 @@
  */
 
 import { getPublicCorsHeaders } from '../_cors.js';
+import { timingSafeEqualSecret } from '../_crypto.js';
 
 // ─── Redis helpers (inline for Edge Function isolation) ───
 
@@ -215,12 +216,21 @@ export default async function handler(req) {
     });
   }
 
-  // Auth: simple shared secret (set N8N_INGEST_SECRET in env)
-  const secret = process.env.N8N_INGEST_SECRET;
+  // Auth: shared secret (set N8N_INGEST_SECRET in env). Fail CLOSED: an
+  // unconfigured secret is a 503, never an open write endpoint. Local/dev can
+  // explicitly opt out with ALLOW_ANONYMOUS_N8N_INGEST=true.
+  const secret = process.env.N8N_INGEST_SECRET || '';
+  const allowAnonymous = process.env.ALLOW_ANONYMOUS_N8N_INGEST === 'true';
+  if (!secret && !allowAnonymous) {
+    return new Response(JSON.stringify({ error: 'n8n ingest is not configured' }), {
+      status: 503,
+      headers: { ...cors, 'Content-Type': 'application/json' },
+    });
+  }
   if (secret) {
     const auth = req.headers.get('authorization') || '';
     const token = auth.replace(/^Bearer\s+/i, '');
-    if (token !== secret) {
+    if (!(await timingSafeEqualSecret(token, secret))) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
         headers: { ...cors, 'Content-Type': 'application/json' },

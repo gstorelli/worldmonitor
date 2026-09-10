@@ -56,9 +56,10 @@ Create a `docker-compose.override.yml` to inject your keys. This file is **gitig
 services:
   worldmonitor:
     environment:
-      # 🤖 LLM — pick one or both (used for intelligence assessments)
-      GROQ_API_KEY: ""            # https://console.groq.com (free, 14.4K req/day)
-      OPENROUTER_API_KEY: ""      # https://openrouter.ai (free, 50 req/day)
+      # 🤖 LLM — OpenRouter is tried FIRST (default model deepseek/deepseek-v4-flash).
+      # Groq is an OPTIONAL free fallback, not required. Configure at least one.
+      OPENROUTER_API_KEY: ""      # https://openrouter.ai (free tier ~50 req/day; add credits for headroom)
+      GROQ_API_KEY: ""            # https://console.groq.com (free, 14.4K req/day — recommended fallback against 429s)
 
       # 📊 Markets & Economics
       FINNHUB_API_KEY: ""         # https://finnhub.io (free tier) — primary equity gap + search
@@ -102,9 +103,51 @@ services:
 | 🟡 Free (limited) | OpenSky (higher rate limits with account) |
 | 🔴 Paid | Cloudflare Radar (internet outages) |
 
+## 🔐 User Authentication (optional)
+
+Risk Sentinel ships a built-in user system — no external IdP. Users/roles are stored in
+Redis (`rs:users`), passwords are PBKDF2-HMAC-SHA256, and sessions are stateless HMAC
+cookies (`rs_session`, HttpOnly, 7-day TTL, `SameSite=Lax`).
+
+1. Create the first admin (on the VPS, stack running):
+   ```bash
+   RS_USER_PASSWORD='...' ./scripts/create-user.sh --username admin --role admin
+   # or: ./scripts/create-user.sh --username admin --role admin --password '...'
+   ```
+2. Enable enforcement in `.env` and recreate the containers:
+   ```bash
+   AUTH_REQUIRED=true
+   WM_SESSION_SECRET=<openssl rand -hex 32>   # min 32 chars (already required)
+   docker compose up -d
+   ```
+3. The SPA now shows a login screen; the header gains a **Logout** button. Manage users
+   with the same script (`--update` to reset a password/role) or the admin-only
+   `GET/POST/PATCH/DELETE /api/auth/users` endpoint.
+
+Notes:
+- The static SPA shell stays public; **all data endpoints require the session**.
+- Machine callers keep using `N8N_INGEST_SECRET` as a Bearer (n8n ingest, notify
+  config), so background automation is unaffected.
+- Health/version probes (`/api/health`, `/api/version`, `/api/sidecar-health`) stay
+  exempt for monitoring and the deploy gate.
+- Without `AUTH_REQUIRED=true` the app behaves exactly as before (anonymous, de-clouded).
+
 ## 🌱 Seeding Data
 
 The seed scripts fetch upstream data and write it to Redis. They run **on the host** (not inside the container) and need the Redis REST proxy to be running.
+
+> **Risk Sentinel compose stack:** run these **on the VPS** so the seeders can reach the
+> compose `internal-net` network. Use `scripts/seed-all.sh`, which runs every
+> `scripts/seed-*.mjs` in a throwaway `node:24-alpine` container attached to that network
+> (Redis REST + local API), reading keys from the checkout `.env`:
+>
+> ```bash
+> cd /path/to/checkout && ./scripts/seed-all.sh
+> ```
+>
+> Seeders whose API key is missing skip/fail individually; the final summary reports
+> `total/ok/fail`. A `docker compose up -d --build` does **not** re-seed. The
+> `run-seeders.sh` flow below is the upstream/local variant.
 
 ```bash
 # Run all seeders (auto-sources API keys from docker-compose.override.yml)

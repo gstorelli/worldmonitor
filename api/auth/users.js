@@ -8,7 +8,7 @@ import {
   publicUser,
   updateUser,
 } from '../_users.js';
-import { getSessionFromRequest } from '../_session.js';
+import { getSessionFromRequest } from '../_user-session.js';
 
 /**
  * Admin-only user management.

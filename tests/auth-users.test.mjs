@@ -27,7 +27,7 @@ globalThis.fetch = async (_url, opts) => {
 };
 
 const users = await import(pathToFileURL(resolve(root, 'api/_users.js')).href);
-const session = await import(pathToFileURL(resolve(root, 'api/_session.js')).href);
+const session = await import(pathToFileURL(resolve(root, 'api/_user-session.js')).href);
 const { default: loginHandler } = await import(pathToFileURL(resolve(root, 'api/auth/login.js')).href);
 const { default: meHandler } = await import(pathToFileURL(resolve(root, 'api/auth/me.js')).href);
 const { default: logoutHandler } = await import(pathToFileURL(resolve(root, 'api/auth/logout.js')).href);

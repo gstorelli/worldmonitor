@@ -1,6 +1,6 @@
 import { getPublicCorsHeaders } from '../_cors.js';
 import { getUserByUsername, isValidUsername, publicUser, verifyPassword } from '../_users.js';
-import { createSessionToken, sessionCookieValue, useSecureCookie } from '../_session.js';
+import { createSessionToken, sessionCookieValue, useSecureCookie } from '../_user-session.js';
 
 /**
  * POST /api/auth/login → { ok, user } + Set-Cookie rs_session

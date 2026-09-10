@@ -38,10 +38,13 @@
  */
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parse as parseYaml } from 'yaml';
 
-const ROOT = new URL('..', import.meta.url).pathname;
+// fileURLToPath (not URL.pathname) so the ROOT is a valid native path on
+// Windows too — `.pathname` yields `/C:/...`, which doubled the drive letter
+// into `C:\C:\...` and broke the pre-push gate on Windows worktrees.
+const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const OPENAPI_DIR = join(ROOT, 'docs/api');
 const RATE_LIMIT_SRC = join(ROOT, 'server/_shared/rate-limit.ts');
 const API_EXCEPTIONS = join(ROOT, 'api/api-route-exceptions.json');

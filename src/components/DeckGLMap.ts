@@ -5009,7 +5009,7 @@ export class DeckGLMap {
 
     const authorBadge = document.createElement('div');
     authorBadge.className = 'map-author-badge';
-    authorBadge.textContent = '© Elie Habib · Someone™';
+    authorBadge.textContent = '© Risk Sentinel · PhD Research';
     toggles.appendChild(authorBadge);
 
     this.container.appendChild(toggles);
@@ -6492,6 +6492,7 @@ export class DeckGLMap {
 
   private layerWarningShown = false;
   private lastActiveLayerCount = 0;
+  private layersInitialized = false;
 
   private enforceLayerLimit(): void {
     const WARN_THRESHOLD = 13;
@@ -6500,9 +6501,13 @@ export class DeckGLMap {
     const activeCount = Array.from(togglesEl.querySelectorAll<HTMLInputElement>('.layer-toggle input'))
       .filter(i => (i.closest('.layer-toggle') as HTMLElement)?.style.display !== 'none')
       .filter(i => i.checked).length;
+    // Defaults already exceed the threshold, so don't block the first paint
+    // with a modal — only warn when the user actually adds layers.
+    const firstPass = !this.layersInitialized;
+    this.layersInitialized = true;
     const increasing = activeCount > this.lastActiveLayerCount;
     this.lastActiveLayerCount = activeCount;
-    if (activeCount >= WARN_THRESHOLD && increasing && !this.layerWarningShown) {
+    if (!firstPass && activeCount >= WARN_THRESHOLD && increasing && !this.layerWarningShown) {
       this.layerWarningShown = true;
       showLayerWarning(WARN_THRESHOLD);
     } else if (activeCount < WARN_THRESHOLD) {
