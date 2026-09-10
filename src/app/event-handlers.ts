@@ -3,6 +3,7 @@ import type { AirlineIntelPanel } from '@/components/AirlineIntelPanel';
 import type { CustomWidgetPanel } from '@/components/CustomWidgetPanel';
 import { openWidgetChatModal } from '@/components/WidgetChatModal';
 import { deleteWidget, getWidget, saveWidget } from '@/services/widget-store';
+import { schedulePanelPrefsPush } from '@/services/user-panel-prefs';
 
 import type { McpDataPanel } from '@/components/McpDataPanel';
 import { openMcpConnectModal } from '@/components/McpConnectModal';
@@ -1034,6 +1035,7 @@ export class EventHandlerManager implements AppModule {
           Object.assign(current, nextConfig);
         });
         saveToStorage(STORAGE_KEYS.panels, this.ctx.panelSettings);
+        schedulePanelPrefsPush(this.ctx.panelSettings);
         this.applyPanelSettings();
         this.callbacks.updateSearchIndex();
       },

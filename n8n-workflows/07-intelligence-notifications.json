@@ -33,17 +33,26 @@
         },
         "options": {
           "timeout": 20000
-        }
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
       },
       "id": "notif-read-config",
       "name": "Read notification config",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [220, 0]
+      "position": [220, 0],
+      "notes": "Public GET is redacted (no botToken/smtpUrl/chatId/to); uses the shared \"Risk Sentinel Ingest Bearer\" credential to receive the full config needed for delivery.",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "Risk Sentinel Ingest Bearer"
+        }
+      }
     },
     {
       "parameters": {
-        "jsCode": "// Decide whether this hourly tick is inside the configured send window.\nconst cfg = $input.item.json.config;\nif (!cfg || !cfg.endpoints) return [{ json: { shouldSend: false, reason: 'no-config' } }];\nconst tg = cfg.endpoints.telegram || {};\nconst email = cfg.endpoints.email || {};\nconst tgOn = Boolean(tg.enabled && tg.chatId);\nconst emailOn = Boolean(email.enabled && email.to);\nif (!tgOn && !emailOn) return [{ json: { shouldSend: false, reason: 'no-channels' } }];\n\nconst freq = cfg.frequency || 'hourly';\nconst hour = new Date().getUTCHours();\nconst day = new Date().getUTCDay();\nlet shouldSend = true;\nif (freq === 'daily') shouldSend = hour === 7;\nif (freq === 'weekly') shouldSend = day === 1 && hour === 7;\n// realtime/hourly send on every tick\n\nreturn [{\n  json: {\n    shouldSend,\n    reason: shouldSend ? '' : 'outside-window',\n    frequency: freq,\n    topics: Array.isArray(cfg.topics) ? cfg.topics : ['chokepoints', 'conflicts', 'commodities', 'climate', 'seismic', 'policy'],\n    enrichment: cfg.enrichment || 'fact',\n    telegram: { enabled: tgOn, chatId: tg.chatId || '' },\n    email: { enabled: emailOn, to: email.to || '', from: email.from || 'alert@risksentinel.opencyber.org' },\n  }\n}];"
+        "jsCode": "// Decide whether this hourly tick is inside the configured send window.\nconst cfg = $input.item.json.config;\nif (!cfg || !cfg.endpoints) return [{ json: { shouldSend: false, reason: 'no-config' } }];\nconst tg = cfg.endpoints.telegram || {};\nconst email = cfg.endpoints.email || {};\n// Fail loudly instead of silently skipping when the config was redacted or\n// incomplete: it means the \"Read notification config\" node is missing the\n// \"Risk Sentinel Ingest Bearer\" credential.\nif (tg.enabled && !tg.chatId) throw new Error('Telegram config redacted/incomplete: authenticate \"Read notification config\" with the Risk Sentinel Ingest Bearer credential.');\nif (email.enabled && !email.to) throw new Error('Email config redacted/incomplete: authenticate \"Read notification config\" with the Risk Sentinel Ingest Bearer credential.');\nconst tgOn = Boolean(tg.enabled && tg.chatId);\nconst emailOn = Boolean(email.enabled && email.to);\nif (!tgOn && !emailOn) return [{ json: { shouldSend: false, reason: 'no-channels' } }];\n\nconst freq = cfg.frequency || 'hourly';\nconst hour = new Date().getUTCHours();\nconst day = new Date().getUTCDay();\nlet shouldSend = true;\nif (freq === 'daily') shouldSend = hour === 7;\nif (freq === 'weekly') shouldSend = day === 1 && hour === 7;\n// realtime/hourly send on every tick\n\nreturn [{\n  json: {\n    shouldSend,\n    reason: shouldSend ? '' : 'outside-window',\n    frequency: freq,\n    topics: Array.isArray(cfg.topics) ? cfg.topics : ['chokepoints', 'conflicts', 'commodities', 'climate', 'seismic', 'policy'],\n    enrichment: cfg.enrichment || 'fact',\n    telegram: { enabled: tgOn, chatId: tg.chatId || '' },\n    email: { enabled: emailOn, to: email.to || '', from: email.from || 'alert@risksentinel.opencyber.org' },\n  }\n}];"
       },
       "id": "notif-decide",
       "name": "Decide send window",

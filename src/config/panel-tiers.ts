@@ -50,6 +50,10 @@ export const PANEL_TIERS: Record<string, PanelTier> = {
   'other-tokens': 3,
   'stablecoins': 3,
   'polymarket': 3,
+  // Upstream PRO finance/trading surfaces (de-clouded: no entitlement layer).
+  'stock-analysis': 3,
+  'stock-backtest': 3,
+  'wsb-ticker-scanner': 3,
 };
 
 export const TIER_META: Record<PanelTier, { label: string; className: string }> = {

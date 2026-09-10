@@ -1,6 +1,7 @@
 import '@/styles/settings-window.css';
 import { FEEDS, INTEL_SOURCES, SOURCE_REGION_MAP } from '@/config/feeds';
 import { PANEL_CATEGORY_MAP, ALL_PANELS, VARIANT_DEFAULTS, getEffectivePanelConfig } from '@/config/panels';
+import { isPanelAllowedInApp } from '@/config/apps';
 
 import { SITE_VARIANT } from '@/config/variant';
 import { t } from '@/services/i18n';
@@ -11,6 +12,10 @@ import { renderPreferences } from '@/services/preferences-content';
 import { renderNotificationsSettings, type NotificationsSettingsResult } from '@/services/notifications-settings';
 import { renderRiskNotifySettings } from '@/services/risk-notify-settings';
 import { getAuthState } from '@/services/auth-state';
+import { getAuthState as getForkAuthState } from '@/services/user-auth';
+import { getPolicyDisabledPanels } from '@/services/panel-policy';
+import { renderPanelPolicyAdmin } from '@/services/admin-panel-policy';
+import { renderAdminUsers } from '@/services/admin-users';
 import { track } from '@/services/analytics';
 import { hasFeature } from '@/services/entitlements';
 
@@ -34,7 +39,7 @@ export interface UnifiedSettingsConfig {
   onMapProviderChange?: (provider: MapProvider) => void;
 }
 
-type TabId = 'settings' | 'panels' | 'sources' | 'notifications' | 'api-keys' | 'mcp-clients';
+type TabId = 'settings' | 'panels' | 'sources' | 'notifications' | 'api-keys' | 'mcp-clients' | 'admin';
 
 export class UnifiedSettings {
   private overlay: HTMLElement;
@@ -286,6 +291,7 @@ export class UnifiedSettings {
 
     const tabClass = (id: TabId) => `unified-settings-tab${this.activeTab === id ? ' active' : ''}`;
     const isSignedIn = !this.config.isDesktopApp && (getAuthState().user !== null);
+    const isAdmin = !this.config.isDesktopApp && getForkAuthState().user?.role === 'admin';
     const prefs = renderPreferences({
       isDesktopApp: this.config.isDesktopApp,
       onMapProviderChange: this.config.onMapProviderChange,
@@ -309,6 +315,7 @@ export class UnifiedSettings {
           ${showNotificationsTab ? `<button class="${tabClass('notifications')}" data-tab="notifications" role="tab" aria-selected="${this.activeTab === 'notifications'}" id="us-tab-notifications" aria-controls="us-tab-panel-notifications">${t('header.tabNotifications')}</button>` : ''}
           <button class="${tabClass('api-keys')}" data-tab="api-keys" role="tab" aria-selected="${this.activeTab === 'api-keys'}" id="us-tab-api-keys" aria-controls="us-tab-panel-api-keys">API Keys</button>
           ${hasFeature('mcpAccess') ? `<button class="${tabClass('mcp-clients')}" data-tab="mcp-clients" role="tab" aria-selected="${this.activeTab === 'mcp-clients'}" id="us-tab-mcp-clients" aria-controls="us-tab-panel-mcp-clients">MCP Clients</button>` : ''}
+          ${isAdmin ? `<button class="${tabClass('admin')}" data-tab="admin" role="tab" aria-selected="${this.activeTab === 'admin'}" id="us-tab-admin" aria-controls="us-tab-panel-admin">Admin</button>` : ''}
         </div>
         <div class="unified-settings-tab-panel${this.activeTab === 'settings' ? ' active' : ''}" data-panel-id="settings" id="us-tab-panel-settings" role="tabpanel" aria-labelledby="us-tab-settings">
           ${prefs.html}
@@ -352,6 +359,12 @@ export class UnifiedSettings {
         ${hasFeature('mcpAccess') ? `
         <div class="unified-settings-tab-panel${this.activeTab === 'mcp-clients' ? ' active' : ''}" data-panel-id="mcp-clients" id="us-tab-panel-mcp-clients" role="tabpanel" aria-labelledby="us-tab-mcp-clients">
           ${this.renderMcpClientsContent()}
+        </div>
+        ` : ''}
+        ${isAdmin ? `
+        <div class="unified-settings-tab-panel${this.activeTab === 'admin' ? ' active' : ''}" data-panel-id="admin" id="us-tab-panel-admin" role="tabpanel" aria-labelledby="us-tab-admin">
+          <div id="usAdminPolicy"></div>
+          <div id="usAdminUsers" style="margin-top:16px"></div>
         </div>
         ` : ''}
       </div>
@@ -418,6 +431,13 @@ export class UnifiedSettings {
       this.stopMcpQuotaPolling();
     }
 
+    if (tab === 'admin') {
+      const policyContainer = this.overlay.querySelector<HTMLElement>('#usAdminPolicy');
+      if (policyContainer) renderPanelPolicyAdmin(policyContainer);
+      const usersContainer = this.overlay.querySelector<HTMLElement>('#usAdminUsers');
+      if (usersContainer) void renderAdminUsers(usersContainer);
+    }
+
     if (tab === 'notifications') {
       this.attachNotificationsTab();
     }
@@ -454,9 +474,12 @@ export class UnifiedSettings {
 
   private getVisiblePanelEntries(): Array<[string, PanelConfig]> {
     const panelSettings = this.draftPanelSettings;
+    const policyDisabled = new Set(getPolicyDisabledPanels());
     let entries = Object.entries(panelSettings)
       .filter(([key]) => key !== 'runtime-config' || this.config.isDesktopApp)
-      .filter(([key]) => !key.startsWith('cw-'));
+      .filter(([key]) => !key.startsWith('cw-'))
+      .filter(([key]) => !policyDisabled.has(key))
+      .filter(([key]) => isPanelAllowedInApp(key));
 
     if (this.activePanelCategory !== 'all') {
       const catDef = PANEL_CATEGORY_MAP[this.activePanelCategory];

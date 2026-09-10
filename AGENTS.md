@@ -1,250 +1,273 @@
 # AGENTS.md
 
-Agent entry point for WorldMonitor. Read this first, then follow links for depth.
+Agent entry point for **Risk Sentinel**, a self-hosted fork of
+[WorldMonitor](https://github.com/koala73/worldmonitor). Read this first: the
+fork diverges substantially from upstream, so upstream docs (and older
+snapshots of this file) can be wrong.
 
 ## What This Project Is
 
-Real-time global intelligence dashboard. TypeScript SPA (Vite + Preact) with 183 top-level TypeScript component files, 80+ Vercel Edge API endpoint entries, a Tauri desktop app with Node.js sidecar, and a Railway relay service. Aggregates geopolitics, military, finance, climate, cyber, maritime, and aviation data across 35 freshness-tracked source groups.
+AI early-warning dashboard for **customs risk mitigation**. TypeScript SPA
+(Vite + Preact), a self-hosted Node API (`local-api-server.mjs` behind nginx),
+plus a Tauri desktop sidecar. It aggregates geopolitics, military, markets,
+commodities, climate, cyber, maritime, aviation, customs, and policy data.
+
+- **Production**: `https://risksentinel.opencyber.org` — a single Docker
+  Compose stack on a Contabo VPS (nginx reverse proxy + `worldmonitor`,
+  `redis`, `redis-rest`, `ais-relay`).
+- **This is a fork, not upstream WorldMonitor**: the de-clouding pass removed
+  Convex, Dodo Payments, and Clerk from the runtime (stubs remain in
+  `src/services/`). `ALLOW_ANONYMOUS_API=true` is the intended self-hosted mode.
+- **n8n** (`automata.opencyber.org`) runs the ingestion/scoring/notification
+  workflows and pushes results into Redis via `/api/n8n/ingest`.
+
+## Production Deployment (read before pushing)
+
+```
+git push origin main
+        │
+        ▼
+.github/workflows/deploy.yml  (GitHub Actions)
+        │  appleboy/ssh-action, port 56969
+        ▼
+Contabo VPS  $DEPLOY_PATH
+  git pull --ff-only origin main
+  docker compose up -d --build
+  docker image prune -f
+        │
+        ▼
+health gate (/api/version) → public check
+https://risksentinel.opencyber.org/api/version
+```
+
+- **Every push to `main` rebuilds production.** Work on a branch, open a PR,
+  merge only when green and explicitly approved. Never push directly to `main`
+  for experimental work.
+- The real `.env` lives **only on the VPS** at `$DEPLOY_PATH/.env`. It is
+  gitignored and the deploy script never touches it. `.env.example` documents
+  the keys; the local `.env` (if present) is ignored local state.
+- GitHub Actions secrets (`SERVER_HOST`, `SERVER_USER`, `SSH_PRIVATE_KEY`,
+  `DEPLOY_PATH`, `SERVER_PORT`) are deploy credentials only — never app keys.
+- Seeding is **manual/one-shot** on the server (`scripts/seed-all.sh` over the
+  internal Docker network). A rebuild does not re-seed; empty Redis surfaces as
+  `/api/health` criticals.
 
 ## Repository Map
 
 ```
-.
-├── src/                    # Browser SPA (TypeScript, class-based components)
-│   ├── app/                # App orchestration (data-loader, refresh-scheduler, panel-layout)
-│   ├── bootstrap/          # Startup/recovery (chunk reload, deferred Sentry, SW update)
-│   ├── components/         # 183 top-level TypeScript component files
-│   ├── config/             # Variant configs, panel/layer definitions, market symbols
-│   ├── services/           # Business logic (230 service modules and domain directories)
-│   ├── shared/             # Cross-cutting helpers (premium paths, registries, staleness)
-│   ├── embed/              # Embeddable widget loader
-│   ├── styles/             # Global CSS (layers, themes, panel styles)
-│   ├── shims/              # Runtime shims (child-process for sidecar)
-│   ├── data/               # Static JSON datasets (conservation, renewable, happiness)
-│   ├── e2e/                # Map test harnesses (consumed by Playwright specs)
-│   ├── types/              # TypeScript type definitions
-│   ├── utils/              # Shared utilities (circuit-breaker, theme, URL state, DOM)
-│   ├── workers/            # Web Workers (analysis, ML/ONNX, vector DB)
-│   ├── generated/          # Proto-generated client/server stubs (DO NOT EDIT)
-│   ├── locales/            # i18n translation files
-│   └── App.ts              # Main application entry
-├── api/                    # Vercel Edge Functions (plain JS, self-contained)
-│   ├── _*.js               # Shared helpers (CORS, rate-limit, API key, relay)
-│   ├── health.js           # Health check endpoint
-│   ├── bootstrap.js        # Bulk data hydration endpoint
-│   └── <domain>/           # Domain-specific endpoints (aviation/, climate/, etc.)
-├── server/                 # Server-side shared code (used by Edge Functions)
-│   ├── _shared/            # Redis, rate-limit, LLM, caching, response headers
-│   ├── gateway.ts          # Domain gateway factory (CORS, auth, cache tiers)
-│   ├── router.ts           # Route matching
-│   └── worldmonitor/       # Domain handlers (mirrors proto service structure)
-├── proto/                  # Protobuf definitions (sebuf framework)
-│   ├── buf.yaml            # Buf configuration
-│   └── worldmonitor/       # Service definitions with HTTP annotations
-├── shared/                 # Cross-platform data (JSON configs for markets, RSS domains)
-├── data/                   # Static data (telegram channels, OREF threat translations, gamma irradiators)
-├── public/                 # Static assets served as-is (favicons, textures, .well-known, llms.txt)
-├── scripts/                # Seed scripts, build helpers, data fetchers
-├── src-tauri/              # Tauri desktop shell (Rust + Node.js sidecar)
-│   └── sidecar/            # Node.js sidecar API server
-├── consumer-prices-core/   # Consumer-price scrapers (Playwright, per-country baskets; Railway/Docker)
-├── workers/                # Cloudflare Workers (edge CORS preflight for api.worldmonitor.app)
-├── tests/                  # Unit/integration tests (node:test runner)
-├── e2e/                    # Playwright E2E specs
-├── pro-test/               # Standalone Pro QA app (separate package)
-├── docs/                   # Mintlify documentation site
-│   └── solutions/          # Documented solutions to past problems (bugs, patterns, practices) — YAML frontmatter (module, tags, problem_type)
-├── docker/                 # Docker build for Railway services
-├── deploy/                 # Deployment configs (nginx)
-├── CONCEPTS.md             # Shared domain vocabulary (entities, named processes, status concepts)
-└── blog-site/              # Static blog (built into public/blog/)
+src/                    # Browser SPA (TypeScript, class-based components)
+  app/                  # Orchestration: data-loader, refresh-scheduler, panel-layout
+  components/           # ~143 top-level component files (Panel subclasses)
+  config/panels.ts      # Single panel registry (the variant system is collapsed to "full")
+  config/panel-tiers.ts # Fork 3-tier selector: CORE / CONTESTO / DISABLED
+  services/             # Business logic (incl. customs-risk-scoring.ts, threat-classifier.ts)
+  utils/circuit-breaker.ts
+  generated/            # Proto-generated client/server stubs (DO NOT EDIT)
+api/                    # Edge Functions (plain JS/TS, self-contained) + fork endpoints
+  _*.js                 # Shared same-dir helpers (CORS, rate-limit, API key)
+  n8n/ingest.js         # n8n ingest (fail-closed Bearer auth)
+  notify/config.js      # Notification config (redacted GET, merging POST)
+  notify/digest.js      # Delivery-ready digest
+  customs/*             # Read dedicated n8n keys
+  policy/registry.js    # reads policy:monitor:v1
+server/                 # Shared server code bundled into gateways at deploy time
+  gateway.ts            # Domain gateway factory (CORS, auth, cache tiers, ETag)
+  _shared/redis.ts      # cachedFetchJson + stampede protection
+  worldmonitor/<domain>/# RPC handlers matching proto services
+proto/worldmonitor/     # Protobuf/sebuf service definitions (make generate)
+src-tauri/sidecar/      # Node sidecar (local-api-server.mjs) + SQLite/ONNX path
+scripts/                # ~168 seeders, build/guard helpers
+tests/                  # node:test suites (tsx --test)
+e2e/                    # Playwright specs
+n8n-workflows/          # 7 active + 2 legacy workflow JSONs (imported manually)
+docker/                 # nginx/supervisord/redis-rest config for the self-hosted stack
+docs/solutions/         # Documented solutions (YAML frontmatter: module, tags, problem_type)
 ```
 
 ## How to Run
 
 ```bash
-npm ci                   # Deterministic install (also runs blog-site postinstall)
-npm run dev              # Start Vite dev server (full variant)
-npm run dev:tech         # Start tech-only variant
-npm run dev:energy       # Start energy-security variant
-npm run typecheck        # tsc --noEmit (strict mode)
-npm run typecheck:api    # Typecheck API layer separately
-npm run test:data        # Run unit/integration tests
-npm run test:sidecar     # Run sidecar + API handler tests
-npm run test:e2e         # Run all Playwright E2E tests
-make generate            # Regenerate proto stubs + per-service & unified OpenAPI specs (requires buf + sebuf v0.11.1 plugins)
-npm run worktree:bootstrap          # Fresh worktree: link local env files + npm ci with tmp cache
-npm run worktree:bootstrap:test-only # Fresh docs/test worktree: same, but npm ci --ignore-scripts
-npm run worktree:env                # Link ignored local env files only
+npm ci                    # Deterministic install (also builds blog-site). Node 24 (.nvmrc).
+npm run dev               # Vite dev server (VITE_VARIANT is collapsed to "full")
+npm run typecheck         # tsc --noEmit (src)
+npm run typecheck:api     # tsc --noEmit (api/server/scripts/generated)
+npm run test:data         # node:test suites (should stay green for changed files)
+npm run test:sidecar      # sidecar + API handler tests
+npm run lint              # biome
+npm run lint:boundaries   # dependency-direction guard
+npm run lint:safe-html    # OPT-IN ONLY: see "Pre-Push" (fork baseline fails this)
 ```
 
-## Fresh Worktree Bootstrap
+- Docker is required to run the real production stack locally; `npm run dev`
+  alone degrades gracefully without Redis/seeds.
+- Node 24 is expected (`.nvmrc`). Node 25 works for typecheck/tests but is not
+  the CI target.
 
-Worktrees usually start without ignored local state. When creating or entering one:
+## Runtime Knobs (fork defaults)
 
-1. Start from `origin/main` or the requested base, not a dirty local branch.
-2. Run `npm run worktree:bootstrap` before typecheck/tests. The helper links ignored `.env.local` / `.env` from the main worktree when Git can infer it, and installs deps with `npm ci --cache /tmp/worldmonitor-npm-cache`.
-3. If only docs/test tooling is needed and native postinstall work is unnecessary, use `npm run worktree:bootstrap:test-only`.
-4. If live credentials are unavailable, do not fabricate secrets. Run the non-credentialed checks you can and report the credential gate explicitly.
+- **LLM chain**: `ollama → openrouter → groq → generic` (`server/_shared/llm.ts`).
+  OpenRouter is tried first with `deepseek/deepseek-v4-flash`; **Groq is optional**
+  (free fallback). A 429 usually means the OpenRouter free-tier quota, not a config
+  error; add a Groq key to absorb it. `LLM_TOOL_PROVIDER`/`LLM_REASONING_PROVIDER`
+  override the per-profile default provider.
+- **Notify auth**: anonymous `GET /api/notify/config` is redacted; changing a stored
+  delivery credential (`chatId`/`to`/`botToken`/`smtpUrl`) requires the
+  `N8N_INGEST_SECRET` bearer. The settings UI keeps that token in `localStorage`
+  (`rs-notify-admin-token`).
+- **Ingest auth**: `/api/n8n/ingest` fails closed (503) without `N8N_INGEST_SECRET`;
+  local opt-out is `ALLOW_ANONYMOUS_N8N_INGEST=true` (never in production).
+- **Seeding**: one-shot on the VPS via `scripts/seed-all.sh` (compose `internal-net`);
+  a rebuild does not re-seed. Missing API keys make individual seeders skip/fail.
+- **Download CTA removed**: the fork has no desktop distribution, so the header
+  download button/dropdown is gone. Do not re-add it without a real release channel.
+- **Panel tiers**: `src/config/panel-tiers.ts` DISABLED (tier 3) includes the upstream
+  PRO finance surfaces (`stock-analysis`, `stock-backtest`, `wsb-ticker-scanner`).
+- **User auth (Phase 1)**: `AUTH_REQUIRED=true` makes the self-hosted server enforce an
+  `rs_session` HttpOnly cookie on every `/api/*` except `auth/login|me|logout`,
+  `sidecar-health`, `service-status`, `version`, `health`. Users/roles live in Redis
+  (`rs:users`, managed with `scripts/create-user.sh`); PBKDF2 password hashes; sessions
+  are stateless HMAC (`WM_SESSION_SECRET`) with 7-day TTL. Machine callers (n8n) may
+  present `N8N_INGEST_SECRET` as a bearer instead. The SPA gate lives in
+  `src/services/user-auth.ts` and is a no-op when `AUTH_REQUIRED` is false.
+- **User prefs & panel policy (Phase 2)**: `GET/PUT /api/prefs/panels` stores per-user
+  panel settings (`rs:user:<id>:panel-prefs`); `GET/PUT /api/panel-policy` stores a
+  global admin deny-list (`rs:panel-policy`, admin-only writes). Precedence:
+  **policy > user prefs > defaults**. The SPA hydrates prefs at boot and pushes on save
+  (`src/services/user-panel-prefs.ts`, `src/services/panel-policy.ts`); admins get an
+  "Admin" tab in UnifiedSettings (`src/services/admin-panel-policy.ts`).
+- **Multi-app (Phase 3)**: `src/config/apps.ts` is an app registry layered ON TOP of the
+  collapsed variant system (do not revive upstream variants — build-time meta/favicon
+  machinery is inert here). `?app=<id>` (persisted in localStorage) selects an app; an
+  app is a panel allowlist + default-enabled set. `customs` = unrestricted (current
+  dashboard), `osint` = curated OSINT workspace. The header switcher links apps; panels
+  outside the active app's allowlist are filtered in layout and settings.
 
-Env rules:
+## Runtime Architecture
 
-- Link only `.env.local` and `.env`. Never copy or link `.env.vercel-backup` or `.env.vercel-export`; the pre-push guard blocks those files even as symlinks.
-- Override env source discovery with `WM_ENV_SOURCE=/path/to/worldmonitor npm run worktree:env` when the main worktree cannot be inferred.
-- `.env*` files are ignored local state. Do not add, print, or summarize secret values.
+Three runtimes share one source tree:
 
-Validation hygiene:
+1. **Vercel Edge / self-hosted Node** — `api/**/*.ts` RPC gateways
+   (`api/<domain>/v1/[rpc].ts`) and legacy `api/*.js`. Edge entries are
+   self-contained: they cannot import from `../src/` or `../server/`; only
+   same-directory `_*.js` helpers. Enforced by `tests/edge-functions.test.mjs`
+   and `scripts/check-edge-function-bundles.mjs`.
+2. **Self-hosted Node API** — `src-tauri/sidecar/local-api-server.mjs`, spawned
+   by Docker; nginx serves the SPA and proxies `/api/*` to it, injecting a local
+   token. `server/` code is bundled into the gateway here.
+3. **Tauri desktop sidecar** — same local server in `desktop-sidecar` mode.
 
-- Prefer `npm ci` over `npm install` in fresh worktrees. Use `npm_config_cache=/tmp/worldmonitor-npm-cache` for `npx` or install commands if cache ownership errors appear.
-- After bootstrap or pre-push, run `git status --short`. If dependency bootstrap changed lockfiles you did not intend to edit, remove those incidental changes before finalizing.
-- After install, prefer local tools such as `./node_modules/.bin/tsx --test ...` for focused TypeScript tests when `npx` is flaky.
+Key mechanisms:
 
-## Architecture Rules
+- `server/gateway.ts` pipeline: CORS → auth → entitlement → rate-limit →
+  cache tiers → JMESPath → ETag/304 → telemetry.
+- `cachedFetchJson()` coalesces concurrent misses; cache tiers fast (5m),
+  medium (10m), slow (30m), static (2h), daily (24h). Include request-varying
+  params in the cache key.
+- Proto flow: `proto/` → `buf generate` (`make generate`) →
+  `src/generated/{client,server}/`. GET fields need `(sebuf.http.query)`;
+  `repeated string` needs `parseStringArray()`; `int64` maps to `string`.
 
-### Dependency Direction
+## n8n Integration (fork-critical)
+
+Active workflows live in `n8n-workflows/` and are imported manually into n8n.
+
+- **Ingest** (`api/n8n/ingest.js`): `POST` with `Authorization: Bearer
+  <N8N_INGEST_SECRET>`. Auth **fails closed** — if the secret is unset the
+  endpoint returns 503 unless `ALLOW_ANONYMOUS_N8N_INGEST=true`. Workflows
+  01–06 use the shared n8n credential `Risk Sentinel Ingest Bearer`.
+- Pipelines write **dedicated keys** `risk_sentinel:n8n:<resource>` (gdelt,
+  usgs, openmeteo, commodities, acled); the sole canonical exception is
+  `policy:monitor:v1`. Contract: `tests/n8n-workflows-contract.test.mjs`.
+- **Notify** (`api/notify/config.js`): anonymous `GET` is **redacted** (no
+  botToken/smtpUrl/chatId/to, but `enabled`/`connected` kept); the n8n workflow
+  authenticates with the same Bearer to receive the full config. `POST` merges
+  into the stored config so a redacted round-trip never wipes credentials.
+- Workflow 07 ("intelligence notifications") reads config + digest and delivers
+  Telegram/email. After changing its JSON you must re-import it in n8n.
+
+## Customs Risk Scoring (fork-critical)
+
+The canonical 8-dimension model is **`src/services/customs-risk-scoring.ts`**:
 
 ```
-types -> config -> services -> components -> app -> App.ts
+RiskScore = 0.18·eventSeverity + 0.10·sourceConfidence + 0.18·tradeExposure
+          + 0.14·routeCriticality + 0.12·commoditySensitivity + 0.10·escalationMomentum
+          + 0.12·customsRelevance + 0.06·geophysicalImpact
 ```
 
-- `types/` has zero internal imports
-- `config/` imports only from `types/`
-- `services/` imports from `types/` and `config/`
-- `components/` imports from all above
-- `app/` orchestrates components and services
+`tests/customs-risk-scoring-parity.test.mjs` locks the canonical weights, the
+n8n workflow 01 code node, and the sidecar `scoring.ts` together. **Never edit
+one copy of the formula without the others** — extend the parity test instead.
 
-### API Layer Constraints
+## Environment Rules
 
-- `api/*.js` are Vercel Edge Functions: **self-contained JS only**
-- They CANNOT import from `../src/` or `../server/` (different runtime)
-- Only same-directory `_*.js` helpers and npm packages
-- Enforced by `tests/edge-functions.test.mjs` and pre-push hook esbuild check
-
-### Server Layer
-
-- `server/` code is bundled INTO Edge Functions at deploy time via gateway
-- `server/_shared/` contains Redis client, rate limiting, LLM helpers
-- `server/worldmonitor/<domain>/` has RPC handlers matching proto services
-- All handlers use `cachedFetchJson()` for Redis caching with stampede protection
-
-### Proto Contract Flow
-
-```
-proto/ definitions -> buf generate -> src/generated/{client,server}/ -> handlers wire up
-```
-
-- GET fields need `(sebuf.http.query)` annotation
-- `repeated string` fields need `parseStringArray()` in handler
-- `int64` maps to `string` in TypeScript
-- CI checks proto freshness via `.github/workflows/proto-check.yml`
-
-## Variant System
-
-The app ships multiple variants with different panel/layer configurations:
-
-- `full` (default): All features
-- `tech`: Technology-focused subset
-- `finance`: Financial markets focus
-- `commodity`: Commodity markets focus
-- `happy`: Positive news only
-- `energy`: Energy security, chokepoints, oil/gas, and disruption timelines
-
-Variant is set via `VITE_VARIANT` env var. Config lives in `src/config/variants/`.
+- Never commit or print secrets. `.env*` are ignored local state; `.env.example`
+  is the only tracked env file (its Convex/Dodo/Clerk sections are legacy).
+- Seed credentials load only via `loadEnvFile()` (inert under tests, resolves the
+  checkout root, `only:` narrows keys). Never hand-roll a `.env` reader.
+- Redis seeders MUST write `seed-meta:<key>` for the health monitor.
+- New data sources need bootstrap hydration in `api/bootstrap.js`, unless
+  nothing in `src/` renders them (then register in `api/health.js`
+  `STANDALONE_KEYS`). `tests/bootstrap.test.mjs` enforces the converse.
 
 ## Key Patterns
 
-### Adding a New API Endpoint
+- **New panel**: extend `Panel` in `src/components/`, register in
+  `src/config/panels.ts`, classify in `src/config/panel-tiers.ts`, wire loading
+  in `src/app/data-loader.ts`.
+- **New endpoint**: define proto → `make generate` → handler in
+  `server/worldmonitor/<domain>/` → gateway, using `cachedFetchJson()`. Edge
+  `api/*.js` must stay self-contained.
+- **Circuit breakers**: `src/utils/circuit-breaker.ts`, one per data domain.
+- **Notification settings UI**: `src/services/risk-notify-settings.ts` relies on
+  the server `connected` flags because GET is redacted.
 
-1. Define proto message in `proto/worldmonitor/<domain>/`
-2. Add RPC with `(sebuf.http.config)` annotation
-3. Run `make generate`
-4. Create handler in `server/worldmonitor/<domain>/`
-5. Wire handler in domain's `handler.ts`
-6. Use `cachedFetchJson()` for caching, include request params in cache key
+## Testing and Validation
 
-### Adding a New Panel
+- **Unit/integration**: `tests/*.test.{mjs,mts}` via `tsx --test` (`test:data`).
+- **API/sidecar**: `npm run test:sidecar`.
+- **DOM**: `npm run test:dom` — **known broken upstream baseline** (specs
+  reference components removed during de-clouding, plus Vitest/Node
+  `localStorage` friction). Only runs in the pre-push DOM partition.
+- **E2E**: `e2e/*.spec.ts` (Playwright).
+- Run targeted tests, not the whole 900+ suite, while iterating.
 
-1. Create `src/components/MyPanel.ts` extending `Panel`
-2. Register in `src/config/panels.ts`
-3. Add to variant configs in `src/config/variants/`
-4. Wire data loading in `src/app/data-loader.ts`
+## CI and Pre-Push
 
-### Circuit Breakers
+CI: `.github/workflows/` — `typecheck.yml`, `lint-code.yml`, `lint.yml`
+(markdown), `proto-check.yml`, `security-audit.yml`, `feed-validation.yml`,
+`build-desktop.yml`, `docker-publish.yml`, `test.yml`, `deploy.yml`.
 
-- `src/utils/circuit-breaker.ts` for client-side
-- Used in data loaders to prevent cascade failures
-- Separate breaker per data domain
+Pre-push (`.husky/pre-push`) runs state guards, then diff-scoped checks:
 
-### Caching
-
-- Redis (Upstash) via `server/_shared/redis.ts`
-- `cachedFetchJson()` coalesces concurrent cache misses
-- Cache tiers: fast (5m), medium (10m), slow (30m), static (2h), daily (24h)
-- Cache key MUST include request-varying params
-
-## Testing
-
-- **Unit/Integration**: `tests/*.test.{mjs,mts}` using `node:test` runner
-- **Sidecar tests**: `api/*.test.mjs`, `src-tauri/sidecar/*.test.mjs`
-- **E2E**: `e2e/*.spec.ts` using Playwright
-- **Visual regression**: Golden screenshot comparison per variant
-
-## CI Checks (GitHub Actions)
-
-| Workflow | Trigger | What it checks |
-|---|---|---|
-| `typecheck.yml` | PR + push to main | `tsc --noEmit` for src and API |
-| `lint.yml` | PR (markdown changes) | markdownlint-cli2 |
-| `proto-check.yml` | PR (proto changes) | Generated code freshness |
-| `build-desktop.yml` | `v*` tag, manual | Tauri desktop build |
-| `test-linux-app.yml` | Twice-weekly schedule, manual | Desktop Canary (Linux): release-processed AppImage smoke — crash, sidecar readiness/liveness, rendered content |
-| `test.yml` (`desktop-config`, `desktop-rust` jobs) | PR touching desktop-coupled paths | Desktop version consistency, AppImage post-processing syntax, Tauri config/capability parse, desktop build env parity (#5905, also in `unit`), `cargo test --locked` (#5902) |
-
-## Pre-Push Hook
-
-Runs automatically before `git push`. Two tiers:
-
-**Always (state-dependent, fast — run even on a cache hit):** local Vercel env-dump guard, PR-state check (no pushes to merged/closed PR branches), branch-contamination guard (>20 commits ahead), `scripts/` lockfile sync.
-
-**Tree-dependent (skipped entirely on a green-tree cache hit):** Unicode safety and version sync (always run for uncached trees), plus the diff-scoped checks: TypeScript (frontend tsc on `src/`-surface changes; `typecheck:api` on `api/|server/|scripts/|src/generated/`; Convex tsc on `convex/`), CJS syntax, boundary/safe-html/Sentry-coverage/rate-limit/premium-fetch lints (each also fires when its own guardrail script changes), edge esbuild check (`api/|server/|src/generated/|scripts/check-edge-function-bundles.mjs` — edge entries bundle-import server code, and the shared checker retriggers its own gate), markdown/MDX lint, proto + pro-test bundle freshness, change-scoped tests. `package.json`/`tsconfig` changes — or an unresolvable `origin/main` diff — force everything (an unresolvable diff also bypasses the green-tree cache: a blind run trusts nothing, including prior attestations).
-
-**Green-tree cache:** a tree that passed the full gate is recorded (`$GIT_DIR/wm-prepush-green`); re-pushing the identical tree (remote failure, message-only amend) skips all tree-dependent checks — same tree, same result. Delete that file to force a full re-run.
-
-Heavy checks (`test:data`, typechecks, edge-bundle) must run **sequentially** in worktrees — parallel runs OOM (exit 137).
-
-## Shipping Velocity (Agent Workflow)
-
-- **Before starting work on an issue:** check for parallel/duplicate work first — `gh pr list --search "<issue#>"` AND `git worktree list` (background codex/claude sessions ship PRs under the same account).
-- **PR delivery authority:** a user request to implement, fix, or ship a scoped change authorizes creating and updating the ready PRs needed to deliver it, including corrective follow-up PRs discovered by review or CI, plus monitoring and repairing those PRs without additional per-PR confirmation. This authority is limited to the requested change and its delivery branches; review-only or diagnostic requests remain read-only.
-- **Merge authority is explicit and non-delegable:** never merge a PR, enable auto-merge, queue a merge, or run any equivalent GitHub merge action unless the user has explicitly requested that specific action in the current conversation. A request to implement, ship, push, create a PR, or monitor CI does **not** authorize merging. Wait for clear approval and report the ready state instead.
-- **PR push readiness is mandatory:** before every push, re-fetch the live PR head and base, verify the remote head has not advanced, and check GitHub mergeability. Do not push a branch that is behind, `CONFLICTING`, or `DIRTY`; update from the latest PR/base state and resolve conflicts first. A successful `git push` is not delivery completion.
-- **After pushing a PR:** start `gh pr checks <n> --watch` (or an equivalent bounded monitor), wait for all required CI checks to reach green, then re-fetch the PR head and verify GitHub reports no conflict (`mergeable: MERGEABLE` / clean merge state). If checks are pending, failing, or the PR becomes conflicting, keep repairing and re-checking; do not report the PR as ready or complete until both CI and mergeability are green. Never use `--no-verify` to bypass this gate or turn on auto-merge without the explicit approval above.
-- **docs/plans/ is gitignored** — plan documents are local working state and do not travel between worktrees or ship in PRs.
-- **PR-review verification:** never assert a finding is fixed/stale from memory — re-fetch the PR head SHA and diff the cited lines first.
-
-## Deployment
-
-- **Web**: Vercel (auto-deploy on push to main)
-- **Relay/Seeds**: Railway (Docker, cron services)
-- **Desktop**: Tauri builds via GitHub Actions
-- **Docs**: Mintlify (proxied through Vercel at `/docs`)
+- Unicode safety, boundaries, Sentry coverage, **rate-limit policies**,
+  **premium-fetch parity**, edge esbuild bundle, typechecks, change-scoped tests.
+- **Safe HTML sink check is DEFERRED**: `scripts/enforce-safe-html.mjs` targets
+  a newer upstream baseline (~149 `Panel.setContent`/innerHTML sinks here), so
+  it is runnable but NOT wired into `lint`/pre-push. See the comment in
+  `.husky/pre-push`.
+- `scripts/` uses a fixed TypeScript via `tsx`; heavy checks (`test:data`,
+  typechecks, edge-bundle) must run **sequentially** or they OOM (exit 137).
+- On Windows, pre-push requires Git Bash; the `tests/prepush-changed-tests`
+  assertions spawn `bash`/`.bin/tsx` and fail without it.
 
 ## Critical Conventions
 
-- `fetch.bind(globalThis)` is BANNED. Use `(...args) => globalThis.fetch(...args)` instead
-- Edge Functions cannot use `node:http`, `node:https`, `node:zlib`
-- Always include `User-Agent` header in server-side fetch calls
-- Yahoo Finance requests must be staggered (150ms delays)
-- New data sources MUST have bootstrap hydration wired in `api/bootstrap.js` — unless nothing in `src/` renders them. A dataset with no dashboard consumer registers in `api/health.js` `STANDALONE_KEYS` instead and stays out of the tiered payload every client downloads; `tests/bootstrap.test.mjs` enforces the converse, that no tier key lacks a `getHydratedData`/`ensureHydrated` consumer. Once a panel does read one, promote it into `BOOTSTRAP_CACHE_KEYS` with a tier — `ON_DEMAND_KEY_NAMES` for an opt-in panel, so the payload is fetched per-key on render rather than riding a tier every visitor downloads (`fxYoy` and `sharedFxRates` went this way for the FX panel, #6199)
-- Redis seed scripts MUST write `seed-meta:<key>` for health monitoring
-- Seed credentials load only via `loadEnvFile()` (inert under test runtimes, resolves `.env.local` at the checkout root, `only:` narrows the keys) — never hand-roll a `.env` reader or resolve one from `$HOME` or an absolute literal. Note `worktree:bootstrap` symlinks the source checkout's `.env.local`, so a bootstrapped worktree shares real credentials when a seeder is actually run
+- `fetch.bind(globalThis)` is BANNED. Use `(...args) => globalThis.fetch(...args)`.
+- Edge Functions cannot use `node:http`, `node:https`, `node:zlib`.
+- Always include a `User-Agent` header in server-side fetches.
+- Yahoo Finance requests must be staggered (150ms delays).
+- Prefer minimal, targeted diffs; run `npm run typecheck` and the relevant
+  `tsx --test` files before finishing.
+- **Merge authority is explicit**: never merge a PR or enable auto-merge unless
+  the user asked for that specific action in the current conversation.
 
 ## External References
 
 - [Architecture (system reference)](ARCHITECTURE.md)
-- [Design Philosophy (why decisions were made)](docs/architecture.mdx)
 - [Contributing guide](CONTRIBUTING.md)
 - [Data sources catalog](docs/data-sources.mdx)
 - [Health endpoints](docs/health-endpoints.mdx)
 - [Adding endpoints guide](docs/adding-endpoints.mdx)
 - [API reference (OpenAPI)](docs/api/)
+- Upstream project: https://github.com/koala73/worldmonitor

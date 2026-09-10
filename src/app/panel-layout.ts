@@ -1,5 +1,7 @@
 import type { AppContext, AppModule } from '@/app/app-context';
 import { isPanelDisabled } from '@/config/panel-tiers';
+import { isPolicyDisabled } from '@/services/panel-policy';
+import { ACTIVE_APP, APPS, isPanelAllowedInApp, switchAppHref } from '@/config/apps';
 import { replayPendingCalls, clearAllPendingCalls } from '@/app/pending-panel-data';
 import type { RelatedAsset } from '@/types';
 import type { TheaterPostureSummary } from '@/services/military-surge';
@@ -177,13 +179,7 @@ export class PanelLayoutManager implements AppModule {
           </button>
         </div>
         <div class="header-right">
-          ${this.ctx.isDesktopApp ? '' : `<div class="download-wrapper" id="downloadWrapper">
-            <button class="download-btn" id="downloadBtn" title="${t('header.downloadApp')}">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-              <span id="downloadBtnLabel">${t('header.downloadApp')}</span>
-            </button>
-            <div class="download-dropdown" id="downloadDropdown"></div>
-          </div>`}
+          ${APPS.length > 1 ? `<div class="rs-app-switcher">${APPS.map(app => `<a class="rs-app-link${app.id === ACTIVE_APP.id ? ' active' : ''}" href="${switchAppHref(app.id)}" title="${app.description}">${app.label}</a>`).join('')}</div>` : ''}
           <button class="search-btn" id="searchBtn"><kbd>⌘K</kbd> ${t('header.search')}</button>
           ${this.ctx.isDesktopApp ? '' : `<button class="copy-link-btn" id="copyLinkBtn">${t('header.copyLink')}</button>`}
           ${this.ctx.isDesktopApp ? '' : `<button class="fullscreen-btn" id="fullscreenBtn" title="${t('header.fullscreen')}">⛶</button>`}
@@ -438,6 +434,10 @@ export class PanelLayoutManager implements AppModule {
     // the layout level regardless of settings — upstream code and settings
     // stay untouched so future syncs remain non-disruptive.
     if (isPanelDisabled(key)) return false;
+    // Admin policy (server) overrides per-user preferences for everyone.
+    if (isPolicyDisabled(key)) return false;
+    // The active app's allowlist scopes the workspace (customs allows all).
+    if (!isPanelAllowedInApp(key)) return false;
     return Object.prototype.hasOwnProperty.call(this.ctx.panelSettings, key);
   }
 

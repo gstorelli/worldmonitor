@@ -7,8 +7,8 @@ export interface RiskNotifyResult {
 
 interface NotifyConfig {
   endpoints?: {
-    telegram?: { enabled?: boolean; chatId?: string };
-    email?: { enabled?: boolean; from?: string; to?: string };
+    telegram?: { enabled?: boolean; connected?: boolean; chatId?: string };
+    email?: { enabled?: boolean; connected?: boolean; from?: string; to?: string };
   };
   frequency?: 'realtime' | 'hourly' | 'daily' | 'weekly';
   topics?: string[];
@@ -24,8 +24,32 @@ const TOPICS: Array<{ id: string; label: string }> = [
   { id: 'policy', label: 'Monitor normativo UE' },
 ];
 
+const ADMIN_TOKEN_KEY = 'rs-notify-admin-token';
+
+function getAdminToken(): string {
+  try {
+    return localStorage.getItem(ADMIN_TOKEN_KEY) || '';
+  } catch {
+    return '';
+  }
+}
+
+function setAdminToken(token: string): void {
+  try {
+    if (token) localStorage.setItem(ADMIN_TOKEN_KEY, token);
+    else localStorage.removeItem(ADMIN_TOKEN_KEY);
+  } catch {
+    // localStorage unavailable (private mode) — token stays session-only.
+  }
+}
+
+function authHeaders(): Record<string, string> {
+  const token = getAdminToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 async function loadConfig(signal: AbortSignal): Promise<NotifyConfig | null> {
-  const res = await fetch('/api/notify/config', { signal });
+  const res = await fetch('/api/notify/config', { signal, headers: authHeaders() });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = await res.json();
   return (data.config as NotifyConfig) ?? null;
@@ -34,7 +58,7 @@ async function loadConfig(signal: AbortSignal): Promise<NotifyConfig | null> {
 async function saveConfig(config: NotifyConfig): Promise<void> {
   const res = await fetch('/api/notify/config', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify(config),
   });
   if (!res.ok) {
@@ -67,8 +91,11 @@ export function renderRiskNotifySettings(): RiskNotifyResult {
         const frequency = config?.frequency ?? 'hourly';
         const topics = config?.topics ?? [];
         const enrichment = config?.enrichment ?? 'fact';
-        const tgConnected = Boolean(tg?.enabled && tg?.chatId);
-        const emailConnected = Boolean(email?.enabled && email?.to);
+        const adminToken = getAdminToken();
+        // The public GET is redacted (no chatId/to), so rely on the server's
+        // `connected` flag and fall back to the destination when present.
+        const tgConnected = Boolean(tg?.connected ?? (tg?.enabled && tg?.chatId));
+        const emailConnected = Boolean(email?.connected ?? (email?.enabled && email?.to));
 
         const freqOptions = [
           ['realtime', 'Tempo reale'],
@@ -90,7 +117,7 @@ export function renderRiskNotifySettings(): RiskNotifyResult {
           <div class="us-notif-ch-row${tgConnected ? ' us-notif-ch-on' : ''}" data-channel-type="telegram">
             <div class="us-notif-ch-body">
               <div class="us-notif-ch-name">Telegram</div>
-              <div class="us-notif-ch-sub">${tgConnected ? `Connesso (chat ${escapeHtml(String(tg!.chatId))})` : 'Non connesso'}</div>
+              <div class="us-notif-ch-sub">${tgConnected ? (tg!.chatId ? `Connesso (chat ${escapeHtml(String(tg!.chatId))})` : 'Connesso') : 'Non connesso'}</div>
             </div>
             <div class="us-notif-ch-actions">
               ${tgConnected
@@ -102,7 +129,7 @@ export function renderRiskNotifySettings(): RiskNotifyResult {
           <div class="us-notif-ch-row${emailConnected ? ' us-notif-ch-on' : ''}" data-channel-type="email">
             <div class="us-notif-ch-body">
               <div class="us-notif-ch-name">Email</div>
-              <div class="us-notif-ch-sub">${emailConnected ? escapeHtml(String(email!.to)) : 'Non connessa'}</div>
+              <div class="us-notif-ch-sub">${emailConnected ? (email!.to ? escapeHtml(String(email!.to)) : 'Connessa') : 'Non connessa'}</div>
             </div>
             <div class="us-notif-ch-actions">
               ${emailConnected
@@ -124,6 +151,10 @@ export function renderRiskNotifySettings(): RiskNotifyResult {
             <option value="analysis"${enrichment === 'analysis' ? ' selected' : ''}>Analisi (segnali + contesto)</option>
             <option value="regulatory"${enrichment === 'regulatory' ? ' selected' : ''}>Regolatorio (segnali + normativa)</option>
           </select>
+
+          <div class="ai-flow-section-label" style="margin-top:10px">Token admin</div>
+          <input type="password" id="rkAdminToken" class="unified-settings-input" style="font-size:12px;width:100%" placeholder="N8N_INGEST_SECRET" value="${escapeHtml(adminToken)}" autocomplete="off">
+          <div class="ai-flow-toggle-desc" style="margin-top:4px">Salvato solo in questo browser. Serve a modificare chat ID / destinatario email già configurati: senza token il server rifiuta le modifiche ai canali esistenti (401).</div>
 
           <div class="ai-flow-section-label" style="margin-top:10px">Stato</div>
           <div class="ai-flow-toggle-desc" id="rkStatus">Salvataggio automatico attivo.</div>`;
@@ -175,6 +206,19 @@ export function renderRiskNotifySettings(): RiskNotifyResult {
 
       container.addEventListener('change', (e) => {
         const target = e.target as HTMLInputElement;
+        if (target.id === 'rkAdminToken') {
+          setAdminToken(target.value.trim());
+          loadConfig(signal)
+            .then((config) => {
+              if (signal.aborted) return;
+              current = config;
+              render(config);
+            })
+            .catch((err: Error) => {
+              if (!signal.aborted) fail(err.message);
+            });
+          return;
+        }
         if (target.id === 'rkFrequency') {
           persist({ frequency: (target.value ?? 'hourly') as NotifyConfig['frequency'] });
           return;

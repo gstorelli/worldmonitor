@@ -1,4 +1,6 @@
 import './styles/base-layer.css';
+import './styles/user-auth.css';
+import './styles/app-switcher.css';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import * as Sentry from '@sentry/browser';
 import { App } from './App';
@@ -776,14 +778,22 @@ if (urlParams.get('settings') === '1') {
     }
   );
 } else {
-  installUtmInterceptor();
-  const app = new App('app');
-  app
-    .init()
-    .then(() => {
-      clearChunkReloadGuard(chunkReloadStorageKey);
-    })
-    .catch(console.error);
+  void (async () => {
+    // Risk Sentinel user auth gate: no-op unless the server has AUTH_REQUIRED=true.
+    const { ensureAuthenticated, installLogoutControl } = await import('./services/user-auth');
+    if (!(await ensureAuthenticated())) return;
+    const { loadPanelPolicy } = await import('./services/panel-policy');
+    await loadPanelPolicy();
+    const { hydratePanelPrefs } = await import('./services/user-panel-prefs');
+    await hydratePanelPrefs();
+    const { seedAppDefaults } = await import('./services/app-selection');
+    seedAppDefaults();
+    installUtmInterceptor();
+    const app = new App('app');
+    await app.init();
+    clearChunkReloadGuard(chunkReloadStorageKey);
+    installLogoutControl();
+  })().catch(console.error);
 }
 
 // Debug helpers for geo-convergence testing (remove in production)

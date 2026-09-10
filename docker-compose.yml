@@ -59,10 +59,19 @@ services:
       # n8n ingestion auth (Risk Sentinel): required by POST /api/n8n/ingest
       # when set. Generate with: openssl rand -hex 32
       N8N_INGEST_SECRET: "${N8N_INGEST_SECRET:-}"
+      # Local/dev escape hatch for the fail-closed ingest auth. Leave unset
+      # (or false) in production; set "true" only to deliberately accept
+      # anonymous writes when N8N_INGEST_SECRET is unavailable.
+      ALLOW_ANONYMOUS_N8N_INGEST: "${ALLOW_ANONYMOUS_N8N_INGEST:-}"
       # Anonymous browser session tokens (HMAC) — the SPA mints one via
       # POST /api/wm-session and sends it as X-WorldMonitor-Key. Without this
       # secret every data endpoint 401s ("API key required"). Min 32 chars.
       WM_SESSION_SECRET: "${WM_SESSION_SECRET:-}"
+      # Risk Sentinel user authentication. When "true", every /api/* endpoint
+      # except login/me/logout and health/version requires a signed session
+      # cookie (POST /api/auth/login). Machine callers (n8n) may still present
+      # N8N_INGEST_SECRET as a bearer. Requires WM_SESSION_SECRET.
+      AUTH_REQUIRED: "${AUTH_REQUIRED:-false}"
       # Self-hosted anonymous access: the de-clouded fork has no premium
       # gating, so API endpoints accept requests without an API key.
       ALLOW_ANONYMOUS_API: "${ALLOW_ANONYMOUS_API:-true}"
