@@ -3143,8 +3143,8 @@
     "copyCoordinates": "座標をコピー"
   },
   "shell": {
-    "documentTitle": "ワールドモニター — リアルタイム グローバルインテリジェンスダッシュボード",
-    "metaDescription": "リアルタイムグローバルインテリジェンスプラットフォーム。WIREDで紹介。190カ国2M+ユーザーが利用。紛争、市場、軍事、OSINTを一画面で。",
+    "documentTitle": "Risk Sentinel — リアルタイム グローバルインテリジェンスダッシュボード",
+    "metaDescription": "Risk Sentinel — AI early-warning for customs risk mitigation: commodity stress, sanctions, chokepoints and supply-chain signals.",
     "offlineTitle": "オフラインです",
     "offlineMessage": "World Monitorはリアルタイムインテリジェンスデータのためにインターネット接続が必要です。",
     "offlineRetry": "再試行"

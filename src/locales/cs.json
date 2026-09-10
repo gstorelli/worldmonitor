@@ -3143,8 +3143,8 @@
     "copyCoordinates": "Kopírovat souřadnice"
   },
   "shell": {
-    "documentTitle": "World Monitor — Přehled reálných globálních informací",
-    "metaDescription": "Platforma globálních informací v reálném čase. Vyznamenáno v WIRED. Používáno 2M+ lidí v 190 zemích. Konflikty, trhy, armáda, OSINT v jednom pohledu.",
+    "documentTitle": "Risk Sentinel — Přehled reálných globálních informací",
+    "metaDescription": "Risk Sentinel — AI early-warning for customs risk mitigation: commodity stress, sanctions, chokepoints and supply-chain signals.",
     "offlineTitle": "Jste offline",
     "offlineMessage": "World Monitor vyžaduje internetové připojení pro data zpravodajství v reálném čase.",
     "offlineRetry": "Zkusit znovu"

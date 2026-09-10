@@ -3143,8 +3143,8 @@
     "copyCoordinates": "คัดลอกพิกัด"
   },
   "shell": {
-    "documentTitle": "World Monitor — แดชบอร์ดข่าวกรรมการระดับโลกแบบเรียลไทม์",
-    "metaDescription": "แพลตฟอร์มข่าวกรรมการระดับโลกแบบเรียลไทม์ ลงนามในวิจารณ์ WIRED ใช้งานโดยผู้ใช้ 2 ล้านคนขึ้นไปทั่วโลก 190 ประเทศ ข้อมูลความขัดแย้ง ตลาด ทหาร OSINT ในมุมมองเดียว",
+    "documentTitle": "Risk Sentinel — แดชบอร์ดข่าวกรรมการระดับโลกแบบเรียลไทม์",
+    "metaDescription": "Risk Sentinel — AI early-warning for customs risk mitigation: commodity stress, sanctions, chokepoints and supply-chain signals.",
     "offlineTitle": "คุณออนไลน์ไม่ได้",
     "offlineMessage": "World Monitor ต้องการการเชื่อมต่ออินเทอร์เน็ตเพื่อรับข้อมูลข่าวกรรมการแบบเรียลไทม์",
     "offlineRetry": "ลองใหม่"

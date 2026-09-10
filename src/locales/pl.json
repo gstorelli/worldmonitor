@@ -3143,8 +3143,8 @@
     "copyCoordinates": "Kopiuj współrzędne"
   },
   "shell": {
-    "documentTitle": "World Monitor — Tablica bieżącej analizy globalnej",
-    "metaDescription": "Platforma analizy globalnej w czasie rzeczywistym. Opisana w WIRED. Używana przez 2M+ użytkowników w 190 krajach. Konflikty, rynki, wojskowość, OSINT w jednym widoku.",
+    "documentTitle": "Risk Sentinel — Tablica bieżącej analizy globalnej",
+    "metaDescription": "Risk Sentinel — AI early-warning for customs risk mitigation: commodity stress, sanctions, chokepoints and supply-chain signals.",
     "offlineTitle": "Jesteś offline",
     "offlineMessage": "World Monitor wymaga połączenia internetowego do otrzymywania danych wywiadowczych w czasie rzeczywistym.",
     "offlineRetry": "Ponów próbę"

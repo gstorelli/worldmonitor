@@ -3143,8 +3143,8 @@
     "copyCoordinates": "Copier les coordonnées"
   },
   "shell": {
-    "documentTitle": "World Monitor — Tableau de Bord de Renseignement Mondial en Temps Réel",
-    "metaDescription": "Plateforme de renseignement mondial en temps réel. Présenté dans WIRED. Utilisé par plus de 2 millions de personnes dans 190 pays. Conflits, marchés, militaire, OSINT en une seule vue.",
+    "documentTitle": "Risk Sentinel — Tableau de Bord de Renseignement Mondial en Temps Réel",
+    "metaDescription": "Risk Sentinel — AI early-warning for customs risk mitigation: commodity stress, sanctions, chokepoints and supply-chain signals.",
     "offlineTitle": "Vous êtes hors ligne",
     "offlineMessage": "World Monitor nécessite une connexion Internet pour les données de renseignement en temps réel.",
     "offlineRetry": "Réessayer"
