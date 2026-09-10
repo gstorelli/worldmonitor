@@ -1,0 +1,450 @@
+/* Risk Sentinel — standalone application shell + workspaces (OSINT / Research / Policy). */
+
+.rs-app-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: #0b0f14;
+  color: #e5e7eb;
+}
+
+.rs-app-shell .rs-app-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 14px;
+  border-bottom: 1px solid #1f2a37;
+  background: rgba(11, 15, 20, 0.94);
+  backdrop-filter: blur(6px);
+}
+
+.rs-app-title {
+  margin-left: 10px;
+  padding-left: 10px;
+  border-left: 1px solid #263241;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #93c5fd;
+}
+
+.rs-app-main {
+  flex: 1;
+  padding: 18px;
+}
+
+.rs-app-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  border-top: 1px solid #1f2a37;
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.rs-app-footer a {
+  color: #9ca3af;
+  text-decoration: none;
+}
+
+.rs-app-footer a:hover {
+  color: #e5e7eb;
+}
+
+/* ── Workspace primitives ──────────────────────────────────────────────── */
+
+.rs-ws {
+  max-width: 1500px;
+  margin: 0 auto;
+}
+
+.rs-loading,
+.rs-empty {
+  padding: 28px 18px;
+  border: 1px dashed #263241;
+  border-radius: 12px;
+  color: #9ca3af;
+  text-align: center;
+}
+
+.rs-ws-toolbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.rs-ws-heading h1 {
+  margin: 0;
+  font-size: 22px;
+  letter-spacing: 0.01em;
+}
+
+.rs-ws-heading p {
+  margin: 4px 0 0;
+  color: #9ca3af;
+  font-size: 13px;
+}
+
+.rs-ws-stats {
+  display: flex;
+  gap: 10px;
+}
+
+.rs-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 84px;
+  padding: 8px 12px;
+  border: 1px solid #1f2a37;
+  border-radius: 10px;
+  background: #111820;
+}
+
+.rs-stat-value {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.rs-stat-label {
+  font-size: 11px;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.rs-ws-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 10px 0 16px;
+}
+
+.rs-input,
+.rs-select {
+  padding: 8px 10px;
+  border: 1px solid #263241;
+  border-radius: 8px;
+  background: #0b1118;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+}
+
+.rs-input {
+  flex: 1;
+  min-width: 220px;
+}
+
+.rs-input:focus,
+.rs-select:focus {
+  outline: none;
+  border-color: #3b82f6;
+}
+
+.rs-button {
+  padding: 8px 14px;
+  border: 1px solid #2563eb;
+  border-radius: 8px;
+  background: #1d4ed8;
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.rs-button:hover {
+  background: #2563eb;
+}
+
+.rs-ws-hint {
+  color: #f59e0b;
+  font-size: 12px;
+}
+
+/* ── Tabs / chips ──────────────────────────────────────────────────────── */
+
+.rs-tabs,
+.rs-chipbar {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.rs-tab,
+.rs-chip-btn {
+  padding: 6px 12px;
+  border: 1px solid #263241;
+  border-radius: 999px;
+  background: transparent;
+  color: #9ca3af;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.rs-tab.active,
+.rs-chip-btn.active {
+  border-color: #2563eb;
+  background: #1d4ed8;
+  color: #fff;
+}
+
+.rs-chip-count {
+  margin-left: 4px;
+  opacity: 0.75;
+}
+
+/* ── Master/detail + cards ─────────────────────────────────────────────── */
+
+.rs-ws-body {
+  display: grid;
+  grid-template-columns: minmax(320px, 460px) 1fr;
+  gap: 14px;
+  align-items: start;
+}
+
+.rs-ws-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 62vh;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.rs-list-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 12px;
+  border: 1px solid #1f2a37;
+  border-radius: 10px;
+  background: #111820;
+  color: inherit;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.rs-list-item:hover {
+  border-color: #374151;
+}
+
+.rs-list-item.active {
+  border-color: #2563eb;
+  background: #12203a;
+}
+
+.rs-list-title {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.rs-list-sub {
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.rs-list-tags {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+
+.rs-ws-detail {
+  padding: 16px 18px;
+  border: 1px solid #1f2a37;
+  border-radius: 12px;
+  background: #111820;
+  max-height: 62vh;
+  overflow: auto;
+}
+
+.rs-ws-detail h2 {
+  margin: 10px 0 6px;
+  font-size: 17px;
+  line-height: 1.35;
+}
+
+.rs-ws-detail h3 {
+  margin: 14px 0 4px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #93c5fd;
+}
+
+.rs-ws-detail p {
+  margin: 0 0 8px;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.rs-detail-head,
+.rs-detail-foot,
+.rs-card-head,
+.rs-card-foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.rs-detail-foot {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid #1f2a37;
+}
+
+.rs-meta {
+  color: #9ca3af;
+  font-size: 12px;
+}
+
+.rs-chip {
+  padding: 2px 8px;
+  border: 1px solid #2b3a4d;
+  border-radius: 999px;
+  font-size: 11px;
+  color: #bfdbfe;
+}
+
+.rs-chip-muted {
+  color: #9ca3af;
+  border-color: #263241;
+}
+
+.rs-chip-dim {
+  color: #a7f3d0;
+  border-color: #14532d;
+}
+
+.rs-link {
+  margin-left: auto;
+  color: #60a5fa;
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.rs-link:hover {
+  text-decoration: underline;
+}
+
+.rs-ws-section {
+  margin-top: 20px;
+}
+
+.rs-ws-section h2 {
+  font-size: 15px;
+  margin: 0 0 10px;
+}
+
+.rs-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 10px;
+}
+
+.rs-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid #1f2a37;
+  border-radius: 12px;
+  background: #111820;
+}
+
+.rs-card h3 {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.rs-card p {
+  margin: 0;
+  font-size: 12px;
+  color: #cbd5e1;
+  line-height: 1.5;
+}
+
+.rs-card-foot {
+  justify-content: space-between;
+  margin-top: 4px;
+}
+
+.rs-card-foot .rs-link {
+  margin-left: 0;
+}
+
+/* OSINT severity accents */
+.rs-card-osint {
+  border-left-width: 3px;
+}
+
+.rs-sev {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.rs-sev-critical {
+  border-left-color: #dc2626;
+}
+.rs-sev-critical .rs-sev {
+  color: #f87171;
+}
+.rs-sev-high {
+  border-left-color: #ea580c;
+}
+.rs-sev-high .rs-sev {
+  color: #fb923c;
+}
+.rs-sev-medium {
+  border-left-color: #d97706;
+}
+.rs-sev-medium .rs-sev {
+  color: #fbbf24;
+}
+.rs-sev-low {
+  border-left-color: #2563eb;
+}
+.rs-sev-low .rs-sev {
+  color: #60a5fa;
+}
+
+.rs-score {
+  font-size: 11px;
+  color: #9ca3af;
+}
+
+@media (max-width: 900px) {
+  .rs-ws-body {
+    grid-template-columns: 1fr;
+  }
+
+  .rs-ws-list,
+  .rs-ws-detail {
+    max-height: none;
+  }
+
+  .rs-app-header {
+    flex-wrap: wrap;
+  }
+}

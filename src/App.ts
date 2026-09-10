@@ -13,6 +13,8 @@ import {
 } from '@/config';
 import { sanitizeLayersForVariant } from '@/config/map-layer-definitions';
 import type { MapVariant } from '@/config/map-layer-definitions';
+import { ACTIVE_APP } from '@/config/apps';
+import { getAppWorkspaceLoader } from '@/apps/registry';
 import { initDB, cleanOldSnapshots, isAisConfigured, initAisStream, isOutagesConfigured, disconnectAisStream } from '@/services';
 import { isProUser } from '@/services/widget-store';
 import { mlWorker } from '@/services/ml-worker';
@@ -751,6 +753,16 @@ export class App {
     setMeta('meta[property="og:locale"]', ogLocaleMap[baseLang] || `${baseLang}_${baseLang.toUpperCase()}`);
     const srH1 = document.querySelector('body > h1');
     if (srH1) srH1.textContent = t('shell.documentTitle');
+
+    // ── Standalone applications (OSINT / Research / Policy) ────────────────
+    // These are separate apps sharing only the header/footer shell: their own
+    // workspace replaces the whole dashboard (no map, panels or data loader).
+    const workspaceLoader = getAppWorkspaceLoader(ACTIVE_APP.id);
+    if (workspaceLoader) {
+      const { mountAppShell } = await import('@/apps/shell');
+      await mountAppShell(this.state.container, workspaceLoader);
+      return;
+    }
     const aiFlow = getAiFlowSettings();
     if (aiFlow.browserModel || isDesktopRuntime()) {
       await mlWorker.init();

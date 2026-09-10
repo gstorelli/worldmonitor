@@ -141,9 +141,13 @@ npm run lint:safe-html    # OPT-IN ONLY: see "Pre-Push" (fork baseline fails thi
 - **Multi-app (Phase 3)**: `src/config/apps.ts` is an app registry layered ON TOP of the
   collapsed variant system (do not revive upstream variants — build-time meta/favicon
   machinery is inert here). `?app=<id>` (persisted in localStorage) selects an app; an
-  app is a panel allowlist + default-enabled set. `customs` = unrestricted (current
-  dashboard), `osint` = curated OSINT workspace. The header switcher links apps; panels
-  outside the active app's allowlist are filtered in layout and settings.
+  app is a panel allowlist + default-enabled set. `customs` = unrestricted dashboard (the
+  Zotero/document and policy panels are excluded and live in their own apps). OSINT,
+  Research and Policy are **standalone applications**: `src/apps/registry.ts` maps them to
+  a workspace (`src/apps/<id>/workspace.ts`) with its own data, layout and styles, and
+  `App.init()` branches to `src/apps/shell.ts` (shared header/footer only) BEFORE
+  `panelLayout.init()` — the dashboard (map, panels, data loader) never initialises for
+  them. Add new panels/features inside the app workspace, not as dashboard panels.
 
 ## Runtime Architecture
 

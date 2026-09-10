@@ -1,6 +1,7 @@
 import './styles/base-layer.css';
 import './styles/user-auth.css';
 import './styles/app-switcher.css';
+import './styles/apps.css';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import * as Sentry from '@sentry/browser';
 import { App } from './App';

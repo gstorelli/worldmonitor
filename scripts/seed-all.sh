@@ -5,26 +5,27 @@
 # Populates Redis with the bootstrap datasets the dashboard panels read.
 # Run on the VPS (or any host with Docker + access to the compose network):
 #
-#   ./scripts/seed-all.sh /path/to/checkout
+#   ./scripts/seed-all.sh                 # every seeder
+#   ./scripts/seed-all.sh commodities     # only seeders whose name matches
+#   SEED_TIMEOUT_SECONDS=300 ./scripts/seed-all.sh
 #
-# Internally it runs every scripts/seed-*.mjs inside a throwaway node:24-alpine
-# container attached to the compose internal network, with the Redis REST env
-# the seeds expect (UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN) derived
-# from the checkout's .env (REDIS_TOKEN), plus API_BASE_URL pointed at the
-# local API container so derived seeds (insights/forecasts) warm their digest
-# against the self-hosted gateway instead of the upstream cloud.
+# It can be launched from anywhere (the checkout root is derived from this
+# file's path). Each seeder runs inside a throwaway node:24-alpine container
+# attached to the compose internal network, with the Redis REST env the seeds
+# expect (UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN derived from the
+# checkout's .env REDIS_TOKEN) and API_BASE_URL pointed at the local API
+# container so derived seeds (insights/forecasts) warm their digest against the
+# self-hosted gateway instead of the upstream cloud.
 #
-# Notes:
-#   - seeds needing CLOUDFLARE_API_TOKEN (internet outages / DDoS / traffic
-#     anomalies) skip gracefully when it is absent
-#   - AviationStack delays need a working AVIATIONSTACK_API key (HTTP 403 =
-#     invalid/expired key or provider IP-block)
-#   - socialVelocity / wsbTickers come from Reddit and are empty when the
-#     host IP is rate-limited or blocked by Reddit
+# Every seeder is bounded by SEED_TIMEOUT_SECONDS (default 180) so one hanging
+# upstream can never freeze the whole sweep. Progress is printed as it goes and
+# a failing seeder shows its last output lines.
 # =============================================================================
 set -euo pipefail
 
-REPO_PATH="${1:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+REPO_PATH="${REPO_PATH:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+FILTER="${1:-}"
+TIMEOUT_SECONDS="${SEED_TIMEOUT_SECONDS:-180}"
 cd "${REPO_PATH}"
 
 if [ ! -f .env ]; then
@@ -41,11 +42,21 @@ fi
 RT="$(grep '^REDIS_TOKEN=' .env | cut -d= -f2-)"
 
 LOG="$(mktemp /tmp/seed-all.XXXXXX.log)"
-total=0; ok=0; fail=0
+echo "seed sweep starting (timeout ${TIMEOUT_SECONDS}s/seeder, log: ${LOG})"
+if [ -n "${FILTER}" ]; then
+  echo "filter: name contains '${FILTER}'"
+fi
+
+total=0; ok=0; fail=0; skipped=0
 for f in scripts/seed-*.mjs; do
   name="$(basename "${f}")"
+  if [ -n "${FILTER}" ] && [[ "${name}" != *"${FILTER}"* ]]; then
+    continue
+  fi
   total=$((total + 1))
-  echo "### ${name}" >> "${LOG}"
+  echo "RUN  ${name}"
+  seedlog="$(mktemp /tmp/seed-one.XXXXXX.log)"
+  echo "### ${name} ($(date -u +%FT%TZ))" >> "${LOG}"
   if docker run --rm --network "${NET}" \
     --env-file "${REPO_PATH}/.env" \
     -e UPSTASH_REDIS_REST_URL=http://redis-rest:80 \
@@ -53,13 +64,18 @@ for f in scripts/seed-*.mjs; do
     -e API_BASE_URL=http://worldmonitor:8080 \
     -v "${REPO_PATH}:/repo:ro" \
     -w /repo/scripts \
-    node:24-alpine sh -c "node ${name}" >> "${LOG}" 2>&1; then
+    node:24-alpine sh -c "timeout -s KILL ${TIMEOUT_SECONDS} node ${name}" > "${seedlog}" 2>&1; then
     ok=$((ok + 1))
+    echo "OK   ${name}"
   else
     fail=$((fail + 1))
-    echo "FAIL ${name}" >> "${LOG}"
     echo "FAIL ${name}"
+    echo "----- last output (${name}) -----"
+    tail -n 15 "${seedlog}" || true
+    echo "--------------------------------"
   fi
+  cat "${seedlog}" >> "${LOG}"
+  rm -f "${seedlog}"
 done
 
-echo "seed sweep complete: total=${total} ok=${ok} fail=${fail} (log: ${LOG})"
+echo "seed sweep complete: total=${total} ok=${ok} fail=${fail} skipped=${skipped} (log: ${LOG})"
