@@ -18,6 +18,8 @@ export interface AppDefinition {
   description: string;
   /** Panels visible inside this app. `null` allows every registered panel. */
   allowedPanels: string[] | null;
+  /** Panels hidden inside this app even when `allowedPanels` is null. */
+  excludedPanels?: string[];
   /** Panels force-enabled the first time the app is opened. */
   defaultPanels: string[];
 }
@@ -27,6 +29,9 @@ export const CUSTOMS_APP: AppDefinition = {
   label: 'Customs Risk',
   description: 'PhD customs-risk early warning (current dashboard)',
   allowedPanels: null,
+  // Moved to their dedicated apps: the Zotero/document-analysis workspace
+  // (research) and the policy/compliance workspace (policy).
+  excludedPanels: ['source-validation', 'policy-analysis'],
   defaultPanels: [],
 };
 
@@ -217,7 +222,9 @@ export const ACTIVE_APP: AppDefinition = (() => {
 
 export function isPanelAllowedInApp(panelId: string, appId: string = ACTIVE_APP.id): boolean {
   const app = getApp(appId);
-  if (!app || app.allowedPanels === null) return true;
+  if (!app) return true;
+  if (app.excludedPanels?.includes(panelId)) return false;
+  if (app.allowedPanels === null) return true;
   return app.allowedPanels.includes(panelId);
 }
 

@@ -31,8 +31,12 @@ describe('risk sentinel app registry', () => {
     assert.equal(apps.resolveAppId('?other=1', null), 'customs');
   });
 
-  it('treats the customs app as unrestricted and the osint app as an allowlist', () => {
+  it('treats the customs app as unrestricted except for the moved panels', () => {
     assert.equal(apps.isPanelAllowedInApp('commodities', 'customs'), true);
+    assert.equal(apps.isPanelAllowedInApp('source-validation', 'customs'), false);
+    assert.equal(apps.isPanelAllowedInApp('policy-analysis', 'customs'), false);
+    assert.equal(apps.isPanelAllowedInApp('source-validation', 'research'), true);
+    assert.equal(apps.isPanelAllowedInApp('policy-analysis', 'policy'), true);
     assert.equal(apps.isPanelAllowedInApp('live-news', 'osint'), true);
     assert.equal(apps.isPanelAllowedInApp('telegram-intel', 'osint'), true);
     assert.equal(apps.isPanelAllowedInApp('commodities', 'osint'), false);
@@ -45,6 +49,9 @@ describe('risk sentinel app registry', () => {
     for (const app of apps.APPS) {
       for (const key of app.allowedPanels ?? []) {
         assert.ok(valid.has(key), `${app.id}.allowedPanels references unknown panel "${key}"`);
+      }
+      for (const key of app.excludedPanels ?? []) {
+        assert.ok(valid.has(key), `${app.id}.excludedPanels references unknown panel "${key}"`);
       }
       for (const key of app.defaultPanels) {
         assert.ok(valid.has(key), `${app.id}.defaultPanels references unknown panel "${key}"`);
