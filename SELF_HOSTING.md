@@ -103,25 +103,29 @@ services:
 | 🟡 Free (limited) | OpenSky (higher rate limits with account) |
 | 🔴 Paid | Cloudflare Radar (internet outages) |
 
-## 🔐 User Authentication (optional)
+## 🔐 User Authentication
 
-Risk Sentinel ships a built-in user system — no external IdP. Users/roles are stored in
-Redis (`rs:users`), passwords are PBKDF2-HMAC-SHA256, and sessions are stateless HMAC
-cookies (`rs_session`, HttpOnly, 7-day TTL, `SameSite=Lax`).
+Risk Sentinel ships a built-in user system — no external IdP, **enforced by default**.
+Users/roles are stored in Redis (`rs:users`), passwords are PBKDF2-HMAC-SHA256, and
+sessions are stateless HMAC cookies (`rs_session`, HttpOnly, 7-day TTL, `SameSite=Lax`).
 
-1. Create the first admin (on the VPS, stack running):
+1. Create the first admin. Either on the VPS with the stack running:
    ```bash
    RS_USER_PASSWORD='...' ./scripts/create-user.sh --username admin --role admin
    # or: ./scripts/create-user.sh --username admin --role admin --password '...'
    ```
-2. Enable enforcement in `.env` and recreate the containers:
+   or remotely (one-shot; returns 409 once any user exists):
    ```bash
-   AUTH_REQUIRED=true
-   WM_SESSION_SECRET=<openssl rand -hex 32>   # min 32 chars (already required)
-   docker compose up -d
+   curl -X POST https://<host>/api/auth/bootstrap \
+     -H "Authorization: Bearer $N8N_INGEST_SECRET" \
+     -H 'Content-Type: application/json' \
+     -d '{"username":"admin","password":"..."}'
    ```
+2. Enforcement is **on by default** (`docker-compose` uses `AUTH_REQUIRED:-true`).
+   To go back to the anonymous mode set `AUTH_REQUIRED=false` in `.env` and
+   `docker compose up -d`.
 3. The SPA now shows a login screen; the header gains a **Logout** button. Manage users
-   with the same script (`--update` to reset a password/role) or the admin-only
+   from *Settings → Admin* (list/create/reset/delete) or the admin-only
    `GET/POST/PATCH/DELETE /api/auth/users` endpoint.
 
 Notes:

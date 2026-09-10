@@ -122,13 +122,16 @@ npm run lint:safe-html    # OPT-IN ONLY: see "Pre-Push" (fork baseline fails thi
   download button/dropdown is gone. Do not re-add it without a real release channel.
 - **Panel tiers**: `src/config/panel-tiers.ts` DISABLED (tier 3) includes the upstream
   PRO finance surfaces (`stock-analysis`, `stock-backtest`, `wsb-ticker-scanner`).
-- **User auth (Phase 1)**: `AUTH_REQUIRED=true` makes the self-hosted server enforce an
-  `rs_session` HttpOnly cookie on every `/api/*` except `auth/login|me|logout`,
-  `sidecar-health`, `service-status`, `version`, `health`. Users/roles live in Redis
-  (`rs:users`, managed with `scripts/create-user.sh`); PBKDF2 password hashes; sessions
-  are stateless HMAC (`WM_SESSION_SECRET`) with 7-day TTL. Machine callers (n8n) may
-  present `N8N_INGEST_SECRET` as a bearer instead. The SPA gate lives in
-  `src/services/user-auth.ts` and is a no-op when `AUTH_REQUIRED` is false.
+- **User auth (Phase 1)**: authentication is **enforced by default**
+  (`docker-compose` uses `AUTH_REQUIRED:-true`; set `AUTH_REQUIRED=false` for the
+  anonymous mode). The server requires an `rs_session` HttpOnly cookie on every
+  `/api/*` except `auth/login|me|logout|bootstrap`, `sidecar-health`,
+  `service-status`, `version`, `health`. Users/roles live in Redis (`rs:users`,
+  managed from Settings → Admin or `scripts/create-user.sh`); the first admin is
+  created with `POST /api/auth/bootstrap` using the ingest bearer. PBKDF2 password
+  hashes; sessions are stateless HMAC (`WM_SESSION_SECRET`) with 7-day TTL.
+  Machine callers (n8n) may present `N8N_INGEST_SECRET` as a bearer instead. The
+  SPA gate lives in `src/services/user-auth.ts`.
 - **User prefs & panel policy (Phase 2)**: `GET/PUT /api/prefs/panels` stores per-user
   panel settings (`rs:user:<id>:panel-prefs`); `GET/PUT /api/panel-policy` stores a
   global admin deny-list (`rs:panel-policy`, admin-only writes). Precedence:

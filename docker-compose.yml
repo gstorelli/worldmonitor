@@ -67,11 +67,12 @@ services:
       # POST /api/wm-session and sends it as X-WorldMonitor-Key. Without this
       # secret every data endpoint 401s ("API key required"). Min 32 chars.
       WM_SESSION_SECRET: "${WM_SESSION_SECRET:-}"
-      # Risk Sentinel user authentication. When "true", every /api/* endpoint
-      # except login/me/logout and health/version requires a signed session
-      # cookie (POST /api/auth/login). Machine callers (n8n) may still present
-      # N8N_INGEST_SECRET as a bearer. Requires WM_SESSION_SECRET.
-      AUTH_REQUIRED: "${AUTH_REQUIRED:-false}"
+      # Risk Sentinel user authentication. Defaults to enforced: every /api/*
+      # endpoint except login/me/logout/bootstrap and health/version requires a
+      # signed session cookie (POST /api/auth/login, first admin via
+      # /api/auth/bootstrap with the ingest bearer, then scripts/create-user.sh).
+      # Set AUTH_REQUIRED=false explicitly for the anonymous/de-clouded mode.
+      AUTH_REQUIRED: "${AUTH_REQUIRED:-true}"
       # Self-hosted anonymous access: the de-clouded fork has no premium
       # gating, so API endpoints accept requests without an API key.
       ALLOW_ANONYMOUS_API: "${ALLOW_ANONYMOUS_API:-true}"
