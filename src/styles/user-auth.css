@@ -1,0 +1,90 @@
+/* Risk Sentinel — user authentication (login gate + logout control). */
+
+.rs-login-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #0b0f14;
+}
+
+.rs-login-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(360px, 90vw);
+  padding: 28px;
+  border: 1px solid #1f2a37;
+  border-radius: 12px;
+  background: #111820;
+  color: #e5e7eb;
+  font-family: inherit;
+}
+
+.rs-login-brand {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-align: center;
+}
+
+.rs-login-subtitle {
+  margin: 0 0 6px;
+  text-align: center;
+  font-size: 13px;
+  color: #9ca3af;
+}
+
+.rs-login-card input {
+  padding: 10px 12px;
+  border: 1px solid #263241;
+  border-radius: 8px;
+  background: #0b1118;
+  color: inherit;
+  font: inherit;
+}
+
+.rs-login-card input:focus {
+  outline: none;
+  border-color: #3b82f6;
+}
+
+.rs-login-error {
+  min-height: 16px;
+  font-size: 12px;
+  color: #f87171;
+}
+
+.rs-login-submit {
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: #2563eb;
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.rs-login-submit:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.rs-logout-btn {
+  margin-right: 6px;
+  padding: 5px 10px;
+  border: 1px solid #2a3644;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.rs-logout-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
