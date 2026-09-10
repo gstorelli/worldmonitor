@@ -1,5 +1,7 @@
 import type { AppContext, AppModule } from '@/app/app-context';
 import { isPanelDisabled } from '@/config/panel-tiers';
+import { isPolicyDisabled } from '@/services/panel-policy';
+import { ACTIVE_APP, APPS, isPanelAllowedInApp, switchAppHref } from '@/config/apps';
 import { replayPendingCalls, clearAllPendingCalls } from '@/app/pending-panel-data';
 import type { RelatedAsset } from '@/types';
 import type { TheaterPostureSummary } from '@/services/military-surge';
@@ -177,6 +179,7 @@ export class PanelLayoutManager implements AppModule {
           </button>
         </div>
         <div class="header-right">
+          ${APPS.length > 1 ? `<div class="rs-app-switcher">${APPS.map(app => `<a class="rs-app-link${app.id === ACTIVE_APP.id ? ' active' : ''}" href="${switchAppHref(app.id)}" title="${app.description}">${app.label}</a>`).join('')}</div>` : ''}
           <button class="search-btn" id="searchBtn"><kbd>⌘K</kbd> ${t('header.search')}</button>
           ${this.ctx.isDesktopApp ? '' : `<button class="copy-link-btn" id="copyLinkBtn">${t('header.copyLink')}</button>`}
           ${this.ctx.isDesktopApp ? '' : `<button class="fullscreen-btn" id="fullscreenBtn" title="${t('header.fullscreen')}">⛶</button>`}
@@ -431,6 +434,10 @@ export class PanelLayoutManager implements AppModule {
     // the layout level regardless of settings — upstream code and settings
     // stay untouched so future syncs remain non-disruptive.
     if (isPanelDisabled(key)) return false;
+    // Admin policy (server) overrides per-user preferences for everyone.
+    if (isPolicyDisabled(key)) return false;
+    // The active app's allowlist scopes the workspace (customs allows all).
+    if (!isPanelAllowedInApp(key)) return false;
     return Object.prototype.hasOwnProperty.call(this.ctx.panelSettings, key);
   }
 

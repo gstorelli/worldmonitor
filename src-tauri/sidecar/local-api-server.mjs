@@ -1043,6 +1043,7 @@ const AUTH_EXEMPT_PATHS = new Set([
   '/api/auth/login',
   '/api/auth/me',
   '/api/auth/logout',
+  '/api/auth/bootstrap',
   '/api/sidecar-health',
   '/api/service-status',
   '/api/version',

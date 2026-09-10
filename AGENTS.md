@@ -129,6 +129,18 @@ npm run lint:safe-html    # OPT-IN ONLY: see "Pre-Push" (fork baseline fails thi
   are stateless HMAC (`WM_SESSION_SECRET`) with 7-day TTL. Machine callers (n8n) may
   present `N8N_INGEST_SECRET` as a bearer instead. The SPA gate lives in
   `src/services/user-auth.ts` and is a no-op when `AUTH_REQUIRED` is false.
+- **User prefs & panel policy (Phase 2)**: `GET/PUT /api/prefs/panels` stores per-user
+  panel settings (`rs:user:<id>:panel-prefs`); `GET/PUT /api/panel-policy` stores a
+  global admin deny-list (`rs:panel-policy`, admin-only writes). Precedence:
+  **policy > user prefs > defaults**. The SPA hydrates prefs at boot and pushes on save
+  (`src/services/user-panel-prefs.ts`, `src/services/panel-policy.ts`); admins get an
+  "Admin" tab in UnifiedSettings (`src/services/admin-panel-policy.ts`).
+- **Multi-app (Phase 3)**: `src/config/apps.ts` is an app registry layered ON TOP of the
+  collapsed variant system (do not revive upstream variants — build-time meta/favicon
+  machinery is inert here). `?app=<id>` (persisted in localStorage) selects an app; an
+  app is a panel allowlist + default-enabled set. `customs` = unrestricted (current
+  dashboard), `osint` = curated OSINT workspace. The header switcher links apps; panels
+  outside the active app's allowlist are filtered in layout and settings.
 
 ## Runtime Architecture
 

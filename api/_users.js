@@ -10,7 +10,8 @@
  * always map through `publicUser()`.
  */
 
-import { constantTimeEqual } from './_user-session.js';
+import { constantTimeEqual, getSessionFromRequest } from './_user-session.js';
+import { redisGetJson, redisSetJson } from './_redis.js';
 
 export const USERS_KEY = 'rs:users';
 export const ROLES = ['admin', 'user'];
@@ -74,53 +75,13 @@ export async function verifyPassword(password, stored) {
   return constantTimeEqual(toBase64Url(derived), hashRaw);
 }
 
-function redisTarget() {
-  const url = process.env.UPSTASH_REDIS_REST_URL || '';
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN || '';
-  return url && token ? { url, token } : null;
-}
-
-async function redisCommand(command) {
-  const target = redisTarget();
-  if (!target) throw new Error('Redis is not configured (UPSTASH_REDIS_REST_URL/TOKEN)');
-  const resp = await fetch(target.url, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${target.token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(command),
-    signal: AbortSignal.timeout(10_000),
-  });
-  if (!resp.ok) throw new Error(`Redis command failed: HTTP ${resp.status}`);
-  await resp.json();
-}
-
-async function redisGet(key) {
-  const target = redisTarget();
-  if (!target) throw new Error('Redis is not configured (UPSTASH_REDIS_REST_URL/TOKEN)');
-  const resp = await fetch(target.url, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${target.token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(['GET', key]),
-    signal: AbortSignal.timeout(10_000),
-  });
-  if (!resp.ok) throw new Error(`Redis GET failed: HTTP ${resp.status}`);
-  const data = await resp.json();
-  const raw = data?.result ?? null;
-  if (raw === null) return null;
-  if (typeof raw !== 'string') return raw;
-  try {
-    return JSON.parse(raw);
-  } catch {
-    throw new Error(`Corrupt JSON in Redis key ${key}`);
-  }
-}
-
 export async function loadUsers() {
-  const raw = await redisGet(USERS_KEY);
+  const raw = await redisGetJson(USERS_KEY);
   return raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
 }
 
 async function saveUsers(users) {
-  await redisCommand(['SET', USERS_KEY, JSON.stringify(users)]);
+  await redisSetJson(USERS_KEY, users);
 }
 
 export function publicUser(user) {
@@ -146,6 +107,15 @@ export async function getUserByUsername(username) {
 export async function getUserById(id) {
   const users = await loadUsers();
   return Object.values(users).find((user) => user.id === id) ?? null;
+}
+
+/** Session cookie → user record, or null when absent/invalid/secret missing. */
+export async function getRequestUser(request) {
+  const secret = process.env.WM_SESSION_SECRET || '';
+  if (!secret) return null;
+  const session = await getSessionFromRequest(request, secret);
+  if (!session) return null;
+  return getUserById(session.sub);
 }
 
 export async function createUser({ username, password, role = 'user' }) {

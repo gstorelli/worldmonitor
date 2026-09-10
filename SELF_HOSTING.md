@@ -132,6 +132,16 @@ Notes:
   exempt for monitoring and the deploy gate.
 - Without `AUTH_REQUIRED=true` the app behaves exactly as before (anonymous, de-clouded).
 
+### Panel policy & per-user preferences
+
+- Every signed-in user gets their own panel toggles, synced server-side at
+  `rs:user:<id>:panel-prefs` (localStorage stays the offline cache).
+- Admins can disable panels **for everyone** in *Settings → Admin* (server key
+  `rs:panel-policy`). Precedence: admin policy > user preferences > defaults.
+- **Apps**: `?app=osint` opens the OSINT workspace, `?app=customs` (default) the PhD
+  customs dashboard. The choice is persisted per browser; the header gains an app
+  switcher when more than one app is registered (`src/config/apps.ts`).
+
 ## 🌱 Seeding Data
 
 The seed scripts fetch upstream data and write it to Redis. They run **on the host** (not inside the container) and need the Redis REST proxy to be running.

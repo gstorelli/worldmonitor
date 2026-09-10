@@ -1,0 +1,40 @@
+/* Risk Sentinel — multi-app switcher (header). */
+
+.rs-app-switcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-right: 8px;
+  padding: 2px;
+  border: 1px solid #2a3644;
+  border-radius: 8px;
+}
+
+.rs-app-link {
+  padding: 4px 10px;
+  border-radius: 6px;
+  color: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-decoration: none;
+  opacity: 0.7;
+  white-space: nowrap;
+}
+
+.rs-app-link:hover {
+  background: rgba(255, 255, 255, 0.06);
+  opacity: 1;
+}
+
+.rs-app-link.active {
+  background: #2563eb;
+  color: #fff;
+  opacity: 1;
+}
+
+@media (max-width: 720px) {
+  .rs-app-switcher {
+    display: none;
+  }
+}
