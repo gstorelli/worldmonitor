@@ -127,6 +127,7 @@ export function createResearchWorkspace(): AppWorkspace {
   let newsQuery: string = THEME_QUERIES.A ?? '';
   let newsDays = 365;
   let newsItems: AcademicItem[] = [];
+  let newsError = '';
   let newsLoading = false;
   let lastEnrichment: { ref: number; fields: { doi?: string; venue?: string; year?: number; url?: string } } | null = null;
 
@@ -370,7 +371,7 @@ export function createResearchWorkspace(): AppWorkspace {
                 </div>
               </article>`,
               )
-              .join('') || '<div class="rs-empty">Nessun risultato: lancia una ricerca.</div>'}
+              .join('') || `<div class="rs-empty">${newsError ? `Ricerca non disponibile: ${escapeHtml(newsError)}` : 'Nessun risultato: lancia una ricerca.'}</div>`}
           </div>
         `;
       };
@@ -783,21 +784,23 @@ export function createResearchWorkspace(): AppWorkspace {
           const queryInputEl = root.querySelector<HTMLInputElement>('#rsNewsQuery');
           newsQuery = queryInputEl?.value.trim() || THEME_QUERIES[newsTheme] || '';
           newsLoading = true;
+          newsError = '';
           renderNews();
           void fetch(`/api/research/papers?q=${encodeURIComponent(newsQuery)}&days=${newsDays}&limit=12`, {
             credentials: 'same-origin',
           })
             .then((res) => res.json())
-            .then((data: { items?: AcademicItem[] }) => {
+            .then((data: { items?: AcademicItem[]; error?: string }) => {
               newsItems = Array.isArray(data.items) ? data.items : [];
+              newsError = data.error ?? '';
               newsLoading = false;
               renderNews();
             })
             .catch(() => {
               newsItems = [];
+              newsError = 'rete non raggiungibile';
               newsLoading = false;
               renderNews();
-              setStatus('Ricerca accademica non raggiungibile.');
             });
           return;
         }

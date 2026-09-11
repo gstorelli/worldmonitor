@@ -26,7 +26,7 @@ globalThis.fetch = async (_url, opts) => {
 };
 
 const { normalizeCrossrefWork } = await import(pathToFileURL(resolve(root, 'api/research/doi.js')).href);
-const { normalizeOpenAlexWork } = await import(pathToFileURL(resolve(root, 'api/research/papers.js')).href);
+const { normalizeOpenAlexWork, normalizeCrossrefItem } = await import(pathToFileURL(resolve(root, 'api/research/papers.js')).href);
 const { buildCreators, buildZoteroItem } = await import(pathToFileURL(resolve(root, 'api/zotero/items.js')).href);
 const { default: researchHandler } = await import(pathToFileURL(resolve(root, 'api/prefs/research.js')).href);
 const users = await import(pathToFileURL(resolve(root, 'api/_users.js')).href);
@@ -68,6 +68,23 @@ describe('research metadata normalizers', () => {
     assert.equal(item.abstract, 'Port disruption early warning');
     assert.equal(item.doi, '10.2/y');
     assert.equal(normalizeOpenAlexWork(null), null);
+  });
+
+  it('normalizes the Crossref recent-works fallback', () => {
+    const item = normalizeCrossrefItem({
+      DOI: '10.3/z',
+      title: ['Llama models for trade documents'],
+      author: [{ family: 'Rossi', given: 'M.' }],
+      issued: { 'date-parts': [[2025, 6, 1]] },
+      'container-title': ['Journal of Customs AI'],
+      URL: 'https://doi.org/10.3/z',
+      abstract: '<jats:p>Long abstract</jats:p>',
+      'is-referenced-by-count': 7,
+    });
+    assert.equal(item.title, 'Llama models for trade documents');
+    assert.equal(item.abstract, 'Long abstract');
+    assert.equal(item.citedByCount, 7);
+    assert.equal(item.source, 'crossref');
   });
 });
 

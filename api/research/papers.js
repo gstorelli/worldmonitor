@@ -48,6 +48,39 @@ export function normalizeOpenAlexWork(work) {
   };
 }
 
+/**
+ * Normalize a Crossref work (used for the recent-works search) into the same
+ * shape as the OpenAlex items. Pure + exported for tests.
+ *
+ * @param {any} work
+ */
+export function normalizeCrossrefItem(work) {
+  if (!work || typeof work !== 'object') return null;
+  const authors = Array.isArray(work.author)
+    ? work.author
+        .slice(0, 6)
+        .map((author) => [author.family, author.given].filter(Boolean).join(', '))
+        .filter(Boolean)
+        .join('; ')
+    : '';
+  const year = work.issued?.['date-parts']?.[0]?.[0];
+  const doi = typeof work.DOI === 'string' ? work.DOI : '';
+  const abstract = typeof work.abstract === 'string' ? work.abstract.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() : '';
+  return {
+    id: doi || work.URL || '',
+    title: Array.isArray(work.title) ? work.title[0] ?? '' : String(work.title ?? ''),
+    authors,
+    year: Number.isInteger(year) ? year : null,
+    date: year ? String(year) : '',
+    venue: Array.isArray(work['container-title']) ? work['container-title'][0] ?? '' : (work.publisher ?? ''),
+    doi,
+    url: work.URL || (doi ? `https://doi.org/${doi}` : ''),
+    citedByCount: Number(work['is-referenced-by-count']) || 0,
+    source: 'crossref',
+    abstract: abstract.slice(0, 700),
+  };
+}
+
 async function cacheKey(value) {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
   const bytes = new Uint8Array(digest);
@@ -90,24 +123,53 @@ export default async function handler(request) {
   }
 
   const mailto = process.env.CROSSREF_MAILTO || 'research@risksentinel.opencyber.org';
-  const target = `https://api.openalex.org/works?search=${encodeURIComponent(query)}&filter=from_publication_date:${from}&sort=publication_date:desc&per-page=${limit}&mailto=${encodeURIComponent(mailto)}`;
+  const userAgent = `RiskSentinelResearch/1.0 (mailto:${mailto})`;
 
-  let payload;
+  // Crossref is the primary source: it is reliably reachable from the VPS,
+  // while OpenAlex throttles shared datacenter IPs (HTTP 429). OpenAlex is the
+  // fallback when Crossref returns nothing.
+  let items = [];
+  let providerError = '';
   try {
+    const target = `https://api.crossref.org/works?query.bibliographic=${encodeURIComponent(query)}&filter=from-pub-date:${from}&sort=published&order=desc&rows=${limit}&select=DOI,title,author,issued,container-title,publisher,type,URL,abstract,is-referenced-by-count`;
     const res = await fetch(target, {
-      headers: { Accept: 'application/json', 'User-Agent': `RiskSentinelResearch/1.0 (mailto:${mailto})` },
+      headers: { Accept: 'application/json', 'User-Agent': userAgent },
       signal: AbortSignal.timeout(20_000),
     });
-    if (!res.ok) return json({ items: [], error: `OpenAlex HTTP ${res.status}` }, 502);
-    payload = await res.json();
+    if (res.ok) {
+      const payload = await res.json();
+      items = Array.isArray(payload?.message?.items)
+        ? payload.message.items.map(normalizeCrossrefItem).filter((entry) => entry && entry.title)
+        : [];
+    } else {
+      providerError = `Crossref HTTP ${res.status}`;
+    }
   } catch (error) {
-    return json({ items: [], error: error instanceof Error ? error.message : 'OpenAlex unreachable' }, 502);
+    providerError = error instanceof Error ? error.message : 'Crossref unreachable';
   }
 
-  const items = Array.isArray(payload?.results)
-    ? payload.results.map(normalizeOpenAlexWork).filter((entry) => entry && entry.title)
-    : [];
-  const body = { query, from, items, fetchedAt: new Date().toISOString() };
+  if (items.length === 0) {
+    try {
+      const target = `https://api.openalex.org/works?search=${encodeURIComponent(query)}&filter=from_publication_date:${from}&sort=publication_date:desc&per-page=${limit}&mailto=${encodeURIComponent(mailto)}`;
+      const res = await fetch(target, {
+        headers: { Accept: 'application/json', 'User-Agent': userAgent },
+        signal: AbortSignal.timeout(20_000),
+      });
+      if (res.ok) {
+        const payload = await res.json();
+        items = Array.isArray(payload?.results)
+          ? payload.results.map(normalizeOpenAlexWork).filter((entry) => entry && entry.title)
+          : [];
+        if (items.length > 0) providerError = '';
+      } else if (!providerError) {
+        providerError = `OpenAlex HTTP ${res.status}`;
+      }
+    } catch (error) {
+      if (!providerError) providerError = error instanceof Error ? error.message : 'OpenAlex unreachable';
+    }
+  }
+
+  const body = items.length > 0 ? { query, from, items, fetchedAt: new Date().toISOString() } : { query, from, items: [], error: providerError || 'No results', fetchedAt: new Date().toISOString() };
   try {
     await redisSetJson(key, body, CACHE_TTL_SECONDS);
   } catch {

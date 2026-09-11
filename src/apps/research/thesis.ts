@@ -43,10 +43,15 @@ function latexEscape(value: string): string {
 function groupByTheme(sources: ResearchSource[]): [string, ResearchSource[]][] {
   const groups = new Map<string, ResearchSource[]>();
   for (const source of sources) {
-    const key = source.themeArea || '—';
+    const key = source.themeArea || '';
     groups.set(key, [...(groups.get(key) ?? []), source]);
   }
   return [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+}
+
+function themeHeading(theme: string): string {
+  if (!theme) return 'Senza tema';
+  return `Tema ${theme} — ${THEME_LABELS[theme] ?? theme}`;
 }
 
 function workflowLine(source: ResearchSource, state: ResearchState): string {
@@ -73,7 +78,7 @@ export function generateThesisMarkdown(
   ];
 
   for (const [theme, entries] of groupByTheme(selected)) {
-    lines.push(`## Tema ${theme} — ${THEME_LABELS[theme] ?? theme}`, '');
+    lines.push(`## ${themeHeading(theme)}`, '');
     for (const source of entries) {
       lines.push(`- ${formatApa(source)}`);
       if (includeWorkflow) {
@@ -117,7 +122,7 @@ export function generateThesisLatex(
   ];
 
   for (const [theme, entries] of groupByTheme(selected)) {
-    lines.push(`\\subsection*{Tema ${latexEscape(theme)} — ${latexEscape(THEME_LABELS[theme] ?? theme)}}`, '\\begin{itemize}');
+    lines.push(`\\subsection*{${latexEscape(themeHeading(theme))}}`, '\\begin{itemize}');
     for (const source of entries) {
       lines.push(`  \\item ${latexEscape(formatApa(source))}`);
       if (includeWorkflow) {
