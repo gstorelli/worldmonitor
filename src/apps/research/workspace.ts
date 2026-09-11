@@ -50,9 +50,9 @@ const THEME_LABELS: Record<string, string> = {
 };
 
 const THEME_QUERIES: Record<string, string> = {
-  A: '"customs risk" OR "border management" artificial intelligence',
-  B: 'supply chain disruption maritime chokepoint risk',
-  C: 'multi-hazard early warning geospatial climate extremes',
+  A: 'customs risk artificial intelligence border management',
+  B: 'supply chain maritime disruption chokepoint',
+  C: 'multi-hazard early warning climate extremes',
   D: 'explainable AI accountability large language models',
   E: 'trade facilitation customs digital infrastructure',
 };

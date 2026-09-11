@@ -48,6 +48,22 @@ export function normalizeOpenAlexWork(work) {
   };
 }
 
+function decodeEntities(value) {
+  let text = String(value ?? '');
+  // Two passes so double-encoded values (`&amp;nbsp;`) fully resolve.
+  for (let pass = 0; pass < 2; pass += 1) {
+    text = text
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&#x27;/gi, "'");
+  }
+  return text;
+}
+
 /**
  * Normalize a Crossref work (used for the recent-works search) into the same
  * shape as the OpenAlex items. Pure + exported for tests.
@@ -65,14 +81,14 @@ export function normalizeCrossrefItem(work) {
     : '';
   const year = work.issued?.['date-parts']?.[0]?.[0];
   const doi = typeof work.DOI === 'string' ? work.DOI : '';
-  const abstract = typeof work.abstract === 'string' ? work.abstract.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim() : '';
+  const abstract = typeof work.abstract === 'string' ? decodeEntities(work.abstract.replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim() : '';
   return {
     id: doi || work.URL || '',
-    title: Array.isArray(work.title) ? work.title[0] ?? '' : String(work.title ?? ''),
-    authors,
+    title: decodeEntities(Array.isArray(work.title) ? work.title[0] ?? '' : String(work.title ?? '')),
+    authors: decodeEntities(authors),
     year: Number.isInteger(year) ? year : null,
     date: year ? String(year) : '',
-    venue: Array.isArray(work['container-title']) ? work['container-title'][0] ?? '' : (work.publisher ?? ''),
+    venue: decodeEntities(Array.isArray(work['container-title']) ? work['container-title'][0] ?? '' : (work.publisher ?? '')),
     doi,
     url: work.URL || (doi ? `https://doi.org/${doi}` : ''),
     citedByCount: Number(work['is-referenced-by-count']) || 0,
@@ -130,8 +146,11 @@ export default async function handler(request) {
   // fallback when Crossref returns nothing.
   let items = [];
   let providerError = '';
+  const today = new Date().toISOString().slice(0, 10);
   try {
-    const target = `https://api.crossref.org/works?query.bibliographic=${encodeURIComponent(query)}&filter=from-pub-date:${from}&sort=published&order=desc&rows=${limit}&select=DOI,title,author,issued,container-title,publisher,type,URL,abstract,is-referenced-by-count`;
+    // Relevance-sorted (no sort/order override) and bounded to the window;
+    // date-sorting would return newest-but-irrelevant works.
+    const target = `https://api.crossref.org/works?query.bibliographic=${encodeURIComponent(query)}&filter=from-pub-date:${from},until-pub-date:${today}&rows=${limit}&select=DOI,title,author,issued,container-title,publisher,type,URL,abstract,is-referenced-by-count&mailto=${encodeURIComponent(mailto)}`;
     const res = await fetch(target, {
       headers: { Accept: 'application/json', 'User-Agent': userAgent },
       signal: AbortSignal.timeout(20_000),
@@ -150,7 +169,9 @@ export default async function handler(request) {
 
   if (items.length === 0) {
     try {
-      const target = `https://api.openalex.org/works?search=${encodeURIComponent(query)}&filter=from_publication_date:${from}&sort=publication_date:desc&per-page=${limit}&mailto=${encodeURIComponent(mailto)}`;
+      // title_and_abstract.search requires ALL terms (AND semantics) and the
+      // relevance score keeps the results on-topic.
+      const target = `https://api.openalex.org/works?filter=title_and_abstract.search:${encodeURIComponent(query)},from_publication_date:${from},to_publication_date:${today}&sort=relevance_score:desc&per-page=${limit}&mailto=${encodeURIComponent(mailto)}`;
       const res = await fetch(target, {
         headers: { Accept: 'application/json', 'User-Agent': userAgent },
         signal: AbortSignal.timeout(20_000),

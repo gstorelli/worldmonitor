@@ -85,6 +85,9 @@ describe('research metadata normalizers', () => {
     assert.equal(item.abstract, 'Long abstract');
     assert.equal(item.citedByCount, 7);
     assert.equal(item.source, 'crossref');
+
+    const entity = normalizeCrossrefItem({ DOI: '10.4/w', title: ['The Intelligent Border:&amp;nbsp;AI &amp; Customs'] });
+    assert.equal(entity.title, 'The Intelligent Border: AI & Customs');
   });
 });
 
