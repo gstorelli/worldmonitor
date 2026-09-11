@@ -148,8 +148,9 @@ if (!UPSTASH_URL || !UPSTASH_TOKEN) {
   process.exit(1);
 }
 if (!CONVEX_SITE_URL || !RELAY_SECRET) {
-  console.error('[digest] CONVEX_SITE_URL / RELAY_SHARED_SECRET not set');
-  process.exit(1);
+  console.log('[digest] Convex/Railway digest is not part of the self-hosted fork (CONVEX_SITE_URL unset) — skipping.');
+  console.log('[digest] Notifications run through api/notify/digest.js + n8n workflow 07.');
+  process.exit(0);
 }
 
 const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;

@@ -157,11 +157,17 @@ const server = http.createServer(async (req, res) => {
           res.end(JSON.stringify({ error: `Command not allowed: ${cmdName}` }));
           return;
         }
-        multi.sendCommand(cmd.map(String));
+        // node-redis v4 Multi exposes addCommand(), not sendCommand().
+        multi.addCommand(cmd.map(String));
       }
-      const results = await multi.exec();
-      res.writeHead(200);
-      res.end(JSON.stringify(results.map((r) => ({ result: r }))));
+      try {
+        const results = await multi.exec();
+        res.writeHead(200);
+        res.end(JSON.stringify(Array.isArray(results) ? results.map((r) => ({ result: r })) : []));
+      } catch (err) {
+        res.writeHead(500);
+        res.end(JSON.stringify({ error: err.message }));
+      }
       return;
     }
 
