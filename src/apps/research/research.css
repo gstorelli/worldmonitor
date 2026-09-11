@@ -1,0 +1,360 @@
+/* Research Workbench — academic bibliography styles (app-scoped). */
+
+.rs-button-ghost {
+  background: transparent;
+  border-color: #2b3a4d;
+  color: #bfdbfe;
+}
+
+.rs-button-ghost:hover {
+  background: rgba(96, 165, 250, 0.12);
+}
+
+.rs-chip-ok {
+  color: #a7f3d0;
+  border-color: #14532d;
+}
+
+/* ── Bibliography table ─────────────────────────────────────────────────── */
+
+.rs-ws-body-bib {
+  grid-template-columns: minmax(420px, 1fr) minmax(320px, 460px);
+}
+
+.rs-bib-table-wrap {
+  max-height: 64vh;
+  overflow: auto;
+  padding: 0;
+}
+
+.rs-bib-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.rs-bib-th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 8px 8px;
+  border-bottom: 1px solid #263241;
+  background: #0f151d;
+  color: #9ca3af;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  text-align: left;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.rs-bib-th:hover {
+  color: #e5e7eb;
+}
+
+.rs-bib-th.sorted {
+  color: #93c5fd;
+}
+
+.rs-bib-row {
+  cursor: pointer;
+  border-bottom: 1px solid rgba(38, 50, 65, 0.55);
+}
+
+.rs-bib-row:hover {
+  background: rgba(96, 165, 250, 0.06);
+}
+
+.rs-bib-row.active {
+  background: #12203a;
+}
+
+.rs-bib-row td {
+  padding: 7px 8px;
+  vertical-align: top;
+}
+
+.rs-bib-ref {
+  color: #6b7280;
+  font-variant-numeric: tabular-nums;
+}
+
+.rs-bib-year {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.rs-bib-title {
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.rs-bib-venue,
+.rs-bib-type {
+  color: #9ca3af;
+}
+
+/* ── Citation block ─────────────────────────────────────────────────────── */
+
+.rs-bib-citation {
+  margin: 12px 0;
+  padding: 10px 12px;
+  border: 1px solid #263241;
+  border-left: 3px solid #2563eb;
+  border-radius: 8px;
+  background: #0d131b;
+}
+
+.rs-bib-citation-label {
+  margin-bottom: 4px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #93c5fd;
+}
+
+.rs-bib-citation p {
+  margin: 0 0 8px;
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+
+.rs-bib-citation-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.rs-bib-citation-actions .rs-button {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+.rs-bib-export {
+  display: inline-flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.rs-bib-export .rs-button {
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+/* ── Coverage matrix ───────────────────────────────────────────────────── */
+
+.rs-cov-summary {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.rs-callout {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 14px;
+  border: 1px solid #2b3a4d;
+  border-radius: 10px;
+  background: #111820;
+  font-size: 12px;
+  color: #cbd5e1;
+}
+
+.rs-callout strong {
+  font-size: 12.5px;
+  color: #e5e7eb;
+}
+
+.rs-callout-warn {
+  border-color: #7c2d12;
+  background: #1d1207;
+}
+
+.rs-callout-warn strong {
+  color: #fb923c;
+}
+
+.rs-callout-ok {
+  border-color: #14532d;
+  background: #0d1a12;
+}
+
+.rs-callout-ok strong {
+  color: #4ade80;
+}
+
+.rs-cov-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.rs-cov-table th,
+.rs-cov-table td {
+  padding: 6px 6px;
+  border-bottom: 1px solid rgba(38, 50, 65, 0.55);
+  text-align: center;
+}
+
+.rs-cov-table thead th {
+  color: #9ca3af;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.rs-cov-table tbody th {
+  text-align: left;
+  font-weight: 600;
+  color: #d1d5db;
+  white-space: nowrap;
+}
+
+.rs-cov-cell {
+  color: transparent;
+  width: 22px;
+}
+
+.rs-cov-cell.covered {
+  color: #4ade80;
+}
+
+.rs-cov-gap th {
+  color: #fb923c;
+}
+
+.rs-cov-gap {
+  background: rgba(251, 146, 60, 0.06);
+}
+
+.rs-cov-count {
+  width: 90px;
+  white-space: nowrap;
+}
+
+.rs-cov-bar {
+  display: inline-block;
+  width: 46px;
+  height: 5px;
+  margin-right: 6px;
+  border-radius: 3px;
+  background: #1f2a37;
+  overflow: hidden;
+  vertical-align: middle;
+}
+
+.rs-cov-bar span {
+  display: block;
+  height: 100%;
+  background: #2563eb;
+}
+
+.rs-cov-distributions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 18px;
+  margin-top: 20px;
+}
+
+.rs-cov-distributions h3 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: #93c5fd;
+}
+
+.rs-bar-row {
+  display: grid;
+  grid-template-columns: 150px 1fr 28px;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 5px;
+  font-size: 12px;
+}
+
+.rs-bar-label {
+  color: #cbd5e1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rs-bar-track {
+  height: 7px;
+  border-radius: 4px;
+  background: #1f2a37;
+  overflow: hidden;
+}
+
+.rs-bar-fill {
+  display: block;
+  height: 100%;
+  background: #2563eb;
+}
+
+.rs-bar-value {
+  color: #9ca3af;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Notes ─────────────────────────────────────────────────────────────── */
+
+.rs-notes-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 360px) 1fr;
+  gap: 14px;
+  align-items: start;
+}
+
+.rs-notes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 64vh;
+  overflow: auto;
+}
+
+.rs-notes-editor h2 {
+  margin: 0 0 4px;
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+.rs-notes-textarea {
+  width: 100%;
+  min-height: 320px;
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid #263241;
+  border-radius: 10px;
+  background: #0b1118;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.55;
+  resize: vertical;
+}
+
+.rs-notes-textarea:focus {
+  outline: none;
+  border-color: #3b82f6;
+}
+
+.rs-notes-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+@media (max-width: 1100px) {
+  .rs-ws-body-bib,
+  .rs-notes-grid {
+    grid-template-columns: 1fr;
+  }
+}

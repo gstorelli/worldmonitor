@@ -148,6 +148,9 @@ npm run lint:safe-html    # OPT-IN ONLY: see "Pre-Push" (fork baseline fails thi
   `App.init()` branches to `src/apps/shell.ts` (shared header/footer only) BEFORE
   `panelLayout.init()` — the dashboard (map, panels, data loader) never initialises for
   them. Add new panels/features inside the app workspace, not as dashboard panels.
+  Research owns its academic layer as pure modules with tests:
+  `src/apps/research/{citations,coverage,filters}.ts` (APA/BibTeX/RIS/CSV, 8D coverage
+  matrix and field-qualified search) — extend those instead of the workspace DOM code.
 
 ## Runtime Architecture
 
