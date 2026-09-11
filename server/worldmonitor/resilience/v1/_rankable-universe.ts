@@ -31,7 +31,7 @@
 // same plain-import shape from scripts/shared/:
 //   `import iso2ToIso3Json from '../../../../shared/iso2-to-iso3.json';`
 // (see _dimension-scorers.ts:1-2).
-import sovereignStatus from '../../../../scripts/shared/sovereign-status.json';
+import sovereignStatus from '../../../../scripts/shared/sovereign-status.json' with { type: 'json' };
 
 export type SovereignStatus = 'un-member' | 'sar';
 

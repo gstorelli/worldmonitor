@@ -129,6 +129,7 @@ sessions are stateless HMAC cookies (`rs_session`, HttpOnly, 7-day TTL, `SameSit
    `GET/POST/PATCH/DELETE /api/auth/users` endpoint.
 
 Notes:
+
 - The static SPA shell stays public; **all data endpoints require the session**.
 - Machine callers keep using `N8N_INGEST_SECRET` as a Bearer (n8n ingest, notify
   config), so background automation is unaffected.
@@ -161,7 +162,10 @@ The seed scripts fetch upstream data and write it to Redis. They run **on the ho
 >
 > Seeders whose API key is missing skip/fail individually; the final summary reports
 > `total/ok/fail`. A `docker compose up -d --build` does **not** re-seed. The
-> `run-seeders.sh` flow below is the upstream/local variant.
+> `run-seeders.sh` flow below is the upstream/local variant. Use
+> `SEED_SKIP="crypto,consumer-prices" ./scripts/seed-all.sh` to skip known-dead
+> deployment-specific seeders, and `SEED_TIMEOUT_SECONDS=300` to raise the per-seeder
+> timeout (default 180s).
 
 ```bash
 # Run all seeders (auto-sources API keys from docker-compose.override.yml)

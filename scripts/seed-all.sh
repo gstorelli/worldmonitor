@@ -26,6 +26,9 @@ set -euo pipefail
 REPO_PATH="${REPO_PATH:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 FILTER="${1:-}"
 TIMEOUT_SECONDS="${SEED_TIMEOUT_SECONDS:-180}"
+# Comma-separated name substrings to skip for this deployment, e.g.:
+#   SEED_SKIP="crypto,consumer-prices,market-breadth" ./scripts/seed-all.sh
+SKIP_LIST="${SEED_SKIP:-}"
 cd "${REPO_PATH}"
 
 if [ ! -f .env ]; then
@@ -62,6 +65,22 @@ total=0; ok=0; fail=0; skipped=0
 for f in scripts/seed-*.mjs; do
   name="$(basename "${f}")"
   if [ -n "${FILTER}" ] && [[ "${name}" != *"${FILTER}"* ]]; then
+    continue
+  fi
+  should_skip=0
+  if [ -n "${SKIP_LIST}" ]; then
+    IFS=',' read -ra skip_parts <<< "${SKIP_LIST}"
+    for part in "${skip_parts[@]}"; do
+      part="${part// /}"
+      if [ -n "${part}" ] && [[ "${name}" == *"${part}"* ]]; then
+        should_skip=1
+        break
+      fi
+    done
+  fi
+  if [ "${should_skip}" -eq 1 ]; then
+    skipped=$((skipped + 1))
+    echo "SKIP ${name}"
     continue
   fi
   total=$((total + 1))

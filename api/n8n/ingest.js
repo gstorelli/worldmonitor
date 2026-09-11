@@ -175,6 +175,21 @@ const PIPELINE_CONFIG = {
     count: (data) => (data.events || []).length,
   },
 
+  'comtrade-anomalies': {
+    redisKey: 'risk_sentinel:n8n:comtrade',
+    ttl: 86400,         // 24h
+    resource: 'comtrade',
+    transform: (data) => (data.alerts || []).map((a) => ({
+      id: a.id || '',
+      source: 'UN_COMTRADE',
+      title: a.title || '',
+      severity: a.severity || 'low',
+      timestamp: a.timestamp || new Date().toISOString(),
+      metadata: a.metadata || {},
+    })),
+    count: (data) => (data.alerts || []).length,
+  },
+
   'policy-monitor': {
     redisKey: 'policy:monitor:v1',
     ttl: 604800,        // 7 days

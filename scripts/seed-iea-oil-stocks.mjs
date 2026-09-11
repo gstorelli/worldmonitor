@@ -232,6 +232,9 @@ const COUNTRY_EXTRA_KEYS = Object.values(COUNTRY_MAP).map(iso2 => ({
   key: `energy:iea-oil-stocks:v1:${iso2}`,
   ttl: TTL_SECONDS,
   transform: (data) => data.members?.find(m => m.iso2 === iso2) ?? null,
+  // Country members carry the raw `seededAt` that publishTransform strips from
+  // the canonical key; allow it explicitly instead of tripping the contract.
+  allowPrePublishFields: ['seededAt'],
 }));
 
 // Analysis key included in extraKeys so runSeed extends its TTL on fetch
@@ -240,6 +243,7 @@ const ANALYSIS_EXTRA_KEY = {
   key: ANALYSIS_KEY,
   ttl: TTL_SECONDS,
   transform: (data) => buildOilStocksAnalysis(data.members, data.dataMonth, data.seededAt),
+  allowPrePublishFields: ['seededAt'],
 };
 
 // Seed-meta for the analysis key, also handled via extraKeys so it stays alive

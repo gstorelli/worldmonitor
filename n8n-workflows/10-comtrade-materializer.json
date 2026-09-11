@@ -1,0 +1,146 @@
+{
+  "name": "Risk Sentinel — UN Comtrade Concentration Materializer",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 12
+            }
+          ]
+        }
+      },
+      "id": "schedule-comtrade",
+      "name": "Schedule (Every 12h)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        250,
+        300
+      ],
+      "notes": "Materializes the derived UN Comtrade concentration alerts into risk_sentinel:n8n:comtrade"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://risksentinel.opencyber.org/api/customs/comtrade",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "RiskSentinelComtrade/1.0"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 20000
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "comtrade-fetch",
+      "name": "Fetch Derived Comtrade Alerts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        500,
+        300
+      ],
+      "notes": "Reads the concentration alerts derived by the API from the seeded bilateral HS4 data. Uses the ingest bearer because the API requires a session.",
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "Risk Sentinel Ingest Bearer"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Normalize the API response (array, {alerts}, or per-item objects) into the ingest payload.\nconst alerts = [];\nfor (const item of $input.all()) {\n  const d = item.json;\n  if (Array.isArray(d)) alerts.push(...d);\n  else if (Array.isArray(d?.alerts)) alerts.push(...d.alerts);\n  else if (Array.isArray(d?.body)) alerts.push(...d.body);\n  else if (d && typeof d === 'object' && (d.title || d.id)) alerts.push(d);\n}\nconst clean = alerts\n  .filter(a => a && typeof a === 'object' && (a.title || a.id))\n  .map(a => ({\n    id: a.id || '',\n    title: a.title || '',\n    severity: a.severity || 'low',\n    timestamp: a.timestamp || new Date().toISOString(),\n    metadata: a.metadata || {},\n  }));\nreturn [{ json: {\n  source: 'un-comtrade-derived',\n  pipeline: 'comtrade-anomalies',\n  alerts: clean,\n  processedAt: new Date().toISOString(),\n} }];"
+      },
+      "id": "comtrade-build",
+      "name": "Build Ingest Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        750,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://risksentinel.opencyber.org/api/n8n/ingest",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($input.item.json) }}",
+        "options": {
+          "timeout": 15000
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "push-comtrade",
+      "name": "Push to Risk Sentinel API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1000,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "Risk Sentinel Ingest Bearer"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule (Every 12h)": {
+      "main": [
+        [
+          {
+            "node": "Fetch Derived Comtrade Alerts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Derived Comtrade Alerts": {
+      "main": [
+        [
+          {
+            "node": "Build Ingest Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Ingest Payload": {
+      "main": [
+        [
+          {
+            "node": "Push to Risk Sentinel API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
