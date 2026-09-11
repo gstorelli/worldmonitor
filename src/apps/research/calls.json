@@ -1,0 +1,150 @@
+{
+  "$comment": "Risk Sentinel — recurring scholarly venues for the research themes. WIP: deadlines recur yearly and MUST be verified on the official site; this curated list is a starting calendar, not a live CFP feed. Themes: A=customs AI, B=supply-chain/maritime, C=multi-hazard/geospatial, D=LLM/XAI/accountability, E=methodology/infrastructure.",
+  "schema_version": 1,
+  "updated_at": "2026-09-11",
+  "calls": [
+    {
+      "id": "wco-tech",
+      "name": "WCO Technology Conference & Exhibition",
+      "scope": "Customs technology, risk management, enforcement, digital trade",
+      "themes": ["A", "E"],
+      "typicalWindow": "Autunno (annuale, sede rotante)",
+      "deadline": null,
+      "location": "Rotante",
+      "url": "https://www.wcoomd.org/en/events.aspx",
+      "notes": "Il venue istituzionale di riferimento per il rischio doganale; utile anche come target di dissemination ADM."
+    },
+    {
+      "id": "ieee-bigdata",
+      "name": "IEEE International Conference on Big Data",
+      "scope": "Big data systems, applied ML, data fusion",
+      "themes": ["A", "D"],
+      "typicalWindow": "Submission ~estate, conferenza Dicembre",
+      "deadline": null,
+      "location": "USA (rotante)",
+      "url": "https://bigdataieee.org/",
+      "notes": "Adatto per la pipeline di fusione multimodale e per i risultati applicativi sul rischio doganale."
+    },
+    {
+      "id": "acm-facct",
+      "name": "ACM Conference on Fairness, Accountability, and Transparency (FAccT)",
+      "scope": "Accountability, explainability, algorithmic governance",
+      "themes": ["D"],
+      "typicalWindow": "Submission ~gennaio, conferenza giugno",
+      "deadline": null,
+      "location": "Rotante",
+      "url": "https://facctconference.org/",
+      "notes": "Il riferimento per il capitolo XAI/accountability e per la validazione etica del sistema."
+    },
+    {
+      "id": "xai-world",
+      "name": "World Conference on Explainable Artificial Intelligence (xAI)",
+      "scope": "Explainable AI methods, evaluation, applications",
+      "themes": ["D"],
+      "typicalWindow": "Submission primavera, conferenza estate",
+      "deadline": null,
+      "location": "Europa (rotante)",
+      "url": "https://www.xai-conference.org/",
+      "notes": "Focus dedicato all'explainability: possibile venue per la dimensione sourceConfidence/audit trail."
+    },
+    {
+      "id": "neurips",
+      "name": "NeurIPS",
+      "scope": "Machine learning, LLM reasoning, datasets and benchmarks",
+      "themes": ["D"],
+      "typicalWindow": "Submission ~maggio, conferenza dicembre",
+      "deadline": null,
+      "location": "Rotante",
+      "url": "https://neurips.cc/",
+      "notes": "Solo se il contributo è metodologico ML; altrimenti preferire venue applicativi."
+    },
+    {
+      "id": "acl-emnlp",
+      "name": "ACL / EMNLP",
+      "scope": "NLP, document understanding, information extraction",
+      "themes": ["A", "D"],
+      "typicalWindow": "Submission ~febbraio (ACL) / ~maggio (EMNLP)",
+      "deadline": null,
+      "location": "Rotante",
+      "url": "https://www.aclweb.org/portal/",
+      "notes": "Per l'analisi documentale doganale e l'estrazione da normative/bollette."
+    },
+    {
+      "id": "iscram",
+      "name": "ISCRAM Conference",
+      "scope": "Information systems for crisis response and management",
+      "themes": ["C"],
+      "typicalWindow": "Submission ~gennaio, conferenza maggio",
+      "deadline": null,
+      "location": "Rotante",
+      "url": "https://iscram.org/",
+      "notes": "Ponte tra multi-hazard e impatto su supply chain: utile per la dimensione geophysicalImpact."
+    },
+    {
+      "id": "egu",
+      "name": "EGU General Assembly",
+      "scope": "Geosciences, climate extremes, natural hazards",
+      "themes": ["C"],
+      "typicalWindow": "Abstract deadline ~gennaio, assemblea aprile",
+      "deadline": null,
+      "location": "Vienna, Austria",
+      "url": "https://www.egu.eu/",
+      "notes": "Venue per la componente climate/geophysical e per i dataset multi-hazard."
+    },
+    {
+      "id": "agu",
+      "name": "AGU Fall Meeting",
+      "scope": "Earth and space sciences, hazard analytics",
+      "themes": ["C"],
+      "typicalWindow": "Abstract deadline ~luglio/agosto, meeting dicembre",
+      "deadline": null,
+      "location": "USA (rotante)",
+      "url": "https://www.agu.org/fall-meeting",
+      "notes": "Alternativa ad EGU per la parte geofisica."
+    },
+    {
+      "id": "iame",
+      "name": "IAME Conference (International Association of Maritime Economists)",
+      "scope": "Maritime economics, ports, shipping and trade",
+      "themes": ["B"],
+      "typicalWindow": "Abstract deadline ~gennaio/febbraio, conferenza estate",
+      "deadline": null,
+      "location": "Rotante",
+      "url": "https://iameconference.com/",
+      "notes": "Riferimento per chokepoint, route criticality e impatto economico portuale."
+    },
+    {
+      "id": "tristan",
+      "name": "TRISTAN (Triennial Symposium on Transportation Analysis)",
+      "scope": "Transportation analysis, network resilience",
+      "themes": ["B", "E"],
+      "typicalWindow": "Triennale, submission ~autunno",
+      "deadline": null,
+      "location": "Rotante",
+      "url": "https://www.tristan-symposium.org/",
+      "notes": "Per la modellazione della rete logistica e della resilienza delle rotte."
+    },
+    {
+      "id": "wto-public-forum",
+      "name": "WTO Public Forum",
+      "scope": "Trade policy, customs facilitation, global value chains",
+      "themes": ["E"],
+      "typicalWindow": "Settembre/ottobre (annuale)",
+      "deadline": null,
+      "location": "Ginevra, Svizzera",
+      "url": "https://www.wto.org/english/forums_e/public_forum_e/public_forum_e.htm",
+      "notes": "Più policy che accademico: utile per dissemination e networking istituzionale."
+    },
+    {
+      "id": "gtr-events",
+      "name": "Global Trade Review (GTR) events",
+      "scope": "Trade finance, compliance, customs practice",
+      "themes": ["B", "E"],
+      "typicalWindow": "Eventi distribuiti durante l'anno",
+      "deadline": null,
+      "location": "Europa/Asia",
+      "url": "https://www.gtreview.com/events/",
+      "notes": "Industry-facing: utile per validare i casi d'uso con operatori e ADM."
+    }
+  ]
+}

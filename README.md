@@ -867,18 +867,25 @@ La progettazione di Risk Sentinel si basa sulle seguenti aree di ricerca:
 
 ## Licenza e Attribuzione
 
-Questo progetto è un **fork** di [WorldMonitor](https://github.com/koala73/worldmonitor) di Elie Habib, rilasciato sotto licenza **AGPL-3.0**.
+Risk Sentinel è un **fork** di [WorldMonitor](https://github.com/koala73/worldmonitor) di **Elie Habib**, distribuito sotto **AGPL-3.0**; il progetto originale resta il riferimento architetturale e il fork ne conserva licenza e attribuzione — v. [LICENSE](LICENSE). Il fork è sviluppato per **ricerca accademica** (dottorato, Università degli Studi di Bari "Aldo Moro" · ADM) e uso non commerciale.
 
-Il fork è stato realizzato per scopi di **ricerca accademica** nell'ambito di un dottorato di ricerca presso l'Università degli Studi di Bari "Aldo Moro", in collaborazione con l'Agenzia delle Dogane e dei Monopoli (ADM).
+### Fonti dati (pipeline WorldMonitor e del fork)
 
-Le modifiche includono:
+- **Geopolitica e conflitti**: GDELT, ACLED, UCDP, GDACS, ReliefWeb, ACAPS, NASA FIRMS, USGS, NOAA/NWS, Open-Meteo, IMF PortWatch.
+- **Commercio e dogane**: UN Comtrade, WTO, World Customs Organization, EUR-Lex, Gazzetta Ufficiale; dataset doganali del fork.
+- **Macro e mercati**: FRED, IMF, World Bank, BIS, ECB, Eurostat, EIA, FAO, JODI, GIE AGSI, Ember, OWID, Yahoo Finance, CoinGecko/CoinPaprika, Polymarket/Kalshi.
+- **Sanità e sicurezza**: WHO, ECDC, IAEA, Radiation Watch.
+- **Trasporti e infrastrutture**: AISStream (AIS), ADS-B Exchange / OpenSky / adsb.lol (ADS-B), AviationStack, Cloudflare Radar, registri dei cavi sottomarini.
+- **Notizie e social**: feed RSS curati, canali Telegram pubblici, think tank e fonti istituzionali.
+- **Ricerca accademica (fork)**: [Crossref](https://www.crossref.org), [OpenAlex](https://openalex.org), [Zotero Web API](https://www.zotero.org/support/dev/web_api/v3/start).
 
-- Rimozione della logica premium/commerciale
-- Aggiunta pipeline n8n per data ingestion trasparente
-- Implementazione del Risk Scoring Engine a 8 dimensioni
-- Rebranding e adattamento al contesto doganale
+### Tecnologie open source
 
-**Uso**: Ricerca accadeica e non commerciale — v. [LICENSE](LICENSE) per i termini completi.
+- **Frontend**: [Preact](https://preactjs.com), [Vite](https://vitejs.dev), [TypeScript](https://www.typescriptlang.org), [MapLibre GL JS](https://maplibre.org), [deck.gl](https://deck.gl), [globe.gl](https://globe.gl), [Protomaps](https://protomaps.com), [PMTiles](https://protomaps.com), [D3](https://d3js.org), [hls.js](https://github.com/video-dev/hls.js).
+- **Dati e orchestrazione**: [Redis](https://redis.io), [n8n](https://n8n.io), [ONNX Runtime Web](https://onnxruntime.ai)/[Transformers.js](https://huggingface.co/docs/transformers.js).
+- **Qualità**: [Biome](https://biomejs.dev), [Playwright](https://playwright.dev), [node:test](https://nodejs.org/api/test.html).
+- **Mappe**: © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors, © [OpenFreeMap](https://openfreemap.org), basemap [Protomaps](https://protomaps.com).
+- **Desktop**: [Tauri](https://tauri.app).
 
 ---
 

@@ -37,6 +37,7 @@ export async function redisGetJson(key) {
   }
 }
 
-export async function redisSetJson(key, value) {
-  await command(['SET', key, JSON.stringify(value)]);
+export async function redisSetJson(key, value, ttlSeconds) {
+  const ttl = Number.isFinite(ttlSeconds) && ttlSeconds > 0 ? ['EX', String(Math.floor(ttlSeconds))] : [];
+  await command(['SET', key, JSON.stringify(value), ...ttl]);
 }
