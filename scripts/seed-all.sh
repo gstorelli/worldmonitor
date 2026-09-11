@@ -41,6 +41,17 @@ fi
 
 RT="$(grep '^REDIS_TOKEN=' .env | cut -d= -f2-)"
 
+# Seeders import the scripts/ sub-package dependencies (exceljs,
+# fast-xml-parser, papaparse, sax, yaml, …). The deploy image does not ship
+# them and the checkout is mounted read-only while seeding, so install them
+# once into the checkout. -u keeps the files host-owned.
+if [ ! -d scripts/node_modules ]; then
+  echo "installing scripts/ dependencies (one-off, ~1-2 min)…"
+  docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp \
+    -v "${REPO_PATH}:/repo" -w /repo/scripts \
+    node:24-alpine npm ci --ignore-scripts --no-audit --no-fund
+fi
+
 LOG="$(mktemp /tmp/seed-all.XXXXXX.log)"
 echo "seed sweep starting (timeout ${TIMEOUT_SECONDS}s/seeder, log: ${LOG})"
 if [ -n "${FILTER}" ]; then

@@ -179,6 +179,37 @@ export function computeCountryLevelExposure(nearestRouteIds, coastSide, hs2) {
 
 // ── Redis pipeline helper ─────────────────────────────────────────────────────
 
+// The self-hosted redis-rest proxy rejects request bodies over 1 MB
+// (docker/redis-rest-proxy.mjs MAX_BODY_BYTES), and a full sweep here is
+// ~1970 SET commands. Sending them in one pipeline destroys the socket
+// (ECONNRESET). Keep each batch comfortably under the cap.
+const MAX_PIPELINE_BYTES = 700_000;
+
+/**
+ * Split Redis commands into pipeline batches whose serialized size stays under
+ * `maxBytes`. Preserves order and never drops a command.
+ * @param {Array<string[]>} commands
+ * @param {number} [maxBytes]
+ * @returns {Array<Array<string[]>>}
+ */
+export function chunkCommands(commands, maxBytes = MAX_PIPELINE_BYTES) {
+  const chunks = [];
+  let batch = [];
+  let bytes = 2; // opening "[" + closing "]"
+  for (const command of commands) {
+    const size = JSON.stringify(command).length + 1;
+    if (batch.length > 0 && bytes + size > maxBytes) {
+      chunks.push(batch);
+      batch = [];
+      bytes = 2;
+    }
+    batch.push(command);
+    bytes += size;
+  }
+  if (batch.length > 0) chunks.push(batch);
+  return chunks;
+}
+
 /**
  * @param {Array<string[]>} commands
  */
@@ -329,10 +360,14 @@ export async function main() {
       'EX', TTL_SECONDS * 3,
     ]);
 
-    const results = await redisPipeline(commands);
-    const failures = results.filter(r => r?.error || r?.result === 'ERR');
-    if (failures.length > 0) {
-      throw new Error(`Redis pipeline: ${failures.length}/${commands.length} commands failed`);
+    const batches = chunkCommands(commands);
+    let failedCommands = 0;
+    for (const batch of batches) {
+      const results = await redisPipeline(batch);
+      failedCommands += results.filter(r => r?.error || r?.result === 'ERR').length;
+    }
+    if (failedCommands > 0) {
+      throw new Error(`Redis pipeline: ${failedCommands}/${commands.length} commands failed`);
     }
 
     logSeedResult('supply_chain:chokepoint-exposure', writtenCount, Date.now() - startedAt, {
