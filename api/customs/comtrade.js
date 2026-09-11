@@ -13,6 +13,24 @@ const SEVERITY_RANK = { critical: 4, high: 3, medium: 2, low: 1 };
 const MIN_PARTNERS_FOR_CONCENTRATION = 3;
 
 /**
+ * UN Comtrade partner codes for the partners we see in the watchlist data,
+ * used when the seeder could not resolve `partnerIso2` (raw numeric codes such
+ * as 842 used to leak into the alert titles).
+ */
+const PARTNER_ISO2_FALLBACK = {
+  36: 'AU', 56: 'BE', 76: 'BR', 124: 'CA', 156: 'CN', 250: 'FR', 251: 'FR', 276: 'DE',
+  380: 'IT', 392: 'JP', 410: 'KR', 484: 'MX', 528: 'NL', 616: 'PL', 643: 'RU', 682: 'SA',
+  699: 'IN', 704: 'VN', 710: 'ZA', 724: 'ES', 757: 'CH', 784: 'AE', 792: 'TR', 804: 'UA',
+  818: 'EG', 826: 'GB', 840: 'US', 842: 'US',
+};
+
+function partnerLabel(top) {
+  if (top.partnerIso2) return top.partnerIso2;
+  const code = String(top.partnerCode ?? '');
+  return PARTNER_ISO2_FALLBACK[code] || code;
+}
+
+/**
  * Derive single-supplier concentration alerts from the seeded UN Comtrade
  * bilateral HS4 payloads (`comtrade:bilateral-hs4:<ISO2>:v1`).
  *
@@ -46,7 +64,7 @@ export function deriveConcentrationAlerts(payloads, { maxAlerts = 20 } = {}) {
       else if (share >= 0.45) severity = 'medium';
       if (!severity) continue;
 
-      const partner = top.partnerIso2 || String(top.partnerCode ?? '');
+      const partner = partnerLabel(top);
       alerts.push({
         id: `comtrade-${iso2}-${product.hs4}`,
         source: 'UN_COMTRADE',

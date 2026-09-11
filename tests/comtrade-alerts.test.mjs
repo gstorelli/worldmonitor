@@ -71,6 +71,23 @@ describe('comtrade concentration alerts (derived from seeded bilateral HS4)', ()
     assert.deepEqual(deriveConcentrationAlerts([payload('IT', [thin, twoPartners])]), []);
   });
 
+  it('resolves numeric partner codes to ISO2 for readable titles', () => {
+    const numeric = {
+      hs4: '8703',
+      totalValue: 1_000_000,
+      year: 2025,
+      topExporters: [
+        { partnerCode: 842, share: 0.8 },
+        { partnerCode: 276, share: 0.15 },
+        { partnerCode: 380, share: 0.05 },
+      ],
+    };
+    const alerts = deriveConcentrationAlerts([payload('FR', [numeric])]);
+    assert.equal(alerts.length, 1);
+    assert.equal(alerts[0].metadata.topExporter, 'US');
+    assert.match(alerts[0].title, /US 80%/);
+  });
+
   it('returns an empty list when there is no usable data', () => {
     assert.deepEqual(deriveConcentrationAlerts([]), []);
     assert.deepEqual(deriveConcentrationAlerts([{ iso2: 'IT', products: [product('2710', 0.2)] }]), []);
