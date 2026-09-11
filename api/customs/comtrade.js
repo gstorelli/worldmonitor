@@ -9,9 +9,17 @@ const WATCHLIST = ['IT', 'DE', 'FR', 'ES', 'NL', 'BE', 'PL', 'US', 'CN', 'TR'];
 
 const SEVERITY_RANK = { critical: 4, high: 3, medium: 2, low: 1 };
 
+/** Minimum ranked partners required before a share is meaningful. */
+const MIN_PARTNERS_FOR_CONCENTRATION = 3;
+
 /**
  * Derive single-supplier concentration alerts from the seeded UN Comtrade
  * bilateral HS4 payloads (`comtrade:bilateral-hs4:<ISO2>:v1`).
+ *
+ * Only products with at least {@link MIN_PARTNERS_FOR_CONCENTRATION} ranked
+ * partners qualify: with one or two partners every "share" collapses to ~100%
+ * and the alert would be noise (the public Comtrade preview returns very thin
+ * partner coverage — authenticated COMTRADE_API_KEYS return the full set).
  *
  * Pure and exported so it can be unit-tested without Redis.
  *
@@ -26,8 +34,11 @@ export function deriveConcentrationAlerts(payloads, { maxAlerts = 20 } = {}) {
     const { iso2, products, fetchedAt } = /** @type {any} */ (payload);
     if (!Array.isArray(products)) continue;
     for (const product of products) {
-      const top = Array.isArray(product?.topExporters) ? product.topExporters[0] : null;
+      const exporters = Array.isArray(product?.topExporters) ? product.topExporters : [];
+      const top = exporters[0];
       if (!top || typeof top.share !== 'number' || !product?.hs4) continue;
+      if (exporters.length < MIN_PARTNERS_FOR_CONCENTRATION) continue;
+      if (top.share >= 0.999) continue;
       const share = top.share;
       let severity = null;
       if (share >= 0.75) severity = 'critical';
@@ -69,10 +80,12 @@ function mockAlerts() {
   return [{
     id: `comtrade-dummy-${Date.now()}`,
     source: 'UN_COMTRADE',
-    title: '[DATA PENDING] Anomalia Baseline Flussi Commerciali',
+    title: '[DATA PENDING] Copertura partner insufficiente per l\'analisi di concentrazione',
     severity: 'low',
     timestamp: new Date().toISOString(),
-    metadata: { note: 'Nessun dato bilateral HS4 in Redis: esegui scripts/seed-comtrade-bilateral-hs4.mjs.' },
+    metadata: {
+      note: 'Nessuna linea HS4 con >=3 partner classificati. Esegui scripts/seed-comtrade-bilateral-hs4.mjs e/o configura COMTRADE_API_KEYS per la copertura completa.',
+    },
   }];
 }
 

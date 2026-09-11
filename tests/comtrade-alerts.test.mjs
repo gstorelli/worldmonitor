@@ -10,14 +10,21 @@ const { deriveConcentrationAlerts } = await import(
 
 const payload = (iso2, products) => ({ iso2, products, fetchedAt: '2026-01-01T00:00:00.000Z' });
 
-const product = (hs4, share, overrides = {}) => ({
-  hs4,
-  description: `prodotto ${hs4}`,
-  totalValue: 1_000_000,
-  year: 2025,
-  topExporters: [{ partnerIso2: 'CN', partnerCode: 156, value: share * 1_000_000, share }],
-  ...overrides,
-});
+const product = (hs4, share, overrides = {}) => {
+  const rest = Math.max(0, 1 - share);
+  return {
+    hs4,
+    description: `prodotto ${hs4}`,
+    totalValue: 1_000_000,
+    year: 2025,
+    topExporters: [
+      { partnerIso2: 'CN', partnerCode: 156, value: share * 1_000_000, share },
+      { partnerIso2: 'DE', partnerCode: 276, value: (rest / 2) * 1_000_000, share: rest / 2 },
+      { partnerIso2: 'US', partnerCode: 842, value: (rest / 2) * 1_000_000, share: rest / 2 },
+    ],
+    ...overrides,
+  };
+};
 
 describe('comtrade concentration alerts (derived from seeded bilateral HS4)', () => {
   it('maps supplier shares to severity and drops low-concentration lines', () => {
@@ -51,6 +58,17 @@ describe('comtrade concentration alerts (derived from seeded bilateral HS4)', ()
       { maxAlerts: 5 },
     );
     assert.equal(alerts.length, 5);
+  });
+
+  it('ignores thin partner coverage that would fake a 100% concentration', () => {
+    const thin = { hs4: '8542', totalValue: 1, year: 2025, topExporters: [{ partnerIso2: 'CL', partnerCode: 152, share: 1 }] };
+    const twoPartners = {
+      hs4: '8703',
+      totalValue: 1,
+      year: 2025,
+      topExporters: [{ partnerIso2: 'DE', share: 0.9 }, { partnerIso2: 'FR', share: 0.1 }],
+    };
+    assert.deepEqual(deriveConcentrationAlerts([payload('IT', [thin, twoPartners])]), []);
   });
 
   it('returns an empty list when there is no usable data', () => {
