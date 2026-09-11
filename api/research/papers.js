@@ -5,6 +5,8 @@ export const config = { runtime: 'edge' };
 
 const CACHE_TTL_SECONDS = 6 * 3600;
 const MAX_LIMIT = 25;
+// Bump when the query/providers change so stale cached bodies are not served.
+const CACHE_VERSION = 'v3';
 
 /** Rebuild a plain abstract from OpenAlex's inverted index. */
 function invertAbstract(index) {
@@ -130,7 +132,7 @@ export default async function handler(request) {
   const limit = Math.min(Math.max(Number(url.searchParams.get('limit')) || 12, 1), MAX_LIMIT);
   const from = new Date(Date.now() - days * 24 * 3600 * 1000).toISOString().slice(0, 10);
 
-  const key = await cacheKey(`${query}|${from}|${limit}`);
+  const key = await cacheKey(`${CACHE_VERSION}|${query}|${from}|${limit}`);
   try {
     const cached = await redisGetJson(key);
     if (cached) return json({ ...cached, cached: true });
