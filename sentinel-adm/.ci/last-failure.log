@@ -1,0 +1,64 @@
+# SENTINEL-ADM CI failure log
+# commit: 029b42769f7d0dd14c375341f1249b01f3cd0257
+# date:   2026-09-14T15:36:57Z
+
+===== log-test_api_services.txt =====
+test_dork_response (tests.test_api_services.DorkAndOsintTests.test_dork_response) ... ok
+test_osint_job_specs (tests.test_api_services.DorkAndOsintTests.test_osint_job_specs) ... ok
+test_unknown_portal_raises (tests.test_api_services.DorkAndOsintTests.test_unknown_portal_raises) ... ok
+test_capture_and_seal_without_tsa (tests.test_api_services.EvidenceServiceTests.test_capture_and_seal_without_tsa) ... ok
+test_capture_reports_archivebox_rejection (tests.test_api_services.EvidenceServiceTests.test_capture_reports_archivebox_rejection) ... ok
+test_capture_without_warc_raises (tests.test_api_services.EvidenceServiceTests.test_capture_without_warc_raises) ... ok
+test_evidence_import_happy_path_and_traversal_guard (tests.test_api_services.EvidenceServiceTests.test_evidence_import_happy_path_and_traversal_guard) ... ok
+test_legal_qualify_returns_urn (tests.test_api_services.LegalServiceTests.test_legal_qualify_returns_urn) ... ok
+test_scan_harvests_and_matches (tests.test_api_services.RadarScanTests.test_scan_harvests_and_matches) ... ERROR
+test_scan_limit (tests.test_api_services.RadarScanTests.test_scan_limit) ... ERROR
+test_scan_without_feeds_reports_configuration (tests.test_api_services.RadarScanTests.test_scan_without_feeds_reports_configuration) ... ok
+test_upsert_list_remove (tests.test_api_services.WatchlistServiceTests.test_upsert_list_remove) ... ok
+
+======================================================================
+ERROR: test_scan_harvests_and_matches (tests.test_api_services.RadarScanTests.test_scan_harvests_and_matches)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/runner/work/worldmonitor/worldmonitor/sentinel-adm/tests/test_api_services.py", line 36, in test_scan_harvests_and_matches
+    result = services.radar_scan(
+             ^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/worldmonitor/worldmonitor/sentinel-adm/app/api/services.py", line 64, in radar_scan
+    alerts = run_radar(harvested.items, entries, extractor or build_extractor(config))
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/worldmonitor/worldmonitor/sentinel-adm/app/radar/pipeline.py", line 75, in run_radar
+    alert = assess_item(item, watchlist, extractor, **options)  # type: ignore[arg-type]
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/worldmonitor/worldmonitor/sentinel-adm/app/radar/pipeline.py", line 56, in assess_item
+    matches = match_watchlist(extraction.watchlist_candidates(), watchlist, threshold=accept, review_floor=review_floor)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/worldmonitor/worldmonitor/sentinel-adm/app/radar/fuzzy.py", line 124, in match_watchlist
+    for candidate in [entry.name, *entry.aliases]:
+                      ^^^^^^^^^^
+AttributeError: 'dict' object has no attribute 'name'
+
+======================================================================
+ERROR: test_scan_limit (tests.test_api_services.RadarScanTests.test_scan_limit)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/runner/work/worldmonitor/worldmonitor/sentinel-adm/tests/test_api_services.py", line 51, in test_scan_limit
+    result = services.radar_scan(feeds=["https://feed/x"], watchlist=WATCHLIST, fetch=lambda url: RSS, limit=1)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/worldmonitor/worldmonitor/sentinel-adm/app/api/services.py", line 64, in radar_scan
+    alerts = run_radar(harvested.items, entries, extractor or build_extractor(config))
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/worldmonitor/worldmonitor/sentinel-adm/app/radar/pipeline.py", line 75, in run_radar
+    alert = assess_item(item, watchlist, extractor, **options)  # type: ignore[arg-type]
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/worldmonitor/worldmonitor/sentinel-adm/app/radar/pipeline.py", line 56, in assess_item
+    matches = match_watchlist(extraction.watchlist_candidates(), watchlist, threshold=accept, review_floor=review_floor)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/worldmonitor/worldmonitor/sentinel-adm/app/radar/fuzzy.py", line 124, in match_watchlist
+    for candidate in [entry.name, *entry.aliases]:
+                      ^^^^^^^^^^
+AttributeError: 'dict' object has no attribute 'name'
+
+----------------------------------------------------------------------
+Ran 12 tests in 0.016s
+
+FAILED (errors=2)
