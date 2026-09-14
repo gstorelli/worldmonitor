@@ -52,7 +52,7 @@ def parse_maigret_json(text: str) -> dict:
     try:
         data = json.loads(text)
     except json.JSONDecodeError:
-        return {"sites": [], "raw": text[:2000]}
+        return {"sites": [], "count": 0, "raw": text[:2000]}
     sites: list[dict[str, str]] = []
     if isinstance(data, dict):
         entries = data.get("sites") or data.get("results") or data

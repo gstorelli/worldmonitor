@@ -29,6 +29,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from app.forensics.evidence import EvidenceVault, TsaClient  # noqa: E402
 from app.legal.urnlex import qualify  # noqa: E402
 from app.radar.fuzzy import WatchlistEntry  # noqa: E402
+from app.radar.extraction import heuristic_extract  # noqa: E402
 from app.radar.harvester import parse_feed  # noqa: E402
 from app.radar.pipeline import alerts_to_digest, run_radar  # noqa: E402
 
@@ -89,6 +90,11 @@ def run() -> StepReport:
 
     # 2. Extraction + fuzzy matching
     alerts = run_radar(items, WATCHLIST)
+    extraction = heuristic_extract(f"{items[0].title}. {items[0].summary}") if items else None
+    print(
+        f"      entità estratte: companies={extraction.companies if extraction else []} "
+        f"actions={extraction.actions if extraction else []}"
+    )
     matched = alerts[0].best_match if alerts else None
     report.check(
         "2. Estrazione entità e match watchlist",

@@ -74,12 +74,23 @@ jobs:
           python-version: '3.12'
 
       - name: Run the acceptance scenario
-        run: python scripts/acceptance.py
+        run: |
+          set -o pipefail
+          python scripts/acceptance.py 2>&1 | tee /tmp/log-acceptance.txt
+
+      - name: Upload acceptance log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs-acceptance
+          path: /tmp/log-acceptance.txt
+          if-no-files-found: ignore
+          retention-days: 7
 
   diagnostics:
     name: Publish diagnostics
-    needs: tests
-    if: always() && needs.tests.result == 'failure'
+    needs: [tests, acceptance]
+    if: always() && (needs.tests.result == 'failure' || needs.acceptance.result == 'failure')
     runs-on: ubuntu-latest
     permissions:
       contents: write

@@ -96,7 +96,10 @@ class PipelineTests(unittest.TestCase):
 
     def test_match_produces_alert_with_severity_and_flash(self):
         alert = assess_item(self._item(HEADLINE), self.watchlist)
-        self.assertIsNotNone(alert)
+        self.assertIsNotNone(
+            alert,
+            f"estrazione={heuristic_extract(HEADLINE)} candidati={heuristic_extract(HEADLINE).watchlist_candidates()}",
+        )
         assert alert is not None
         self.assertEqual(alert.best_match.entry.entry_id, "w1")
         self.assertGreaterEqual(alert.score, 55)
@@ -111,7 +114,11 @@ class PipelineTests(unittest.TestCase):
             self._item(HEADLINE),
         ]
         alerts = run_radar(items, self.watchlist)
-        self.assertEqual(len(alerts), 2)
+        self.assertEqual(
+            len(alerts),
+            2,
+            f"entità={[heuristic_extract(f'{item.title}. {item.summary}').watchlist_candidates() for item in items]}",
+        )
         self.assertGreaterEqual(alerts[0].score, alerts[1].score)
         digest = alerts_to_digest(alerts)
         self.assertEqual(digest[0]["matched"][0]["entry_id"], alerts[0].best_match.entry.entry_id)
