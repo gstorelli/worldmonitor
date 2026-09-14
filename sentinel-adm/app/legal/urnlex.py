@@ -14,6 +14,7 @@ Stdlib only.
 from __future__ import annotations
 
 import re
+import unicodedata
 from dataclasses import dataclass, field
 
 from .acts import ACTS, LegalAct, all_aliases, find_act, get_act
@@ -101,8 +102,11 @@ _ASSOCIATION_WINDOW = 120
 
 
 def _detect_in_force(text: str) -> bool:
-    lowered = text.casefold()
-    if any(marker in lowered for marker in ("abrogato", "non più in vigore", "previgente", "versione storica")):
+    # Stems, not full words: Italian inflects ("abrogato" / "abrogata" /
+    # "abrogati"), and accents must not defeat the match ("più" → "piu").
+    lowered = unicodedata.normalize("NFKD", text.casefold())
+    lowered = "".join(ch for ch in lowered if not unicodedata.combining(ch))
+    if any(marker in lowered for marker in ("abrogat", "previgent", "non piu in vigore", "versione storica")):
         return False
     return True
 
