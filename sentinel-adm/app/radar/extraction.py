@@ -42,14 +42,18 @@ SYSTEM_PROMPT = (
     "camion, depositi). Non inventare: se un campo è assente restituisci un array vuoto."
 )
 
+# The company name must start with a real capital letter (no IGNORECASE on the
+# name group) and the legal form is matched case-insensitively, otherwise the
+# regex swallows the preceding lowercase words ("deposito della Fratelli
+# Rossi S.r.l") and dilutes the fuzzy match.
 _COMPANY_PATTERN = re.compile(
-    r"\b([A-ZÀ-Ù][\w&'’.\-]*(?:\s+[A-ZÀ-Ù][\w&'’.\-]*){0,3})\s+"
-    r"(s\.?\s*r\.?\s*l\.?(?:\s*s)?|s\.?\s*p\.?\s*a\.?|s\.?\s*n\.?\s*c\.?|s\.?\s*a\.?\s*s\.?|srls?|spa|snc|sas)\b",
-    re.IGNORECASE,
+    r"(?<![A-Za-zÀ-ù0-9])"
+    r"([A-ZÀ-Ù][\w&'’.\-]*(?:\s+[A-ZÀ-Ù][\w&'’.\-]*){0,3})\s+"
+    r"(?i:(s\.?\s*r\.?\s*l\.?(?:\s*s)?|s\.?\s*p\.?\s*a\.?|s\.?\s*n\.?\s*c\.?|s\.?\s*a\.?\s*s\.?))"
 )
 _COMPANY_MARKERS = re.compile(
-    r"(?:ditta|società|societa|impresa|deposito|distributore|gestore|titolare)\s+"
-    r"([A-ZÀ-Ù][\w&'’.\-]*(?:\s+[A-ZÀ-Ù][\w&'’.\-]*){0,3})",
+    r"(?:ditta|società|societa|impresa|distributore|gestore|titolare)\s+"
+    r"([A-ZÀ-Ù][\w&'’.\-]*(?:\s+[A-ZÀ-Ù][\w&'’.\-]*){0,3})"
 )
 
 _TARGET_PLACES = (

@@ -144,36 +144,45 @@ def qualify(text: str) -> LegalQualificationReport:
     in_force = _detect_in_force(text)
     mentions = _act_mentions(text)
     article_matches = list(_ARTICLE_PATTERN.finditer(text))
-    assigned_articles: set[int] = set()
-    seen: set[tuple[str, str | None, str | None]] = set()
 
-    for start, end, act in mentions:
-        window: list[tuple[int, int, re.Match[str]]] = []
-        for index, match in enumerate(article_matches):
-            if index in assigned_articles:
-                continue
-            distance = min(abs(match.start() - end), abs(start - match.end()))
+    # Assign each article to its NEAREST act mention (globally, shortest distance
+    # first). First-come association would let a nearby act steal the article of
+    # the act it actually belongs to ("TUA art. 40 ... d.lgs. 74/2000 art. 8").
+    pairs: list[tuple[int, int, int]] = []
+    for article_index, article in enumerate(article_matches):
+        for mention_index, (start, end, _) in enumerate(mentions):
+            distance = min(abs(article.start() - end), abs(start - article.end()))
             if distance <= _ASSOCIATION_WINDOW:
-                window.append((distance, index, match))
-        window.sort(key=lambda item: item[0])
+                pairs.append((distance, article_index, mention_index))
+    pairs.sort()
+    article_owner: dict[int, LegalAct] = {}
+    for _, article_index, mention_index in pairs:
+        article_owner.setdefault(article_index, mentions[mention_index][2])
 
-        if not window:
-            key = (act.key, None, None)
-            if key not in seen:
-                seen.add(key)
-                report.qualifications.append(_qualify_act(act, None, None, in_force))
+    seen: set[tuple[str, str | None, str | None]] = set()
+    for article_index, article in enumerate(article_matches):
+        act = article_owner.get(article_index)
+        if act is None:
             continue
+        for number in (article.group(1), article.group(2)):
+            if not number:
+                continue
+            key = (act.key, number, article.group(3))
+            if key in seen:
+                continue
+            seen.add(key)
+            report.qualifications.append(_qualify_act(act, number, article.group(3), in_force))
 
-        for _, index, match in window[:2]:
-            assigned_articles.add(index)
-            for article in (match.group(1), match.group(2)):
-                if not article:
-                    continue
-                key = (act.key, article, match.group(3))
-                if key in seen:
-                    continue
-                seen.add(key)
-                report.qualifications.append(_qualify_act(act, article, match.group(3), in_force))
+    # Acts cited without any article get an act-level qualification.
+    acts_with_articles = {act.key for act in article_owner.values()}
+    for _, _, act in mentions:
+        if act.key in acts_with_articles:
+            continue
+        key = (act.key, None, None)
+        if key in seen:
+            continue
+        seen.add(key)
+        report.qualifications.append(_qualify_act(act, None, None, in_force))
 
     # No explicit act: suggest acts from offence keywords (needs review).
     if not report.qualifications:
