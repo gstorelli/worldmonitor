@@ -60,7 +60,8 @@ def radar_scan(
     if not feed_list:
         return {"items": [], "errors": ["nessun feed configurato (SENTINEL_NEWS_FEEDS)"], "alerts": [], "scanned_at": _now()}
     harvested = MediaHarvester(feed_list, fetch=fetch).harvest(limit=limit)
-    entries = watchlist if watchlist is not None else load_watchlist(config.watchlist_path)
+    raw_entries = watchlist if watchlist is not None else load_watchlist(config.watchlist_path)
+    entries = [validate_entry(entry) if isinstance(entry, dict) else entry for entry in raw_entries]
     alerts = run_radar(harvested.items, entries, extractor or build_extractor(config))
     return {
         "items": [_jsonable(item) for item in harvested.items],
