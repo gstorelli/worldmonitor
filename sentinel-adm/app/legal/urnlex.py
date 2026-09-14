@@ -95,6 +95,10 @@ _ARTICLE_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
+# How far an article may sit from the act mention it belongs to ("art. 40" and
+# "TUA" are commonly split by a period, so sentence splitting is not viable).
+_ASSOCIATION_WINDOW = 120
+
 
 def _detect_in_force(text: str) -> bool:
     lowered = text.casefold()
@@ -103,37 +107,71 @@ def _detect_in_force(text: str) -> bool:
     return True
 
 
+def _numeric_patterns(act: LegalAct) -> tuple[str, ...]:
+    year = act.date[:4]
+    return (
+        f"legge {act.number} {year}",
+        f"l {act.number} {year}",
+        f"decreto legislativo {act.number} {year}",
+        f"d lgs {act.number} {year}",
+        f"dpr {act.number} {year}",
+        f"regolamento {act.number} {year}",
+    )
+
+
+def _act_mentions(text: str) -> list[tuple[int, int, LegalAct]]:
+    """All act citations with their positions, word-boundary matched."""
+    lowered = text.casefold()
+    mentions: set[tuple[int, int, LegalAct]] = set()
+    for act in ACTS:
+        patterns = list(act.aliases)
+        if act.verified and act.number and act.date:
+            patterns.extend(_numeric_patterns(act))
+        for alias in patterns:
+            pattern = f"(?<![a-z0-9]){re.escape(alias.casefold())}(?![a-z0-9])"
+            for match in re.finditer(pattern, lowered):
+                mentions.add((match.start(), match.end(), act))
+    return sorted(mentions, key=lambda mention: mention[0])
+
+
 def qualify(text: str) -> LegalQualificationReport:
     """Produce structured qualifications from an incident description."""
     report = LegalQualificationReport()
     in_force = _detect_in_force(text)
-
-    # 1. Explicit citations ("TUA art. 47, comma 1", "d.lgs. 74/2000 art. 8").
+    mentions = _act_mentions(text)
+    article_matches = list(_ARTICLE_PATTERN.finditer(text))
+    assigned_articles: set[int] = set()
     seen: set[tuple[str, str | None, str | None]] = set()
-    for mention in re.split(r"[.;\n]", text):
-        if not mention.strip():
-            continue
-        mention_act = find_act(mention)
-        if not mention_act:
-            continue
-        articles = [match for match in _ARTICLE_PATTERN.finditer(mention)]
-        if not articles:
-            key = (mention_act.key, None, None)
+
+    for start, end, act in mentions:
+        window: list[tuple[int, int, re.Match[str]]] = []
+        for index, match in enumerate(article_matches):
+            if index in assigned_articles:
+                continue
+            distance = min(abs(match.start() - end), abs(start - match.end()))
+            if distance <= _ASSOCIATION_WINDOW:
+                window.append((distance, index, match))
+        window.sort(key=lambda item: item[0])
+
+        if not window:
+            key = (act.key, None, None)
             if key not in seen:
                 seen.add(key)
-                report.qualifications.append(_qualify_act(mention_act, None, None, in_force))
+                report.qualifications.append(_qualify_act(act, None, None, in_force))
             continue
-        for match in articles:
+
+        for _, index, match in window[:2]:
+            assigned_articles.add(index)
             for article in (match.group(1), match.group(2)):
                 if not article:
                     continue
-                key = (mention_act.key, article, match.group(3))
+                key = (act.key, article, match.group(3))
                 if key in seen:
                     continue
                 seen.add(key)
-                report.qualifications.append(_qualify_act(mention_act, article, match.group(3), in_force))
+                report.qualifications.append(_qualify_act(act, article, match.group(3), in_force))
 
-    # 2. No explicit act: suggest acts from offence keywords (needs review).
+    # No explicit act: suggest acts from offence keywords (needs review).
     if not report.qualifications:
         lowered = text.casefold()
         suggested: list[str] = []

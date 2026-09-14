@@ -13,6 +13,7 @@ on:
 
 permissions:
   contents: read
+  statuses: write
 
 jobs:
   tests:
@@ -32,4 +33,63 @@ jobs:
         run: python -m compileall -q app
 
       - name: Run the test suite
-        run: python -m unittest discover -s tests -t . -v
+        run: |
+          set -o pipefail
+          python -m unittest discover -s tests -t . -v 2>&1 | tee /tmp/sentinel-tests.log
+
+      # Publish every failing test as a commit status: Actions logs need
+      # authentication, while statuses are readable on a public repository, so
+      # this keeps failures diagnosable from outside the runner.
+      - name: Publish failure summary as commit statuses
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_SHA: ${{ github.sha }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import re
+          import urllib.error
+          import urllib.request
+
+          log_path = '/tmp/sentinel-tests.log'
+          if not os.path.exists(log_path):
+              print('no test log to publish')
+              raise SystemExit(0)
+
+          text = open(log_path, encoding='utf-8', errors='replace').read()
+          blocks = re.findall(r'^(?:FAIL|ERROR): (\S+).*?\n(.*?)(?=\n(?:FAIL|ERROR): |\Z)', text, re.S | re.M)
+          token = os.environ.get('GH_TOKEN', '')
+          repo = os.environ.get('GITHUB_REPOSITORY', '')
+          sha = os.environ.get('GITHUB_SHA', '')
+          if not (token and repo and sha and blocks):
+              print(f'nothing to publish (blocks={len(blocks)})')
+              raise SystemExit(0)
+
+          for name, body in blocks[:20]:
+              lines = [line.strip() for line in body.strip().splitlines() if line.strip()]
+              detail = lines[-1] if lines else 'test failed'
+              payload = json.dumps({
+                  'state': 'error',
+                  'context': f'sentinel-adm/{name}'[:100],
+                  'description': detail[:130],
+              }).encode('utf-8')
+              request = urllib.request.Request(
+                  f'https://api.github.com/repos/{repo}/statuses/{sha}',
+                  data=payload,
+                  headers={
+                      'Authorization': f'Bearer {token}',
+                      'Accept': 'application/vnd.github+json',
+                      'Content-Type': 'application/json',
+                      'User-Agent': 'sentinel-adm-ci',
+                  },
+                  method='POST',
+              )
+              try:
+                  urllib.request.urlopen(request, timeout=20)
+                  print(f'published {name}: {detail[:80]}')
+              except urllib.error.URLError as error:
+                  print(f'status post failed for {name}: {error}')
+          PY
