@@ -116,3 +116,11 @@ playground-pricing.html
 
 # Local PhD thesis materials (literature review, chapters, evolution report) — context only, never pushed.
 dottorato/
+
+# SENTINEL-ADM (separate Python platform): local venv, bytecode, runtime data.
+sentinel-adm/.venv/
+sentinel-adm/**/__pycache__/
+sentinel-adm/**/*.py[cod]
+sentinel-adm/data/
+# The global `.env.example` ignore above would hide the stack template.
+!sentinel-adm/.env.example

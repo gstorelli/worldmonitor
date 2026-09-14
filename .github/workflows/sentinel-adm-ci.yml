@@ -1,0 +1,35 @@
+name: SENTINEL-ADM CI
+
+on:
+  push:
+    paths:
+      - 'sentinel-adm/**'
+      - '.github/workflows/sentinel-adm-ci.yml'
+  pull_request:
+    paths:
+      - 'sentinel-adm/**'
+      - '.github/workflows/sentinel-adm-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: Unit tests (stdlib)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sentinel-adm
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Byte-compile the package
+        run: python -m compileall -q app
+
+      - name: Run the test suite
+        run: python -m unittest discover -s tests -t . -v

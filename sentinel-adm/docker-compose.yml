@@ -1,0 +1,95 @@
+# SENTINEL-ADM — on-premise stack: API core, operator UI, Yente sanctions engine,
+# ArchiveBox forensic capture and its PostgreSQL store. No GPU, no external
+# licensing. Only news scraping and the inference endpoint require egress.
+
+services:
+  sentinel-api:
+    build: .
+    environment:
+      SENTINEL_ENV: "${SENTINEL_ENV:-on-prem}"
+      LLM_BASE_URL: "${LLM_BASE_URL:-}"
+      LLM_API_KEY: "${LLM_API_KEY:-}"
+      LLM_MODEL: "${LLM_MODEL:-gpt-4o-mini}"
+      LLM_TEMPERATURE: "${LLM_TEMPERATURE:-0.1}"
+      LLM_TIMEOUT: "${LLM_TIMEOUT:-60}"
+      LLM_JSON_SCHEMA_STRICT: "${LLM_JSON_SCHEMA_STRICT:-true}"
+      YENTE_URL: "${YENTE_URL:-http://yente:8000}"
+      YENTE_DATASET: "${YENTE_DATASET:-default}"
+      ARCHIVEBOX_URL: "${ARCHIVEBOX_URL:-http://archivebox:8000}"
+      ARCHIVEBOX_OUTPUT_DIR: /data/archivebox
+      EVIDENCE_DIR: /data/evidence
+      TSA_URL: "${TSA_URL:-https://freetsa.org/tsr}"
+      SANCTIONS_MATCH_THRESHOLD: "${SANCTIONS_MATCH_THRESHOLD:-0.7}"
+      SANCTIONS_FLASH_THRESHOLD: "${SANCTIONS_FLASH_THRESHOLD:-0.9}"
+      WATCHLIST_FUZZY_THRESHOLD: "${WATCHLIST_FUZZY_THRESHOLD:-0.88}"
+      SENTINEL_WEBHOOK_URL: "${SENTINEL_WEBHOOK_URL:-}"
+      TELEGRAM_BOT_TOKEN: "${TELEGRAM_BOT_TOKEN:-}"
+      TELEGRAM_CHAT_ID: "${TELEGRAM_CHAT_ID:-}"
+      SMTP_URL: "${SMTP_URL:-}"
+      SENTINEL_NEWS_FEEDS: "${SENTINEL_NEWS_FEEDS:-}"
+    volumes:
+      - evidence-data:/data/evidence
+      - archivebox-data:/data/archivebox:ro
+    ports:
+      - "8080:8000"
+    depends_on:
+      yente:
+        condition: service_started
+      archivebox:
+        condition: service_started
+    networks:
+      - sentinel-net
+    restart: unless-stopped
+
+  sentinel-ui:
+    build: .
+    command: ["streamlit", "run", "app/ui/dashboard.py", "--server.address=0.0.0.0", "--server.port=8501", "--server.headless=true"]
+    environment:
+      SENTINEL_API_URL: "http://sentinel-api:8000"
+    ports:
+      - "8501:8501"
+    depends_on:
+      sentinel-api:
+        condition: service_started
+    networks:
+      - sentinel-net
+    restart: unless-stopped
+
+  yente:
+    image: ghcr.io/opensanctions/yente:latest
+    environment:
+      YENTE_INDEX_TYPE: "${YENTE_INDEX_TYPE:-sqlite}"
+      YENTE_INDEX_URL: "sqlite:////data/yente.db"
+      YENTE_UPDATE_TOKEN: "${YENTE_UPDATE_TOKEN:-}"
+    volumes:
+      - yente-data:/data
+    ports:
+      - "8000:8000"
+    networks:
+      - sentinel-net
+    restart: unless-stopped
+
+  archivebox:
+    image: archivebox/archivebox:latest
+    command: ["server", "0.0.0.0:8000"]
+    environment:
+      ARCHIVEBOX_ALLOW_NO_CHROME: "false"
+      PUBLIC_INDEX: "false"
+      PUBLIC_SNAPSHOTS: "false"
+      SEARCH_BACKEND_ENGINE: "ripgrep"
+    volumes:
+      - archivebox-data:/data
+    ports:
+      - "8090:8000"
+    networks:
+      - sentinel-net
+    restart: unless-stopped
+
+volumes:
+  evidence-data:
+  archivebox-data:
+  yente-data:
+
+networks:
+  sentinel-net:
+    driver: bridge
