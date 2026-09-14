@@ -3,6 +3,15 @@ name: Deploy to Contabo VPS
 on:
   push:
     branches: [main]
+    # The Contabo stack only contains the SPA/API image: changes that touch
+    # nothing but docs, workflows or the separate sentinel-adm platform must
+    # not rebuild production. A commit that also changes src|api|server|proto
+    # still deploys normally (paths-ignore only skips when *every* path matches).
+    paths-ignore:
+      - 'sentinel-adm/**'
+      - '.github/**'
+      - 'docs/**'
+      - '**.md'
   workflow_dispatch:
 
 # One deploy at a time: a second push while a deploy is running waits.
