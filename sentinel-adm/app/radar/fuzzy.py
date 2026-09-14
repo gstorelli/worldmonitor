@@ -17,8 +17,14 @@ from dataclasses import dataclass, field
 
 _LEGAL_SUFFIXES = {
     "srl", "srls", "spa", "snc", "sas", "soc", "coop", "cooperative", "societa", "società",
-    "di", "del", "della", "dei", "delle", "e", "il", "la", "lo", "le", "gli", "&", "snc",
+    "di", "del", "della", "dei", "delle", "e", "il", "la", "lo", "le", "gli",
 }
+
+# Company forms are written in many ways ("S.r.l.", "SRL", "s r l"): collapse
+# the spaced/acronym variants before tokenising, otherwise the initials survive
+# as single-letter tokens and wreck the similarity ratio.
+_COMPANY_FORM_SPACED = re.compile(r"\b(?:s\s+r\s+l(?:\s+s)?|s\s+p\s+a|s\s+n\s+c|s\s+a\s+s)\b")
+_FRATELLI = re.compile(r"\bf\s+lli\b")
 
 
 def normalize_entity(value: str) -> str:
@@ -26,7 +32,13 @@ def normalize_entity(value: str) -> str:
     text = "".join(ch for ch in text if not unicodedata.combining(ch))
     text = text.casefold()
     text = re.sub(r"[^\w\s]", " ", text)
-    tokens = [token for token in text.split() if token and token not in _LEGAL_SUFFIXES]
+    text = _FRATELLI.sub("fratelli", text)
+    text = _COMPANY_FORM_SPACED.sub(" ", text)
+    tokens = [
+        token
+        for token in text.split()
+        if len(token) > 1 and token not in _LEGAL_SUFFIXES
+    ]
     return " ".join(sorted(tokens))
 
 

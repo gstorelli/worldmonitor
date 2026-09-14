@@ -28,6 +28,10 @@ class LegalAct:
     verified: bool = True
     notes: str = ""
 
+    def __hash__(self) -> int:
+        # `articles` is a dict (unhashable), so identity is the act key.
+        return hash(self.key)
+
 
 # Act types follow the CNIPA URN-NIR vocabulary (e.g. "decreto.legislativo").
 ACTS: tuple[LegalAct, ...] = (

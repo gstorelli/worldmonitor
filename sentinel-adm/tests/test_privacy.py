@@ -65,8 +65,11 @@ class MaskingTests(unittest.TestCase):
     def test_stable_tokens_and_no_persistence_after_clear(self):
         masker = PrivacyMasker()
         first = masker.mask(f"CF {self.cf}")
-        second = masker.mask(f"di nuovo {self.cf}")
-        self.assertEqual(first.text, second.text)
+        second = masker.mask(f"di nuovo il codice {self.cf}")
+        # The surrogate is stable for the same value within the session, while
+        # the surrounding text naturally differs.
+        self.assertIn("[[CF_1]]", first.text)
+        self.assertIn("[[CF_1]]", second.text)
         masker.clear()
         third = masker.mask(f"CF {self.cf}")
         self.assertEqual(first.text, third.text)
