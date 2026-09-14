@@ -64,7 +64,10 @@ python -m unittest discover -s tests -t . -v
 ```
 
 CI runs the same command on every push touching `sentinel-adm/`
-(`.github/workflows/sentinel-adm-ci.yml`).
+(`.github/workflows/sentinel-adm-ci.yml`), one job per test module so failures
+are localised. When a module fails, the full output is published to the
+`ci-diagnostics` branch (`sentinel-adm/.ci/last-failure.log`) because Actions
+logs require authentication — that file is readable from outside the runner.
 
 ## Acceptance criteria mapping
 
