@@ -20,9 +20,14 @@ GPU requirement and no software licensing fees.
 | F · Forensic vault (WARC + SHA-256 sidecar + manifest + RFC 3161 sealing via OpenSSL) | **Implemented + tested** | `app/forensics/evidence.py` |
 | G · Notification dispatch (flash + "Il Mattinale Antifrode", webhook/Telegram/Apprise) | **Implemented + tested** | `app/notify/dispatch.py` |
 | H · Operator workbench (5 workspaces: radar, legal, OSINT, screening, vault) | **Scaffold (functional UI shell)** | `app/api/main.py`, `app/ui/dashboard.py` |
-| C · News harvesting (institutional RSS / press rooms) | **Staged** | planned (`app/radar/harvester.py`) |
-| D · Maigret / Holehe / marketplace wrappers | **Staged** | executed by dedicated containers, console prepares jobs |
-| — · ArchiveBox page acquisition into the shared volume | **Wired via compose** | `docker-compose.yml` |
+| C · News harvesting (RSS 2.0 / Atom, dedupe, failure isolation) | **Implemented + tested** | `app/radar/harvester.py` |
+| C · Entity extraction (zero-shot via gateway + deterministic offline fallback) | **Implemented + tested** | `app/radar/extraction.py` |
+| C · Contagion pipeline (watchlist store, ripple alerts, digest, flash policy) | **Implemented + tested** | `app/radar/pipeline.py`, `app/radar/watchlist.py` |
+| D · Maigret / Holehe wrappers (validated argv, job specs, parsers, toolbox container) | **Implemented + tested** | `app/osint/wrappers.py`, `osint-toolbox/` |
+| D · Institutional registry dorking (PVP, OpenCoesione, BDAP, ANAC, Gazzetta) | **Implemented + tested** | `app/osint/dorking.py` |
+| F · ArchiveBox capture → vault import → RFC 3161 sealing | **Implemented + tested** | `app/forensics/archivebox.py` |
+| All · End-to-end acceptance scenario (offline, enforced in CI) | **Implemented** | `scripts/acceptance.py` |
+| D · Telegram / marketplace ingestion | **Staged** | planned (`app/osint/marketplaces.py`) |
 
 The deterministic engines are **stdlib-only**: they run and are tested without
 FastAPI, Streamlit, Yente or ArchiveBox installed.
@@ -83,9 +88,9 @@ logs require authentication — that file is readable from outside the runner.
 
 1. **Foundation** — compose stack, volumes, config models (done).
 2. **Security, LegalTech, Sanctions core** — sanitizer, inference adapter, URN:LEX, Yente client (done).
-3. **News radar & contagion** — fuzzy matcher and severity scoring (done); asynchronous harvester and zero-shot extraction (staged).
-4. **OSINT & forensic vault** — vault, hashing, TSA (done); Maigret/Holehe wrappers and archival trigger (staged).
-5. **Notifications & UI** — dispatcher (done); full workbench integration and end-to-end acceptance script (in progress).
+3. **News radar & contagion** — harvester, entity extraction (model + offline fallback), watchlist store, ripple alerts (done); Telegram/marketplace ingestion (staged).
+4. **OSINT & forensic vault** — vault, hashing, TSA, Maigret/Holehe wrappers, dorking, ArchiveBox import (done); live capture triggering from the UI (staged).
+5. **Notifications & UI** — dispatcher and acceptance scenario (done); full workbench integration of the new endpoints (in progress).
 
 ## Operational notes
 

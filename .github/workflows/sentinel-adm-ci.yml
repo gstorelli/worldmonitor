@@ -27,6 +27,10 @@ jobs:
           - test_llm_adapter
           - test_sanctions
           - test_radar
+          - test_harvester
+          - test_radar_pipeline
+          - test_osint
+          - test_archivebox
           - test_evidence
           - test_config_dispatch
     defaults:
@@ -55,6 +59,22 @@ jobs:
           path: /tmp/log-${{ matrix.module }}.txt
           if-no-files-found: ignore
           retention-days: 7
+
+  acceptance:
+    name: End-to-end acceptance
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sentinel-adm
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run the acceptance scenario
+        run: python scripts/acceptance.py
 
   diagnostics:
     name: Publish diagnostics

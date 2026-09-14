@@ -18,6 +18,7 @@ services:
       ARCHIVEBOX_URL: "${ARCHIVEBOX_URL:-http://archivebox:8000}"
       ARCHIVEBOX_OUTPUT_DIR: /data/archivebox
       EVIDENCE_DIR: /data/evidence
+      WATCHLIST_PATH: /data/watchlist/watchlist.json
       TSA_URL: "${TSA_URL:-https://freetsa.org/tsr}"
       SANCTIONS_MATCH_THRESHOLD: "${SANCTIONS_MATCH_THRESHOLD:-0.7}"
       SANCTIONS_FLASH_THRESHOLD: "${SANCTIONS_FLASH_THRESHOLD:-0.9}"
@@ -30,6 +31,7 @@ services:
     volumes:
       - evidence-data:/data/evidence
       - archivebox-data:/data/archivebox:ro
+      - ./data:/data/watchlist
     ports:
       - "8080:8000"
     depends_on:
@@ -85,10 +87,22 @@ services:
       - sentinel-net
     restart: unless-stopped
 
+  # Optional OSINT toolbox (profile "osint"): execute the wrappers here, e.g.
+  #   docker compose run --rm osint-toolbox maigret <username> --json simple --folderoutput /dossiers
+  osint-toolbox:
+    build: ./osint-toolbox
+    profiles: ["osint"]
+    volumes:
+      - osint-dossiers:/dossiers
+    networks:
+      - sentinel-net
+    restart: unless-stopped
+
 volumes:
   evidence-data:
   archivebox-data:
   yente-data:
+  osint-dossiers:
 
 networks:
   sentinel-net:
