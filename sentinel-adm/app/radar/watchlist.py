@@ -77,3 +77,8 @@ def find_entry(entries: list[WatchlistEntry], entry_id: str) -> WatchlistEntry |
 def upsert_entry(entries: list[WatchlistEntry], entry: WatchlistEntry) -> list[WatchlistEntry]:
     remaining = [candidate for candidate in entries if candidate.entry_id != entry.entry_id]
     return [*remaining, entry]
+
+
+def remove_entry(entries: list[WatchlistEntry], entry_id: str) -> tuple[list[WatchlistEntry], bool]:
+    remaining = [candidate for candidate in entries if candidate.entry_id != entry_id]
+    return remaining, len(remaining) != len(entries)

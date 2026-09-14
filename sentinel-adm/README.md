@@ -19,7 +19,7 @@ GPU requirement and no software licensing fees.
 | C · Ripple-effect matching (normalised token-sort Levenshtein, grey-zone review, severity scoring) | **Implemented + tested** | `app/radar/fuzzy.py` |
 | F · Forensic vault (WARC + SHA-256 sidecar + manifest + RFC 3161 sealing via OpenSSL) | **Implemented + tested** | `app/forensics/evidence.py` |
 | G · Notification dispatch (flash + "Il Mattinale Antifrode", webhook/Telegram/Apprise) | **Implemented + tested** | `app/notify/dispatch.py` |
-| H · Operator workbench (5 workspaces: radar, legal, OSINT, screening, vault) | **Scaffold (functional UI shell)** | `app/api/main.py`, `app/ui/dashboard.py` |
+| H · Operator workbench (5 workspaces) + full HTTP surface | **Implemented** (services tested; Streamlit shell) | `app/api/`, `app/ui/dashboard.py` |
 | C · News harvesting (RSS 2.0 / Atom, dedupe, failure isolation) | **Implemented + tested** | `app/radar/harvester.py` |
 | C · Entity extraction (zero-shot via gateway + deterministic offline fallback) | **Implemented + tested** | `app/radar/extraction.py` |
 | C · Contagion pipeline (watchlist store, ripple alerts, digest, flash policy) | **Implemented + tested** | `app/radar/pipeline.py`, `app/radar/watchlist.py` |
@@ -47,6 +47,23 @@ Streamlit workbench (app/ui/dashboard.py) — 5 workspaces over the API
 Yente container (OpenSanctions) — local screening, never external
 ArchiveBox container — ISO 28500 WARC capture into the shared volume
 ```
+
+## HTTP surface
+
+All handlers are thin wrappers over `app/api/services.py` (which is unit
+tested): the logic is reachable from the UI, from scripts and from tests.
+
+| Method | Endpoint | Purpose |
+| --- | --- | --- |
+| GET | `/health` | config snapshot + Yente/evidence reachability |
+| POST | `/privacy/mask`, `/privacy/unmask` | session-scoped masking round trip |
+| POST | `/legal/qualify` · GET `/legal/catalog` | legal qualification + canonical acts |
+| GET | `/radar/feeds` · POST `/radar/scan` | configured feeds; harvest → extract → contagion alerts |
+| GET/POST/DELETE | `/watchlist` | local watchlist management |
+| POST | `/sanctions/screen` | Yente screening |
+| POST | `/osint/dorks` · POST `/osint/job` | registry dorks; reconnaissance job specs (never executed by the API) |
+| GET | `/evidence` · `/evidence/{id}/verify` | evidence list + integrity check |
+| POST | `/evidence/capture` · `/evidence/import` · `/evidence/seal/{id}` | ArchiveBox capture, WARC import, RFC 3161 sealing |
 
 ## Quick start
 
@@ -90,7 +107,7 @@ logs require authentication — that file is readable from outside the runner.
 2. **Security, LegalTech, Sanctions core** — sanitizer, inference adapter, URN:LEX, Yente client (done).
 3. **News radar & contagion** — harvester, entity extraction (model + offline fallback), watchlist store, ripple alerts (done); Telegram/marketplace ingestion (staged).
 4. **OSINT & forensic vault** — vault, hashing, TSA, Maigret/Holehe wrappers, dorking, ArchiveBox import (done); live capture triggering from the UI (staged).
-5. **Notifications & UI** — dispatcher and acceptance scenario (done); full workbench integration of the new endpoints (in progress).
+5. **Notifications & UI** — dispatcher, HTTP surface and acceptance scenario (done); the Streamlit workbench is wired to the new endpoints and expanded as the services grow.
 
 ## Operational notes
 

@@ -31,6 +31,7 @@ jobs:
           - test_radar_pipeline
           - test_osint
           - test_archivebox
+          - test_api_services
           - test_evidence
           - test_config_dispatch
     defaults:

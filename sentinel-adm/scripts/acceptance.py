@@ -144,6 +144,22 @@ def run() -> StepReport:
         report.check("5c. Sigillo RFC 3161", manifest["tsa"]["status"] == "sealed", manifest["tsa"].get("token_file", ""))
         report.check("5d. Verifica finale post-sigillo", vault.verify(record.evidence_id)["tsa_status"] == "sealed")
 
+    # 6. Service layer (the payloads the HTTP routes return)
+    from app.api import services  # imported here so the script stays import-light
+
+    scan = services.radar_scan(feeds=["https://fixture.local/rss"], watchlist=WATCHLIST, fetch=lambda _url: RSS_FIXTURE)
+    report.check(
+        "6. Service layer: scansione radar",
+        bool(scan["alerts"]) and scan["alerts"][0]["flash"],
+        f"alert={len(scan['alerts'])}",
+    )
+    dorks = services.dork_response(["Fratelli Rossi"], ["pvp"])
+    report.check(
+        "6b. Service layer: dorking PVP",
+        len(dorks["queries"]) == 1 and dorks["queries"][0]["url"].startswith("https://"),
+        dorks["queries"][0]["portal"] if dorks["queries"] else "",
+    )
+
     return report
 
 

@@ -34,6 +34,7 @@ class Settings:
     archivebox_url: str = "http://archivebox:8000"
     archivebox_output_dir: str = "/data/archivebox"
     evidence_dir: str = "/data/evidence"
+    watchlist_path: str = "./data/watchlist.json"
     tsa_url: str = "https://freetsa.org/tsr"
 
     # Thresholds
@@ -66,6 +67,7 @@ class Settings:
             archivebox_url=_env("ARCHIVEBOX_URL", "http://archivebox:8000"),
             archivebox_output_dir=_env("ARCHIVEBOX_OUTPUT_DIR", "/data/archivebox"),
             evidence_dir=_env("EVIDENCE_DIR", "/data/evidence"),
+            watchlist_path=_env("WATCHLIST_PATH", "./data/watchlist.json"),
             tsa_url=_env("TSA_URL", "https://freetsa.org/tsr"),
             sanctions_match_threshold=float(_env("SANCTIONS_MATCH_THRESHOLD", "0.7")),
             sanctions_flash_threshold=float(_env("SANCTIONS_FLASH_THRESHOLD", "0.9")),
@@ -87,6 +89,7 @@ class Settings:
             "yente_url": self.yente_url,
             "archivebox_url": self.archivebox_url,
             "evidence_dir": self.evidence_dir,
+            "watchlist_path": self.watchlist_path,
             "tsa_url": self.tsa_url,
             "news_feeds": len(self.news_feeds),
             "notify_channels": [
