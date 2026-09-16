@@ -27,6 +27,7 @@ GPU requirement and no software licensing fees.
 | D · Institutional registry dorking (PVP, OpenCoesione, BDAP, ANAC, Gazzetta) | **Implemented + tested** | `app/osint/dorking.py` |
 | F · ArchiveBox capture → vault import → RFC 3161 sealing | **Implemented + tested** | `app/forensics/archivebox.py` |
 | All · End-to-end acceptance scenario (offline, enforced in CI) | **Implemented** | `scripts/acceptance.py` |
+| Ops · Production compose (proxy profile, resource limits), bootstrap, verified backup, Yente refresh, cron example | **Implemented** | `docker-compose.yml`, `deploy/`, `scripts/*.sh` |
 | D · Telegram / marketplace ingestion | **Staged** | planned (`app/osint/marketplaces.py`) |
 
 The deterministic engines are **stdlib-only**: they run and are tested without
@@ -65,16 +66,67 @@ tested): the logic is reachable from the UI, from scripts and from tests.
 | GET | `/evidence` · `/evidence/{id}/verify` | evidence list + integrity check |
 | POST | `/evidence/capture` · `/evidence/import` · `/evidence/seal/{id}` | ArchiveBox capture, WARC import, RFC 3161 sealing |
 
-## Quick start
+## Quick start (development)
 
 ```bash
 cd sentinel-adm
 cp .env.example .env          # set LLM_BASE_URL / LLM_API_KEY and thresholds
 docker compose up -d --build
-# API      http://localhost:8080/health
-# UI       http://localhost:8501
-# Yente    http://localhost:8000/healthz
+# API      http://127.0.0.1:8080/health
+# UI       http://127.0.0.1:8501
+# Yente    http://127.0.0.1:8000/healthz
 ```
+
+Published ports bind to `127.0.0.1` by default; widen `SENTINEL_BIND_IP` only on
+a trusted development LAN.
+
+## Production deployment
+
+Target: a dedicated host (recommended, so the OpenSanctions index and the
+ArchiveBox images cannot starve the Risk Sentinel stack). No GPU; plan ~4-8 GB
+RAM and 40-80 GB disk.
+
+```bash
+git clone <repo> /srv/sentinel-adm && cd /srv/sentinel-adm/sentinel-adm
+SENTINEL_BASIC_AUTH_PASSWORD='...' ./scripts/bootstrap.sh   # env, auth hash, up, healthcheck
+./scripts/yente-update.sh                                   # OpenSanctions data (multi-GB, first run)
+```
+
+What `bootstrap.sh` does, idempotently: creates `.env` from the template,
+generates the Caddy basic-auth hash into it, seeds `data/watchlist/watchlist.json`
+from the example, starts the `prod` profile, and waits for `/health`.
+
+**TLS and exposure** — the proxy terminates TLS and enforces basic auth; the API
+is never published directly in production:
+
+| Scenario | Settings |
+| --- | --- |
+| Public domain (Let's Encrypt) | `SENTINEL_DOMAIN=…`, `SENTINEL_ACME_EMAIL=…`, `SENTINEL_CADDYFILE=Caddyfile` |
+| Internal/LAN (local CA) | `SENTINEL_CADDYFILE=Caddyfile.internal`, any hostname; install the CA on clients (`docker compose --profile prod cp proxy:/data/caddy/pki/authorities/local/root.crt ./sentinel-adm-ca.crt`) |
+
+The workbench is served at `/` and the API under `/api/*` (e.g.
+`curl https://<domain>/api/health`), both authenticated.
+
+**Operations**
+
+```bash
+./scripts/backup.sh                 # tar.gz + SHA-256 sidecar + retention (default 14)
+BACKUP_DIR=/var/backups/sentinel-adm BACKUP_RETENTION=30 ./scripts/backup.sh
+./scripts/yente-update.sh           # dataset refresh (schedule it)
+# deploy/crontab.example            # ready-made daily cron entries
+```
+
+**Pre-go-live checklist**
+
+- [ ] `LLM_BASE_URL` / `LLM_API_KEY` set (a dedicated OpenRouter key is
+      recommended so spend is attributable per platform).
+- [ ] Basic-auth credentials distributed to the operators; TLS verified.
+- [ ] `yente update` completed and `docker compose exec yente yente status` healthy.
+- [ ] Real watchlist loaded in `data/watchlist/watchlist.json`.
+- [ ] First `backup.sh` run and its `.sha256` verified.
+- [ ] Retention/authorisation policy for evidence and dossiers agreed (GDPR);
+      point `TSA_URL` at a qualified TSA for judicial use.
+- [ ] `docker compose --profile prod ps` shows every service healthy.
 
 ## Tests
 

@@ -1,0 +1,41 @@
+# SENTINEL-ADM — production reverse proxy (public domain, automatic ACME TLS).
+#
+# Required in .env:
+#   SENTINEL_DOMAIN=                  e.g. sentinel.example.org
+#   SENTINEL_ACME_EMAIL=              contact for Let's Encrypt
+#   SENTINEL_BASIC_AUTH_USER=adm
+#   SENTINEL_BASIC_AUTH_HASH=         generate with scripts/bootstrap.sh
+#
+# The API is never published directly: everything goes through this proxy over
+# TLS, and both surfaces require the basic-auth credentials.
+
+{
+	email {$SENTINEL_ACME_EMAIL}
+}
+
+{$SENTINEL_DOMAIN} {
+	encode gzip
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	# Machine / API surface, e.g. curl https://<domain>/api/health
+	handle_path /api/* {
+		basic_auth {
+			{$SENTINEL_BASIC_AUTH_USER} {$SENTINEL_BASIC_AUTH_HASH}
+		}
+		reverse_proxy sentinel-api:8000
+	}
+
+	# Operator workbench (Streamlit, websockets included).
+	handle {
+		basic_auth {
+			{$SENTINEL_BASIC_AUTH_USER} {$SENTINEL_BASIC_AUTH_HASH}
+		}
+		reverse_proxy sentinel-ui:8501
+	}
+}

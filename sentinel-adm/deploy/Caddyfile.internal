@@ -1,0 +1,35 @@
+# SENTINEL-ADM — internal/LAN deployment: Caddy issues certificates from its own
+# local CA (no public DNS, no ACME). Install the CA once on client machines:
+#
+#   docker compose --profile prod cp proxy:/data/caddy/pki/authorities/local/root.crt ./sentinel-adm-ca.crt
+#
+# Same authentication and routing rules as the public Caddyfile.
+
+{
+	local_certs
+	email {$SENTINEL_ACME_EMAIL}
+}
+
+{$SENTINEL_DOMAIN:localhost} {
+	encode gzip
+	header {
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	handle_path /api/* {
+		basic_auth {
+			{$SENTINEL_BASIC_AUTH_USER} {$SENTINEL_BASIC_AUTH_HASH}
+		}
+		reverse_proxy sentinel-api:8000
+	}
+
+	handle {
+		basic_auth {
+			{$SENTINEL_BASIC_AUTH_USER} {$SENTINEL_BASIC_AUTH_HASH}
+		}
+		reverse_proxy sentinel-ui:8501
+	}
+}

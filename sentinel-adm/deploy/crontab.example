@@ -1,0 +1,11 @@
+# SENTINEL-ADM — periodic maintenance. Install with `crontab -e` on the host and
+# adjust the checkout path.
+
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# OpenSanctions dataset refresh — every day at 03:30
+30 3 * * * cd /srv/sentinel-adm && ./scripts/yente-update.sh >> /var/log/sentinel-adm-yente.log 2>&1
+
+# Verified backup — every day at 02:00, 14 copies retained
+0 2 * * * cd /srv/sentinel-adm && BACKUP_DIR=/var/backups/sentinel-adm BACKUP_RETENTION=14 ./scripts/backup.sh >> /var/log/sentinel-adm-backup.log 2>&1

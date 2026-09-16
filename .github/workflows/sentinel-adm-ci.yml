@@ -88,6 +88,38 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+  scripts:
+    name: Deploy assets (shellcheck, compose, Caddyfile)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install shellcheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+
+      - name: Syntax-check and lint the shell scripts
+        working-directory: sentinel-adm
+        run: |
+          for script in scripts/*.sh; do
+            bash -n "$script"
+          done
+          shellcheck -S warning scripts/*.sh
+
+      - name: Validate the compose files
+        working-directory: sentinel-adm
+        run: |
+          cp .env.example .env
+          docker compose config -q
+          docker compose --profile prod config -q
+          docker compose --profile osint config -q
+
+      - name: Validate the Caddyfiles
+        working-directory: sentinel-adm
+        run: |
+          for file in deploy/Caddyfile deploy/Caddyfile.internal; do
+            docker run --rm -i caddy:2-alpine caddy fmt - < "$file" > /dev/null
+          done
+
   diagnostics:
     name: Publish diagnostics
     needs: [tests, acceptance]
