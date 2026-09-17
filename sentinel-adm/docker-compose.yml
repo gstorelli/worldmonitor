@@ -89,6 +89,11 @@ services:
     environment:
       PUBLIC_INDEX: "false"
       PUBLIC_SNAPSHOTS: "false"
+      # The API is the only client of this service (internal network, no host
+      # exposure unless SENTINEL_BIND_IP is widened): allow headless captures
+      # via POST /add without an interactive admin session. The ArchiveBox web
+      # UI stays read-only/public-off.
+      PUBLIC_ADD_VIEW: "true"
       SEARCH_BACKEND_ENGINE: "ripgrep"
       ARCHIVEBOX_ALLOW_NO_CHROME: "false"
     volumes:
