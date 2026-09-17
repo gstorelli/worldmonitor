@@ -2,6 +2,7 @@ import { defineConfig, loadEnv, type Plugin } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import { resolve, dirname, extname } from 'path';
 import { mkdir, readFile, writeFile } from 'fs/promises';
+import { readFileSync } from 'fs';
 import { brotliCompress } from 'zlib';
 import { promisify } from 'util';
 import pkg from './package.json';
@@ -702,6 +703,41 @@ function gpsjamDevPlugin(): Plugin {
   };
 }
 
+// maplibre-gl >= 6 loads its web worker as a sibling file at runtime
+// (`maplibre-gl-worker.mjs` next to the maplibre chunk). Vite does not emit
+// dependency assets that are only referenced by URL at runtime, so the worker
+// 404s and the basemap never renders. Emit it into `assets/` at build time and
+// serve it from node_modules in dev. maplibre < 6 inlines the worker, so the
+// copy is skipped when the file is absent.
+function maplibreWorkerPlugin(): Plugin {
+  const workerFile = 'maplibre-gl-worker.mjs';
+  const workerPath = resolve(process.cwd(), 'node_modules/maplibre-gl/dist', workerFile);
+  return {
+    name: 'wm-maplibre-worker',
+    generateBundle() {
+      let worker: Buffer;
+      try {
+        worker = readFileSync(workerPath);
+      } catch {
+        return;
+      }
+      this.emitFile({ type: 'asset', fileName: `assets/${workerFile}`, source: worker });
+    },
+    configureServer(server) {
+      server.middlewares.use(async (req, res, next) => {
+        if (!req.url?.endsWith(`/${workerFile}`)) return next();
+        try {
+          const worker = await readFile(workerPath);
+          res.setHeader('Content-Type', 'text/javascript');
+          res.end(worker);
+        } catch {
+          next();
+        }
+      });
+    },
+  };
+}
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   // Inject environment variables from .env files into process.env.
@@ -741,6 +777,7 @@ export default defineConfig(({ mode }) => {
         },
       },
       htmlVariantPlugin(activeMeta, activeVariant, isDesktopBuild),
+      maplibreWorkerPlugin(),
       polymarketPlugin(),
       rssProxyPlugin(),
       youtubeLivePlugin(),
