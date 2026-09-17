@@ -4,7 +4,7 @@
 // imported by `DeckGLMap.ts`, which is itself dynamically imported when
 // the map panel mounts — so maplibre + deck.gl now load lazily.
 import { Protocol } from 'pmtiles';
-import maplibregl from 'maplibre-gl';
+import * as maplibregl from 'maplibre-gl';
 import { layers, namedFlavor } from '@protomaps/basemaps';
 import type { StyleSpecification } from 'maplibre-gl';
 import {

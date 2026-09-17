@@ -87,7 +87,7 @@ docs/solutions/         # Documented solutions (YAML frontmatter: module, tags, 
 ## How to Run
 
 ```bash
-npm ci                    # Deterministic install (also builds blog-site). Node 24 (.nvmrc).
+npm ci                    # Deterministic install (blog-site is NOT installed). Node 24 (.nvmrc).
 npm run dev               # Vite dev server (VITE_VARIANT is collapsed to "full")
 npm run typecheck         # tsc --noEmit (src)
 npm run typecheck:api     # tsc --noEmit (api/server/scripts/generated)
@@ -274,7 +274,7 @@ Pre-push (`.husky/pre-push`) runs state guards, then diff-scoped checks:
 
 ## SENTINEL-ADM (separate platform)
 
-`sentinel-adm/` is a **separate Python platform** (ADM tactical OSINT, early
+`sentinel-adm/` is a separate platform (ADM tactical OSINT, early
 warning and legal intelligence) that shares the repo but not the Risk Sentinel
 runtime: its own `docker-compose.yml`, its own containers (API, Streamlit UI,
 Yente, ArchiveBox). The deterministic engines are **stdlib-only** and unit
@@ -283,6 +283,14 @@ the web layer (FastAPI/Streamlit) is optional. Its CI is per-module
 (`.github/workflows/sentinel-adm-ci.yml`) and publishes failure logs to the
 `ci-diagnostics` branch. Do not wire it into the Contabo deploy or the SPA
 builds: changes under `sentinel-adm/` must not alter the Risk Sentinel stack.
+
+## blog-site (upstream-only in this fork)
+
+`blog-site/` is upstream marketing content (53 WorldMonitor articles). This fork
+does **not** build, deploy or audit it: `npm run build` is `tsc && vite build`
+and there is no `postinstall` step, exactly like the production Dockerfile
+(which skips it). Run it manually with `npm ci --prefix blog-site && npm run
+build:blog` if ever needed; its Astro 7 upgrade still needs a config migration.
 
 ## External References
 

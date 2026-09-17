@@ -6,7 +6,7 @@
 import { MapboxOverlay } from '@deck.gl/mapbox';
 import type { Layer, LayersList, PickingInfo } from '@deck.gl/core';
 import { GeoJsonLayer, ScatterplotLayer, PathLayer, IconLayer, TextLayer, PolygonLayer } from '@deck.gl/layers';
-import maplibregl from 'maplibre-gl';
+import * as maplibregl from 'maplibre-gl';
 import { FALLBACK_DARK_STYLE, FALLBACK_LIGHT_STYLE, getMapProvider, getMapTheme, isLightMapTheme } from '@/config/basemap';
 import { registerPMTilesProtocol, getStyleForProvider } from '@/config/basemap-styles';
 import Supercluster from 'supercluster';
@@ -873,7 +873,7 @@ export class DeckGLMap {
     let tileLoadOk = false;
     let tileErrorCount = 0;
 
-    this.maplibreMap.on('error', (e: { error?: Error; message?: string }) => {
+    this.maplibreMap.on('error', (e: { error?: { message?: string } | null; message?: string }) => {
       const msg = e.error?.message ?? e.message ?? '';
       console.warn('[DeckGLMap] map error:', msg);
       if (msg.includes('Failed to fetch') || msg.includes('AJAXError') || msg.includes('CORS') || msg.includes('NetworkError') || msg.includes('403') || msg.includes('Forbidden')) {
@@ -900,7 +900,7 @@ export class DeckGLMap {
     }, 10000);
 
     const canvas = this.maplibreMap.getCanvas();
-    canvas.addEventListener('webglcontextlost', (e) => {
+    canvas.addEventListener('webglcontextlost', (e: Event) => {
       e.preventDefault();
       this.webglLost = true;
       console.warn('[DeckGLMap] WebGL context lost — will restore when browser recovers');
@@ -6890,7 +6890,7 @@ export class DeckGLMap {
       map.setFilter('country-hover-border', noMatch);
     };
 
-    map.on('mousemove', (e) => {
+    map.on('mousemove', (e: maplibregl.MapMouseEvent) => {
       if (!this.onCountryClick) return;
       try {
         if (!map.getLayer('country-interactive')) return;
@@ -7024,7 +7024,7 @@ export class DeckGLMap {
       if (timeoutId) { clearTimeout(timeoutId); timeoutId = null; }
     };
 
-    const onError = (e: { error?: Error; message?: string }) => {
+    const onError = (e: { error?: { message?: string } | null; message?: string }) => {
       if (gen !== this.tileMonitorGeneration) { cleanup(); return; }
       const msg = e.error?.message ?? e.message ?? '';
       if (msg.includes('Failed to fetch') || msg.includes('AJAXError') || msg.includes('CORS') || msg.includes('NetworkError') || msg.includes('403') || msg.includes('Forbidden')) {

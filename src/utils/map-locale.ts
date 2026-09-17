@@ -38,7 +38,9 @@ interface MapStyle {
 interface LocalizableMap {
   getStyle?: () => MapStyle | null | undefined;
   getLayoutProperty?: (layerId: string, property: 'text-field') => unknown;
-  setLayoutProperty?: (layerId: string, property: 'text-field', value: Expression) => void;
+  // `never` keeps this duck-typed interface assignable from maplibre >= 6, whose
+  // setLayoutProperty overloads are stricter than our structural tuple type.
+  setLayoutProperty?: (layerId: string, property: 'text-field', value: never) => unknown;
 }
 
 export function getLocalizedNameField(lang?: string): string {
@@ -98,7 +100,7 @@ export function localizeMapLabels(map: LocalizableMap | null | undefined): void 
     if (!isLocalizableTextField(textField)) continue;
 
     try {
-      map.setLayoutProperty?.(layer.id, 'text-field', expr);
+      map.setLayoutProperty?.(layer.id, 'text-field', expr as never);
     } catch {}
   }
 }
