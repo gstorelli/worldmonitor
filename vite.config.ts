@@ -704,32 +704,38 @@ function gpsjamDevPlugin(): Plugin {
 }
 
 // maplibre-gl >= 6 loads its web worker as a sibling file at runtime
-// (`maplibre-gl-worker.mjs` next to the maplibre chunk). Vite does not emit
-// dependency assets that are only referenced by URL at runtime, so the worker
-// 404s and the basemap never renders. Emit it into `assets/` at build time and
-// serve it from node_modules in dev. maplibre < 6 inlines the worker, so the
-// copy is skipped when the file is absent.
+// (`maplibre-gl-worker.mjs`, which itself imports `maplibre-gl-shared.mjs` from
+// the same directory). Vite does not emit dependency assets that are only
+// referenced by URL at runtime, so the worker 404s (or loads without its shared
+// module) and the basemap never renders — the map stays blank with no page
+// console error because the failure happens inside the worker. Emit both files
+// into `assets/` at build time and serve them from node_modules in dev.
+// maplibre < 6 inlines the worker, so the copy is skipped when files are absent.
+const MAPLIBRE_RUNTIME_FILES = ['maplibre-gl-worker.mjs', 'maplibre-gl-shared.mjs'] as const;
+
 function maplibreWorkerPlugin(): Plugin {
-  const workerFile = 'maplibre-gl-worker.mjs';
-  const workerPath = resolve(process.cwd(), 'node_modules/maplibre-gl/dist', workerFile);
+  const sourceDir = resolve(process.cwd(), 'node_modules/maplibre-gl/dist');
   return {
     name: 'wm-maplibre-worker',
     generateBundle() {
-      let worker: Buffer;
-      try {
-        worker = readFileSync(workerPath);
-      } catch {
-        return;
+      for (const file of MAPLIBRE_RUNTIME_FILES) {
+        let source: Buffer;
+        try {
+          source = readFileSync(resolve(sourceDir, file));
+        } catch {
+          continue;
+        }
+        this.emitFile({ type: 'asset', fileName: `assets/${file}`, source });
       }
-      this.emitFile({ type: 'asset', fileName: `assets/${workerFile}`, source: worker });
     },
     configureServer(server) {
       server.middlewares.use(async (req, res, next) => {
-        if (!req.url?.endsWith(`/${workerFile}`)) return next();
+        const file = MAPLIBRE_RUNTIME_FILES.find((candidate) => req.url?.endsWith(`/${candidate}`));
+        if (!file) return next();
         try {
-          const worker = await readFile(workerPath);
+          const source = await readFile(resolve(sourceDir, file));
           res.setHeader('Content-Type', 'text/javascript');
-          res.end(worker);
+          res.end(source);
         } catch {
           next();
         }
