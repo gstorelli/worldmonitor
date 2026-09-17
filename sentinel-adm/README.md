@@ -46,6 +46,7 @@ FastAPI core (app/api/main.py)
   └── notify/dispatch.py       flash alerts + daily brief
 Streamlit workbench (app/ui/dashboard.py) — 5 workspaces over the API
 Yente container (OpenSanctions) — local screening, never external
+  └── Elasticsearch index (yente-index) — Yente has no sqlite backend
 ArchiveBox container — ISO 28500 WARC capture into the shared volume
 ```
 
@@ -84,7 +85,9 @@ a trusted development LAN.
 
 Target: a dedicated host (recommended, so the OpenSanctions index and the
 ArchiveBox images cannot starve the Risk Sentinel stack). No GPU; plan ~4-8 GB
-RAM and 40-80 GB disk.
+RAM and 40-80 GB disk. The Elasticsearch index (`yente-index`) is the heavy
+container: 1 GB heap / 3 GB limit by default, tunable with
+`YENTE_ES_JAVA_OPTS` / `YENTE_ES_MEM_LIMIT` in `.env`.
 
 ```bash
 git clone <repo> /srv/sentinel-adm && cd /srv/sentinel-adm/sentinel-adm
@@ -161,7 +164,7 @@ logs require authentication — that file is readable from outside the runner.
 | Normative precision | URN/URL generation is deterministic; acts with unverified metadata return *needs review* instead of a link (`tle` today) |
 | Local operational autonomy | Yente, ArchiveBox and the evidence vault run on-prem; external connectivity is only needed for news scraping and inference |
 | Forensic admissibility | Every capture has a `capture.warc`, a SHA-256 sidecar and a manifest; `verify()` recomputes the digest and detects tampering; RFC 3161 sealing stores the `.tsq`/`.tsr` pair |
-| Clean execution | `docker compose up -d` with healthchecks on API, Yente and ArchiveBox |
+| Clean execution | `docker compose up -d` with healthchecks on API, Yente and its Elasticsearch index; ArchiveBox initialises its collection on first boot (`server --quick-init`) |
 
 ## Milestones
 
@@ -177,7 +180,13 @@ logs require authentication — that file is readable from outside the runner.
 - **TSA**: `TSA_URL` defaults to a public RFC 3161 provider; point it to a
   qualified TSA for judicial use. If `openssl` is unavailable the seal is
   recorded as `unavailable` and the vault stays verifiable by hash.
-- **Yente data**: run `docker compose exec yente yente update` (or the bundled
-  cron) to refresh OpenSanctions datasets.
+- **Yente data**: run `./scripts/yente-update.sh` (or the bundled cron) to
+  download/refresh the OpenSanctions datasets into the local Elasticsearch
+  index. The one-shot `yente-index-tune` container raises the host
+  `vm.max_map_count` when the kernel allows; otherwise run
+  `sudo sysctl -w vm.max_map_count=262144` once (or persist it in
+  `/etc/sysctl.d/`).
 - **ArchiveBox**: captures land in the shared `archivebox-data` volume; the
-  vault imports them with `EvidenceVault.import_warc()`.
+  vault imports them with `EvidenceVault.import_warc()`. The collection is
+  created on first boot and, since the web UI is never published, headless
+  captures are enabled for the internal network (`PUBLIC_ADD_VIEW=true`).

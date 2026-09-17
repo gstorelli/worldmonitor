@@ -68,24 +68,85 @@ services:
       - internal-net
     restart: unless-stopped
 
-  yente:
-    image: ghcr.io/opensanctions/yente:latest
+  # ── Sanctions engine ─────────────────────────────────────────────────────────
+  # Yente has no sqlite backend: it indexes into Elasticsearch/OpenSearch.
+  # Upstream pairing is yente 5.5.x + Elasticsearch 9.x; the index is the
+  # memory-heavy service of the platform and its limits are tunable in .env.
+  yente-index-tune:
+    # Elasticsearch requires vm.max_map_count >= 262144 on the host. This
+    # one-shot privileged container raises it when the kernel allows; the
+    # permanent host equivalent is: sudo sysctl -w vm.max_map_count=262144
+    image: alpine:3.20
+    command:
+      - sh
+      - -c
+      - >
+        sysctl -w vm.max_map_count=262144 2>/dev/null
+        || echo 262144 > /proc/sys/vm/max_map_count 2>/dev/null
+        || echo 'warning: vm.max_map_count non impostato: esegui "sudo sysctl -w vm.max_map_count=262144" sull host' >&2
+    privileged: true
+    network_mode: none
+    mem_limit: 64m
+    restart: "no"
+
+  yente-index:
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.4.2
     environment:
-      YENTE_INDEX_TYPE: "${YENTE_INDEX_TYPE:-sqlite}"
-      YENTE_INDEX_URL: "sqlite:////data/yente.db"
+      discovery.type: single-node
+      bootstrap.memory_lock: "true"
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: "${YENTE_ES_JAVA_OPTS:--Xms1g -Xmx1g}"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - yente-index-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail http://localhost:9200/_cluster/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 60s
+    mem_limit: "${YENTE_ES_MEM_LIMIT:-3g}"
+    depends_on:
+      yente-index-tune:
+        condition: service_completed_successfully
+    networks:
+      - internal-net
+    restart: unless-stopped
+
+  yente:
+    image: ghcr.io/opensanctions/yente:5.5.0
+    environment:
+      YENTE_INDEX_TYPE: "${YENTE_INDEX_TYPE:-elasticsearch}"
+      YENTE_INDEX_URL: "${YENTE_INDEX_URL:-http://yente-index:9200}"
       YENTE_UPDATE_TOKEN: "${YENTE_UPDATE_TOKEN:-}"
+      OPENSANCTIONS_DELIVERY_TOKEN: "${OPENSANCTIONS_DELIVERY_TOKEN:-}"
     volumes:
       - yente-data:/data
     ports:
       - "${SENTINEL_BIND_IP:-127.0.0.1}:${SENTINEL_YENTE_PORT:-8000}:8000"
-    mem_limit: 3g
+    mem_limit: 1g
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 30s
+    depends_on:
+      yente-index:
+        condition: service_healthy
     networks:
       - internal-net
     restart: unless-stopped
 
   archivebox:
-    image: archivebox/archivebox:latest
-    command: ["server", "0.0.0.0:8000"]
+    image: archivebox/archivebox:0.7.4
+    # --quick-init creates the collection on an empty volume without the setup
+    # wizard: plain `server` exits with "No archivebox index found" on a fresh
+    # install and crash-loops under restart: unless-stopped.
+    command: ["server", "--quick-init", "0.0.0.0:8000"]
     environment:
       PUBLIC_INDEX: "false"
       PUBLIC_SNAPSHOTS: "false"
@@ -179,6 +240,7 @@ volumes:
   evidence-data:
   archivebox-data:
   yente-data:
+  yente-index-data:
   osint-dossiers:
   caddy-data:
   caddy-config:

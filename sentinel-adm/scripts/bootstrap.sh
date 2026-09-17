@@ -33,6 +33,23 @@ if [ ! -f .env ]; then
   echo "creato .env da .env.example — compila dominio, email ACME e canali di notifica"
 fi
 
+# Yente has no sqlite backend: repair a template copied before Elasticsearch
+# was introduced, so an existing .env keeps working after git pull.
+if grep -qE '^YENTE_INDEX_TYPE=sqlite' .env; then
+  sed -i 's|^YENTE_INDEX_TYPE=.*|YENTE_INDEX_TYPE=elasticsearch|' .env
+  echo "YENTE_INDEX_TYPE: sqlite non è supportato da Yente → impostato a elasticsearch"
+fi
+if grep -qE '^YENTE_INDEX_URL=sqlite' .env; then
+  sed -i 's|^YENTE_INDEX_URL=.*|YENTE_INDEX_URL=http://yente-index:9200|' .env
+  echo "YENTE_INDEX_URL: puntato all'indice Elasticsearch locale"
+fi
+
+# Compose interpolates the values of .env: a raw bcrypt hash ($2a$14$...)
+# would have its $-segments replaced by empty strings, so the hash is stored
+# with every $ doubled (compose turns $$ back into a literal $).
+escape_dollars() { printf '%s' "$1" | sed 's/\$/$$/g'; }
+unescape_dollars() { printf '%s' "$1" | sed 's/\$\$/$/g'; }
+
 # Ask for the operator password when it was not provided and no hash exists yet,
 # so it never has to appear in the shell history.
 if [ -z "${SENTINEL_BASIC_AUTH_PASSWORD:-}" ] && ! grep -qE '^SENTINEL_BASIC_AUTH_HASH=.+' .env; then
@@ -43,19 +60,26 @@ if [ -z "${SENTINEL_BASIC_AUTH_PASSWORD:-}" ] && ! grep -qE '^SENTINEL_BASIC_AUT
   fi
 fi
 
-if [ -n "${SENTINEL_BASIC_AUTH_PASSWORD:-}" ]; then
-  if grep -qE '^SENTINEL_BASIC_AUTH_HASH=.+' .env; then
-    echo "hash basic-auth già presente: lasciato invariato"
+if grep -qE '^SENTINEL_BASIC_AUTH_HASH=.+' .env; then
+  # Migrate a hash written by an older version: unescape, then escape again,
+  # so re-running bootstrap repairs an existing .env in place.
+  OLD_HASH="$(sed -n 's/^SENTINEL_BASIC_AUTH_HASH=//p' .env | tail -n 1)"
+  NEW_HASH="$(escape_dollars "$(unescape_dollars "$OLD_HASH")")"
+  if [ "$NEW_HASH" != "$OLD_HASH" ]; then
+    sed -i "s|^SENTINEL_BASIC_AUTH_HASH=.*|SENTINEL_BASIC_AUTH_HASH=${NEW_HASH}|" .env
+    echo "hash basic-auth riallineato: ora le \$ sono protette dall'interpolazione di compose"
   else
-    HASH="$(docker run --rm caddy:2-alpine caddy hash-password --plaintext "$SENTINEL_BASIC_AUTH_PASSWORD")"
-    if grep -q '^SENTINEL_BASIC_AUTH_HASH=' .env; then
-      # Delimiter | because bcrypt hashes contain / and $
-      sed -i "s|^SENTINEL_BASIC_AUTH_HASH=.*|SENTINEL_BASIC_AUTH_HASH=${HASH}|" .env
-    else
-      printf 'SENTINEL_BASIC_AUTH_HASH=%s\n' "$HASH" >> .env
-    fi
-    echo "hash basic-auth generato e salvato in .env"
+    echo "hash basic-auth già presente: lasciato invariato"
   fi
+elif [ -n "${SENTINEL_BASIC_AUTH_PASSWORD:-}" ]; then
+  HASH="$(docker run --rm caddy:2-alpine caddy hash-password --plaintext "$SENTINEL_BASIC_AUTH_PASSWORD")"
+  if grep -q '^SENTINEL_BASIC_AUTH_HASH=' .env; then
+    # Delimiter | because bcrypt hashes contain / and $
+    sed -i "s|^SENTINEL_BASIC_AUTH_HASH=.*|SENTINEL_BASIC_AUTH_HASH=$(escape_dollars "$HASH")|" .env
+  else
+    printf 'SENTINEL_BASIC_AUTH_HASH=%s\n' "$(escape_dollars "$HASH")" >> .env
+  fi
+  echo "hash basic-auth generato e salvato in .env"
 fi
 
 if ! grep -qE '^SENTINEL_BASIC_AUTH_HASH=.+' .env; then
