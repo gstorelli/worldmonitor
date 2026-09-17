@@ -33,6 +33,16 @@ if [ ! -f .env ]; then
   echo "creato .env da .env.example — compila dominio, email ACME e canali di notifica"
 fi
 
+# Ask for the operator password when it was not provided and no hash exists yet,
+# so it never has to appear in the shell history.
+if [ -z "${SENTINEL_BASIC_AUTH_PASSWORD:-}" ] && ! grep -qE '^SENTINEL_BASIC_AUTH_HASH=.+' .env; then
+  if [ -t 0 ]; then
+    printf 'Password per l'\''utente %s (invio per annullare): ' "${SENTINEL_BASIC_AUTH_USER:-adm}"
+    read -r -s SENTINEL_BASIC_AUTH_PASSWORD
+    printf '\n'
+  fi
+fi
+
 if [ -n "${SENTINEL_BASIC_AUTH_PASSWORD:-}" ]; then
   if grep -qE '^SENTINEL_BASIC_AUTH_HASH=.+' .env; then
     echo "hash basic-auth già presente: lasciato invariato"
