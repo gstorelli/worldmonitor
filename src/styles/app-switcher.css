@@ -33,8 +33,23 @@
   opacity: 1;
 }
 
+/* Link to the external SENTINEL-ADM platform (separate stack). */
+.rs-external-link {
+  margin-right: 8px;
+  border: 1px solid #2a3644;
+  border-radius: 8px;
+  text-decoration: none;
+  opacity: 0.85;
+}
+
+.rs-external-link:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.06);
+}
+
 @media (max-width: 720px) {
-  .rs-app-switcher {
+  .rs-app-switcher,
+  .rs-external-link {
     display: none;
   }
 }

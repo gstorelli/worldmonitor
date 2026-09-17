@@ -13,6 +13,8 @@ declare const __BUILD_HASH__: string;
 interface ImportMetaEnv {
   readonly VITE_SENTRY_DSN?: string;
   readonly VITE_WS_API_URL?: string;
+  /** External SENTINEL-ADM platform (separate stack: sentinel-adm/); empty hides the header link. */
+  readonly VITE_SENTINEL_ADM_URL?: string;
 }
 
 interface ImportMeta {

@@ -2,6 +2,11 @@ import type { AppContext, AppModule } from '@/app/app-context';
 import { isPanelDisabled } from '@/config/panel-tiers';
 import { isPolicyDisabled } from '@/services/panel-policy';
 import { ACTIVE_APP, APPS, isPanelAllowedInApp, switchAppHref } from '@/config/apps';
+
+// External SENTINEL-ADM platform (separate stack under sentinel-adm/): shown as
+// a header link so operators can jump from the dashboard to the tactical
+// OSINT/legal workbench. Build-time configurable; an empty value hides it.
+const SENTINEL_ADM_URL = (import.meta.env.VITE_SENTINEL_ADM_URL ?? 'https://osint.risksentinel.opencyber.org').trim();
 import { replayPendingCalls, clearAllPendingCalls } from '@/app/pending-panel-data';
 import type { RelatedAsset } from '@/types';
 import type { TheaterPostureSummary } from '@/services/military-surge';
@@ -180,6 +185,7 @@ export class PanelLayoutManager implements AppModule {
         </div>
         <div class="header-right">
           ${APPS.length > 1 ? `<div class="rs-app-switcher">${APPS.map(app => `<a class="rs-app-link${app.id === ACTIVE_APP.id ? ' active' : ''}" href="${switchAppHref(app.id)}" title="${app.description}">${app.label}</a>`).join('')}</div>` : ''}
+          ${SENTINEL_ADM_URL ? `<a class="rs-app-link rs-external-link" href="${SENTINEL_ADM_URL}" target="_blank" rel="noopener" title="SENTINEL-ADM — OSINT &amp; legal intelligence platform (separate stack)">SENTINEL-ADM ↗</a>` : ''}
           <button class="search-btn" id="searchBtn"><kbd>⌘K</kbd> ${t('header.search')}</button>
           ${this.ctx.isDesktopApp ? '' : `<button class="copy-link-btn" id="copyLinkBtn">${t('header.copyLink')}</button>`}
           ${this.ctx.isDesktopApp ? '' : `<button class="fullscreen-btn" id="fullscreenBtn" title="${t('header.fullscreen')}">⛶</button>`}

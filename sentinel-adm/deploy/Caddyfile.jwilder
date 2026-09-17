@@ -1,0 +1,33 @@
+# SENTINEL-ADM — front-end for jwilder/nginx-proxy + acme-companion.
+#
+# In this mode TLS is terminated by nginx-proxy (VIRTUAL_HOST / LETSENCRYPT_*),
+# which forwards plain HTTP to this container on port 80. This instance applies
+# basic auth and routes:
+#   /api/*  → sentinel-api:8000   (e.g. https://<domain>/api/health)
+#   /*      → sentinel-ui:8501    (Streamlit workbench, websockets included)
+#
+# SENTINEL_BASIC_AUTH_HASH is mandatory: generate it with scripts/bootstrap.sh.
+
+:80 {
+	encode gzip
+	header {
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	handle_path /api/* {
+		basic_auth {
+			{$SENTINEL_BASIC_AUTH_USER} {$SENTINEL_BASIC_AUTH_HASH}
+		}
+		reverse_proxy sentinel-api:8000
+	}
+
+	handle {
+		basic_auth {
+			{$SENTINEL_BASIC_AUTH_USER} {$SENTINEL_BASIC_AUTH_HASH}
+		}
+		reverse_proxy sentinel-ui:8501
+	}
+}

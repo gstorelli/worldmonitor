@@ -111,12 +111,13 @@ jobs:
           cp .env.example .env
           docker compose config -q
           docker compose --profile prod config -q
+          docker compose --profile jwilder config -q
           docker compose --profile osint config -q
 
       - name: Validate the Caddyfiles
         working-directory: sentinel-adm
         run: |
-          for file in deploy/Caddyfile deploy/Caddyfile.internal; do
+          for file in deploy/Caddyfile deploy/Caddyfile.internal deploy/Caddyfile.jwilder; do
             docker run --rm -i caddy:2-alpine caddy fmt - < "$file" > /dev/null
           done
 

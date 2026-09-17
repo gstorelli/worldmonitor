@@ -27,7 +27,7 @@ GPU requirement and no software licensing fees.
 | D · Institutional registry dorking (PVP, OpenCoesione, BDAP, ANAC, Gazzetta) | **Implemented + tested** | `app/osint/dorking.py` |
 | F · ArchiveBox capture → vault import → RFC 3161 sealing | **Implemented + tested** | `app/forensics/archivebox.py` |
 | All · End-to-end acceptance scenario (offline, enforced in CI) | **Implemented** | `scripts/acceptance.py` |
-| Ops · Production compose (proxy profile, resource limits), bootstrap, verified backup, Yente refresh, cron example | **Implemented** | `docker-compose.yml`, `deploy/`, `scripts/*.sh` |
+| Ops · Production front-ends (jwilder/nginx-proxy profile, standalone Caddy TLS), resource limits, bootstrap, verified backup, Yente refresh, cron example | **Implemented** | `docker-compose.yml`, `deploy/`, `scripts/*.sh` |
 | D · Telegram / marketplace ingestion | **Staged** | planned (`app/osint/marketplaces.py`) |
 
 The deterministic engines are **stdlib-only**: they run and are tested without
@@ -88,21 +88,31 @@ RAM and 40-80 GB disk.
 
 ```bash
 git clone <repo> /srv/sentinel-adm && cd /srv/sentinel-adm/sentinel-adm
-SENTINEL_BASIC_AUTH_PASSWORD='...' ./scripts/bootstrap.sh   # env, auth hash, up, healthcheck
+# Choose the front-end mode: jwilder (shared nginx-proxy) or prod (own TLS).
+SENTINEL_BASIC_AUTH_PASSWORD='...' ./scripts/bootstrap.sh jwilder
 ./scripts/yente-update.sh                                   # OpenSanctions data (multi-GB, first run)
 ```
 
 What `bootstrap.sh` does, idempotently: creates `.env` from the template,
-generates the Caddy basic-auth hash into it, seeds `data/watchlist/watchlist.json`
-from the example, starts the `prod` profile, and waits for `/health`.
+generates the Caddy basic-auth hash into it (mandatory for both production
+profiles), creates the external `nginx-proxy` network in jwilder mode, seeds
+`data/watchlist/watchlist.json` from the example, starts the selected profile
+and waits for `/health`.
 
-**TLS and exposure** — the proxy terminates TLS and enforces basic auth; the API
-is never published directly in production:
+**Front-end modes** — basic auth is enforced in every mode and the API is never
+published directly:
 
-| Scenario | Settings |
-| --- | --- |
-| Public domain (Let's Encrypt) | `SENTINEL_DOMAIN=…`, `SENTINEL_ACME_EMAIL=…`, `SENTINEL_CADDYFILE=Caddyfile` |
-| Internal/LAN (local CA) | `SENTINEL_CADDYFILE=Caddyfile.internal`, any hostname; install the CA on clients (`docker compose --profile prod cp proxy:/data/caddy/pki/authorities/local/root.crt ./sentinel-adm-ca.crt`) |
+| Scenario | Command | Settings |
+| --- | --- | --- |
+| Behind jwilder/nginx-proxy (same pattern as worldmonitor) | `bootstrap.sh jwilder` | `SENTINEL_VIRTUAL_HOST`, `LETSENCRYPT_EMAIL`; external `nginx-proxy` network (created once) |
+| Standalone, public domain (ACME TLS) | `bootstrap.sh prod` | `SENTINEL_DOMAIN`, `SENTINEL_ACME_EMAIL`, `SENTINEL_CADDYFILE=Caddyfile` |
+| Standalone, internal/LAN (local CA) | `bootstrap.sh prod` | `SENTINEL_CADDYFILE=Caddyfile.internal`; install the CA on clients (`docker compose --profile prod cp proxy:/data/caddy/pki/authorities/local/root.crt ./sentinel-adm-ca.crt`) |
+
+In jwilder mode only `sentinel-router` joins the external network and declares
+`VIRTUAL_HOST` / `VIRTUAL_PORT=80` / `LETSENCRYPT_HOST` / `LETSENCRYPT_EMAIL`:
+TLS and the certificate are handled by nginx-proxy + acme-companion, while the
+router applies basic auth and splits `/api/*` (API) from `/` (workbench). The
+`prod` and `jwilder` profiles are alternatives — never run both.
 
 The workbench is served at `/` and the API under `/api/*` (e.g.
 `curl https://<domain>/api/health`), both authenticated.
