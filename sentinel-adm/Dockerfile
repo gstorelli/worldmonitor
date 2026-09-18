@@ -5,9 +5,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1
 
-# openssl provides the RFC 3161 timestamping primitives used by the vault.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends openssl ca-certificates curl \
+    && apt-get install -y --no-install-recommends ca-certificates curl \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -17,9 +16,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app ./app
 
-# Non-root runtime user; the evidence volume is mounted at /data.
+# Non-root runtime user; the watchlist is mounted at /data/watchlist.
 RUN useradd --create-home --shell /usr/sbin/nologin sentinel \
-    && mkdir -p /data/evidence /data/archivebox \
+    && mkdir -p /data/watchlist \
     && chown -R sentinel:sentinel /app /data
 USER sentinel
 

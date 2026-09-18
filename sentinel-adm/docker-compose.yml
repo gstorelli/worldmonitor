@@ -1,5 +1,5 @@
-# SENTINEL-ADM — on-premise stack: API core, operator UI, Yente sanctions engine,
-# ArchiveBox forensic capture and two alternative production front-ends.
+# SENTINEL-ADM — on-premise stack: FastAPI core and the operator workbench,
+# behind one of two production front-ends.
 #
 # Development:      docker compose up -d
 # Standalone prod:  docker compose --profile prod up -d      (own Caddy TLS; scripts/bootstrap.sh prod)
@@ -22,15 +22,7 @@ services:
       LLM_TEMPERATURE: "${LLM_TEMPERATURE:-0.1}"
       LLM_TIMEOUT: "${LLM_TIMEOUT:-60}"
       LLM_JSON_SCHEMA_STRICT: "${LLM_JSON_SCHEMA_STRICT:-true}"
-      YENTE_URL: "${YENTE_URL:-http://yente:8000}"
-      YENTE_DATASET: "${YENTE_DATASET:-default}"
-      ARCHIVEBOX_URL: "${ARCHIVEBOX_URL:-http://archivebox:8000}"
-      ARCHIVEBOX_OUTPUT_DIR: /data/archivebox
-      EVIDENCE_DIR: /data/evidence
       WATCHLIST_PATH: /data/watchlist/watchlist.json
-      TSA_URL: "${TSA_URL:-https://freetsa.org/tsr}"
-      SANCTIONS_MATCH_THRESHOLD: "${SANCTIONS_MATCH_THRESHOLD:-0.7}"
-      SANCTIONS_FLASH_THRESHOLD: "${SANCTIONS_FLASH_THRESHOLD:-0.9}"
       WATCHLIST_FUZZY_THRESHOLD: "${WATCHLIST_FUZZY_THRESHOLD:-0.88}"
       SENTINEL_WEBHOOK_URL: "${SENTINEL_WEBHOOK_URL:-}"
       TELEGRAM_BOT_TOKEN: "${TELEGRAM_BOT_TOKEN:-}"
@@ -38,17 +30,10 @@ services:
       SMTP_URL: "${SMTP_URL:-}"
       SENTINEL_NEWS_FEEDS: "${SENTINEL_NEWS_FEEDS:-}"
     volumes:
-      - evidence-data:/data/evidence
-      - archivebox-data:/data/archivebox:ro
       - ./data:/data/watchlist
     ports:
       - "${SENTINEL_BIND_IP:-127.0.0.1}:${SENTINEL_API_PORT:-8080}:8000"
     mem_limit: 1g
-    depends_on:
-      yente:
-        condition: service_started
-      archivebox:
-        condition: service_started
     networks:
       - internal-net
     restart: unless-stopped
@@ -64,116 +49,6 @@ services:
     depends_on:
       sentinel-api:
         condition: service_started
-    networks:
-      - internal-net
-    restart: unless-stopped
-
-  # ── Sanctions engine ─────────────────────────────────────────────────────────
-  # Yente has no sqlite backend: it indexes into Elasticsearch/OpenSearch.
-  # Upstream pairing is yente 5.5.x + Elasticsearch 9.x; the index is the
-  # memory-heavy service of the platform and its limits are tunable in .env.
-  yente-index-tune:
-    # Elasticsearch requires vm.max_map_count >= 262144 on the host. This
-    # one-shot privileged container raises it when the kernel allows; the
-    # permanent host equivalent is: sudo sysctl -w vm.max_map_count=262144
-    image: alpine:3.20
-    command:
-      - sh
-      - -c
-      - >
-        sysctl -w vm.max_map_count=262144 2>/dev/null
-        || echo 262144 > /proc/sys/vm/max_map_count 2>/dev/null
-        || echo 'warning: vm.max_map_count non impostato: esegui "sudo sysctl -w vm.max_map_count=262144" sull host' >&2
-    privileged: true
-    network_mode: none
-    mem_limit: 64m
-    restart: "no"
-
-  yente-index:
-    image: docker.elastic.co/elasticsearch/elasticsearch:9.4.2
-    environment:
-      discovery.type: single-node
-      bootstrap.memory_lock: "true"
-      xpack.security.enabled: "false"
-      ES_JAVA_OPTS: "${YENTE_ES_JAVA_OPTS:--Xms1g -Xmx1g}"
-    ulimits:
-      memlock:
-        soft: -1
-        hard: -1
-    volumes:
-      - yente-index-data:/usr/share/elasticsearch/data
-    healthcheck:
-      test: ["CMD-SHELL", "curl --fail http://localhost:9200/_cluster/health || exit 1"]
-      interval: 15s
-      timeout: 10s
-      retries: 20
-      start_period: 60s
-    mem_limit: "${YENTE_ES_MEM_LIMIT:-3g}"
-    depends_on:
-      yente-index-tune:
-        condition: service_completed_successfully
-    networks:
-      - internal-net
-    restart: unless-stopped
-
-  yente:
-    image: ghcr.io/opensanctions/yente:5.5.0
-    environment:
-      YENTE_INDEX_TYPE: "${YENTE_INDEX_TYPE:-elasticsearch}"
-      YENTE_INDEX_URL: "${YENTE_INDEX_URL:-http://yente-index:9200}"
-      YENTE_UPDATE_TOKEN: "${YENTE_UPDATE_TOKEN:-}"
-      OPENSANCTIONS_DELIVERY_TOKEN: "${OPENSANCTIONS_DELIVERY_TOKEN:-}"
-    volumes:
-      - yente-data:/data
-    ports:
-      - "${SENTINEL_BIND_IP:-127.0.0.1}:${SENTINEL_YENTE_PORT:-8000}:8000"
-    mem_limit: 1g
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]
-      interval: 15s
-      timeout: 10s
-      retries: 20
-      start_period: 30s
-    depends_on:
-      yente-index:
-        condition: service_healthy
-    networks:
-      - internal-net
-    restart: unless-stopped
-
-  archivebox:
-    image: archivebox/archivebox:0.7.4
-    # --quick-init creates the collection on an empty volume without the setup
-    # wizard: plain `server` exits with "No archivebox index found" on a fresh
-    # install and crash-loops under restart: unless-stopped.
-    command: ["server", "--quick-init", "0.0.0.0:8000"]
-    environment:
-      PUBLIC_INDEX: "false"
-      PUBLIC_SNAPSHOTS: "false"
-      # The API is the only client of this service (internal network, no host
-      # exposure unless SENTINEL_BIND_IP is widened): allow headless captures
-      # via POST /add without an interactive admin session. The ArchiveBox web
-      # UI stays read-only/public-off.
-      PUBLIC_ADD_VIEW: "true"
-      SEARCH_BACKEND_ENGINE: "ripgrep"
-      ARCHIVEBOX_ALLOW_NO_CHROME: "false"
-    volumes:
-      - archivebox-data:/data
-    ports:
-      - "${SENTINEL_BIND_IP:-127.0.0.1}:${SENTINEL_ARCHIVEBOX_PORT:-8090}:8000"
-    mem_limit: 2g
-    networks:
-      - internal-net
-    restart: unless-stopped
-
-  # Optional OSINT toolbox (profile "osint"): execute the wrappers here, e.g.
-  #   docker compose run --rm osint-toolbox maigret <username> --json simple --folderoutput /dossiers
-  osint-toolbox:
-    build: ./osint-toolbox
-    profiles: ["osint"]
-    volumes:
-      - osint-dossiers:/dossiers
-    mem_limit: 1g
     networks:
       - internal-net
     restart: unless-stopped
@@ -237,11 +112,6 @@ services:
     restart: unless-stopped
 
 volumes:
-  evidence-data:
-  archivebox-data:
-  yente-data:
-  yente-index-data:
-  osint-dossiers:
   caddy-data:
   caddy-config:
 

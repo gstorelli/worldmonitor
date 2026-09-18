@@ -136,15 +136,12 @@ def ripple_severity(
     action_type: str,
     match_score: float,
     same_province: bool = False,
-    sanctions_hit: bool = False,
 ) -> RippleAssessment:
     """Contagion risk for a local entity, 0-100, with an explainable rationale."""
     base = _ACTION_WEIGHTS.get(action_type.casefold(), 12)
     score = base + int(round(max(0.0, min(match_score, 1.0)) * 40))
     if same_province:
         score += 10
-    if sanctions_hit:
-        score += 15
     score = max(0, min(score, 100))
     if score >= 75:
         level = "critical"
@@ -157,6 +154,4 @@ def ripple_severity(
     drivers = [f"azione={action_type or 'n/d'}", f"similarità={match_score:.2f}"]
     if same_province:
         drivers.append("stessa provincia")
-    if sanctions_hit:
-        drivers.append("hit sanzioni")
     return RippleAssessment(score=score, level=level, rationale="; ".join(drivers))

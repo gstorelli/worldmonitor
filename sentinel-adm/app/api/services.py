@@ -2,7 +2,7 @@
 
 All business logic lives here (not in the FastAPI handlers) so it is testable
 with the standard library alone and reusable from scripts/CLI. Every external
-dependency (feed fetch, ArchiveBox, vault, inference) is injectable.
+dependency (feed fetch, inference) is injectable.
 
 Stdlib only.
 """
@@ -10,17 +10,12 @@ Stdlib only.
 from __future__ import annotations
 
 from dataclasses import asdict
-from datetime import datetime, timedelta, timezone
-from pathlib import Path
+from datetime import datetime, timezone
 from typing import Any, Callable
 
 from ..config import Settings
-from ..forensics.archivebox import ArchiveBoxClient, ArchiveBoxError, import_newest_warc
-from ..forensics.evidence import EvidenceRecord, EvidenceVault
 from ..legal.urnlex import qualify
 from ..llm.adapter import OpenAICompatibleClient
-from ..osint.dorking import DorkQuery, build_dorks, portal_catalog
-from ..osint.wrappers import TOOLS, OsintInputError, OsintTool
 from ..radar.extraction import EntityExtraction, extract_entities, heuristic_extract
 from ..radar.harvester import MediaHarvester
 from ..radar.pipeline import alerts_to_digest, run_radar
@@ -105,76 +100,6 @@ def legal_qualify(text: str) -> dict[str, Any]:
     }
 
 
-# ── OSINT ────────────────────────────────────────────────────────────────────
-
-def dork_response(terms: list[str], portals: list[str] | None = None) -> dict[str, Any]:
-    queries: list[DorkQuery] = build_dorks([term for term in terms if str(term).strip()], portals)
-    return {"portals": portal_catalog(), "queries": [asdict(query) for query in queries]}
-
-
-def osint_job(tool: str, target: str, output_dir: str = "") -> dict[str, Any]:
-    """Prepare (never execute) a reconnaissance job for the OSINT toolbox."""
-    implementation: OsintTool | None = TOOLS.get(tool)
-    if implementation is None:
-        raise OsintInputError(f"tool sconosciuto: {tool} (disponibili: {', '.join(sorted(TOOLS))})")
-    spec = implementation.job(target, output_dir)
-    return {"spec": asdict(spec), "execution": "toolbox", "note": "eseguire nel container osint-toolbox: aprire mai shell dall'API"}
-
-
-# ── Evidence ─────────────────────────────────────────────────────────────────
-
-def _assert_within(candidate: Path, root: Path) -> Path:
-    resolved = candidate.resolve()
-    if not str(resolved).startswith(str(root.resolve())):
-        raise ArchiveBoxError("percorso fuori dalla directory di cattura")
-    return resolved
-
-
-def capture_and_seal(
-    url: str,
-    *,
-    settings: Settings | None = None,
-    client: ArchiveBoxClient | None = None,
-    vault: EvidenceVault | None = None,
-    seal: bool = True,
-) -> dict[str, Any]:
-    """Request an ArchiveBox snapshot, then adopt and seal the resulting WARC."""
-    config = settings or Settings.from_env()
-    archivebox = client or ArchiveBoxClient(config.archivebox_url)
-    evidence_vault = vault or EvidenceVault(root=config.evidence_dir)
-    started = datetime.now(timezone.utc) - timedelta(seconds=5)
-    request = archivebox.add(url)
-    if not request.get("accepted"):
-        raise ArchiveBoxError(f"ArchiveBox ha rifiutato la richiesta (HTTP {request.get('status')})")
-    record, verification = import_newest_warc(
-        evidence_vault, config.archivebox_output_dir, url, since=started, seal=seal
-    )
-    return {"request": request, "evidence": asdict(record), "verification": verification}
-
-
-def evidence_import(
-    warc_path: str,
-    url: str,
-    *,
-    settings: Settings | None = None,
-    vault: EvidenceVault | None = None,
-    seal: bool = True,
-) -> dict[str, Any]:
-    """Adopt a WARC that ArchiveBox already wrote into the shared volume."""
-    config = settings or Settings.from_env()
-    evidence_vault = vault or EvidenceVault(root=config.evidence_dir)
-    path = _assert_within(Path(warc_path), Path(config.archivebox_output_dir))
-    if not path.is_file():
-        raise ArchiveBoxError(f"WARC non trovato: {path}")
-    record: EvidenceRecord = evidence_vault.import_warc(path, url, agent="archivebox")
-    verification = evidence_vault.verify(record.evidence_id)
-    if seal:
-        manifest = evidence_vault.seal(record.evidence_id)
-        verification = evidence_vault.verify(record.evidence_id)
-        verification["tsa"] = manifest.get("tsa")
-    return {"evidence": asdict(record), "verification": verification}
-
-
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
 def _now() -> str:
@@ -192,11 +117,5 @@ __all__ = [
     "watchlist_upsert",
     "watchlist_remove",
     "legal_qualify",
-    "dork_response",
-    "osint_job",
-    "capture_and_seal",
-    "evidence_import",
     "WatchlistError",
-    "ArchiveBoxError",
-    "OsintInputError",
 ]

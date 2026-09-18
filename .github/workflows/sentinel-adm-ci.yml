@@ -25,14 +25,10 @@ jobs:
           - test_privacy
           - test_legal
           - test_llm_adapter
-          - test_sanctions
           - test_radar
           - test_harvester
           - test_radar_pipeline
-          - test_osint
-          - test_archivebox
           - test_api_services
-          - test_evidence
           - test_config_dispatch
     defaults:
       run:
@@ -112,7 +108,6 @@ jobs:
           docker compose config -q
           docker compose --profile prod config -q
           docker compose --profile jwilder config -q
-          docker compose --profile osint config -q
 
       - name: Validate the Caddyfiles
         working-directory: sentinel-adm

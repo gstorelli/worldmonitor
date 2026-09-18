@@ -43,8 +43,6 @@ def build_daily_brief(items: list[dict[str, Any]], generated_at: str, summary: s
 
 def should_flash(event: dict[str, Any]) -> bool:
     """Flash only for high-confidence events, to avoid alert fatigue."""
-    if event.get("sanctions_hit") and float(event.get("sanctions_score", 0)) >= 0.9:
-        return True
     if event.get("watchlist_score", 0) and float(event["watchlist_score"]) >= 0.9 and event.get("action") in {
         "sequestro",
         "chiusura",

@@ -12,9 +12,7 @@ ENV = {
     "LLM_BASE_URL": "https://inference.example/v1",
     "LLM_API_KEY": "super-secret",
     "LLM_MODEL": "qwen2.5",
-    "YENTE_URL": "http://yente:8000",
-    "EVIDENCE_DIR": "/data/evidence",
-    "SANCTIONS_MATCH_THRESHOLD": "0.75",
+    "WATCHLIST_FUZZY_THRESHOLD": "0.9",
     "SENTINEL_NEWS_FEEDS": "https://www.gdf.gov.it/rss,https://www.adm.gov.it/rss",
     "TELEGRAM_BOT_TOKEN": "123:abc",
     "TELEGRAM_CHAT_ID": "-100",
@@ -26,7 +24,7 @@ class SettingsTests(unittest.TestCase):
         with mock.patch.dict(os.environ, ENV, clear=False):
             settings = Settings.from_env()
         self.assertEqual(settings.llm_model, "qwen2.5")
-        self.assertEqual(settings.sanctions_match_threshold, 0.75)
+        self.assertEqual(settings.watchlist_fuzzy_threshold, 0.9)
         self.assertEqual(len(settings.news_feeds), 2)
         self.assertTrue(settings.llm_json_schema_strict)
 
@@ -64,8 +62,6 @@ class DispatchTests(unittest.TestCase):
         self.assertEqual(results[0]["channel"], "none")
 
     def test_flash_policy(self):
-        self.assertTrue(should_flash({"sanctions_hit": True, "sanctions_score": 0.95}))
-        self.assertFalse(should_flash({"sanctions_hit": True, "sanctions_score": 0.5}))
         self.assertTrue(should_flash({"watchlist_score": 0.92, "action": "sequestro"}))
         self.assertFalse(should_flash({"watchlist_score": 0.92, "action": "controllo"}))
 

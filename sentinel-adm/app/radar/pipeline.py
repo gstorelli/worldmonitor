@@ -44,7 +44,6 @@ def assess_item(
     extractor: Extractor = heuristic_extract,
     *,
     same_province: bool = False,
-    sanctions_hit: bool = False,
     accept: float | None = None,
     review_floor: float | None = None,
 ) -> RippleAlert | None:
@@ -57,10 +56,8 @@ def assess_item(
     if not matches:
         return None
     action = extraction.actions[0] if extraction.actions else ""
-    severity = ripple_severity(action, matches[0].score, same_province=same_province, sanctions_hit=sanctions_hit)
+    severity = ripple_severity(action, matches[0].score, same_province=same_province)
     flash = should_flash({"watchlist_score": matches[0].score, "action": action})
-    if sanctions_hit and matches[0].score >= 0.9:
-        flash = True
     return RippleAlert(item=item, extraction=extraction, matches=matches, severity=severity, flash=flash)
 
 

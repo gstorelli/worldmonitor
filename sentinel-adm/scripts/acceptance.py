@@ -1,4 +1,4 @@
-"""SENTINEL-ADM — end-to-end acceptance script (Milestone 5).
+"""SENTINEL-ADM — end-to-end acceptance script.
 
 Deterministic, offline verification of the operating chain required by the
 specification:
@@ -7,8 +7,7 @@ specification:
   2. extract entities and fuzzy-match them against the local watchlist;
   3. validate the flash-alert policy for a high-confidence hit;
   4. qualify the facts legally and validate the generated Normattiva URN;
-  5. store a WARC capture, validate the SHA-256 sidecar, detect tampering and
-     seal it with an RFC 3161 timestamp token (fake TSA transport).
+  5. verify the service layer payloads the HTTP routes return.
 
 Run from the project root:
 
@@ -20,16 +19,13 @@ Exit code is 0 only when every step passes.
 from __future__ import annotations
 
 import sys
-import tempfile
 from pathlib import Path
-from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.forensics.evidence import EvidenceVault, TsaClient  # noqa: E402
 from app.legal.urnlex import qualify  # noqa: E402
-from app.radar.fuzzy import WatchlistEntry  # noqa: E402
 from app.radar.extraction import heuristic_extract  # noqa: E402
+from app.radar.fuzzy import WatchlistEntry  # noqa: E402
 from app.radar.harvester import parse_feed  # noqa: E402
 from app.radar.pipeline import alerts_to_digest, run_radar  # noqa: E402
 
@@ -43,8 +39,6 @@ RSS_FIXTURE = """<?xml version="1.0" encoding="UTF-8"?>
     <description>Blitz in via Roma 12: denunciato il titolare, e-DAS mancante e autocisterna sequestrata.</description>
   </item>
 </channel></rss>"""
-
-WARC_BYTES = b"WARC/1.0\r\nWARC-Type: response\r\nWARC-Target-URI: https://example.org/news/sequestro-bari\r\nContent-Length: 5\r\n\r\nhello"
 
 WATCHLIST = [
     WatchlistEntry(entry_id="w1", name="Fratelli Rossi S.r.l.", kind="deposit", city="Bari", vat="12345678903"),
@@ -73,12 +67,6 @@ class StepReport:
     def summary(self) -> str:
         passed = sum(1 for _, ok, _ in self.steps if ok)
         return f"{passed}/{len(self.steps)} passi superati"
-
-
-def _fake_tsa_runner(args: list[str], data: bytes | None) -> tuple[int, bytes, bytes]:
-    out_index = args.index("-out") + 1
-    Path(args[out_index]).write_bytes(b"TSQ-REQUEST")
-    return 0, b"", b""
 
 
 def run() -> StepReport:
@@ -123,41 +111,14 @@ def run() -> StepReport:
     penal = next((item for item in legal.qualifications if item.act_key == "dlgs74" and item.article == "8"), None)
     report.check("4c. Qualificazione D.Lgs. 74/2000 art. 8", penal is not None)
 
-    # 5. Forensic vault
-    with tempfile.TemporaryDirectory() as folder:
-        vault = EvidenceVault(root=folder, tsa=TsaClient(tsa_url="http://tsa.local", runner=_fake_tsa_runner))
-        record = vault.store_capture("https://example.org/news/sequestro-bari", WARC_BYTES, agent="acceptance", notes="test")
-        verification = vault.verify(record.evidence_id)
-        report.check("5. WARC archiviato con sidecar SHA-256", verification["status"] == "ok", verification["sha256"][:16])
-
-        warc_path = Path(record.folder) / "capture.warc"
-        warc_path.write_bytes(WARC_BYTES + b"tampered")
-        report.check("5b. Rilevazione manomissione", vault.verify(record.evidence_id)["status"] == "mismatch")
-        warc_path.write_bytes(WARC_BYTES)
-
-        fake_response = mock.MagicMock()
-        fake_response.read.return_value = b"TSR-TOKEN"
-        fake_response.__enter__ = lambda self: self
-        fake_response.__exit__ = lambda self, *args: False
-        with mock.patch("urllib.request.urlopen", return_value=fake_response):
-            manifest = vault.seal(record.evidence_id)
-        report.check("5c. Sigillo RFC 3161", manifest["tsa"]["status"] == "sealed", manifest["tsa"].get("token_file", ""))
-        report.check("5d. Verifica finale post-sigillo", vault.verify(record.evidence_id)["tsa_status"] == "sealed")
-
-    # 6. Service layer (the payloads the HTTP routes return)
+    # 5. Service layer (the payloads the HTTP routes return)
     from app.api import services  # imported here so the script stays import-light
 
     scan = services.radar_scan(feeds=["https://fixture.local/rss"], watchlist=WATCHLIST, fetch=lambda _url: RSS_FIXTURE)
     report.check(
-        "6. Service layer: scansione radar",
+        "5. Service layer: scansione radar",
         bool(scan["alerts"]) and scan["alerts"][0]["flash"],
         f"alert={len(scan['alerts'])}",
-    )
-    dorks = services.dork_response(["Fratelli Rossi"], ["pvp"])
-    report.check(
-        "6b. Service layer: dorking PVP",
-        len(dorks["queries"]) == 1 and dorks["queries"][0]["url"].startswith("https://"),
-        dorks["queries"][0]["portal"] if dorks["queries"] else "",
     )
 
     return report

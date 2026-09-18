@@ -66,12 +66,6 @@ class RippleScoringTests(unittest.TestCase):
         self.assertEqual(assessment.level, "low")
         self.assertLess(assessment.score, 35)
 
-    def test_sanctions_hit_raises_severity(self):
-        without = ripple_severity("denuncia", 0.8)
-        with_hit = ripple_severity("denuncia", 0.8, sanctions_hit=True)
-        self.assertEqual(with_hit.score, min(100, without.score + 15))
-        self.assertIn("hit sanzioni", with_hit.rationale)
-
 
 if __name__ == "__main__":
     unittest.main()

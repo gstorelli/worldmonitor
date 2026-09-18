@@ -1,8 +1,8 @@
 # SENTINEL-ADM
 
-Tactical OSINT, Early Warning and Legal Intelligence platform for the Italian
-Customs and Monopolies Agency (ADM) — Inter-Regional Directorate for Puglia,
-Molise and Basilicata.
+Early Warning and Legal Intelligence platform for the Italian Customs and
+Monopolies Agency (ADM) — Inter-Regional Directorate for Puglia, Molise and
+Basilicata.
 
 This is a **separate platform** from the Risk Sentinel dashboard: its own
 Python services, its own containers, its own data. It runs on-premise with no
@@ -15,23 +15,17 @@ GPU requirement and no software licensing fees.
 | A · Edge privacy masking (CF, P.IVA, IBAN, targhe, email, telefoni, indirizzi, nomi contestuali) | **Implemented + tested** | `app/privacy/sanitizer.py` |
 | A · Abstracted inference gateway (OpenAI-compatible, JSON-schema enforced, mask → infer → restore) | **Implemented + tested** | `app/llm/adapter.py` |
 | B · Dynamic legal engine (URN:LEX, Normattiva, EUR-Lex CELEX, alias TULD/TUA/D.Lgs 74/2000/L. 401/89/CP/TULPS) | **Implemented + tested** | `app/legal/` |
-| E · Local sanctions screening (Yente REST client, flash threshold) | **Implemented + tested** | `app/sanctions/yente_client.py` |
 | C · Ripple-effect matching (normalised token-sort Levenshtein, grey-zone review, severity scoring) | **Implemented + tested** | `app/radar/fuzzy.py` |
-| F · Forensic vault (WARC + SHA-256 sidecar + manifest + RFC 3161 sealing via OpenSSL) | **Implemented + tested** | `app/forensics/evidence.py` |
 | G · Notification dispatch (flash + "Il Mattinale Antifrode", webhook/Telegram/Apprise) | **Implemented + tested** | `app/notify/dispatch.py` |
-| H · Operator workbench (5 workspaces) + full HTTP surface | **Implemented** (services tested; Streamlit shell) | `app/api/`, `app/ui/dashboard.py` |
+| H · Operator workbench (2 workspaces) + HTTP surface | **Implemented** (services tested; Streamlit shell) | `app/api/`, `app/ui/dashboard.py` |
 | C · News harvesting (RSS 2.0 / Atom, dedupe, failure isolation) | **Implemented + tested** | `app/radar/harvester.py` |
 | C · Entity extraction (zero-shot via gateway + deterministic offline fallback) | **Implemented + tested** | `app/radar/extraction.py` |
 | C · Contagion pipeline (watchlist store, ripple alerts, digest, flash policy) | **Implemented + tested** | `app/radar/pipeline.py`, `app/radar/watchlist.py` |
-| D · Maigret / Holehe wrappers (validated argv, job specs, parsers, toolbox container) | **Implemented + tested** | `app/osint/wrappers.py`, `osint-toolbox/` |
-| D · Institutional registry dorking (PVP, OpenCoesione, BDAP, ANAC, Gazzetta) | **Implemented + tested** | `app/osint/dorking.py` |
-| F · ArchiveBox capture → vault import → RFC 3161 sealing | **Implemented + tested** | `app/forensics/archivebox.py` |
 | All · End-to-end acceptance scenario (offline, enforced in CI) | **Implemented** | `scripts/acceptance.py` |
-| Ops · Production front-ends (jwilder/nginx-proxy profile, standalone Caddy TLS), resource limits, bootstrap, verified backup, Yente refresh, cron example | **Implemented** | `docker-compose.yml`, `deploy/`, `scripts/*.sh` |
-| D · Telegram / marketplace ingestion | **Staged** | planned (`app/osint/marketplaces.py`) |
+| Ops · Production front-ends (jwilder/nginx-proxy profile, standalone Caddy TLS), resource limits, bootstrap, verified backup, cron example | **Implemented** | `docker-compose.yml`, `deploy/`, `scripts/*.sh` |
 
 The deterministic engines are **stdlib-only**: they run and are tested without
-FastAPI, Streamlit, Yente or ArchiveBox installed.
+FastAPI or Streamlit installed.
 
 ## Architecture
 
@@ -40,14 +34,11 @@ FastAPI core (app/api/main.py)
   ├── privacy/sanitizer.py     deterministic masking (session dictionary, no persistence)
   ├── llm/adapter.py           OpenAI-compatible client, JSON-schema enforcement
   ├── legal/acts.py + urnlex.py canonical acts → URN:LEX → Normattiva / EUR-Lex
-  ├── sanctions/yente_client.py local Yente engine (OpenSanctions data)
   ├── radar/fuzzy.py           fuzzy watchlist matching + ripple severity
-  ├── forensics/evidence.py    WARC vault, SHA-256 sidecar, RFC 3161 TSA
+  ├── radar/harvester.py       RSS/Atom ingestion
+  ├── radar/extraction.py      entity extraction (model + offline fallback)
   └── notify/dispatch.py       flash alerts + daily brief
-Streamlit workbench (app/ui/dashboard.py) — 5 workspaces over the API
-Yente container (OpenSanctions) — local screening, never external
-  └── Elasticsearch index (yente-index) — Yente has no sqlite backend
-ArchiveBox container — ISO 28500 WARC capture into the shared volume
+Streamlit workbench (app/ui/dashboard.py) — 2 workspaces over the API
 ```
 
 ## HTTP surface
@@ -57,15 +48,11 @@ tested): the logic is reachable from the UI, from scripts and from tests.
 
 | Method | Endpoint | Purpose |
 | --- | --- | --- |
-| GET | `/health` | config snapshot + Yente/evidence reachability |
+| GET | `/health` | config snapshot |
 | POST | `/privacy/mask`, `/privacy/unmask` | session-scoped masking round trip |
 | POST | `/legal/qualify` · GET `/legal/catalog` | legal qualification + canonical acts |
 | GET | `/radar/feeds` · POST `/radar/scan` | configured feeds; harvest → extract → contagion alerts |
 | GET/POST/DELETE | `/watchlist` | local watchlist management |
-| POST | `/sanctions/screen` | Yente screening |
-| POST | `/osint/dorks` · POST `/osint/job` | registry dorks; reconnaissance job specs (never executed by the API) |
-| GET | `/evidence` · `/evidence/{id}/verify` | evidence list + integrity check |
-| POST | `/evidence/capture` · `/evidence/import` · `/evidence/seal/{id}` | ArchiveBox capture, WARC import, RFC 3161 sealing |
 
 ## Quick start (development)
 
@@ -75,7 +62,6 @@ cp .env.example .env          # set LLM_BASE_URL / LLM_API_KEY and thresholds
 docker compose up -d --build
 # API      http://127.0.0.1:8080/health
 # UI       http://127.0.0.1:8501
-# Yente    http://127.0.0.1:8000/healthz
 ```
 
 Published ports bind to `127.0.0.1` by default; widen `SENTINEL_BIND_IP` only on
@@ -83,17 +69,14 @@ a trusted development LAN.
 
 ## Production deployment
 
-Target: a dedicated host (recommended, so the OpenSanctions index and the
-ArchiveBox images cannot starve the Risk Sentinel stack). No GPU; plan ~4-8 GB
-RAM and 40-80 GB disk. The Elasticsearch index (`yente-index`) is the heavy
-container: 1 GB heap / 3 GB limit by default, tunable with
-`YENTE_ES_JAVA_OPTS` / `YENTE_ES_MEM_LIMIT` in `.env`.
+Target: a small dedicated host is enough — the platform is two Python
+containers (API + Streamlit workbench) plus the reverse proxy; plan ~1-2 GB RAM
+and a few GB of disk. No screening index or archiving service is required.
 
 ```bash
 git clone <repo> /srv/sentinel-adm && cd /srv/sentinel-adm/sentinel-adm
 # Choose the front-end mode: jwilder (shared nginx-proxy) or prod (own TLS).
 SENTINEL_BASIC_AUTH_PASSWORD='...' ./scripts/bootstrap.sh jwilder
-./scripts/yente-update.sh                                   # OpenSanctions data (multi-GB, first run)
 ```
 
 What `bootstrap.sh` does, idempotently: creates `.env` from the template,
@@ -125,7 +108,6 @@ The workbench is served at `/` and the API under `/api/*` (e.g.
 ```bash
 ./scripts/backup.sh                 # tar.gz + SHA-256 sidecar + retention (default 14)
 BACKUP_DIR=/var/backups/sentinel-adm BACKUP_RETENTION=30 ./scripts/backup.sh
-./scripts/yente-update.sh           # dataset refresh (schedule it)
 # deploy/crontab.example            # ready-made daily cron entries
 ```
 
@@ -134,11 +116,8 @@ BACKUP_DIR=/var/backups/sentinel-adm BACKUP_RETENTION=30 ./scripts/backup.sh
 - [ ] `LLM_BASE_URL` / `LLM_API_KEY` set (a dedicated OpenRouter key is
       recommended so spend is attributable per platform).
 - [ ] Basic-auth credentials distributed to the operators; TLS verified.
-- [ ] `yente update` completed and `docker compose exec yente yente status` healthy.
 - [ ] Real watchlist loaded in `data/watchlist/watchlist.json`.
 - [ ] First `backup.sh` run and its `.sha256` verified.
-- [ ] Retention/authorisation policy for evidence and dossiers agreed (GDPR);
-      point `TSA_URL` at a qualified TSA for judicial use.
 - [ ] `docker compose --profile prod ps` shows every service healthy.
 
 ## Tests
@@ -162,31 +141,20 @@ logs require authentication — that file is readable from outside the runner.
 | --- | --- |
 | Isolation & zero leakage | `SanitizedInference` masks before the call and restores only locally; `PrivacyMasker` is session-scoped and never persisted |
 | Normative precision | URN/URL generation is deterministic; acts with unverified metadata return *needs review* instead of a link (`tle` today) |
-| Local operational autonomy | Yente, ArchiveBox and the evidence vault run on-prem; external connectivity is only needed for news scraping and inference |
-| Forensic admissibility | Every capture has a `capture.warc`, a SHA-256 sidecar and a manifest; `verify()` recomputes the digest and detects tampering; RFC 3161 sealing stores the `.tsq`/`.tsr` pair |
-| Clean execution | `docker compose up -d` with healthchecks on API, Yente and its Elasticsearch index; ArchiveBox initialises its collection on first boot (`server --quick-init`) |
+| Local operational autonomy | Every deterministic engine runs on-prem in the two containers; external connectivity is only needed for news scraping and inference |
+| Clean execution | `docker compose up -d` with healthchecks on the API |
 
 ## Milestones
 
 1. **Foundation** — compose stack, volumes, config models (done).
-2. **Security, LegalTech, Sanctions core** — sanitizer, inference adapter, URN:LEX, Yente client (done).
-3. **News radar & contagion** — harvester, entity extraction (model + offline fallback), watchlist store, ripple alerts (done); Telegram/marketplace ingestion (staged).
-4. **OSINT & forensic vault** — vault, hashing, TSA, Maigret/Holehe wrappers, dorking, ArchiveBox import (done); live capture triggering from the UI (staged).
-5. **Notifications & UI** — dispatcher, HTTP surface and acceptance scenario (done); the Streamlit workbench is wired to the new endpoints and expanded as the services grow.
+2. **Security & LegalTech core** — sanitizer, inference adapter, URN:LEX (done).
+3. **News radar & contagion** — harvester, entity extraction (model + offline fallback), watchlist store, ripple alerts (done).
+4. **Notifications & UI** — dispatcher, HTTP surface and acceptance scenario (done); the Streamlit workbench is wired to the new endpoints and expanded as the services grow.
 
 ## Operational notes
 
 - **Secrets stay out of git**: `.env` is ignored; only `.env.example` is tracked.
-- **TSA**: `TSA_URL` defaults to a public RFC 3161 provider; point it to a
-  qualified TSA for judicial use. If `openssl` is unavailable the seal is
-  recorded as `unavailable` and the vault stays verifiable by hash.
-- **Yente data**: run `./scripts/yente-update.sh` (or the bundled cron) to
-  download/refresh the OpenSanctions datasets into the local Elasticsearch
-  index. The one-shot `yente-index-tune` container raises the host
-  `vm.max_map_count` when the kernel allows; otherwise run
-  `sudo sysctl -w vm.max_map_count=262144` once (or persist it in
-  `/etc/sysctl.d/`).
-- **ArchiveBox**: captures land in the shared `archivebox-data` volume; the
-  vault imports them with `EvidenceVault.import_warc()`. The collection is
-  created on first boot and, since the web UI is never published, headless
-  captures are enabled for the internal network (`PUBLIC_ADD_VIEW=true`).
+- **State**: the only persistent state is `data/watchlist/watchlist.json`
+  (bind-mounted into the API container); the verified backup covers it.
+- **Notifications**: flash policy and the daily brief are dispatched through
+  `app/notify/dispatch.py` (webhook, Telegram, SMTP via Apprise).

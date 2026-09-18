@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # SENTINEL-ADM — verified backup of the platform state.
 #
-# Backs up the watchlist (bind ./data), the evidence vault, the ArchiveBox
-# captures and the Yente index into a single tarball with a SHA-256 sidecar,
-# then prunes older copies.
+# The only persistent state of the platform is the bind-mounted ./data
+# directory (the watchlist): it is packed into a tarball with a SHA-256
+# sidecar, then older copies are pruned.
 #
 #   BACKUP_DIR=/var/backups/sentinel-adm BACKUP_RETENTION=14 ./scripts/backup.sh
 set -euo pipefail
@@ -17,30 +17,13 @@ STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 NAME="sentinel-adm-${STAMP}.tar.gz"
 mkdir -p "$BACKUP_DIR"
 
-volume_for() {
-  local container
-  container="$(docker compose ps -q "$1" 2>/dev/null || true)"
-  if [ -z "$container" ]; then
-    echo ""
-    return
-  fi
-  docker inspect -f '{{range .Mounts}}{{if eq .Type "volume"}}{{.Name}}{{"\n"}}{{end}}{{end}}' "$container" | head -n 1
-}
-
-MOUNTS=()
-for service in sentinel-api yente archivebox; do
-  volume="$(volume_for "$service")"
-  if [ -n "$volume" ]; then
-    MOUNTS+=(-v "${volume}:/volumes/${service}:ro")
-  else
-    echo "warning: nessun volume trovato per ${service}" >&2
-  fi
-done
-MOUNTS+=(-v "${REPO_ROOT}/data:/volumes/watchlist:ro")
+if [ ! -d data ]; then
+  echo "error: directory ./data assente (watchlist non inizializzata)" >&2
+  exit 1
+fi
 
 echo "creazione ${NAME}…"
-docker run --rm "${MOUNTS[@]}" -v "${BACKUP_DIR}:/backup" alpine:3.20 \
-  tar -czf "/backup/${NAME}" -C /volumes .
+tar -czf "${BACKUP_DIR}/${NAME}" ./data
 
 if command -v sha256sum >/dev/null 2>&1; then
   (cd "$BACKUP_DIR" && sha256sum "$NAME" > "${NAME}.sha256" && sha256sum -c "${NAME}.sha256")

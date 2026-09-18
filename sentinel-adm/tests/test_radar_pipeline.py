@@ -124,11 +124,6 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(digest[0]["matched"][0]["entry_id"], alerts[0].best_match.entry.entry_id)
         self.assertIn("rationale", digest[0])
 
-    def test_sanctions_hit_forces_flash(self):
-        alert = assess_item(self._item(HEADLINE), self.watchlist, sanctions_hit=True)
-        assert alert is not None
-        self.assertTrue(alert.flash)
-
 
 if __name__ == "__main__":
     unittest.main()

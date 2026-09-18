@@ -28,18 +28,10 @@ class Settings:
     llm_timeout: float = 60.0
     llm_json_schema_strict: bool = True
 
-    # Local services
-    yente_url: str = "http://yente:8000"
-    yente_dataset: str = "default"
-    archivebox_url: str = "http://archivebox:8000"
-    archivebox_output_dir: str = "/data/archivebox"
-    evidence_dir: str = "/data/evidence"
+    # Local state
     watchlist_path: str = "./data/watchlist.json"
-    tsa_url: str = "https://freetsa.org/tsr"
 
     # Thresholds
-    sanctions_match_threshold: float = 0.7
-    sanctions_flash_threshold: float = 0.9
     watchlist_fuzzy_threshold: float = 0.88
 
     # Notifications
@@ -62,15 +54,7 @@ class Settings:
             llm_temperature=float(_env("LLM_TEMPERATURE", "0.1")),
             llm_timeout=float(_env("LLM_TIMEOUT", "60")),
             llm_json_schema_strict=_env("LLM_JSON_SCHEMA_STRICT", "true").lower() in {"1", "true", "yes"},
-            yente_url=_env("YENTE_URL", "http://yente:8000"),
-            yente_dataset=_env("YENTE_DATASET", "default"),
-            archivebox_url=_env("ARCHIVEBOX_URL", "http://archivebox:8000"),
-            archivebox_output_dir=_env("ARCHIVEBOX_OUTPUT_DIR", "/data/archivebox"),
-            evidence_dir=_env("EVIDENCE_DIR", "/data/evidence"),
             watchlist_path=_env("WATCHLIST_PATH", "./data/watchlist.json"),
-            tsa_url=_env("TSA_URL", "https://freetsa.org/tsr"),
-            sanctions_match_threshold=float(_env("SANCTIONS_MATCH_THRESHOLD", "0.7")),
-            sanctions_flash_threshold=float(_env("SANCTIONS_FLASH_THRESHOLD", "0.9")),
             watchlist_fuzzy_threshold=float(_env("WATCHLIST_FUZZY_THRESHOLD", "0.88")),
             sentinel_webhook_url=_env("SENTINEL_WEBHOOK_URL"),
             telegram_bot_token=_env("TELEGRAM_BOT_TOKEN"),
@@ -86,11 +70,7 @@ class Settings:
             "environment": self.environment,
             "llm_configured": bool(self.llm_base_url),
             "llm_model": self.llm_model,
-            "yente_url": self.yente_url,
-            "archivebox_url": self.archivebox_url,
-            "evidence_dir": self.evidence_dir,
             "watchlist_path": self.watchlist_path,
-            "tsa_url": self.tsa_url,
             "news_feeds": len(self.news_feeds),
             "notify_channels": [
                 name

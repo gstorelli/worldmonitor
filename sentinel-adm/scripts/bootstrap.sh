@@ -33,17 +33,6 @@ if [ ! -f .env ]; then
   echo "creato .env da .env.example — compila dominio, email ACME e canali di notifica"
 fi
 
-# Yente has no sqlite backend: repair a template copied before Elasticsearch
-# was introduced, so an existing .env keeps working after git pull.
-if grep -qE '^YENTE_INDEX_TYPE=sqlite' .env; then
-  sed -i 's|^YENTE_INDEX_TYPE=.*|YENTE_INDEX_TYPE=elasticsearch|' .env
-  echo "YENTE_INDEX_TYPE: sqlite non è supportato da Yente → impostato a elasticsearch"
-fi
-if grep -qE '^YENTE_INDEX_URL=sqlite' .env; then
-  sed -i 's|^YENTE_INDEX_URL=.*|YENTE_INDEX_URL=http://yente-index:9200|' .env
-  echo "YENTE_INDEX_URL: puntato all'indice Elasticsearch locale"
-fi
-
 # Compose interpolates the values of .env: a raw bcrypt hash ($2a$14$...)
 # would have its $-segments replaced by empty strings, so the hash is stored
 # with every $ doubled (compose turns $$ back into a literal $).
@@ -97,7 +86,7 @@ if [ "$PROFILE" = "jwilder" ]; then
   fi
 fi
 
-mkdir -p data/evidence data/archivebox data/watchlist
+mkdir -p data/watchlist
 if [ ! -f data/watchlist/watchlist.json ] && [ -f data/watchlist.example.json ]; then
   cp data/watchlist.example.json data/watchlist/watchlist.json
   echo "watchlist inizializzata dall'esempio: va sostituita con i dati reali"
@@ -127,10 +116,9 @@ if [ "$PROFILE" = "jwilder" ]; then
   cat <<EOF
 
 Prossimi passi:
-  1) ./scripts/yente-update.sh       scarica i dataset OpenSanctions (prima volta: diversi GB)
-  2) data/watchlist/watchlist.json   inserisci la watchlist reale
-  3) ./scripts/backup.sh             primo backup verificato
-  4) deploy/crontab.example          aggiornamento Yente e backup periodici
+  1) data/watchlist/watchlist.json   inserisci la watchlist reale
+  2) ./scripts/backup.sh             primo backup verificato
+  3) deploy/crontab.example          backup periodico
 
 Routing jwilder: https://${VIRTUAL_HOST:-osint.risksentinel.opencyber.org} (UI)
                  https://${VIRTUAL_HOST:-osint.risksentinel.opencyber.org}/api/health (API)
@@ -139,9 +127,8 @@ else
   cat <<'EOF'
 
 Prossimi passi:
-  1) ./scripts/yente-update.sh       scarica i dataset OpenSanctions (prima volta: diversi GB)
-  2) data/watchlist/watchlist.json   inserisci la watchlist reale
-  3) ./scripts/backup.sh             primo backup verificato
-  4) deploy/crontab.example          aggiornamento Yente e backup periodici
+  1) data/watchlist/watchlist.json   inserisci la watchlist reale
+  2) ./scripts/backup.sh             primo backup verificato
+  3) deploy/crontab.example          backup periodico
 EOF
 fi

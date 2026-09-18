@@ -274,15 +274,18 @@ Pre-push (`.husky/pre-push`) runs state guards, then diff-scoped checks:
 
 ## SENTINEL-ADM (separate platform)
 
-`sentinel-adm/` is a separate platform (ADM tactical OSINT, early
+`sentinel-adm/` is a separate platform (ADM early
 warning and legal intelligence) that shares the repo but not the Risk Sentinel
-runtime: its own `docker-compose.yml`, its own containers (API, Streamlit UI,
-Yente, ArchiveBox). The deterministic engines are **stdlib-only** and unit
+runtime: its own `docker-compose.yml`, its own containers (FastAPI API +
+Streamlit workbench, behind a Caddy front-end). The deterministic engines are
+**stdlib-only** and unit
 tested (`python -m unittest discover -s sentinel-adm/tests -t sentinel-adm`);
 the web layer (FastAPI/Streamlit) is optional. Its CI is per-module
 (`.github/workflows/sentinel-adm-ci.yml`) and publishes failure logs to the
 `ci-diagnostics` branch. Do not wire it into the Contabo deploy or the SPA
 builds: changes under `sentinel-adm/` must not alter the Risk Sentinel stack.
+There is no sanctions screener, OSINT toolbox or evidence vault any more: the
+platform state is only the local watchlist (`sentinel-adm/data/`, gitignored).
 
 ## blog-site (upstream-only in this fork)
 
