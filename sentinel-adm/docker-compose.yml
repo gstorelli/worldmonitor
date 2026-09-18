@@ -11,6 +11,14 @@
 # production the API is never published directly: the front-end terminates TLS
 # (or receives it from nginx-proxy) and enforces basic auth.
 
+# Log rotation is shared by every service: a crash-looping container must
+# never fill the host disk again (that alone can hang the docker daemon).
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   sentinel-api:
     build: .
@@ -37,6 +45,7 @@ services:
     networks:
       - internal-net
     restart: unless-stopped
+    logging: *default-logging
 
   sentinel-ui:
     build: .
@@ -52,6 +61,7 @@ services:
     networks:
       - internal-net
     restart: unless-stopped
+    logging: *default-logging
 
   # Standalone production reverse proxy (profile "prod"): TLS + basic auth in
   # front of the UI and the API. Select the public (ACME) or internal (local CA)
@@ -80,6 +90,7 @@ services:
     networks:
       - internal-net
     restart: unless-stopped
+    logging: *default-logging
 
   # jwilder/nginx-proxy front-end (profile "jwilder"): the external proxy
   # terminates TLS with the acme-companion and routes by VIRTUAL_HOST; this
@@ -110,6 +121,7 @@ services:
       - nginx-proxy
       - internal-net
     restart: unless-stopped
+    logging: *default-logging
 
 volumes:
   caddy-data:
