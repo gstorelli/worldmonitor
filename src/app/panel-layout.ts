@@ -1387,15 +1387,29 @@ export class PanelLayoutManager implements AppModule {
       const bottomGrid = document.getElementById('mapBottomGrid');
       if (bottomGrid && this.getEffectiveUltraWide() && this.bottomSetMemory.has(key)) {
         this.insertByOrder(bottomGrid, el, key);
+        this.applyStoredPanelVisibility(key, panel);
         return;
       }
 
       const grid = document.getElementById('panelsGrid');
       if (!grid) return;
       this.insertByOrder(grid, el, key);
+      this.applyStoredPanelVisibility(key, panel);
     }).catch((err) => {
       console.error(`[panel] failed to lazy-load "${key}"`, err);
     });
+  }
+
+  /**
+   * Lazily mounted panels are inserted after the initial applyPanelSettings()
+   * pass, so a panel the operator disabled would otherwise reappear on every
+   * boot. Re-apply the stored visibility at mount time.
+   */
+  private applyStoredPanelVisibility(key: string, panel: unknown): void {
+    const config = this.ctx.panelSettings[key];
+    if (config && config.enabled === false) {
+      (panel as { hide?: () => void }).hide?.();
+    }
   }
 
   private makeDraggable(el: HTMLElement, key: string): void {
