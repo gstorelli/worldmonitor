@@ -635,6 +635,12 @@ async function warmDigestCache(language = 'en') {
     Origin: 'https://worldmonitor.app',
   };
   if (RELAY_API_KEY) headers['X-WorldMonitor-Key'] = RELAY_API_KEY;
+  // Self-hosted deploys enforce AUTH_REQUIRED on every non-exempt /api/ route;
+  // seed-all.sh passes the checkout .env through, so authenticate the internal
+  // warm call as the machine caller the sidecar already trusts (same bearer n8n
+  // uses), instead of relying on Origin auth that no longer exists here.
+  const ingestSecret = process.env.N8N_INGEST_SECRET || '';
+  if (ingestSecret) headers.Authorization = `Bearer ${ingestSecret}`;
   try {
     const resp = await fetch(`${apiBase}/api/news/v1/list-feed-digest?variant=full&lang=${encodeURIComponent(language)}`, {
       headers,
