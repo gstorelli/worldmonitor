@@ -182,6 +182,8 @@ export interface Commodity {
   symbol: string;
   name: string;
   display: string;
+  /** HS4 code of the traded good — drives the Commodities panel HS filter. */
+  hsCode?: string;
 }
 
 export interface MarketSymbol {

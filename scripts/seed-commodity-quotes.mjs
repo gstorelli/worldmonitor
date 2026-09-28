@@ -154,6 +154,7 @@ async function fetchGoldExtended() {
 }
 
 const COMMODITY_SYMBOLS = commodityConfig.commodities.map(c => c.symbol);
+const COMMODITY_META = new Map(commodityConfig.commodities.map(c => [c.symbol, c]));
 
 async function fetchCommodityQuotes() {
   const quotes = [];
@@ -167,8 +168,8 @@ async function fetchCommodityQuotes() {
     for (const sym of physicalSymbols) {
       const q = await fetchAvPhysicalCommodity(sym, avKey);
       if (q) {
-        const meta = commodityConfig.commodities.find(c => c.symbol === sym);
-        quotes.push({ symbol: sym, name: meta?.name || sym, display: meta?.display || sym, ...q });
+        const meta = COMMODITY_META.get(sym);
+        quotes.push({ symbol: sym, name: meta?.name || sym, display: meta?.display || sym, hsCode: meta?.hsCode, ...q });
         console.log(`  [AV:physical] ${sym}: $${q.price} (${q.change > 0 ? '+' : ''}${q.change.toFixed(2)}%)`);
       }
     }
@@ -177,8 +178,8 @@ async function fetchCommodityQuotes() {
     const bulkCandidates = COMMODITY_SYMBOLS.filter(s => !AV_PHYSICAL_MAP[s] && !quotes.some(q => q.symbol === s) && !s.includes('=F') && !s.startsWith('^'));
     const bulkResults = await fetchAvBulkQuotes(bulkCandidates, avKey);
     for (const [sym, q] of bulkResults) {
-      const meta = commodityConfig.commodities.find(c => c.symbol === sym);
-      quotes.push({ symbol: sym, name: meta?.name || sym, display: meta?.display || sym, price: q.price, change: q.change, sparkline: [] });
+      const meta = COMMODITY_META.get(sym);
+      quotes.push({ symbol: sym, name: meta?.name || sym, display: meta?.display || sym, hsCode: meta?.hsCode, price: q.price, change: q.change, sparkline: [] });
       console.log(`  [AV:bulk] ${sym}: $${q.price} (${q.change > 0 ? '+' : ''}${q.change.toFixed(2)}%)`);
     }
   }
@@ -204,7 +205,7 @@ async function fetchCommodityQuotes() {
       }
       const parsed = parseYahooChart(chart, symbol);
       if (parsed) {
-        quotes.push(parsed);
+        quotes.push({ ...parsed, hsCode: COMMODITY_META.get(symbol)?.hsCode });
         covered.add(symbol);
         console.log(`  [Yahoo] ${symbol}: $${parsed.price} (${parsed.change > 0 ? '+' : ''}${parsed.change}%)`);
       } else {

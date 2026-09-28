@@ -178,7 +178,7 @@ export function warmSectorCache(resp: GetSectorSummaryResponse): void {
 }
 
 export async function fetchCommodityQuotes(
-  commodities: Array<{ symbol: string; name: string; display: string }>,
+  commodities: Array<{ symbol: string; name: string; display: string; hsCode?: string }>,
   options: { onBatch?: (results: MarketData[]) => void } = {},
 ): Promise<MarketFetchResult> {
   const symbols = commodities.map((c) => c.symbol);
@@ -201,6 +201,7 @@ export async function fetchCommodityQuotes(
       price: q.price,
       change: q.change,
       sparkline: q.sparkline?.length > 0 ? q.sparkline : undefined,
+      hsCode: (m as { hsCode?: string } | undefined)?.hsCode,
     };
   });
 
