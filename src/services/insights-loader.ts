@@ -1,4 +1,5 @@
 import { getHydratedData } from '@/services/bootstrap';
+import { toApiUrl } from '@/services/runtime';
 
 export interface ServerInsightStory {
   primaryTitle: string;
@@ -46,18 +47,45 @@ export function getServerInsights(): ServerInsights | null {
     return cached;
   }
   cached = null;
+  return accept(getHydratedData('insights'));
+}
 
-  const raw = getHydratedData('insights');
+export function setServerInsights(data: ServerInsights): void {
+  cached = data;
+}
+
+/** Test-only: clear the module-scope cache between cases. */
+export function __resetServerInsightsCacheForTests(): void {
+  cached = null;
+}
+
+function accept(raw: unknown): ServerInsights | null {
   if (!raw || typeof raw !== 'object') return null;
   const data = raw as ServerInsights;
   if (!Array.isArray(data.topStories) || data.topStories.length === 0) return null;
   if (typeof data.generatedAt !== 'string') return null;
   if (!isFresh(data)) return null;
-
   cached = data;
   return data;
 }
 
-export function setServerInsights(data: ServerInsights): void {
-  cached = data;
+/**
+ * On-demand counterpart of the one-shot bootstrap hydration: fetch the same
+ * `insights` key straight from the bootstrap endpoint when the hydration cache
+ * has no value yet (or another reader consumed it) and the panel would
+ * otherwise dead-end in the "waiting for data" state.
+ */
+export async function fetchServerInsights(timeoutMs = 5_000): Promise<ServerInsights | null> {
+  if (cached && isFresh(cached)) return cached;
+  try {
+    const resp = await fetch(toApiUrl('/api/bootstrap?keys=insights'), {
+      credentials: 'same-origin',
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (!resp.ok) return null;
+    const payload = (await resp.json()) as { data?: Record<string, unknown> };
+    return accept(payload?.data?.insights);
+  } catch {
+    return null;
+  }
 }
