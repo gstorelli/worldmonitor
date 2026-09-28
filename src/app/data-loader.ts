@@ -78,6 +78,7 @@ import {
   fetchSanctionsPressure,
   fetchRadiationWatch,
   fetchCustomsEvents,
+  fetchDigestSignals,
 } from '@/services';
 import { getMarketWatchlistEntries } from '@/services/market-watchlist';
 import { fetchStockAnalysesForTargets, getStockAnalysisTargets } from '@/services/stock-analysis';
@@ -1950,6 +1951,9 @@ export class DataLoaderManager implements AppModule {
           // listUcdpEvents is a pure Redis-read (gold standard). Retrying returns
           // the same empty result until the Railway seed refreshes the key.
           dataFreshness.recordError('ucdp_events', 'UCDP events unavailable (retaining prior event state)');
+          // First load without cached state: release the spinner into the empty state.
+          const ucdpPanel = this.ctx.panels['ucdp-events'] as UcdpEventsPanel | undefined;
+          if (ucdpPanel && ucdpPanel.getEvents().length === 0) ucdpPanel.setEvents([]);
           return;
         }
         const acledEvents = protestEvents.map(e => ({
@@ -1964,6 +1968,8 @@ export class DataLoaderManager implements AppModule {
       } catch (error) {
         console.error('[Intelligence] UCDP events fetch failed:', error);
         dataFreshness.recordError('ucdp_events', String(error));
+        const ucdpPanel = this.ctx.panels['ucdp-events'] as UcdpEventsPanel | undefined;
+        if (ucdpPanel && ucdpPanel.getEvents().length === 0) ucdpPanel.setEvents([]);
       }
     })());
 
@@ -2754,7 +2760,7 @@ export class DataLoaderManager implements AppModule {
     try {
       const fireResult = await fetchAllFires(1);
       if (fireResult.skipped) {
-        this.ctx.panels['satellite-fires']?.showConfigError(t('panels.satelliteFires.noData'));
+        this.ctx.panels['satellite-fires']?.showConfigError(t('components.satelliteFires.noData'));
         this.ctx.statusPanel?.updateApi('FIRMS', { status: 'error' });
         return;
       }
@@ -3084,7 +3090,10 @@ export class DataLoaderManager implements AppModule {
   async loadCustomsEvents(): Promise<void> {
     try {
       const events = await fetchCustomsEvents();
-      this.callPanel('alert-feed', 'renderAlerts', events);
+      // The SQLite event table has no writer on the self-hosted deploy; fall back
+      // to the n8n notification digest so the panel still shows live signals.
+      const alerts = events.length > 0 ? events : await fetchDigestSignals();
+      this.callPanel('alert-feed', 'renderAlerts', alerts);
       
       const hotspots = events.map(e => {
         let level: 'high' | 'elevated' | 'low' = 'low';

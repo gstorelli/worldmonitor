@@ -14,6 +14,11 @@ export class AlertFeedPanel extends Panel {
   }
 
   public renderAlerts(alerts: any[]) {
+    if (alerts.length === 0) {
+      this.content.innerHTML =
+        '<div style="padding: 12px; color: var(--text-secondary);">Nessun alert attivo. Il feed si popola dalle pipeline n8n (conflict, commodity, climate, chokepoints).</div>';
+      return;
+    }
     this.content.innerHTML = alerts.map(a => `
       <div class="alert-card" style="padding: 12px; border-bottom: 1px solid var(--border-color);" data-id="${a.id}">
         <h4 style="margin: 0 0 4px; color: var(--text-primary); font-size: 14px;">
