@@ -24,10 +24,16 @@ export function seedAppDefaults(): void {
   }
 
   const settings = loadFromStorage<Record<string, PanelConfig>>(STORAGE_KEYS.panels, {}) ?? {};
+  let changed = false;
   for (const key of app.defaultPanels) {
-    settings[key] = { ...(settings[key] ?? { name: key }), enabled: true };
+    // Never override an explicit choice: a panel the operator hid stays hidden
+    // even if this app's seed flag was reset (new browser, cleared storage,
+    // re-seed after an app switch).
+    if (settings[key]) continue;
+    settings[key] = { name: key, enabled: true };
+    changed = true;
   }
-  saveToStorage(STORAGE_KEYS.panels, settings);
+  if (changed) saveToStorage(STORAGE_KEYS.panels, settings);
   try {
     localStorage.setItem(flag, '1');
   } catch {
