@@ -194,6 +194,19 @@ Active workflows live in `n8n-workflows/` and are imported manually into n8n.
   into the stored config so a redacted round-trip never wipes credentials.
 - Workflow 07 ("intelligence notifications") reads config + digest and delivers
   Telegram/email. After changing its JSON you must re-import it in n8n.
+- **Editing workflows through the n8n MCP** (`scripts/n8n-mcp.mjs`, token in
+  `.env` as `API_MCP_N8N`):
+  `node --env-file=.env scripts/n8n-mcp.mjs call <tool> '<json>'`.
+  - `update_workflow` saves a **draft**: schedule triggers keep running the
+    **published** version, so an edit that "worked" in a manual run can still
+    fail on the next tick. Always follow it with `publish_workflow`, then prove
+    it with a **production** run (`execute_workflow`, `executionMode:
+    production`) — a `manual` run exercises the draft, not the live version.
+  - The MCP endpoint rate-limits bursts (HTTP 429 "Too many requests"): keep
+    calls spaced (≥15 s between workflow-level operations) and never sweep all
+    workflows in one loop.
+  - Workflows whose MCP access is disabled cannot be inspected (`get_workflow_details`
+    returns "not available in MCP"): enable it in n8n before debugging them.
 
 ## Customs Risk Scoring (fork-critical)
 
