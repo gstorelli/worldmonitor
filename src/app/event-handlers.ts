@@ -144,6 +144,7 @@ export class EventHandlerManager implements AppModule {
     config.enabled = true;
     trackPanelToggled(panelId, true);
     saveToStorage(STORAGE_KEYS.panels, this.ctx.panelSettings);
+    schedulePanelPrefsPush(this.ctx.panelSettings);
     this.applyPanelSettings();
     this.ctx.unifiedSettings?.refreshPanelToggles();
 
@@ -376,6 +377,7 @@ export class EventHandlerManager implements AppModule {
         delete this.ctx.panels[panelId];
         delete this.ctx.panelSettings[panelId];
         saveToStorage(STORAGE_KEYS.panels, this.ctx.panelSettings);
+        schedulePanelPrefsPush(this.ctx.panelSettings);
         panel?.getElement()?.remove();
         return;
       }
@@ -388,6 +390,7 @@ export class EventHandlerManager implements AppModule {
         delete this.ctx.panels[panelId];
         delete this.ctx.panelSettings[panelId];
         saveToStorage(STORAGE_KEYS.panels, this.ctx.panelSettings);
+        schedulePanelPrefsPush(this.ctx.panelSettings);
         panel?.getElement()?.remove();
         return;
       }
@@ -397,6 +400,7 @@ export class EventHandlerManager implements AppModule {
       config.enabled = false;
       trackPanelToggled(panelId, false);
       saveToStorage(STORAGE_KEYS.panels, this.ctx.panelSettings);
+      schedulePanelPrefsPush(this.ctx.panelSettings);
       this.applyPanelSettings();
       this.ctx.unifiedSettings?.refreshPanelToggles();
       // push to undo stack (cap size for memory safety)

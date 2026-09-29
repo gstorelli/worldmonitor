@@ -1,6 +1,7 @@
 import type { AppContext, AppModule } from '@/app/app-context';
 import { isPanelDisabled } from '@/config/panel-tiers';
 import { isPolicyDisabled } from '@/services/panel-policy';
+import { schedulePanelPrefsPush } from '@/services/user-panel-prefs';
 import { ACTIVE_APP, APPS, isPanelAllowedInApp, switchAppHref } from '@/config/apps';
 
 // External SENTINEL-ADM platform (separate stack under sentinel-adm/): shown as
@@ -1102,6 +1103,7 @@ export class PanelLayoutManager implements AppModule {
     this.ctx.panels[spec.id] = panel;
     this.ctx.panelSettings[spec.id] = { name: spec.title, enabled: true, priority: 3 };
     saveToStorage(STORAGE_KEYS.panels, this.ctx.panelSettings);
+    schedulePanelPrefsPush(this.ctx.panelSettings);
     const el = panel.getElement();
     this.makeDraggable(el, spec.id);
     const grid = document.getElementById('panelsGrid');
@@ -1123,6 +1125,7 @@ export class PanelLayoutManager implements AppModule {
     this.ctx.panels[spec.id] = panel;
     this.ctx.panelSettings[spec.id] = { name: spec.title, enabled: true, priority: 3 };
     saveToStorage(STORAGE_KEYS.panels, this.ctx.panelSettings);
+    schedulePanelPrefsPush(this.ctx.panelSettings);
     const el = panel.getElement();
     this.makeDraggable(el, spec.id);
     const grid = document.getElementById('panelsGrid');
