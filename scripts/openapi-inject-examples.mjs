@@ -1176,7 +1176,12 @@ function replaceResponseExample(lines, opStart, opEnd, code, example) {
 }
 
 function patchYamlExamples(raw, spec, label) {
-  const lines = raw.split('\n');
+  // Preserve the artifact's line endings: a Windows checkout (autocrlf) has
+  // CRLF, and splitting on '\n' leaves a trailing '\r' that defeats the
+  // parameter regex (`(.+)$` cannot match through '\r'), so the surgical
+  // patch failed with "could not locate YAML parameter" only on Windows.
+  const eol = raw.includes('\r\n') ? '\r\n' : '\n';
+  const lines = raw.split(eol);
   for (const [path, ops] of Object.entries(spec.paths ?? {})) {
     for (const [method, op] of Object.entries(ops ?? {})) {
       if (!HTTP_METHODS.has(method) || !op || typeof op !== 'object') continue;
@@ -1204,7 +1209,7 @@ function patchYamlExamples(raw, spec, label) {
       }
     }
   }
-  return lines.join('\n');
+  return lines.join(eol);
 }
 
 function processServiceSpec(file) {
