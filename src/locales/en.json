@@ -2859,6 +2859,10 @@
       "heading": "HEADING",
       "hexCode": "HEX CODE",
       "squawk": "SQUAWK",
+      "climbRate": "CLIMB RATE",
+      "manufacturer": "MANUFACTURER",
+      "owner": "OWNER",
+      "builtYear": "BUILT",
       "attribution": "Source: OpenSky Network"
     },
     "militaryVessel": {
@@ -2904,6 +2908,7 @@
         "unknown": "Naval Activity"
       },
       "moreVessels": "+{{count}} more vessels",
+      "showLess": "Show less",
       "vesselsCount": "{{count}} VESSELS",
       "vessels": "VESSELS",
       "trackedVessels": "TRACKED VESSELS"

@@ -14,6 +14,7 @@
     "lint:safe-html": "node scripts/enforce-safe-html.mjs",
     "lint:mintlify-slugs": "node scripts/enforce-mintlify-reserved-slugs.mjs",
     "lint:unicode": "node scripts/check-unicode-safety.mjs",
+    "lint:i18n": "node scripts/check-i18n-keys.mjs",
     "lint:unicode:staged": "node scripts/check-unicode-safety.mjs --staged",
     "lint:md": "markdownlint-cli2 '**/*.md' '!**/node_modules/**' '!.agent/**' '!.agents/**' '!.claude/**' '!.factory/**' '!.windsurf/**' '!skills/**' '!docs/internal/**' '!docs/Docs_To_Review/**' '!docs/archive/**' '!todos/**' '!docs/plans/**' '!docs/brainstorms/**' '!docs/ideation/**'",
     "version:sync": "node scripts/sync-desktop-version.mjs",

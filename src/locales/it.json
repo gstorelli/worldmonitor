@@ -2789,6 +2789,10 @@
       "heading": "INTESTAZIONE",
       "hexCode": "CODICE ESAGONALE",
       "squawk": "SQUAWK",
+      "climbRate": "VELOCITÀ DI SALITA",
+      "manufacturer": "COSTRUTTORE",
+      "owner": "OPERATORE",
+      "builtYear": "ANNO DI COSTRUZIONE",
       "attribution": "Fonte: rete OpenSky"
     },
     "militaryVessel": {
@@ -2834,6 +2838,7 @@
         "unknown": "Attività navale"
       },
       "moreVessels": "+{{count}} altre navi",
+      "showLess": "Mostra meno",
       "vesselsCount": "{{count}} VASI",
       "vessels": "VASI",
       "trackedVessels": "NAVI CINGOLATE"

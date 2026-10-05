@@ -45,6 +45,7 @@ jobs:
       - run: npm ci
       - run: npm run lint:unicode
       - run: npm run lint
+      - run: npm run lint:i18n
       - run: npm run lint:boundaries
       # Risk Sentinel fork carries api/ tree drift vs the upstream contract
       # manifest (restored domains market/prediction/giving/research). The
