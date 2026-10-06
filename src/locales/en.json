@@ -1346,7 +1346,18 @@
         "kindness": "Acts of Kindness",
         "happiness": "World Happiness",
         "speciesRecovery": "Species Recovery",
-        "renewableInstallations": "Clean Energy"
+        "renewableInstallations": "Clean Energy",
+        "radiationWatch": "Radiation Watch",
+        "resilienceScore": "Resilience",
+        "sanctions": "Sanctions",
+        "miningSites": "Mining Sites",
+        "processingPlants": "Processing Plants",
+        "commodityPorts": "Commodity Ports",
+        "webcams": "Live Webcams",
+        "diseaseOutbreaks": "Disease Outbreaks",
+        "storageFacilities": "Storage Facilities",
+        "fuelShortages": "Fuel Shortages",
+        "liveTankers": "Live Tanker Positions"
       },
       "tooltip": {
         "earthquake": "Earthquake",

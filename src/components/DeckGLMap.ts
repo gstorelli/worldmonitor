@@ -3,7 +3,7 @@
  * Uses deck.gl for high-performance rendering of large datasets
  * Mobile devices gracefully degrade to the D3/SVG-based Map component
  */
-import { MapboxOverlay } from '@deck.gl/mapbox';
+import { MapLibreOverlay } from '@deck.gl/maplibre';
 import type { Layer, LayersList, PickingInfo } from '@deck.gl/core';
 import { GeoJsonLayer, ScatterplotLayer, PathLayer, IconLayer, TextLayer, PolygonLayer } from '@deck.gl/layers';
 import * as maplibregl from 'maplibre-gl';
@@ -403,42 +403,17 @@ const CHOKEPOINT_PULSE_FREQ = 0.01;
 const CHOKEPOINT_PULSE_AMP = 0.3;
 
 /**
- * MapLibre GL v6 removed the private `map.transform` object, but the deck.gl
- * 9.2 interleaved overlay (`@deck.gl/mapbox`) still dereferences it on every
- * frame — throwing `Cannot read properties of undefined (reading 'height')`
- * and leaving the map with no deck layers at all (no hotspots, no AIS, no
- * conflict markers). Rebuild the few fields deck reads from public APIs so the
- * integration keeps working until the `@deck.gl/maplibre` upgrade lands.
+ * MapLibre GL v6 removed the private `map.transform` object that the old
+ * deck.gl 9.2 `@deck.gl/mapbox` interleaved overlay read on every frame. The
+ * fork now uses `@deck.gl/maplibre` (deck 9.4+), which talks to the v4.5/v5/v6
+ * custom-layer API directly, so no compatibility shim is needed here anymore.
  */
-function installMapLibreTransformShim(): void {
-  const proto = maplibregl.Map?.prototype as unknown as Record<string, unknown> | undefined;
-  if (!proto || 'transform' in proto) return;
-  Object.defineProperty(proto, 'transform', {
-    configurable: true,
-    get(this: maplibregl.Map) {
-      const canvas = this.getCanvas?.() as HTMLCanvasElement | undefined;
-      const elevationOf = this as unknown as { getCenterElevation?: () => number };
-      const elevation = typeof elevationOf.getCenterElevation === 'function'
-        ? (elevationOf.getCenterElevation() ?? 0)
-        : 0;
-      return {
-        width: canvas?.clientWidth ?? 0,
-        height: canvas?.clientHeight ?? 0,
-        elevation,
-        _nearZ: undefined,
-        _farZ: undefined,
-      };
-    },
-  });
-}
-
-installMapLibreTransformShim();
 
 export class DeckGLMap {
   private static readonly MAX_CLUSTER_LEAVES = 200;
 
   private container: HTMLElement;
-  private deckOverlay: MapboxOverlay | null = null;
+  private deckOverlay: MapLibreOverlay | null = null;
   private maplibreMap: maplibregl.Map | null = null;
   private state: DeckMapState;
   private popup: MapPopup;
@@ -805,7 +780,7 @@ export class DeckGLMap {
     wrapper.id = 'deckglMapWrapper';
     wrapper.style.cssText = 'position: relative; width: 100%; height: 100%; overflow: hidden;';
 
-    // MapLibre container - deck.gl renders directly into MapLibre via MapboxOverlay
+    // MapLibre container - deck.gl renders directly into MapLibre via MapLibreOverlay
     const mapContainer = document.createElement('div');
     mapContainer.id = 'deckgl-basemap';
     mapContainer.style.cssText = 'position: absolute; top: 0; left: 0; width: 100%; height: 100%;';
@@ -971,7 +946,7 @@ export class DeckGLMap {
   private initDeck(): void {
     if (!this.maplibreMap) return;
 
-    this.deckOverlay = new MapboxOverlay({
+    this.deckOverlay = new MapLibreOverlay({
       interleaved: true,
       layers: this.buildLayers(),
       getTooltip: (info: PickingInfo) => this.getTooltip(info),
