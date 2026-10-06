@@ -332,6 +332,25 @@ function digestKeyForLanguage(language) {
   return `news:digest:v1:full:${language}`;
 }
 
+/**
+ * True when a decoded digest value actually carries articles. The server also
+ * negative-caches failed digest builds as a *string* sentinel (`__WM_NEG__`,
+ * 120s) and the Redis REST readback hands that string back verbatim — treating
+ * it as a digest produced `Digest has no items (shape: string)` and the
+ * retry loop (1+2+4s) always ran inside the sentinel window.
+ */
+function digestHasItems(value) {
+  if (!value || typeof value !== 'object') return false;
+  if (Array.isArray(value)) return value.length > 0;
+  if (value.categories && typeof value.categories === 'object') {
+    return Object.values(value.categories).some(
+      (bucket) => Array.isArray(bucket?.items) && bucket.items.length > 0,
+    );
+  }
+  const fallback = value.items || value.articles || value.headlines;
+  return Array.isArray(fallback) && fallback.length > 0;
+}
+
 async function readDigestFromRedis(key = DIGEST_KEY) {
   const { url, token } = getRedisCredentials();
   const resp = await fetch(`${url}/get/${encodeURIComponent(key)}`, {
@@ -340,7 +359,15 @@ async function readDigestFromRedis(key = DIGEST_KEY) {
   });
   if (!resp.ok) return null;
   const data = await resp.json();
-  return data.result ? unwrapEnvelope(JSON.parse(data.result)).data : null;
+  if (!data.result) return null;
+  let parsed;
+  try {
+    parsed = JSON.parse(data.result);
+  } catch {
+    return null;
+  }
+  const value = unwrapEnvelope(parsed).data;
+  return digestHasItems(value) ? value : null;
 }
 
 async function readExistingInsights() {
@@ -646,13 +673,24 @@ async function warmDigestCache(language = 'en') {
       headers,
       signal: AbortSignal.timeout(30_000),
     });
-    if (resp.ok) console.log(`  ${language} digest cache warmed via RPC`);
-    else {
-      const keyNote = RELAY_API_KEY ? '' : ' (WORLDMONITOR_RELAY_KEY not set — Origin-only auth)';
-      console.warn(`  Digest warm failed: HTTP ${resp.status}${keyNote}`);
+    if (resp.ok) {
+      // Use the RPC payload directly: the cache readback is a second Redis trip
+      // that may still be inside a negative-cache window.
+      const body = await resp.json().catch(() => null);
+      const candidate = body ? unwrapEnvelope(body).data : null;
+      if (digestHasItems(candidate)) {
+        console.log(`  ${language} digest cache warmed via RPC`);
+        return candidate;
+      }
+      console.log(`  ${language} digest warm returned no items — falling back to the Redis readback`);
+      return null;
     }
+    const keyNote = RELAY_API_KEY ? '' : ' (WORLDMONITOR_RELAY_KEY not set — Origin-only auth)';
+    console.warn(`  Digest warm failed: HTTP ${resp.status}${keyNote}`);
+    return null;
   } catch (err) {
     console.warn(`  Digest warm failed: ${err.message}`);
+    return null;
   }
 }
 
@@ -661,7 +699,10 @@ async function readOrWarmDigest(language) {
   let digest = await readDigestFromRedis(key);
   if (digest) return digest;
   console.log(`  ${language} digest not in Redis, warming cache via RPC...`);
-  await warmDigestCache(language);
+  // Prefer the warm response: if the build succeeded, the payload is already in
+  // hand and no readback (or 3s propagation wait) is needed.
+  const warmed = await warmDigestCache(language);
+  if (warmed) return warmed;
   // Wait for the Edge write to propagate before the readback. This is the
   // existing full/en warm-cache contract, now reused for the Chinese digest.
   await new Promise(r => setTimeout(r, 3_000));
