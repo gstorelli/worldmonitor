@@ -17,6 +17,11 @@ const TOPIC_SOURCES = {
   chokepoints: ['risk_sentinel:n8n:acled', 'risk_sentinel:n8n:usgs'],
   conflicts: ['risk_sentinel:n8n:acled'],
   commodities: ['risk_sentinel:n8n:commodities', 'risk_sentinel:n8n:gdelt'],
+  // UN Comtrade concentration materializer: single-supplier dependency per
+  // HS4 (n8n workflow 10). Kept as its own topic so the OSINT workspace and
+  // the notification workflow can surface trade-dependency signals next to —
+  // not buried under — the price feeds.
+  trade: ['risk_sentinel:n8n:comtrade'],
   climate: ['risk_sentinel:n8n:openmeteo'],
   seismic: ['risk_sentinel:n8n:usgs'],
   policy: ['policy:monitor:v1'],
@@ -26,6 +31,7 @@ const TOPIC_LABELS = {
   chokepoints: 'Chokepoints & Trade Routes',
   conflicts: 'Conflict Events',
   commodities: 'Commodities & Customs',
+  trade: 'Trade Concentration (HS4)',
   climate: 'Climate Anomalies',
   seismic: 'Seismic Activity',
   policy: 'Policy Monitor (EU)',
@@ -72,7 +78,7 @@ function toDigestItem(source, item) {
   const url = item.url || item.sourceUrl || '';
   return {
     title: String(item.title || item.place || item.zone || item.symbol || item.name || 'Signal'),
-    summary: String(item.summary || item.matchedRoute || item.nearChokepoint || item.country || ''),
+    summary: String(item.summary || item.matchedRoute || item.nearChokepoint || item.country || item.metadata?.description || ''),
     url,
     severity,
     score: scoreOf(item),
