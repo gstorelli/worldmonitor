@@ -254,7 +254,12 @@ export class DataLoaderManager implements AppModule {
   private cachedSatRecs: SatRecEntry[] | null = null;
 
   private digestBreaker = { state: 'closed' as 'closed' | 'open' | 'half-open', failures: 0, cooldownUntil: 0 };
-  private readonly digestRequestTimeoutMs = 8000;
+  // Cold cache: the digest build fans out across every RSS feed server-side and
+  // measured ~11 s on the Contabo VPS, so the old 8 s cap aborted the request on
+  // the first load of an idle deploy — and two consecutive aborts tripped the
+  // 5-minute breaker, leaving the news panels empty until a reload. Warm cache
+  // answers in ~150 ms, so the wider cap costs nothing in the common case.
+  private readonly digestRequestTimeoutMs = 25_000;
   private readonly digestBreakerCooldownMs = 5 * 60 * 1000;
   private readonly persistedDigestMaxAgeMs = 6 * 60 * 60 * 1000;
   private readonly perFeedFallbackCategoryFeedLimit = 3;

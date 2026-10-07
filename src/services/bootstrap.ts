@@ -154,31 +154,12 @@ async function fetchTier(tier: 'fast' | 'slow', signal: AbortSignal): Promise<Bo
   return tierState;
 }
 
-export async function fetchBootstrapData(): Promise<void> {
-  hydrationCache.clear();
-  lastHydrationState = {
-    source: 'none',
-    tiers: {
-      fast: { ...EMPTY_TIER_STATE },
-      slow: { ...EMPTY_TIER_STATE },
-    },
-  };
-
+async function runBootstrapAttempt(fastMs: number, slowMs: number): Promise<boolean> {
   const fastCtrl = new AbortController();
   const slowCtrl = new AbortController();
-  const desktop = isDesktopRuntime();
-  // Tier abort budgets:
-  // - Fast tier (~10 keys, small payload) keeps an aggressive 1.2 s browser cap; it already meets that budget.
-  // - Slow tier carries ~70 bootstrap keys (~500 KB). The previous 1.8 s browser cap was below realistic p95
-  //   from a cold CF cache, so it aborted on slow connections. That left the hydration cache empty for those
-  //   keys, and downstream per-panel lazy fetches each got a doomed 5 s shot — half of which timed out under
-  //   the same conditions, leaving panels stuck in empty-state.
-  // - 3.0 s is a conservative bump to avoid that cascade. Further tuning should be driven by RUM / Sentry
-  //   data once available; do not move this without evidence.
-  // - Desktop budgets (5 s / 8 s) are unchanged — different network and dependency-loading constraints.
-  const fastTimeout = setTimeout(() => fastCtrl.abort(), desktop ? 5_000 : 1_200);
-  const slowTimeout = setTimeout(() => slowCtrl.abort(), desktop ? 8_000 : 3_000);
-
+  let timedOut = false;
+  const fastTimeout = setTimeout(() => { timedOut = true; fastCtrl.abort(); }, fastMs);
+  const slowTimeout = setTimeout(() => { timedOut = true; slowCtrl.abort(); }, slowMs);
   try {
     const [slowState, fastState] = await Promise.all([
       fetchTier('slow', slowCtrl.signal),
@@ -192,8 +173,44 @@ export async function fetchBootstrapData(): Promise<void> {
         slow: slowState,
       },
     };
+    return !timedOut;
   } finally {
     clearTimeout(fastTimeout);
     clearTimeout(slowTimeout);
+  }
+}
+
+export async function fetchBootstrapData(): Promise<void> {
+  hydrationCache.clear();
+  lastHydrationState = {
+    source: 'none',
+    tiers: {
+      fast: { ...EMPTY_TIER_STATE },
+      slow: { ...EMPTY_TIER_STATE },
+    },
+  };
+
+  const desktop = isDesktopRuntime();
+  // Tier abort budgets:
+  // - Fast tier (~10 keys, small payload) keeps an aggressive 1.2 s browser cap; it already meets that budget.
+  // - Slow tier carries ~70 bootstrap keys (~500 KB). The previous 1.8 s browser cap was below realistic p95
+  //   from a cold CF cache, so it aborted on slow connections. That left the hydration cache empty for those
+  //   keys, and downstream per-panel lazy fetches each got a doomed 5 s shot — half of which timed out under
+  //   the same conditions, leaving panels stuck in empty-state.
+  // - 3.0 s is a conservative bump to avoid that cascade. Further tuning should be driven by RUM / Sentry
+  //   data once available; do not move this without evidence.
+  // - Desktop budgets were 5 s / 8 s. On a cold self-hosted cache the first slow tier has to build the news
+  //   digest server-side (~11 s measured on the Contabo VPS), so those budgets aborted the request and left
+  //   the dashboard half-hydrated until the operator reloaded (with a now-warm cache). 12 s / 25 s cover the
+  //   cold path with headroom; the retry below then absorbs any remaining transient slowness.
+  const fastMs = desktop ? 12_000 : 1_200;
+  const slowMs = desktop ? 25_000 : 3_000;
+
+  const completed = await runBootstrapAttempt(fastMs, slowMs);
+  if (!completed) {
+    // One retry: by now the server-side build is done and the tier cache is warm,
+    // so the second attempt is cheap. Better than an empty dashboard until F5.
+    await new Promise((resolve) => setTimeout(resolve, 1_500));
+    await runBootstrapAttempt(fastMs, slowMs);
   }
 }
