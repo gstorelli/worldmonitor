@@ -681,7 +681,13 @@ export async function afterPublish(data, _meta) {
     : 'OK';
   const freshnessMetaPatch = completionState === 'DEGRADED'
     ? {
-        status: 'error',
+        // The canonical payload passed validation (>= 3 populated topics) or the
+        // previous snapshot was preserved, so the panel keeps serving data.
+        // GDELT throttles shared cloud egress (direct route times out on the
+        // Contabo VPS), which used to flip this to a hard `status: 'error'` on
+        // every partial run and painted SEED_ERROR over healthy data. Keep the
+        // codes for observability, but report the run as degraded, not failed.
+        status: 'degraded',
         errorReason: upstreamFailed ? GDELT_UPSTREAM_ERROR_REASON : TIMELINE_ERROR_REASON,
         ...(upstreamFailed ? { errorCode: data._gdeltFailureCode } : {}),
         ...(Number.isInteger(data?._freshTopicCount)

@@ -120,7 +120,7 @@ test('afterPublish reports DEGRADED when an empty timeline cannot extend an abse
 
   assert.equal(outcome.completionState, 'DEGRADED');
   assert.deepEqual(outcome.freshnessMetaPatch, {
-    status: 'error',
+    status: 'degraded',
     errorReason: 'timeline_keys_missing_or_unconfirmed',
     missingTimelineKeys: ['gdelt:intel:vol:military'],
   });
@@ -170,7 +170,7 @@ test('afterPublish surfaces the bounded transport code even while last-good time
   assert.deepEqual(outcome, {
     completionState: 'DEGRADED',
     freshnessMetaPatch: {
-      status: 'error',
+      status: 'degraded',
       errorReason: 'gdelt_upstream_unavailable',
       errorCode: 'GDELT_SHARED_PROXY_TLS',
       freshTopicCount: 0,
