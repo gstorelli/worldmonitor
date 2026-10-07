@@ -44,6 +44,8 @@ interface FakeEnv {
     modalVisible: boolean;
     supportsCheckVisibility: boolean;
     _removedListeners: Array<() => void>;
+    /** Non-visibility document listeners (pointerdown/keydown/wheel/touchstart). */
+    activityListeners: Record<string, Array<() => void>>;
     querySelector(sel: string): FakeElement | null;
     querySelectorAll(sel: string): Iterable<FakeElement>;
     createElement(tag: string): FakeElement;
@@ -72,6 +74,7 @@ function makeEnv(): FakeEnv {
   const visibilityListeners: Array<() => void> = [];
   const appendedToasts: FakeElement[] = [];
   const pendingTimers: Array<() => void> = [];
+  const activityListeners: Record<string, Array<() => void>> = {};
   let _visibilityState = 'visible';
 
   const doc: FakeEnv['doc'] = {
@@ -81,6 +84,7 @@ function makeEnv(): FakeEnv {
     modalVisible: false,
     supportsCheckVisibility: true,
     _removedListeners: [],
+    activityListeners,
 
     querySelector(sel: string): FakeElement | null {
       if (sel === '.update-toast') return appendedToasts.at(-1) ?? null;
@@ -151,14 +155,20 @@ function makeEnv(): FakeEnv {
     },
 
     addEventListener(type: string, cb: () => void) {
-      if (type === 'visibilitychange') visibilityListeners.push(cb);
+      if (type === 'visibilitychange') { visibilityListeners.push(cb); return; }
+      (activityListeners[type] ??= []).push(cb);
     },
     removeEventListener(type: string, cb: () => void) {
       if (type === 'visibilitychange') {
         const i = visibilityListeners.indexOf(cb);
         if (i !== -1) visibilityListeners.splice(i, 1);
         doc._removedListeners.push(cb);
+        return;
       }
+      const list = activityListeners[type];
+      if (!list) return;
+      const i = list.indexOf(cb);
+      if (i !== -1) list.splice(i, 1);
     },
   };
 
@@ -683,5 +693,113 @@ describe('readServiceWorkerContainer', () => {
   it('returns the container when it is readable', () => {
     const container = { controller: null, addEventListener() {} };
     assert.equal(readServiceWorkerContainer({ serviceWorker: container } as unknown as Navigator), container);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Idle auto-reload — a dashboard left visible must still pick up the new
+// bundle, without interrupting active use (WORLDMONITOR stale-bundle class).
+// ---------------------------------------------------------------------------
+
+interface IdleHarness {
+  advance(ms: number): void;
+  tick(): void;
+  fireActivity(type: string): void;
+}
+
+function installWithIdleClock(env: FakeEnv, idleReloadDelayMs = 45_000): IdleHarness {
+  let t = 1_000_000;
+  const intervals: Array<() => void> = [];
+  const cleared = new Set<number>();
+  installSwUpdateHandler({
+    swContainer: env.swContainer,
+    document: env.doc,
+    reload: env.reload,
+    raf: (cb) => cb(),
+    setTimer: (cb) => {
+      env.pendingTimers.push(cb);
+      return (env.pendingTimers.length - 1) as unknown as ReturnType<typeof setTimeout>;
+    },
+    clearTimer: (id) => {
+      const idx = id as unknown as number;
+      if (idx >= 0 && idx < env.pendingTimers.length) env.pendingTimers.splice(idx, 1);
+    },
+    setInterval: (cb) => {
+      intervals.push(cb);
+      return (intervals.length - 1) as unknown as ReturnType<typeof setInterval>;
+    },
+    clearInterval: (id) => {
+      cleared.add(id as unknown as number);
+    },
+    now: () => t,
+    idleReloadDelayMs,
+  });
+  return {
+    advance: (ms) => { t += ms; },
+    tick: () => {
+      for (const [index, cb] of intervals.entries()) {
+        if (!cleared.has(index)) cb();
+      }
+    },
+    fireActivity: (type) => {
+      for (const cb of [...(env.doc.activityListeners[type] ?? [])]) cb();
+    },
+  };
+}
+
+describe('idle auto-reload', () => {
+  let env: FakeEnv;
+  beforeEach(() => { env = makeEnv(); });
+
+  it('reloads once the dwell passed and the operator has been idle', () => {
+    env.swContainer._controller = {};
+    const clock = installWithIdleClock(env);
+    env.swContainer.fireControllerChange();
+    fireDwellTimer(env); // VISIBLE_DWELL_MS elapsed
+    clock.advance(45_001);
+    clock.tick();
+    assert.equal(env.reloadCalls.length, 1);
+  });
+
+  it('postpones while the operator is active', () => {
+    env.swContainer._controller = {};
+    const clock = installWithIdleClock(env);
+    env.swContainer.fireControllerChange();
+    fireDwellTimer(env);
+    clock.advance(40_000);
+    clock.fireActivity('keydown'); // resets the idle window
+    clock.advance(30_000); // 30s since the keystroke: still active
+    clock.tick();
+    assert.equal(env.reloadCalls.length, 0);
+    clock.advance(15_001);
+    clock.tick();
+    assert.equal(env.reloadCalls.length, 1);
+  });
+
+  it('does not reload while a modal is open, then fires once it closes', () => {
+    env.swContainer._controller = {};
+    const clock = installWithIdleClock(env);
+    env.swContainer.fireControllerChange();
+    fireDwellTimer(env);
+    env.doc.modalMounted = true;
+    env.doc.modalVisible = true;
+    clock.advance(60_000);
+    clock.tick();
+    assert.equal(env.reloadCalls.length, 0);
+    env.doc.modalVisible = false;
+    clock.advance(46_000);
+    clock.tick();
+    assert.equal(env.reloadCalls.length, 1);
+  });
+
+  it('dismiss stops the idle monitor', () => {
+    env.swContainer._controller = {};
+    const clock = installWithIdleClock(env);
+    env.swContainer.fireControllerChange();
+    fireDwellTimer(env);
+    clickToastButton(env, 'dismiss');
+    clock.advance(120_000);
+    clock.tick();
+    assert.equal(env.reloadCalls.length, 0);
   });
 });

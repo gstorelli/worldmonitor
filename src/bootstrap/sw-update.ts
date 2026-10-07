@@ -28,10 +28,39 @@ export interface SwUpdateHandlerOptions {
   setTimer?: (cb: () => void, ms: number) => ReturnType<typeof setTimeout>;
   /** Override clearTimeout for testing. */
   clearTimer?: (id: ReturnType<typeof setTimeout> | null) => void;
+  /** Override setInterval for testing (defaults to global setInterval). */
+  setInterval?: (cb: () => void, ms: number) => ReturnType<typeof setInterval>;
+  /** Override clearInterval for testing (defaults to global clearInterval). */
+  clearInterval?: (id: ReturnType<typeof setInterval> | null) => void;
+  /** Override Date.now for testing. */
+  now?: () => number;
+  /**
+   * How long the tab may stay visible without user activity before an update is
+   * applied while it remains on screen. Prevents interrupting active use while
+   * still guaranteeing the update lands on a dashboard left open.
+   */
+  idleReloadDelayMs?: number;
   /** Enable debug logging. Defaults to localStorage.getItem('wm-debug-sw') === '1'. */
   debug?: boolean;
   /** App version string included in debug log entries. */
   version?: string;
+}
+
+/**
+ * Read `navigator.serviceWorker` defensively. Sandboxed iframes throw on
+ * property access (SecurityError, WORLDMONITOR-Y5) and older engines / SSR
+ * environments may not expose it at all — in both cases the update handler
+ * must degrade to a no-op instead of breaking app boot.
+ */
+export function readServiceWorkerContainer(
+  nav: Navigator = navigator,
+): ServiceWorkerContainerLike | null {
+  try {
+    const container = (nav as unknown as { serviceWorker?: ServiceWorkerContainerLike | null }).serviceWorker;
+    return container ?? null;
+  } catch {
+    return null;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -109,12 +138,18 @@ function appendDebugLog(entry: Record<string, unknown>): void {
  * Dismissing one version never suppresses toasts for future deploys.
  */
 export function installSwUpdateHandler(options: SwUpdateHandlerOptions = {}): void {
-  const swContainer = options.swContainer ?? navigator.serviceWorker;
+  const resolvedContainer = options.swContainer ?? readServiceWorkerContainer();
+  if (!resolvedContainer) return;
+  const swContainer: ServiceWorkerContainerLike = resolvedContainer;
   const doc = options.document ?? (document as unknown as DocumentLike);
   const reload = options.reload ?? (() => window.location.reload());
   const raf = options.raf ?? ((cb: () => void) => requestAnimationFrame(() => requestAnimationFrame(cb)));
   const setTimer = options.setTimer ?? ((cb: () => void, ms: number) => setTimeout(cb, ms));
   const clearTimer = options.clearTimer ?? ((id: ReturnType<typeof setTimeout> | null) => { if (id !== null) clearTimeout(id); });
+  const setIntervalFn = options.setInterval ?? ((cb: () => void, ms: number) => setInterval(cb, ms));
+  const clearIntervalFn = options.clearInterval ?? ((id: ReturnType<typeof setInterval> | null) => { if (id !== null) clearInterval(id); });
+  const now = options.now ?? (() => Date.now());
+  const idleReloadDelayMs = options.idleReloadDelayMs ?? 45_000;
 
   const debugEnabled = options.debug ?? (() => {
     try { return localStorage.getItem('wm-debug-sw') === '1'; } catch { return false; }
@@ -141,6 +176,7 @@ export function installSwUpdateHandler(options: SwUpdateHandlerOptions = {}): vo
 
   let currentOnHidden: (() => void) | null = null;
   let currentDwellCancel: (() => void) | null = null;
+  let currentMonitorCleanup: (() => void) | null = null;
 
   const showToast = (): void => {
     if (currentOnHidden) {
@@ -152,6 +188,11 @@ export function installSwUpdateHandler(options: SwUpdateHandlerOptions = {}): vo
     if (currentDwellCancel) {
       currentDwellCancel();
       currentDwellCancel = null;
+    }
+    // A superseded toast must not leave its idle monitor running.
+    if (currentMonitorCleanup) {
+      currentMonitorCleanup();
+      currentMonitorCleanup = null;
     }
     doc.querySelector('.update-toast')?.remove();
 
@@ -191,6 +232,40 @@ export function installSwUpdateHandler(options: SwUpdateHandlerOptions = {}): vo
 
     logSw('toast-shown', { wasVisible: doc.visibilityState === 'visible' });
 
+    // Idle monitor: a dashboard that stays on screen (the common case for an
+    // ops wall-board) would otherwise keep serving the previous bundle forever
+    // because the hidden-tab path below never fires. Once the dwell window has
+    // passed, apply the update as soon as the operator has not touched the page
+    // for `idleReloadDelayMs`; active use (typing, scrolling, clicking, any open
+    // modal) keeps postponing it.
+    let lastActivityAt = now();
+    const activityEvents = ['pointerdown', 'keydown', 'wheel', 'touchstart'] as const;
+    const onActivity = (): void => {
+      lastActivityAt = now();
+    };
+    const monitorCleanup = (): void => {
+      clearIntervalFn(idleIntervalId);
+      for (const type of activityEvents) doc.removeEventListener(type, onActivity);
+    };
+    const idleIntervalId = setIntervalFn(() => {
+      if (dismissed || !autoReloadAllowed) return;
+      if (doc.visibilityState !== 'visible') return; // the hidden-tab path owns this case
+      if (isModalOpen(doc)) return;
+      const idleForMs = now() - lastActivityAt;
+      if (idleForMs < idleReloadDelayMs) {
+        logSw('idle-check-active', { idleForMs });
+        return;
+      }
+      logSw('auto-reload-idle', { idleForMs });
+      monitorCleanup();
+      reload();
+    }, 15_000);
+    // Node keeps the event loop alive for a pending interval; the browser
+    // returns a numeric handle (no unref), so the optional call is a no-op there.
+    (idleIntervalId as { unref?: () => void } | null)?.unref?.();
+    for (const type of activityEvents) doc.addEventListener(type, onActivity);
+    currentMonitorCleanup = monitorCleanup;
+
     const onHidden = (): void => {
       if (doc.visibilityState === 'visible') {
         // Tab returned to foreground — start dwell timer if not already running.
@@ -216,6 +291,7 @@ export function installSwUpdateHandler(options: SwUpdateHandlerOptions = {}): vo
           return;
         }
         logSw('auto-reload-triggered');
+        monitorCleanup();
         reload();
       }
     };
@@ -226,12 +302,14 @@ export function installSwUpdateHandler(options: SwUpdateHandlerOptions = {}): vo
         clearTimer(dwellTimerId);
         dwellTimerId = null;
         currentDwellCancel = null;
+        monitorCleanup();
         logSw('reload-clicked');
         reload();
       } else if (action === 'dismiss') {
         clearTimer(dwellTimerId);
         dwellTimerId = null;
         currentDwellCancel = null;
+        monitorCleanup();
         dismissed = true;
         logSw('dismiss-clicked');
         doc.removeEventListener('visibilitychange', onHidden);
