@@ -655,6 +655,14 @@ export class PanelLayoutManager implements AppModule {
       }),
     );
 
+    this.lazyPanel('node-hazards', () =>
+      import('@/components/NodeHazardsPanel').then(m => {
+        const p = new m.NodeHazardsPanel();
+        p.setNodeClickHandler((lat: number, lon: number) => { this.ctx.map?.setCenter(lat, lon, 5); });
+        return p;
+      }),
+    );
+
     this.lazyPanel('population-exposure', () =>
       import('@/components/PopulationExposurePanel').then(m => new m.PopulationExposurePanel()),
     );

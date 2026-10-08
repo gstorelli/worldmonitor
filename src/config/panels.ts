@@ -79,6 +79,7 @@ export const FULL_PANELS: Record<string, PanelConfig> = {
   giving: { name: 'Global Giving', enabled: false, priority: 2 },
   displacement: { name: 'UNHCR Displacement', enabled: false, priority: 2 },
   climate: { name: 'Climate Anomalies', enabled: true, priority: 2 },
+  'node-hazards': { name: 'Critical Node Hazards', enabled: true, priority: 1 },
   'population-exposure': { name: 'Population Exposure', enabled: false, priority: 2 },
   'security-advisories': { name: 'Security Advisories', enabled: false, priority: 2 },
   'sanctions-pressure': { name: 'Sanctions Pressure', enabled: false, priority: 2 },
@@ -247,7 +248,7 @@ export const LAYER_TO_SOURCE: Partial<Record<keyof MapLayers, DataSourceId[]>> =
 export const PANEL_CATEGORY_MAP: Record<string, { labelKey: string; panelKeys: string[]; variants?: string[] }> = {
   core: { labelKey: 'header.panelCatCore', panelKeys: ['map', 'live-news', 'insights', 'strategic-posture'] },
   customs: { labelKey: 'Customs & Trade', panelKeys: ['alert-feed', 'trade-policy', 'supply-chain', 'sanctions-pressure', 'commodities', 'economic-correlation'] },
-  research: { labelKey: 'Research & Compliance', panelKeys: ['source-validation', 'policy-analysis'] },
+  research: { labelKey: 'Research & Compliance', panelKeys: ['node-hazards', 'source-validation', 'policy-analysis'] },
   intelligence: { labelKey: 'Intelligence', panelKeys: ['cii', 'strategic-risk', 'intel', 'gdelt-intel', 'cascade', 'military-correlation'] },
 };
 

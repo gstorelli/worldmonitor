@@ -218,7 +218,9 @@ Active workflows live in `n8n-workflows/` and are imported manually into n8n.
 
 ## Customs Risk Scoring (fork-critical)
 
-The canonical 8-dimension model is **`src/services/customs-risk-scoring.ts`**:
+The **provisional v0** 8-dimension model lives in **`src/services/customs-risk-scoring.ts`**
+(weights and constants are not validated research results — see `CLAUDE.md` and
+`docs/thesis/`):
 
 ```
 RiskScore = 0.18·eventSeverity + 0.10·sourceConfidence + 0.18·tradeExposure
@@ -226,8 +228,9 @@ RiskScore = 0.18·eventSeverity + 0.10·sourceConfidence + 0.18·tradeExposure
           + 0.12·customsRelevance + 0.06·geophysicalImpact
 ```
 
-`tests/customs-risk-scoring-parity.test.mjs` locks the canonical weights, the
-n8n workflow 01 code node, and the sidecar `scoring.ts` together. **Never edit
+`tests/customs-risk-scoring-parity.test.mjs` locks the v0 weights, the
+n8n workflow 01 code node, and the sidecar `scoring.ts` together (weights and
+bands only: the keyword extraction rules of the three copies still differ). **Never edit
 one copy of the formula without the others** — extend the parity test instead.
 
 ## Environment Rules

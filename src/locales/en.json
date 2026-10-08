@@ -339,6 +339,7 @@
     "displacement": "UNHCR Displacement",
     "climate": "Climate Anomalies",
     "populationExposure": "Population Exposure",
+    "nodeHazards": "Critical Node Hazards",
     "securityAdvisories": "Security Advisories",
     "orefSirens": "Israel Sirens",
     "telegramIntel": "Telegram Intel",
@@ -1670,6 +1671,32 @@
       "source": "Source: World Bank",
       "updated": "Updated: {{date}}",
       "infoTooltip": "<strong>Global Tech Readiness</strong><br>Composite score (0-100) based on World Bank data:<br><br><strong>Metrics shown:</strong><br>🌐 Internet Users (% of population)<br>📱 Mobile Subscriptions (per 100 people)<br>🔬 R&D Expenditure (% of GDP)<br><br><strong>Weights:</strong> R&D (35%), Internet (30%), Broadband (20%), Mobile (15%)<br><br><em>— = No recent data available</em><br><em>Source: World Bank Open Data (2019-2024)</em>"
+    },
+    "nodeHazards": {
+      "node": "Node",
+      "m6": "Mw≥6",
+      "m7": "Mw≥7",
+      "eruptions": "Erupt.",
+      "plateShort": "plate {{km}} km",
+      "kindStrait": "Chokepoint",
+      "goods": {"copper": "Copper", "nickel": "Nickel", "chips": "Chips"},
+      "nodes": {
+        "suez": "Suez",
+        "bab-el-mandeb": "Bab el-Mandeb",
+        "hormuz": "Hormuz",
+        "malacca": "Malacca",
+        "taiwan-strait": "Taiwan Strait",
+        "panama": "Panama",
+        "gibraltar": "Gibraltar",
+        "antofagasta": "Antofagasta (Chile)",
+        "morowali": "Morowali (Sulawesi)",
+        "weda-bay": "Weda Bay (Halmahera)",
+        "hsinchu": "Hsinchu (Taiwan)",
+        "tainan": "Tainan (Taiwan)"
+      },
+      "rowTooltip": "Strongest event: Mw {{mw}} on {{date}}",
+      "footnote": "Events within {{radius}} km of each node. Earthquakes: ISC-GEM v12.1, {{period}}, aftershocks included. Eruptions: Smithsonian GVP, since 1922. Plate boundaries: Bird (2003). Taiwan Strait, Hsinchu and Tainan overlap: do not sum them. The radius is a working hypothesis.",
+      "infoTooltip": "<strong>Hazard at the critical nodes</strong> Seismic and volcanic hazard around the chokepoints and production areas of the thesis model.<ul><li>Mw≥6 / Mw≥7: earthquakes 1922-2021 (ISC-GEM)</li><li>Eruptions: confirmed eruptions since 1922 (GVP)</li><li>Plate: distance to the nearest plate boundary</li></ul>Static research data, not a live feed. Click a row to centre the map."
     },
     "populationExposure": {
       "noData": "No exposure data available",

@@ -62,7 +62,7 @@ I file nel repository NON contengono segreti né espressioni `$env`: il test
 
 ## Architettura del Risk Scoring (Workflow 01)
 
-Il workflow GDELT implementa l'algoritmo di scoring a **8 dimensioni** definito nella specifica PhD:
+Il workflow GDELT implementa il motore **v0 a 8 dimensioni**. Pesi, soglie e costanti sono **provvisori e non validati** (vedi `CLAUDE.md` e `docs/thesis/`); dimensioni come severità e rilevanza doganale sono stimate con parole chiave sui titoli GDELT, quindi GDELT va letto come **segnale**, non come misura del pericolo:
 
 ```
 RiskScore = 0.18 × EventSeverity
@@ -88,6 +88,7 @@ RiskScore = 0.18 × EventSeverity
 ### Rotte Critiche Monitorate
 
 - 🚢 **Canale di Suez** (criticality: 0.95)
+- 🚢 **Stretto di Bab el-Mandeb** (criticality: 0.95, prima conteggiato come Suez)
 - ⛽ **Stretto di Hormuz** (criticality: 0.90)
 - 🌎 **Canale di Panama** (criticality: 0.85)
 - 🔧 **Stretto di Taiwan** (criticality: 0.85)
@@ -131,4 +132,4 @@ Ogni alert prodotto dal Risk Scoring Engine include una decomposizione completa 
 - **Auditabilità**: ogni dimensione è tracciabile alla keyword o alla metrica che l'ha attivata
 - **Riproducibilità**: lo stesso input produce sempre lo stesso output (scoring deterministico)
 
-Questo soddisfa il requisito di **Explainable AI** del progetto di dottorato.
+La decomposizione rende il punteggio ispezionabile; non ne dimostra la validità, che è oggetto della sperimentazione dell'Anno 2.

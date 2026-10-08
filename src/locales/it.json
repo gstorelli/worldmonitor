@@ -262,6 +262,7 @@
     "displacement": "Sfollamenti UNHCR",
     "climate": "Anomalie climatiche",
     "populationExposure": "Esposizione della popolazione",
+    "nodeHazards": "Pericoli dei nodi critici",
     "startups": "Startup e VC",
     "vcblogs": "Approfondimenti VC e Saggi",
     "regionalStartups": "Notizie globali sulle startup",
@@ -1501,6 +1502,32 @@
       "status": "Stato",
       "count": "Conteggio",
       "infoTooltip": "<strong>Dati UNHCR sugli sfollamenti</strong> Conteggio globale di rifugiati, richiedenti asilo e sfollati interni forniti dall'UNHCR.<ul><li><strong>Origins</strong>: Paesi in cui le persone fuggono DA</li><li><strong>Ospiti</strong>: Paesi che ospitano rifugiati</li><li>Crisi distintivi: >1M | Alto: >500.000 spostati</li></ul>Aggiornamenti dei dati ogni anno. Licenza CC BY 4.0."
+    },
+    "nodeHazards": {
+      "node": "Nodo",
+      "m6": "Mw≥6",
+      "m7": "Mw≥7",
+      "eruptions": "Eruz.",
+      "plateShort": "placca {{km}} km",
+      "kindStrait": "Stretto",
+      "goods": {"copper": "Rame", "nickel": "Nichel", "chips": "Chip"},
+      "nodes": {
+        "suez": "Suez",
+        "bab-el-mandeb": "Bab el-Mandeb",
+        "hormuz": "Hormuz",
+        "malacca": "Malacca",
+        "taiwan-strait": "Stretto di Taiwan",
+        "panama": "Panama",
+        "gibraltar": "Gibilterra",
+        "antofagasta": "Antofagasta (Cile)",
+        "morowali": "Morowali (Sulawesi)",
+        "weda-bay": "Weda Bay (Halmahera)",
+        "hsinchu": "Hsinchu (Taiwan)",
+        "tainan": "Tainan (Taiwan)"
+      },
+      "rowTooltip": "Evento più forte: Mw {{mw}} del {{date}}",
+      "footnote": "Eventi entro {{radius}} km da ciascun nodo. Terremoti: ISC-GEM v12.1, {{period}}, repliche incluse. Eruzioni: Smithsonian GVP, dal 1922. Limiti di placca: Bird (2003). Stretto di Taiwan, Hsinchu e Tainan si sovrappongono: non vanno sommati. Il raggio è un'ipotesi di lavoro.",
+      "infoTooltip": "<strong>Pericoli dei nodi critici</strong> Pericolo sismico e vulcanico attorno agli stretti e alle aree produttive del modello della tesi.<ul><li>Mw≥6 / Mw≥7: terremoti 1922-2021 (ISC-GEM)</li><li>Eruzioni: eruzioni confermate dal 1922 (GVP)</li><li>Placca: distanza dal limite di placca più vicino</li></ul>Dati di ricerca statici, non un feed in tempo reale. Clicca una riga per centrare la mappa."
     },
     "populationExposure": {
       "noData": "Nessun dato di esposizione disponibile",
