@@ -1,2 +1,0 @@
-# SENTINEL-ADM — development extras (tests use the standard library only).
-ruff>=0.6,<1.0

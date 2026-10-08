@@ -293,20 +293,12 @@ Pre-push (`.husky/pre-push`) runs state guards, then diff-scoped checks:
 - **Merge authority is explicit**: never merge a PR or enable auto-merge unless
   the user asked for that specific action in the current conversation.
 
-## SENTINEL-ADM (separate platform)
+## SENTINEL-ADM (moved out)
 
-`sentinel-adm/` is a separate platform (ADM early
-warning and legal intelligence) that shares the repo but not the Risk Sentinel
-runtime: its own `docker-compose.yml`, its own containers (FastAPI API +
-Streamlit workbench, behind a Caddy front-end). The deterministic engines are
-**stdlib-only** and unit
-tested (`python -m unittest discover -s sentinel-adm/tests -t sentinel-adm`);
-the web layer (FastAPI/Streamlit) is optional. Its CI is per-module
-(`.github/workflows/sentinel-adm-ci.yml`) and publishes failure logs to the
-`ci-diagnostics` branch. Do not wire it into the Contabo deploy or the SPA
-builds: changes under `sentinel-adm/` must not alter the Risk Sentinel stack.
-There is no sanctions screener, OSINT toolbox or evidence vault any more: the
-platform state is only the local watchlist (`sentinel-adm/data/`, gitignored).
+The former `sentinel-adm/` platform (legal intelligence and watchlist radar) is
+not part of Risk Sentinel or of the PhD thesis. It was removed from `main` on
+2026-10-08 and is preserved on the `archive/sentinel-adm` branch until it gets
+its own repository. Do not reintroduce it here.
 
 ## blog-site (upstream-only in this fork)
 
