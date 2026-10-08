@@ -9,17 +9,8 @@ export default async function handler(_req) {
   
   try {
     const cached = await readJsonFromUpstash(cacheKey);
-    const mockData = [{
-      id: `acled-dummy-${Date.now()}`,
-      source: 'ACLED',
-      title: '[N8N SYNC PENDING] Schermaglia di Confine Simulativa',
-      severity: 'elevated',
-      coordinates: [35.2136, 31.7683], 
-      timestamp: new Date().toISOString(),
-      metadata: { note: 'Dati simulati. Flusso n8n non ancora inizializzato.' }
-    }];
 
-    return new Response(JSON.stringify(cached || mockData), {
+    return new Response(JSON.stringify(Array.isArray(cached) ? cached : []), {
       headers: {
         'Content-Type': 'application/json',
         'Cache-Control': 's-maxage=60',

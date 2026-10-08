@@ -42,6 +42,9 @@ export const PANEL_TIERS: Record<string, PanelTier> = {
   'source-validation': 1,
   'policy-analysis': 1,
   'node-hazards': 1,
+  'risk-chain': 1,
+  'trigger-monitor': 1,
+  'strategic-goods': 1,
 
   // ── Tier 3: DISABLED (speculative / crypto / startup) ──────────────────
   'crypto': 3,

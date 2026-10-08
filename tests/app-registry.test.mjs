@@ -27,8 +27,9 @@ describe('risk sentinel app registry', () => {
     assert.equal(apps.resolveAppId('?app=osint', 'customs'), 'osint');
     assert.equal(apps.resolveAppId('', 'osint'), 'osint');
     assert.equal(apps.resolveAppId('?app=bogus', 'osint'), 'osint');
-    assert.equal(apps.resolveAppId('', null), 'customs');
-    assert.equal(apps.resolveAppId('?other=1', null), 'customs');
+    assert.equal(apps.resolveAppId('', null), 'thesis');
+    assert.equal(apps.resolveAppId('?other=1', null), 'thesis');
+    assert.equal(apps.resolveAppId('?app=customs', null), 'customs');
   });
 
   it('treats the customs app as unrestricted except for the moved panels', () => {
@@ -59,6 +60,17 @@ describe('risk sentinel app registry', () => {
           assert.ok(app.allowedPanels.includes(key), `${app.id}.defaultPanels must be a subset of allowedPanels ("${key}")`);
         }
       }
+    }
+  });
+
+  it('restricts the default thesis app to the panels of the six-layer model', () => {
+    assert.equal(apps.DEFAULT_APP_ID, 'thesis');
+    for (const id of ['map', 'risk-chain', 'trigger-monitor', 'node-hazards', 'strategic-goods']) {
+      assert.equal(apps.isPanelAllowedInApp(id, 'thesis'), true, id);
+      assert.ok(apps.appDefaultEnabledSet('thesis').has(id), `${id} must be enabled by default`);
+    }
+    for (const id of ['crypto', 'markets', 'stock-analysis', 'insights', 'strategic-posture', 'live-news']) {
+      assert.equal(apps.isPanelAllowedInApp(id, 'thesis'), false, id);
     }
   });
 

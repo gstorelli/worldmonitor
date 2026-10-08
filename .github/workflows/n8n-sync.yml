@@ -1,0 +1,49 @@
+name: Sync n8n Code nodes
+
+# Pushes the Code-node sources of n8n-workflows/*.json into the live n8n
+# instance (automata.opencyber.org) through the public API, and re-activates
+# the workflows that were active. Credentials and non-code nodes are never
+# touched. Needs the repository secret N8N_API_KEY; without it the job only
+# prints a warning.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'n8n-workflows/**'
+      - 'scripts/n8n-sync-code-nodes.mjs'
+  workflow_dispatch:
+    inputs:
+      files:
+        description: 'Comma-separated files in n8n-workflows/ (empty = all non-legacy)'
+        required: false
+        default: ''
+      dry_run:
+        description: 'Report only, change nothing'
+        type: boolean
+        default: false
+
+concurrency:
+  group: n8n-sync
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    name: Sync Code nodes to n8n
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Sync
+        env:
+          N8N_BASE_URL: https://automata.opencyber.org
+          N8N_API_KEY: ${{ secrets.N8N_API_KEY }}
+          N8N_SYNC_FILES: ${{ github.event.inputs.files }}
+          N8N_DRY_RUN: ${{ github.event.inputs.dry_run == 'true' && '1' || '0' }}
+        run: node scripts/n8n-sync-code-nodes.mjs

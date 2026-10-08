@@ -855,6 +855,13 @@
       "reason": "Risk Sentinel PhD source-validation library endpoint (curated Zotero sources). Hand-written JS data API on the fork-native stack.",
       "owner": "@gstorelli",
       "removal_issue": null
+    },
+    {
+      "path": "api/thesis/triggers.js",
+      "category": "upstream-proxy",
+      "reason": "Risk Sentinel PhD trigger layer: normalised pass-through of the EMSC FDSN earthquake catalogue (USGS FDSN fallback), last 30 days, M>=4.5. Matching to critical nodes happens client-side in src/services/thesis/risk-chain.ts.",
+      "owner": "@SebastienMelki",
+      "removal_issue": null
     }
   ]
 }

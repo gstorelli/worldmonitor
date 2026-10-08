@@ -262,6 +262,9 @@
     "displacement": "Sfollamenti UNHCR",
     "climate": "Anomalie climatiche",
     "populationExposure": "Esposizione della popolazione",
+    "riskChain": "Catena del rischio · sei strati",
+    "triggerMonitor": "Inneschi misurati sui nodi critici",
+    "strategicGoods": "Beni strategici e modulatori",
     "nodeHazards": "Pericoli dei nodi critici",
     "startups": "Startup e VC",
     "vcblogs": "Approfondimenti VC e Saggi",
@@ -1015,6 +1018,7 @@
         "displacementFlows": "Flussi di sfollamento",
         "climateAnomalies": "Anomalie climatiche",
         "weatherAlerts": "Allerte meteo",
+        "criticalNodes": "Nodi critici (tesi)",
         "strategicWaterways": "Vie d’acqua strategiche",
         "economicCenters": "Centri economici",
         "criticalMinerals": "Minerali critici",
@@ -1070,6 +1074,7 @@
         "pipeline": "Conduttura",
         "conflictZone": "Zona di conflitto",
         "naturalEvent": "Evento naturale",
+        "criticalNodeHistory": "Mw≥6 entro {{km}} km, 1922-2021: {{m6}}",
         "financialCenter": "centro finanziario",
         "port": "Porta",
         "disruption": "Interruzione",
@@ -1502,6 +1507,87 @@
       "status": "Stato",
       "count": "Conteggio",
       "infoTooltip": "<strong>Dati UNHCR sugli sfollamenti</strong> Conteggio globale di rifugiati, richiedenti asilo e sfollati interni forniti dall'UNHCR.<ul><li><strong>Origins</strong>: Paesi in cui le persone fuggono DA</li><li><strong>Ospiti</strong>: Paesi che ospitano rifugiati</li><li>Crisi distintivi: >1M | Alto: >500.000 spostati</li></ul>Aggiornamenti dei dati ogni anno. Licenza CC BY 4.0."
+    },
+    "thesis": {
+      "loading": "Caricamento degli inneschi misurati…",
+      "error": "Dati della tesi non disponibili",
+      "updated": "aggiornato",
+      "significant": "significativo",
+      "depth": "di profondità",
+      "state": {
+        "none": "Nessun rischio indotto",
+        "monitor": "Monitoraggio",
+        "assess": "Valutare allerta"
+      },
+      "alert": {
+        "red": "GDACS rossa",
+        "orange": "GDACS arancione",
+        "green": "GDACS verde"
+      },
+      "kind": {
+        "earthquake": "Terremoto",
+        "volcano": "Eruzione",
+        "flood": "Alluvione",
+        "cyclone": "Ciclone",
+        "drought": "Siccità",
+        "wildfire": "Incendio",
+        "other": "Evento"
+      },
+      "col": {
+        "node": "Nodo",
+        "trigger": "Innesco (misurato)",
+        "status": "Stato del nodo",
+        "goods": "Beni",
+        "risk": "Rischio doganale",
+        "event": "Evento",
+        "when": "Quando"
+      },
+      "layer": {
+        "trigger": "1 · Inneschi misurati nella zona del nodo",
+        "hazard": "Pericolosità storica del nodo",
+        "goods": "3-4 · Beni strategici, vulnerabilità di fornitura, modulatori",
+        "customs": "5-6 · Vulnerabilità doganale e rischio doganale"
+      },
+      "strip": {
+        "trigger": "inneschi",
+        "node": "nodi colpiti",
+        "good": "beni strategici",
+        "supply": "fatti di fornitura",
+        "customs": "vuln. doganale",
+        "risk": "da valutare"
+      },
+      "chain": {
+        "infoTooltip": "<strong>Catena a sei strati</strong><br>Innesco → nodo critico → bene strategico → vulnerabilità di fornitura → vulnerabilità doganale → rischio doganale.<br><br>Gli inneschi sono eventi <strong>misurati</strong> (terremoti EMSC/USGS, allerte GDACS), mai parole chiave nelle notizie. Regola del modello: senza innesco nella zona del nodo non c'è rischio indotto. Lo stato non è uno score e non usa pesi.",
+        "noTrigger": "nessun innesco",
+        "noTriggerDetail": "Nessun innesco misurato entro {{radius}} km nella finestra di osservazione.",
+        "productionStatus": "area produttiva",
+        "noTransit": "PortWatch n.d.",
+        "transits": "transiti",
+        "goodsTbd": "flussi da stimare",
+        "goodsTbdDetail": "Beni strategici in transito nello stretto: da stimare con Eurostat Comext e IMF PortWatch (Capitolo 3).",
+        "customsTbd": "La vulnerabilità doganale (capacità degli uffici, obsolescenza dei profili, incentivo alla mis-declaration) richiede dati ADM: pilota in shadow-mode presso l'Ufficio delle Dogane di Bari, Anno 3. Gli indicatori pubblici (spostamento delle origini, valori unitari, divario speculare) si costruiscono nell'Anno 2.",
+        "history": "1922-2021, entro 300 km: {{m6}} terremoti Mw≥6, {{m7}} Mw≥7; {{erupt}} eruzioni dal 1922; limite di placca a {{km}} km (ISC-GEM, GVP, Bird 2003).",
+        "rule": "Regola: senza innesco nella zona del nodo → nessun rischio indotto. Soglie di lavoro (non validate, da calibrare nell'Anno 2): raggio {{radius}} km; significativo = Mw ≥ {{mw}} o allerta GDACS arancione/rossa. Nessun peso, nessuno score.",
+        "sources": "Terremoti: {{quake}}, ultimi {{days}} giorni; eventi GDACS/EONET: {{natural}}; stretti con transiti PortWatch: {{transit}}",
+        "noQuakeSource": "Catalogo sismico non disponibile"
+      },
+      "triggers": {
+        "infoTooltip": "<strong>Inneschi misurati</strong><br>Terremoti M≥4,5 dal catalogo EMSC (USGS come riserva) e allerte GDACS (eruzioni, alluvioni, cicloni, siccità) entro il raggio di lavoro di un nodo critico. Clic su una riga per localizzarla sulla mappa.",
+        "all": "Tutti",
+        "significant": "Significativi",
+        "none": "Nessun innesco misurato entro {{radius}} km da un nodo critico.",
+        "footer": "Fonte: {{quake}} ({{days}} giorni, {{count}} terremoti M≥4,5 nel mondo) + {{natural}} eventi GDACS/EONET. Raggio {{radius}} km (ipotesi di lavoro)."
+      },
+      "goods": {
+        "infoTooltip": "<strong>Beni strategici</strong><br>Codici HS di dettaglio, criticità UE (CRMA o metodo della Commissione), evidenze di vulnerabilità di fornitura e modulatori in vigore. ✓ = verificato con fonte; ◌ = ancora da fare.",
+        "pilot": "Pilota Bari",
+        "nodes": "Nodi produttivi",
+        "noNodes": "nessuno nel perimetro (esposizione tramite gli stretti)",
+        "criticality": "Criticità UE",
+        "supply": "Vulnerabilità di fornitura",
+        "modulators": "Modulatori in vigore",
+        "footer": "Fonti: CRMA (Reg. (UE) 2024/1252) e JRC RMIS; SWD(2021) 352; Eurostat Comext; USGS MCS 2026; List of Common High Priority Items UE (feb. 2024); AdSP MAM."
+      }
     },
     "nodeHazards": {
       "node": "Nodo",

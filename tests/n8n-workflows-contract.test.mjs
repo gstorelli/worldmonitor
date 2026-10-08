@@ -166,8 +166,11 @@ describe('n8n workflow JSON contract', () => {
     }
   });
 
-  it('customs endpoints keep the mock fallback explicit about pending n8n sync', () => {
-    const gdelt = read('api/customs/gdelt.js');
-    assert.match(gdelt, /N8N SYNC PENDING/);
+  it('customs endpoints never return fabricated records when a key is empty', () => {
+    for (const name of ['gdelt', 'usgs', 'acled', 'open-meteo', 'comtrade']) {
+      const src = read(`api/customs/${name}.js`);
+      assert.doesNotMatch(src, /mockData|mockAlerts|dummy|Simulativ|SYNC PENDING/,
+        `api/customs/${name}.js must not ship placeholder events (CLAUDE.md rule 2)`);
+    }
   });
 });

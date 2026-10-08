@@ -59,6 +59,9 @@ import { H3HexagonLayer, TripsLayer } from '@deck.gl/geo-layers';
 import { PathStyleExtension } from '@deck.gl/extensions';
 import type { WeatherAlert } from '@/services/weather';
 import { escapeHtml } from '@/utils/sanitize';
+import { THESIS_NODES, TRIGGER_WORKING_RULES, type ThesisNode } from '@/config/thesis-model';
+import { onThesisSnapshot } from '@/services/thesis/snapshot';
+import type { ChainState } from '@/services/thesis/risk-chain';
 import {
   derivePipelinePublicBadge,
   type PipelineEvidenceInput,
@@ -424,6 +427,8 @@ export class DeckGLMap {
   // Data stores
   private hotspots: HotspotWithBreaking[];
   private earthquakes: Earthquake[] = [];
+  private thesisNodeStates = new Map<string, ChainState>();
+  private unsubscribeThesis: (() => void) | null = null;
   private weatherAlerts: WeatherAlert[] = [];
   private outages: InternetOutage[] = [];
   private trafficAnomalies: ProtoTrafficAnomaly[] = [];
@@ -1782,6 +1787,11 @@ export class DeckGLMap {
     // Military flight clusters layer
     if (mapLayers.military && filteredMilitaryFlightClusters.length > 0) {
       layers.push(this.createMilitaryFlightClustersLayer(filteredMilitaryFlightClusters));
+    }
+
+    // Thesis critical nodes (straits and production areas) with their hazard radius
+    if (mapLayers.criticalNodes) {
+      layers.push(...this.createCriticalNodesLayers());
     }
 
     // Strategic waterways layer
@@ -3291,6 +3301,68 @@ export class DeckGLMap {
     });
   }
 
+  private criticalNodeColor(node: ThesisNode, alpha: number): [number, number, number, number] {
+    const state = this.thesisNodeStates.get(node.id) ?? 'none';
+    if (state === 'assess') return [235, 70, 60, alpha];
+    if (state === 'monitor') return [240, 195, 60, alpha];
+    return node.kind === 'strait' ? [90, 165, 255, alpha] : [225, 160, 70, alpha];
+  }
+
+  private createCriticalNodesLayers(): Layer[] {
+    if (!this.unsubscribeThesis) {
+      this.unsubscribeThesis = onThesisSnapshot((snap) => {
+        this.thesisNodeStates = new Map(snap.chains.map((c) => [c.node.id, c.state]));
+        this.updateLayers();
+      });
+    }
+    const stateKey = [...this.thesisNodeStates.entries()].map(([k, v]) => `${k}:${v}`).join('|');
+    return [
+      new ScatterplotLayer<ThesisNode>({
+        id: 'critical-nodes-radius-layer',
+        data: THESIS_NODES as ThesisNode[],
+        getPosition: (d) => [d.lon, d.lat],
+        radiusUnits: 'meters',
+        getRadius: TRIGGER_WORKING_RULES.radiusKm * 1000,
+        filled: true,
+        stroked: true,
+        getFillColor: (d) => this.criticalNodeColor(d, 22),
+        getLineColor: (d) => this.criticalNodeColor(d, 150),
+        lineWidthMinPixels: 1,
+        pickable: false,
+        updateTriggers: { getFillColor: stateKey, getLineColor: stateKey },
+      }),
+      new ScatterplotLayer<ThesisNode>({
+        id: 'critical-nodes-layer',
+        data: THESIS_NODES as ThesisNode[],
+        getPosition: (d) => [d.lon, d.lat],
+        getRadius: 12000,
+        radiusMinPixels: 5,
+        radiusMaxPixels: 11,
+        stroked: true,
+        getFillColor: (d) => this.criticalNodeColor(d, 235),
+        getLineColor: [255, 255, 255, 200],
+        lineWidthMinPixels: 1,
+        pickable: true,
+        updateTriggers: { getFillColor: stateKey },
+      }),
+      new TextLayer<ThesisNode>({
+        id: 'critical-nodes-label-layer',
+        data: THESIS_NODES as ThesisNode[],
+        getPosition: (d) => [d.lon, d.lat],
+        getText: (d) => t(`components.nodeHazards.nodes.${d.id}`),
+        getSize: 11,
+        getColor: [235, 240, 245, 230],
+        getPixelOffset: [0, -14],
+        fontWeight: 600,
+        outlineWidth: 2,
+        outlineColor: [10, 15, 20, 220],
+        fontSettings: { sdf: true },
+        characterSet: 'auto',
+        pickable: false,
+      }),
+    ];
+  }
+
   private createWaterwaysLayer(): ScatterplotLayer {
     return new ScatterplotLayer({
       id: 'waterways-layer',
@@ -4346,6 +4418,11 @@ export class DeckGLMap {
         return { html: `<div class="deckgl-tooltip"><strong>${text(obj.stormName)}</strong><br/>Forecast Cone</div>` };
       case 'ais-density-layer':
         return { html: `<div class="deckgl-tooltip"><strong>${t('components.deckgl.layers.shipTraffic')}</strong><br/>${t('popups.intensity')}: ${text(obj.intensity)}</div>` };
+      case 'critical-nodes-layer': {
+        const state = this.thesisNodeStates.get(obj.id) ?? 'none';
+        const kind = obj.kind === 'strait' ? t('components.nodeHazards.kindStrait') : t(`components.nodeHazards.goods.${obj.good}`);
+        return { html: `<div class="deckgl-tooltip"><strong>${text(t(`components.nodeHazards.nodes.${obj.id}`))}</strong><br/>${text(kind)} · ${text(t(`components.thesis.state.${state}`))}<br/>${text(t('components.deckgl.tooltip.criticalNodeHistory', { m6: String(obj.m6), km: String(TRIGGER_WORKING_RULES.radiusKm) }))}</div>` };
+      }
       case 'waterways-layer':
         return { html: `<div class="deckgl-tooltip"><strong>${text(obj.name)}</strong><br/>${t('components.deckgl.layers.strategicWaterways')}</div>` };
       case 'economic-centers-layer':
@@ -7097,6 +7174,8 @@ export class DeckGLMap {
   }
 
   public destroy(): void {
+    this.unsubscribeThesis?.();
+    this.unsubscribeThesis = null;
     this.stopTradeAnimation();
     this.activeFlightTrails.clear();
     this.clearTrailsBtn = null;

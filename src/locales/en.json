@@ -339,6 +339,9 @@
     "displacement": "UNHCR Displacement",
     "climate": "Climate Anomalies",
     "populationExposure": "Population Exposure",
+    "riskChain": "Risk chain · six layers",
+    "triggerMonitor": "Measured triggers at critical nodes",
+    "strategicGoods": "Strategic goods & modulators",
     "nodeHazards": "Critical Node Hazards",
     "securityAdvisories": "Security Advisories",
     "orefSirens": "Israel Sirens",
@@ -1330,6 +1333,7 @@
         "displacementFlows": "Displacement Flows",
         "climateAnomalies": "Climate Anomalies",
         "weatherAlerts": "Weather Alerts",
+        "criticalNodes": "Critical nodes (thesis)",
         "strategicWaterways": "Chokepoints",
         "economicCenters": "Economic Centers",
         "criticalMinerals": "Critical Minerals",
@@ -1376,6 +1380,7 @@
         "pipeline": "Pipeline",
         "conflictZone": "Conflict Zone",
         "naturalEvent": "Natural Event",
+        "criticalNodeHistory": "Mw≥6 within {{km}} km, 1922-2021: {{m6}}",
         "financialCenter": "financial center",
         "port": "Port",
         "disruption": "Disruption",
@@ -1671,6 +1676,87 @@
       "source": "Source: World Bank",
       "updated": "Updated: {{date}}",
       "infoTooltip": "<strong>Global Tech Readiness</strong><br>Composite score (0-100) based on World Bank data:<br><br><strong>Metrics shown:</strong><br>🌐 Internet Users (% of population)<br>📱 Mobile Subscriptions (per 100 people)<br>🔬 R&D Expenditure (% of GDP)<br><br><strong>Weights:</strong> R&D (35%), Internet (30%), Broadband (20%), Mobile (15%)<br><br><em>— = No recent data available</em><br><em>Source: World Bank Open Data (2019-2024)</em>"
+    },
+    "thesis": {
+      "loading": "Loading measured triggers…",
+      "error": "Thesis data unavailable",
+      "updated": "updated",
+      "significant": "significant",
+      "depth": "deep",
+      "state": {
+        "none": "No induced risk",
+        "monitor": "Monitor",
+        "assess": "Assess alert"
+      },
+      "alert": {
+        "red": "GDACS red",
+        "orange": "GDACS orange",
+        "green": "GDACS green"
+      },
+      "kind": {
+        "earthquake": "Earthquake",
+        "volcano": "Eruption",
+        "flood": "Flood",
+        "cyclone": "Cyclone",
+        "drought": "Drought",
+        "wildfire": "Wildfire",
+        "other": "Event"
+      },
+      "col": {
+        "node": "Node",
+        "trigger": "Trigger (measured)",
+        "status": "Node status",
+        "goods": "Goods",
+        "risk": "Customs risk",
+        "event": "Event",
+        "when": "When"
+      },
+      "layer": {
+        "trigger": "1 · Measured triggers in the node zone",
+        "hazard": "Historical hazard of the node",
+        "goods": "3-4 · Strategic goods, supply vulnerability, modulators",
+        "customs": "5-6 · Customs vulnerability and customs risk"
+      },
+      "strip": {
+        "trigger": "triggers",
+        "node": "nodes hit",
+        "good": "strategic goods",
+        "supply": "supply facts",
+        "customs": "customs vuln.",
+        "risk": "to assess"
+      },
+      "chain": {
+        "infoTooltip": "<strong>Six-layer chain</strong><br>Trigger → critical node → strategic good → supply vulnerability → customs vulnerability → customs risk.<br><br>Triggers are <strong>measured</strong> events (EMSC/USGS earthquakes, GDACS alerts), never news keywords. Gate rule of the model: no trigger in the node zone means no induced risk. The state is not a score and uses no weights.",
+        "noTrigger": "no trigger",
+        "noTriggerDetail": "No measured trigger within {{radius}} km in the observation window.",
+        "productionStatus": "production area",
+        "noTransit": "PortWatch n/a",
+        "transits": "transits",
+        "goodsTbd": "flows to estimate",
+        "goodsTbdDetail": "Strategic goods transiting this strait: to be estimated from Eurostat Comext and IMF PortWatch (Chapter 3).",
+        "customsTbd": "Customs vulnerability (office capacity, profile obsolescence, mis-declaration incentive) needs ADM data: shadow-mode pilot at the Bari customs office, Year 3. Public indicators (origin shifts, unit values, mirror gaps) are built in Year 2.",
+        "history": "1922-2021, 300 km: {{m6}} earthquakes Mw≥6, {{m7}} Mw≥7; {{erupt}} eruptions since 1922; plate boundary at {{km}} km (ISC-GEM, GVP, Bird 2003).",
+        "rule": "Gate rule: no trigger in the node zone → no induced risk. Working thresholds (not validated, Year 2 calibration): radius {{radius}} km; significant = Mw ≥ {{mw}} or GDACS orange/red. No weights, no score.",
+        "sources": "Earthquakes: {{quake}}, last {{days}} days; GDACS/EONET events: {{natural}}; straits with PortWatch transits: {{transit}}",
+        "noQuakeSource": "Earthquake catalogue unavailable"
+      },
+      "triggers": {
+        "infoTooltip": "<strong>Measured triggers</strong><br>Earthquakes M≥4.5 from the EMSC catalogue (USGS as fallback) and GDACS alerts (eruptions, floods, cyclones, droughts) within the working radius of a critical node. Click a row to locate it on the map.",
+        "all": "All",
+        "significant": "Significant",
+        "none": "No measured trigger within {{radius}} km of a critical node.",
+        "footer": "Source: {{quake}} ({{days}} days, {{count}} earthquakes M≥4.5 worldwide) + {{natural}} GDACS/EONET events. Radius {{radius}} km (working hypothesis)."
+      },
+      "goods": {
+        "infoTooltip": "<strong>Strategic goods</strong><br>Detailed HS codes, EU criticality (CRMA or Commission method), supply-vulnerability evidence and modulators in force. ✓ = verified with source; ◌ = still to be done.",
+        "pilot": "Bari pilot",
+        "nodes": "Production nodes",
+        "noNodes": "none in the perimeter (exposure through the straits)",
+        "criticality": "EU criticality",
+        "supply": "Supply vulnerability",
+        "modulators": "Modulators in force",
+        "footer": "Sources: CRMA (Reg. (EU) 2024/1252) and JRC RMIS; SWD(2021) 352; Eurostat Comext; USGS MCS 2026; EU List of Common High Priority Items (Feb. 2024); AdSP MAM."
+      }
     },
     "nodeHazards": {
       "node": "Node",

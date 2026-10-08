@@ -10,17 +10,8 @@ export default async function handler(_req) {
   
   try {
     const cached = await readJsonFromUpstash(cacheKey);
-    const mockData = [{
-      id: `gdelt-dummy-${Date.now()}`,
-      source: 'GDELT',
-      title: '[N8N SYNC PENDING] Interruzione Logistica in Fase di Rilevamento',
-      severity: 'medium',
-      coordinates: [12.4964, 41.9028], // Rome dummy
-      timestamp: new Date().toISOString(),
-      metadata: { note: 'Dati simulati. Flusso n8n non ancora inizializzato.' }
-    }];
 
-    return new Response(JSON.stringify(cached || mockData), {
+    return new Response(JSON.stringify(Array.isArray(cached) ? cached : []), {
       headers: {
         'Content-Type': 'application/json',
         'Cache-Control': 's-maxage=60',
