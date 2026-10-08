@@ -51,6 +51,7 @@ case "$TIER" in
     run cross-source 240
     run chokepoint 180
     run ecb-fx 180
+    run acled 180
     ;;
   slow)
     run sanctions 300

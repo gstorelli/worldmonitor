@@ -194,6 +194,14 @@ Active workflows live in `n8n-workflows/` and are imported manually into n8n.
   into the stored config so a redacted round-trip never wipes credentials.
 - Workflow 07 ("intelligence notifications") reads config + digest and delivers
   Telegram/email. After changing its JSON you must re-import it in n8n.
+- **ACLED is no longer an n8n pair**: the Token Manager + conflict-ingestion
+  workflows are superseded by `scripts/seed-acled-events.mjs` (OAuth password
+  grant from `ACLED_EMAIL`/`ACLED_PASSWORD`, 30-day events, chokepoint/fatality
+  scoring, writes `risk_sentinel:n8n:acled` + `seed-meta:n8n:acled`). It runs in
+  the `signals` cron tier. The pair stays unpublished in n8n; do not re-publish
+  it without removing this seeder, or the two writers will fight over the key.
+  A 403 "Access denied" on the data endpoint means the ACLED account lacks the
+  Research/Partner tier — that is an entitlement, not a code problem.
 - **Editing workflows through the n8n MCP** (`scripts/n8n-mcp.mjs`, token in
   `.env` as `API_MCP_N8N`):
   `node --env-file=.env scripts/n8n-mcp.mjs call <tool> '<json>'`.
