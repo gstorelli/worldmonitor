@@ -72,7 +72,7 @@ Le Dogane necessitano di un sistema che:
 Risk Sentinel risponde a queste esigenze con un approccio **multimodale e multi-sorgente**, combinando:
 
 - **Data Fusion**: aggregazione automatica di eventi geopolitici (GDELT), conflitti armati (ACLED), dati sismici (USGS), anomalie climatiche (Open-Meteo), e prezzi commodity (Yahoo Finance/Alpha Vantage)
-- **Explainable Scoring**: algoritmo a 8 dimensioni con pesi calibrati e decomposizione trasparente del punteggio
+- **Explainable Scoring**: punteggio a 8 dimensioni con decomposizione trasparente (motore v0: pesi provvisori, non ancora validati — vedi [`docs/thesis/`](./docs/thesis/))
 - **Low-Code Orchestration**: pipeline n8n per rendere trasparente, visiva e riproducibile l'intera catena di elaborazione dati
 - **Visual Intelligence**: interfaccia geo-spaziale che traduce i dati grezzi in consapevolezza situazionale
 
@@ -81,11 +81,11 @@ Risk Sentinel risponde a queste esigenze con un approccio **multimodale e multi-
 | # | Deliverable | Stato |
 |---|-------------|:-----:|
 | D1 | Revisione sistematica della letteratura sui sistemi di early-warning per le dogane | 🔄 In corso |
-| D2 | Progettazione del Risk Scoring Engine a 8 dimensioni | ✅ Completato |
+| D2 | Modello a sei strati (innesco → nodo → bene strategico → vulnerabilità → rischio); motore v0 provvisorio implementato | 🔄 In corso |
 | D3 | Implementazione del sistema Risk Sentinel (questa repository) | ✅ Completato |
 | D4 | Pipeline n8n per data ingestion e risk scoring | ✅ Implementato |
-| D5 | Sperimentazione su dati GDELT + ACLED con valutazione precisione/recall | 🔄 Prossimo |
-| D6 | Validazione con operatori ADM (Agenzia delle Dogane e dei Monopoli) | 📋 Pianificato |
+| D5 | Validazione retrospettiva "as-of" su 4 scenari storici (Ever Given 2021, Hualien 2024, Panama 2023-24, Mar Rosso 2023-24) | 📋 Anno 2 |
+| D6 | Pilota in shadow-mode presso l'Ufficio delle Dogane di Bari (ADM) | 📋 Anno 3 |
 | D7 | Articolo su rivista internazionale (target: Decision Support Systems o GIScience) | 📋 Pianificato |
 | D8 | Dissertazione di dottorato | 📋 Pianificato |
 
@@ -113,7 +113,7 @@ Risk Sentinel risponde a queste esigenze con un approccio **multimodale e multi-
 │              ▼             ▼                                ▼          │
 │     ┌────────────────────────────┐   ┌────────────────────────┐       │
 │     │  RISK SCORING ENGINE       │   │  TRADE IMPACT SCORER   │       │
-│     │  (8 dimensioni, pesi PhD)  │   │  (chokepoint proximity)│       │
+│     │  (8 dim., pesi provvisori) │   │  (chokepoint proximity)│       │
 │     └────────────┬───────────────┘   └──────────┬─────────────┘       │
 │                  │                               │                     │
 │                  ▼                               ▼                     │
@@ -150,7 +150,7 @@ Risk Sentinel risponde a queste esigenze con un approccio **multimodale e multi-
 
 ## Risk Scoring Engine (8 Dimensioni)
 
-Ogni evento rilevato dalle sorgenti dati viene valutato attraverso un **algoritmo multi-dimensionale con pesi calibrati**:
+Ogni evento rilevato dalle sorgenti dati viene valutato da un **motore v0 a 8 dimensioni**. I pesi e le costanti qui sotto sono **provvisori e non validati**: nell'Anno 2 vengono confrontati con pesi uniformi e con formulazioni alternative (hazard-gated e moltiplicativa) tramite analisi di sensibilità. Il modello di riferimento della tesi è descritto in [`docs/thesis/ARCHITECTURE-THESIS.md`](./docs/thesis/ARCHITECTURE-THESIS.md).
 
 ```
 RiskScore = 0.18 × EventSeverity
@@ -234,14 +234,17 @@ Per istruzioni dettagliate su import e configurazione, vedi [`n8n-workflows/READ
 
 ### Rotte Marittime Strategiche
 
-| Rotta | Criticality | Volume Stimato | Keyword di Detection |
-|-------|:-----------:|----------------|----------------------|
-| 🚢 Canale di Suez | 0.95 | 12% commercio mondiale | suez, red sea, bab el mandeb |
-| ⛽ Stretto di Hormuz | 0.90 | 20% petrolio mondiale | hormuz, strait of hormuz |
-| 🌎 Canale di Panama | 0.85 | 5% commercio mondiale | panama, panama canal |
-| 🔧 Stretto di Taiwan | 0.85 | 90% chip avanzati | taiwan strait, taiwan |
-| 🚢 Stretto di Malacca | 0.80 | 25% merci marittime | malacca |
-| 🌊 Stretto di Gibilterra | 0.70 | Accesso Mediterraneo | gibraltar |
+I valori di *criticality* sono costanti provvisorie del motore v0, senza giustificazione empirica. Per il valore del commercio esposto si veda Verschuur et al. (2025), *Nature Communications*, doi:10.1038/s41467-025-65403-w.
+
+| Rotta | Criticality (v0) | Keyword di Detection |
+|-------|:----------------:|----------------------|
+| 🚢 Canale di Suez | 0.95 | suez, red sea |
+| 🚢 Stretto di Bab el-Mandeb | 0.95 | bab el mandeb, bab al-mandab |
+| ⛽ Stretto di Hormuz | 0.90 | hormuz, strait of hormuz |
+| 🌎 Canale di Panama | 0.85 | panama, panama canal |
+| 🔧 Stretto di Taiwan | 0.85 | taiwan strait, strait of taiwan |
+| 🚢 Stretto di Malacca | 0.80 | malacca |
+| 🌊 Stretto di Gibilterra | 0.70 | gibraltar |
 
 ### Commodity Critiche per le Dogane
 

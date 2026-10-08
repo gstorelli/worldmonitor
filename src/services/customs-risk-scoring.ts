@@ -1,5 +1,10 @@
 /**
- * Canonical 8-dimension Customs Risk Scoring model (PhD spec).
+ * Provisional v0 8-dimension Customs Risk Scoring model.
+ *
+ * The weights below are NOT validated research results: they come from early
+ * drafts and are kept as the v0 configuration of the prototype. Year 2 of the
+ * thesis compares them with uniform weights and with hazard-gated and
+ * multiplicative formulations (see CLAUDE.md and docs/thesis/).
  *
  * RiskScore = 0.18 × EventSeverity
  *           + 0.10 × SourceConfidence
@@ -10,7 +15,7 @@
  *           + 0.12 × CustomsRelevance
  *           + 0.06 × GeophysicalClimateImpact
  *
- * This is the single source of truth for the weights. The formula is
+ * This is the single source of truth for the v0 weights. The formula is
  * duplicated for runtime reasons in two places that cannot import this module:
  *   - n8n workflow 01 code node (`n8n-workflows/01-gdelt-customs-ingestion.json`)
  *   - desktop sidecar baseline scorer (`src-tauri/sidecar/services/scoring.ts`)
@@ -55,7 +60,7 @@ export function computeWeightedRiskScore(dimensions: CustomsRiskDimensions): num
   return Math.min(100, Math.max(0, Math.round(total)));
 }
 
-/** Alert bands from the PhD spec (`n8n-workflows/README.md`). */
+/** Provisional v0 alert bands (`n8n-workflows/README.md`). */
 export function classifyCustomsRisk(score: number): CustomsRiskLevel {
   if (score >= 85) return 'Critical';
   if (score >= 70) return 'High';

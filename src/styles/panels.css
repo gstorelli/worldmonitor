@@ -302,6 +302,27 @@
   white-space: nowrap;
 }
 
+/* Critical node hazards panel (reuses the climate table styles). */
+.node-hazards-table .climate-zone {
+  white-space: normal;
+}
+
+.node-hazards-table th,
+.node-hazards-table td {
+  padding: 4px 6px;
+}
+
+.node-hazards-table th:nth-child(n + 2) {
+  text-align: right;
+}
+
+.node-hazards-note {
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-muted);
+  padding: 8px 6px;
+}
+
 .climate-icon {
   margin-right: 6px;
 }

@@ -1,6 +1,7 @@
 // Domain Knowledge Constants provided by user
 const ROUTES = {
     'Suez Canal': 0.95,
+    'Bab el-Mandeb': 0.95,
     'Strait of Hormuz': 0.90,
     'Panama Canal': 0.85,
     'Taiwan Strait': 0.85,

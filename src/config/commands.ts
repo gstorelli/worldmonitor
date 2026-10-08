@@ -159,6 +159,7 @@ export const COMMANDS: Command[] = [
   { id: 'panel:giving', keywords: ['giving', 'philanthropy', 'awards', 'donations'], label: 'Panel: Global Giving', icon: '\u{1F49D}', category: 'panels' },
   { id: 'panel:ucdp-events', keywords: ['ucdp', 'armed conflict', 'conflict events', 'war data'], label: 'Panel: UCDP Conflict Events', icon: '\u2694\uFE0F', category: 'panels' },
   { id: 'panel:displacement', keywords: ['displacement', 'refugees', 'unhcr', 'idp'], label: 'Panel: UNHCR Displacement', icon: '\u{1F3C3}', category: 'panels' },
+  { id: 'panel:node-hazards', keywords: ['hazard', 'earthquake', 'volcano', 'chokepoint', 'node', 'pericoli', 'terremoti', 'vulcani'], label: 'Panel: Critical Node Hazards', icon: '\u{1F30B}', category: 'panels' },
   { id: 'panel:climate', keywords: ['climate', 'climate anomalies', 'temperature', 'weather patterns'], label: 'Panel: Climate Anomalies', icon: '\u{1F321}\uFE0F', category: 'panels' },
   { id: 'panel:population-exposure', keywords: ['population', 'exposure', 'population exposure', 'affected population'], label: 'Panel: Population Exposure', icon: '\u{1F465}', category: 'panels' },
   { id: 'panel:security-advisories', keywords: ['advisories', 'travel advisory', 'security advisory', 'travel warning'], label: 'Panel: Security Advisories', icon: '\u{1F6C2}', category: 'panels' },

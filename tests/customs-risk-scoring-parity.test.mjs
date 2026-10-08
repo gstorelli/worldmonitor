@@ -91,7 +91,7 @@ describe('customs 8-dimension risk scoring parity', () => {
   it('keeps the canonical weights summing to 1.0 across exactly 8 dimensions', () => {
     const weights = canonicalWeights();
     const entries = Object.entries(weights);
-    assert.equal(entries.length, 8, 'the PhD spec defines exactly 8 dimensions');
+    assert.equal(entries.length, 8, 'the v0 model has exactly 8 dimensions');
     const sum = entries.reduce((acc, [, value]) => acc + value, 0);
     assert.ok(Math.abs(sum - 1) < 1e-9, `weights must sum to 1.0 (got ${sum})`);
   });
