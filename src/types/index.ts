@@ -624,6 +624,8 @@ export interface MapLayers {
   weather: boolean;
   economic: boolean;
   waterways: boolean;
+  /** Thesis critical nodes (straits and production areas) with their hazard radius. */
+  criticalNodes?: boolean;
   outages: boolean;
   cyberThreats: boolean;
   datacenters: boolean;

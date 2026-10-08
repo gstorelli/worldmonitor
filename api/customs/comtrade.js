@@ -94,18 +94,6 @@ export function deriveConcentrationAlerts(payloads, { maxAlerts = 20 } = {}) {
     .slice(0, maxAlerts);
 }
 
-function mockAlerts() {
-  return [{
-    id: `comtrade-dummy-${Date.now()}`,
-    source: 'UN_COMTRADE',
-    title: '[DATA PENDING] Copertura partner insufficiente per l\'analisi di concentrazione',
-    severity: 'low',
-    timestamp: new Date().toISOString(),
-    metadata: {
-      note: 'Nessuna linea HS4 con >=3 partner classificati. Esegui scripts/seed-comtrade-bilateral-hs4.mjs e/o configura COMTRADE_API_KEYS per la copertura completa.',
-    },
-  }];
-}
 
 function jsonResponse(body, maxAgeSeconds) {
   return new Response(JSON.stringify(body), {
@@ -133,8 +121,8 @@ export default async function handler(_req) {
       return jsonResponse(derived, 300);
     }
 
-    // 3. No bilateral data seeded yet (or all reads failed).
-    return jsonResponse(mockAlerts(), 60);
+    // 3. No bilateral data seeded yet (or all reads failed): no alerts, never placeholders.
+    return jsonResponse([], 60);
   } catch (err) {
     return new Response(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }), { status: 500 });
   }

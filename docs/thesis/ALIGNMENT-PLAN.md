@@ -6,6 +6,8 @@ Questo piano porta il codice di Risk Sentinel dal motore attuale (v0: parole chi
 
 **Stato all'8 ottobre 2026.** Fatte nella PR `thesis/phase-0-alignment`: la Fase 0 completa; i punti 1 e 2 della Fase 1 (Bab el-Mandeb autonomo, "taiwan" da solo non attiva più lo stretto, con test comportamentale); un pannello *Pericoli dei nodi critici* con i dati ISC-GEM e GVP (anticipa parte delle Fasi 2 e 7). Resta della Fase 1 il test di parità comportamentale tra n8n e sidecar.
 
+**Aggiornamento dell'8 ottobre (sera), PR `thesis/phase-1-platform`.** L'app predefinita è ora *Risk Sentinel* (vista della tesi, `?app=thesis`): mostra solo i pannelli che servono a uno strato del modello, mentre la dashboard ereditata resta in `?app=customs`. Fatte in parte la Fase 2 (registro `src/config/thesis-model.ts`: 12 nodi, mappatura sui chokepoint PortWatch, beni strategici con fonti) e la Fase 3 (endpoint `/api/thesis/triggers` con EMSC e riserva USGS, eventi GDACS, regola del cancello in `src/services/thesis/risk-chain.ts` con test). Nuovi pannelli: *Catena del rischio*, *Inneschi misurati*, *Beni strategici e modulatori*; nuovo livello di mappa *Nodi critici*. Gli endpoint `api/customs/*` non restituiscono più eventi simulati. Restano: il registro condiviso con n8n 02 e con lo script di analisi, i vulcani dal bollettino settimanale, la durata e l'area degli inneschi.
+
 Le fasi 0 e 1 sono pulizia e non cambiano il comportamento della piattaforma. Dalla fase 2 in poi si aggiungono capacità nuove, sempre *accanto* al motore v0, che resta visibile finché la validazione dell'Anno 2 non dice altro.
 
 ---

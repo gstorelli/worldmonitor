@@ -66,6 +66,7 @@ export const LAYER_REGISTRY: Record<keyof MapLayers, LayerDefinition> = {
   cyberThreats:             def('cyberThreats',             '&#128737;', 'cyberThreats',             'Cyber Threats'),
   natural:                  def('natural',                  '&#127755;', 'naturalEvents',            'Natural Events'),
   fires:                    def('fires',                    '&#128293;', 'fires',                    'Fires'),
+  criticalNodes:            def('criticalNodes',            '&#9673;',   'criticalNodes',            'Critical nodes (thesis)', ['flat'], undefined, true),
   waterways:                def('waterways',                '&#9875;',   'strategicWaterways',       'Chokepoints'),
   economic:                 def('economic',                 '&#128176;', 'economicCenters',          'Economic Centers'),
   minerals:                 def('minerals',                 '&#128142;', 'criticalMinerals',         'Critical Minerals'),
@@ -108,6 +109,7 @@ export const LAYER_REGISTRY: Record<keyof MapLayers, LayerDefinition> = {
 
 const VARIANT_LAYER_ORDER: Record<MapVariant, Array<keyof MapLayers>> = {
   full: [
+    'criticalNodes',
     'iranAttacks', 'hotspots', 'conflicts',
     'bases', 'nuclear', 'irradiators', 'radiationWatch', 'spaceports',
     'cables', 'pipelines', 'storageFacilities', 'fuelShortages', 'datacenters', 'military',

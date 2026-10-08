@@ -650,6 +650,29 @@ export class PanelLayoutManager implements AppModule {
       }),
     );
 
+    this.lazyPanel('risk-chain', () =>
+      import('@/components/RiskChainPanel').then(m => {
+        const p = new m.RiskChainPanel();
+        p.setNodeClickHandler((lat: number, lon: number) => { this.ctx.map?.setCenter(lat, lon, 5); });
+        return p;
+      }),
+    );
+
+    this.lazyPanel('trigger-monitor', () =>
+      import('@/components/TriggerMonitorPanel').then(m => {
+        const p = new m.TriggerMonitorPanel();
+        p.setEventClickHandler((lat: number, lon: number) => {
+          this.ctx.map?.setCenter(lat, lon, 6);
+          this.ctx.map?.flashLocation?.(lat, lon, 2500);
+        });
+        return p;
+      }),
+    );
+
+    this.lazyPanel('strategic-goods', () =>
+      import('@/components/StrategicGoodsPanel').then(m => new m.StrategicGoodsPanel()),
+    );
+
     this.lazyPanel('node-hazards', () =>
       import('@/components/NodeHazardsPanel').then(m => {
         const p = new m.NodeHazardsPanel();

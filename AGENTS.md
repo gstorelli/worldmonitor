@@ -138,6 +138,19 @@ npm run lint:safe-html    # OPT-IN ONLY: see "Pre-Push" (fork baseline fails thi
   **policy > user prefs > defaults**. The SPA hydrates prefs at boot and pushes on save
   (`src/services/user-panel-prefs.ts`, `src/services/panel-policy.ts`); admins get an
   "Admin" tab in UnifiedSettings (`src/services/admin-panel-policy.ts`).
+- **Thesis app (default)**: `?app=thesis` (`THESIS_APP` in `src/config/apps.ts`) is the
+  default app. It allows only the panels of the six-layer model (`risk-chain`,
+  `trigger-monitor`, `node-hazards`, `strategic-goods` + map, supply-chain, climate,
+  commodities, trade-policy, sanctions, GDELT as signal, alert-feed) and seeds a map-layer
+  preset once (`mapLayerPreset`, flag `rs-app-layers-seeded:<id>`). Registry:
+  `src/config/thesis-model.ts` (nodes, goods, sourced facts); pure logic:
+  `src/services/thesis/risk-chain.ts` (gate rule, no weights); live seismic triggers:
+  `api/thesis/triggers.js` (EMSC, USGS fallback, 30 days, M>=4.5). The inherited dashboard is
+  `?app=customs` ("Full dashboard").
+- **n8n Code-node sync**: `.github/workflows/n8n-sync.yml` runs `scripts/n8n-sync-code-nodes.mjs`
+  on pushes to `main` that touch `n8n-workflows/**` (or by hand). It patches only Code
+  nodes by workflow/node name and re-activates active workflows; it needs the repository
+  secret `N8N_API_KEY` and prints a warning without it.
 - **Multi-app (Phase 3)**: `src/config/apps.ts` is an app registry layered ON TOP of the
   collapsed variant system (do not revive upstream variants — build-time meta/favicon
   machinery is inert here). `?app=<id>` (persisted in localStorage) selects an app; an

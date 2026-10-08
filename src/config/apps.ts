@@ -4,7 +4,7 @@
  * The platform hosts multiple "apps" over the same SPA/backend. An app is a
  * curated panel allowlist plus a default enabled set for first-time use; the
  * active app is selected with `?app=<id>` (persisted in localStorage) and
- * defaults to `customs`.
+ * defaults to `thesis`.
  *
  * This is deliberately layered ON TOP of the existing collapsed variant system
  * (SITE_VARIANT) instead of reviving upstream variants: the variant machinery
@@ -22,12 +22,54 @@ export interface AppDefinition {
   excludedPanels?: string[];
   /** Panels force-enabled the first time the app is opened. */
   defaultPanels: string[];
+  /**
+   * Map layers switched on the first time the app is opened (every other layer
+   * is switched off once); the user can change them afterwards.
+   */
+  mapLayerPreset?: string[];
 }
+
+/**
+ * Default app: the PhD thesis view of Risk Sentinel (six-layer model). Only the
+ * panels that serve a layer of the model are allowed; everything else stays in
+ * the full dashboard (`?app=customs`).
+ */
+export const THESIS_APP: AppDefinition = {
+  id: 'thesis',
+  label: 'Risk Sentinel',
+  description: 'Six-layer model: triggers at critical nodes to customs risk (PhD thesis view)',
+  allowedPanels: [
+    'map',
+    'risk-chain',
+    'trigger-monitor',
+    'node-hazards',
+    'strategic-goods',
+    'supply-chain',
+    'climate',
+    'commodities',
+    'trade-policy',
+    'sanctions-pressure',
+    'gdelt-intel',
+    'alert-feed',
+  ],
+  defaultPanels: [
+    'map',
+    'risk-chain',
+    'trigger-monitor',
+    'node-hazards',
+    'strategic-goods',
+    'supply-chain',
+    'climate',
+    'commodities',
+    'trade-policy',
+  ],
+  mapLayerPreset: ['criticalNodes', 'natural', 'waterways', 'tradeRoutes'],
+};
 
 export const CUSTOMS_APP: AppDefinition = {
   id: 'customs',
-  label: 'Customs Risk',
-  description: 'PhD customs-risk early warning (current dashboard)',
+  label: 'Full dashboard',
+  description: 'Every panel inherited from WorldMonitor (context and signals)',
   allowedPanels: null,
   // Moved to their dedicated apps: the Zotero/document-analysis workspace
   // (research) and the policy/compliance workspace (policy).
@@ -181,8 +223,8 @@ export const POLICY_APP: AppDefinition = {
   ],
 };
 
-export const APPS: AppDefinition[] = [CUSTOMS_APP, OSINT_APP, RESEARCH_APP, POLICY_APP];
-export const DEFAULT_APP_ID = CUSTOMS_APP.id;
+export const APPS: AppDefinition[] = [THESIS_APP, CUSTOMS_APP, OSINT_APP, RESEARCH_APP, POLICY_APP];
+export const DEFAULT_APP_ID = THESIS_APP.id;
 const APP_STORAGE_KEY = 'rs-active-app';
 const APP_QUERY_PARAM = 'app';
 
@@ -207,7 +249,7 @@ function readStoredApp(): string | null {
 }
 
 export const ACTIVE_APP: AppDefinition = (() => {
-  if (typeof window === 'undefined') return CUSTOMS_APP;
+  if (typeof window === 'undefined') return THESIS_APP;
   const search = window.location.search;
   const appId = resolveAppId(search, readStoredApp());
   if (new URLSearchParams(search).has(APP_QUERY_PARAM)) {
@@ -217,7 +259,7 @@ export const ACTIVE_APP: AppDefinition = (() => {
       // private mode: the app still works, the choice just isn't persisted.
     }
   }
-  return getApp(appId) ?? CUSTOMS_APP;
+  return getApp(appId) ?? THESIS_APP;
 })();
 
 export function isPanelAllowedInApp(panelId: string, appId: string = ACTIVE_APP.id): boolean {

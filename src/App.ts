@@ -576,6 +576,24 @@ export class App {
       }
     }
 
+    // Per-app map preset, applied once per app; the user can change layers afterwards.
+    if (ACTIVE_APP.mapLayerPreset?.length) {
+      const presetKey = `rs-app-layers-seeded:${ACTIVE_APP.id}`;
+      try {
+        if (!localStorage.getItem(presetKey)) {
+          const preset = new Set(ACTIVE_APP.mapLayerPreset);
+          const next = { ...mapLayers } as Record<string, boolean | undefined>;
+          for (const key of Object.keys(next)) next[key] = preset.has(key);
+          for (const key of preset) next[key] = true;
+          mapLayers = sanitizeLayersForVariant(next as unknown as MapLayers, currentVariant as MapVariant);
+          saveToStorage(STORAGE_KEYS.mapLayers, mapLayers);
+          localStorage.setItem(presetKey, '1');
+        }
+      } catch {
+        // storage unavailable: keep the loaded layers
+      }
+    }
+
     const initialUrlState: ParsedMapUrlState | null = parseMapUrlState(window.location.search, mapLayers);
     if (initialUrlState.layers) {
       mapLayers = sanitizeLayersForVariant(initialUrlState.layers, currentVariant as MapVariant);

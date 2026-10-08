@@ -3025,3 +3025,341 @@ a.hub-top-story {
   color: var(--text-muted, #888);
   font-size: 12px;
 }
+
+/* ------------------------------------------------------------------------ */
+/* Thesis panels (six-layer model): risk-chain, trigger-monitor,            */
+/* strategic-goods.                                                          */
+/* ------------------------------------------------------------------------ */
+.thesis-panel {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.thesis-strip {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  margin: 2px 0 8px;
+}
+
+.thesis-strip-cell {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 5px 2px 4px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  background: var(--overlay-subtle);
+  text-align: center;
+}
+
+.thesis-strip-cell b {
+  font-size: 15px;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.thesis-strip-cell span:last-child {
+  font-size: 9px;
+  line-height: 1.15;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.thesis-strip-n {
+  font-size: 9px;
+  color: var(--text-faint);
+}
+
+.thesis-strip-trigger {
+  border-color: color-mix(in srgb, var(--semantic-high) 45%, transparent);
+}
+
+.thesis-strip-risk {
+  border-color: color-mix(in srgb, var(--semantic-critical) 45%, transparent);
+}
+
+.thesis-strip-customs b {
+  color: var(--text-faint);
+}
+
+.thesis-strip-arrow {
+  align-self: center;
+  color: var(--text-faint);
+  font-size: 12px;
+}
+
+.thesis-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.thesis-table th {
+  text-align: left;
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 10px;
+  text-transform: uppercase;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.thesis-table td {
+  padding: 5px 6px;
+  border-bottom: 1px solid var(--border-subtle);
+  vertical-align: top;
+  line-height: 1.35;
+}
+
+.thesis-row {
+  cursor: pointer;
+}
+
+.thesis-row:hover,
+.thesis-row-open {
+  background: var(--surface-hover);
+}
+
+.thesis-row-assess {
+  background: color-mix(in srgb, var(--semantic-critical) 6%, transparent);
+}
+
+.thesis-row b {
+  color: var(--text);
+}
+
+.thesis-muted {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.thesis-nowrap {
+  white-space: nowrap;
+}
+
+.thesis-empty {
+  text-align: center;
+  padding: 14px 6px !important;
+}
+
+.thesis-state {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 3px;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.thesis-state-none {
+  color: var(--text-muted);
+  background: var(--overlay-subtle);
+}
+
+.thesis-state-monitor {
+  color: var(--semantic-elevated);
+  background: color-mix(in srgb, var(--semantic-elevated) 16%, transparent);
+}
+
+.thesis-state-assess {
+  color: var(--semantic-critical);
+  background: color-mix(in srgb, var(--semantic-critical) 18%, transparent);
+}
+
+.thesis-hs {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.thesis-kind {
+  display: inline-block;
+  width: 14px;
+  text-align: center;
+  color: var(--semantic-high);
+}
+
+.thesis-kind-volcano {
+  color: var(--semantic-critical);
+}
+
+.thesis-kind-flood,
+.thesis-kind-cyclone {
+  color: var(--semantic-info);
+}
+
+.thesis-sig {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--semantic-critical);
+  text-transform: uppercase;
+}
+
+.thesis-up {
+  color: var(--semantic-positive);
+}
+
+.thesis-down {
+  color: var(--semantic-high);
+}
+
+.thesis-detail-row td {
+  background: var(--overlay-subtle);
+  cursor: default;
+}
+
+.thesis-detail {
+  padding: 2px 2px 6px;
+}
+
+.thesis-detail p {
+  margin: 2px 0 6px;
+}
+
+.thesis-detail-h {
+  margin: 8px 0 3px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: var(--accent);
+}
+
+.thesis-events,
+.thesis-facts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.thesis-events li {
+  padding: 2px 0;
+}
+
+.thesis-fact {
+  display: flex;
+  gap: 6px;
+  padding: 2px 0;
+}
+
+.thesis-fact-mark {
+  flex: 0 0 auto;
+  width: 12px;
+  text-align: center;
+}
+
+.thesis-fact-ok .thesis-fact-mark {
+  color: var(--semantic-positive);
+}
+
+.thesis-fact-todo {
+  color: var(--text-muted);
+}
+
+.thesis-fact-src {
+  color: var(--text-faint);
+  font-size: 10px;
+}
+
+.thesis-panel a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.thesis-panel a:hover {
+  text-decoration: underline;
+}
+
+.thesis-good {
+  margin: 4px 0 8px;
+}
+
+.thesis-good-title {
+  margin-bottom: 2px;
+  color: var(--text);
+}
+
+.thesis-filters {
+  display: flex;
+  gap: 6px;
+  margin: 2px 0 6px;
+}
+
+.thesis-filter {
+  font: inherit;
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.thesis-filter.active {
+  color: var(--text);
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.thesis-goodcard {
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  margin-bottom: 6px;
+}
+
+.thesis-goodcard-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  cursor: pointer;
+}
+
+.thesis-goodcard-head b {
+  color: var(--text);
+}
+
+.thesis-goodcard-head:hover {
+  background: var(--surface-hover);
+}
+
+.thesis-goodcard-meta {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.thesis-goodcard-body {
+  padding: 0 8px 8px;
+}
+
+.thesis-goodcard-body p {
+  margin: 2px 0 4px;
+}
+
+.thesis-pilot {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 3px;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.thesis-note {
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-muted);
+  padding: 8px 4px 2px;
+}

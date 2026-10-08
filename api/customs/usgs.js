@@ -9,17 +9,8 @@ export default async function handler(_req) {
   
   try {
     const cached = await readJsonFromUpstash(cacheKey);
-    const mockData = [{
-      id: `usgs-dummy-${Date.now()}`,
-      source: 'USGS',
-      title: '[N8N SYNC PENDING] Scossa Sismica M 4.0 Simulativa',
-      severity: 'low',
-      coordinates: [-122.4194, 37.7749],
-      timestamp: new Date().toISOString(),
-      metadata: { note: 'Dati simulati. Flusso n8n non ancora inizializzato.' }
-    }];
 
-    return new Response(JSON.stringify(cached || mockData), {
+    return new Response(JSON.stringify(Array.isArray(cached) ? cached : []), {
       headers: {
         'Content-Type': 'application/json',
         'Cache-Control': 's-maxage=60',
