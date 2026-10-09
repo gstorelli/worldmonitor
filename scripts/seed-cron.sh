@@ -8,6 +8,7 @@
 #   ./scripts/seed-cron.sh intel    # insights -> forecasts -> correlation (hourly)
 #   ./scripts/seed-cron.sh signals  # gdelt-intel, cross-source, chokepoints, FX (hourly)
 #   ./scripts/seed-cron.sh slow     # sanctions + UCDP                    (every 6h)
+#   ./scripts/seed-cron.sh thesis   # thesis triggers: USGS quakes, GDACS/EONET, climate (hourly)
 #   ./scripts/seed-cron.sh full     # everything else                     (weekly)
 #
 # Rules that keep the box predictable:
@@ -57,13 +58,21 @@ case "$TIER" in
     run sanctions 300
     run ucdp 240
     ;;
+  thesis)
+    # Trigger layer of the thesis view. TTLs: earthquakes 6h, natural events
+    # 18h, climate anomalies 9h — the weekly sweep alone leaves them expired
+    # for most of the week. (Chokepoint transits come from ais-relay.)
+    run earthquakes 180
+    run natural-events 240
+    run climate-anomalies 300
+    ;;
   full)
     # Everything without a tier of its own: the weekly catch-all.
-    export SEED_SKIP="market-quotes,commodity,insights,forecasts,correlation,gdelt-intel,cross-source,chokepoint,ecb-fx,sanctions,ucdp"
+    export SEED_SKIP="market-quotes,commodity,insights,forecasts,correlation,gdelt-intel,cross-source,chokepoint,ecb-fx,sanctions,ucdp,earthquakes,natural-events,climate-anomalies"
     run "" 240
     ;;
   *)
-    echo "usage: seed-cron.sh {quotes|intel|signals|slow|full}" >&2
+    echo "usage: seed-cron.sh {quotes|intel|signals|slow|thesis|full}" >&2
     exit 2
     ;;
 esac

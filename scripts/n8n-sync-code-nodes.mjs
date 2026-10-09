@@ -75,6 +75,13 @@ export function patchCodeNodes(live, committed) {
   return { nodes, changed, missing };
 }
 
+/** Live names sharing a distinctive word with the committed name (helps after a rename in n8n). */
+export function similarNames(name, liveNames) {
+  const stop = new Set(['risk', 'sentinel', 'ingestion', 'data', 'and', 'the']);
+  const words = name.toLowerCase().split(/[^a-z0-9-]+/).filter((w) => w.length > 2 && !stop.has(w));
+  return liveNames.filter((n) => words.some((w) => n.toLowerCase().includes(w))).slice(0, 8);
+}
+
 export function updateBody(live, nodes) {
   const settings = {};
   for (const k of SETTINGS_KEYS) if (live.settings && k in live.settings) settings[k] = live.settings[k];
@@ -125,7 +132,11 @@ async function main() {
     const committed = JSON.parse(readFileSync(join(WF_DIR, file), 'utf8'));
     const matches = live.filter((w) => w.name === committed.name);
     if (matches.length !== 1) {
-      note('warning', `${file}: ${matches.length} live workflows named "${committed.name}" — skipped.`);
+      const similar = similarNames(committed.name, live.map((w) => w.name));
+      note(
+        'warning',
+        `${file}: ${matches.length} live workflows named "${committed.name}" — skipped.${similar.length ? ` Similar live names: ${similar.map((n) => `"${n}"`).join(', ')}.` : ''}`,
+      );
       continue;
     }
     try {
