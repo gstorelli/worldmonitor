@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { patchCodeNodes, selectFiles, updateBody } from '../scripts/n8n-sync-code-nodes.mjs';
+import { patchCodeNodes, selectFiles, similarNames, updateBody } from '../scripts/n8n-sync-code-nodes.mjs';
 
 const live = {
   id: 'w1',
@@ -43,5 +43,10 @@ describe('n8n code-node sync', () => {
     const all = ['01-a.json', '08-x-legacy.json', 'README.md', '02-b.json'];
     assert.deepEqual(selectFiles(all), ['01-a.json', '02-b.json']);
     assert.deepEqual(selectFiles(all, '02-b.json, 08-x-legacy.json'), ['02-b.json']);
+  });
+
+  it('suggests similar live names after a rename in n8n', () => {
+    const live = ['Risk Sentinel — GDELT Customs Ingestion v2', 'Risk Sentinel — USGS Seismic Data Ingestion', 'Other'];
+    assert.deepEqual(similarNames('Risk Sentinel — GDELT Customs Intelligence Ingestion', live), ['Risk Sentinel — GDELT Customs Ingestion v2']);
   });
 });
