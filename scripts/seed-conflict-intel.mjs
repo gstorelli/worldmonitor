@@ -205,7 +205,14 @@ const HAPI_APP_IDENTIFIER = Buffer.from(
 
 // ─── ACLED Events ───
 
+// ACLED is disabled in Risk Sentinel. ACLED's EULA forbids using its data with
+// AI/ML/LLM systems, academic use included, and ACLED declined an access upgrade for
+// this project (October 2026). Never return a token: callers treat null as
+// "source unavailable" and continue with the other sources.
+const ACLED_DISABLED = true;
+
 async function fetchAcledToken() {
+  if (ACLED_DISABLED) return null;
   // Priority 1: ACLED_EMAIL + ACLED_PASSWORD -> OAuth flow (matches server/acled-auth.ts)
   const email = process.env.ACLED_EMAIL?.trim();
   const password = process.env.ACLED_PASSWORD?.trim();

@@ -21,7 +21,17 @@ const ACLED_CLIENT_ID = 'acled';
  * @param {string} [options.userAgent] - User-Agent header value.
  * @returns {Promise<string|null>}
  */
+// ACLED is disabled in Risk Sentinel. ACLED's EULA forbids using its data with
+// AI/ML/LLM systems, academic use included, and ACLED declined an access upgrade for
+// this project (October 2026). Never return a token: callers treat null as
+// "source unavailable" and continue with the other sources.
+export const ACLED_DISABLED = true;
+
 export async function getAcledToken({ userAgent } = {}) {
+  if (ACLED_DISABLED) {
+    console.log('  ACLED: disabled (licence excludes AI/LLM use) — skipping');
+    return null;
+  }
   const email = (process.env.ACLED_EMAIL || '').trim();
   const password = (process.env.ACLED_PASSWORD || '').trim();
 

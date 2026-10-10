@@ -52,7 +52,6 @@ case "$TIER" in
     run cross-source 240
     run chokepoint 180
     run ecb-fx 180
-    run acled 180
     ;;
   slow)
     run sanctions 300
@@ -68,7 +67,7 @@ case "$TIER" in
     ;;
   full)
     # Everything without a tier of its own: the weekly catch-all.
-    export SEED_SKIP="market-quotes,commodity,insights,forecasts,correlation,gdelt-intel,cross-source,chokepoint,ecb-fx,sanctions,ucdp,earthquakes,natural-events,climate-anomalies"
+    export SEED_SKIP="market-quotes,commodity,insights,forecasts,correlation,gdelt-intel,cross-source,chokepoint,ecb-fx,acled,sanctions,ucdp,earthquakes,natural-events,climate-anomalies"
     run "" 240
     ;;
   *)

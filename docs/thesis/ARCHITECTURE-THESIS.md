@@ -13,14 +13,14 @@ specified, not implemented. **To build** = not started.
 
 | Layer | What it needs | What exists today | Status |
 |---|---|---|---|
-| 1. Trigger | Measured events with intensity, area, duration, frequency | USGS M4.5+ feed (`seismology:earthquakes:v1`, n8n 02); GDACS + NASA EONET + NOAA (`natural:events:v1`); Open-Meteo anomalies (n8n 03); ACLED conflicts (`scripts/seed-acled-events.mjs`); century statistics (ISC-GEM, GVP) shown in the *Critical node hazards* panel (`src/config/node-hazards.ts`), reproducible with `research/hazard-stats/` | Collected, not linked to the score |
+| 1. Trigger | Measured events with intensity, area, duration, frequency | USGS M4.5+ feed (`seismology:earthquakes:v1`, n8n 02); GDACS + NASA EONET + NOAA (`natural:events:v1`); Open-Meteo anomalies (n8n 03); UCDP conflict events (`scripts/seed-ucdp-events.mjs`; ACLED is excluded by its licence); century statistics (ISC-GEM, GVP) shown in the *Critical node hazards* panel (`src/config/node-hazards.ts`), reproducible with `research/hazard-stats/` | Collected, not linked to the score |
 | 2. Critical node | Registry of chokepoints, ports, production areas with coordinates and geology | `src/config/chokepoint-registry.ts`, `server/_shared/chokepoint-registry.ts`; PortWatch chokepoints and ports (`portwatch:chokepoints:ref:v1`, `supply_chain:portwatch:v1`, `supply_chain:portwatch-ports:v1:*`, `portwatch:disruptions:active:v1`) | Chokepoints and ports: implemented (inherited from WorldMonitor). Production areas: to build |
 | 3. Strategic good | HS/CN codes at detailed level, EU criticality | `data/hs-commodity-map.json`; HS4 list in `scripts/seed-comtrade-bilateral-hs4.mjs`; HS2 exposure (`supply-chain:exposure:*`) | Partially implemented (HS4 level, no CRMA criticality) |
 | 4. Supply vulnerability | Import dependence, supplier concentration, substitutability | Single-supplier share from UN Comtrade (`api/customs/comtrade.js`, `comtrade:bilateral-hs4:<ISO2>:v1`) with arbitrary thresholds 0.45/0.60/0.75 | Partially implemented; needs HHI / CRMA method and documented thresholds |
 | 5. Customs vulnerability | Indicators for capacity, profile obsolescence, misdeclaration incentive | None in the open instance | To build (public indicators, §3) |
 | 6. Customs risk | Hazard-gated combination, alert with goods/origins/window | `src/services/customs-risk-scoring.ts` (weighted sum of 8 keyword-based dimensions, mirrored in n8n 01 and `src-tauri/sidecar/services/scoring.ts`) | Implemented as a provisional v0; does not comply with the model rule (positive score with zero hazard) |
 | Modulators | Tariffs, trade defence, sanctions, export bans | Policy monitor (EUR-Lex, n8n 06, `policy:monitor:v1`); trade-policy panels inherited from WorldMonitor | Partially implemented (news-level, not measure-level) |
-| Signals | News/OSINT, vessel traffic, physical feeds | GDELT (n8n 01), ACLED, AIS relay, intelligence feeds, PortWatch | Implemented |
+| Signals | News/OSINT, vessel traffic, physical feeds | GDELT (n8n 01), UCDP, AIS relay, intelligence feeds, PortWatch | Implemented |
 
 ## 2. The current scoring engine (v0) and its known limits
 

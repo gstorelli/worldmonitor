@@ -199,7 +199,7 @@ Active workflows live in `n8n-workflows/` and are imported manually into n8n.
   endpoint returns 503 unless `ALLOW_ANONYMOUS_N8N_INGEST=true`. Workflows
   01–06 use the shared n8n credential `Risk Sentinel Ingest Bearer`.
 - Pipelines write **dedicated keys** `risk_sentinel:n8n:<resource>` (gdelt,
-  usgs, openmeteo, commodities, acled); the sole canonical exception is
+  usgs, openmeteo, commodities; `acled` is retired); the sole canonical exception is
   `policy:monitor:v1`. Contract: `tests/n8n-workflows-contract.test.mjs`.
 - **Notify** (`api/notify/config.js`): anonymous `GET` is **redacted** (no
   botToken/smtpUrl/chatId/to, but `enabled`/`connected` kept); the n8n workflow
@@ -207,14 +207,18 @@ Active workflows live in `n8n-workflows/` and are imported manually into n8n.
   into the stored config so a redacted round-trip never wipes credentials.
 - Workflow 07 ("intelligence notifications") reads config + digest and delivers
   Telegram/email. After changing its JSON you must re-import it in n8n.
-- **ACLED is no longer an n8n pair**: the Token Manager + conflict-ingestion
-  workflows are superseded by `scripts/seed-acled-events.mjs` (OAuth password
-  grant from `ACLED_EMAIL`/`ACLED_PASSWORD`, 30-day events, chokepoint/fatality
-  scoring, writes `risk_sentinel:n8n:acled` + `seed-meta:n8n:acled`). It runs in
-  the `signals` cron tier. The pair stays unpublished in n8n; do not re-publish
-  it without removing this seeder, or the two writers will fight over the key.
-  A 403 "Access denied" on the data endpoint means the ACLED account lacks the
-  Research/Partner tier — that is an entitlement, not a code problem.
+- **ACLED is disabled, and must stay disabled.** ACLED's EULA forbids using its
+  data with AI/ML/LLM systems (academic use included), and in October 2026 ACLED
+  refused an access upgrade for this project. Every token entry point
+  (`scripts/shared/acled-oauth.mjs`, `server/_shared/acled-auth.ts`,
+  `scripts/seed-conflict-intel.mjs`, `scripts/seed-acled-events.mjs`) returns no
+  token behind an `ACLED_DISABLED` constant; compose no longer passes `ACLED_*`
+  credentials; the seeder is out of the cron tiers and the n8n workflow 05 is
+  legacy. Conflict seeders fall back to their other sources (GDELT, UCDP). Do not
+  re-enable ACLED in any form. Conflict events come from **UCDP**
+  (`scripts/seed-ucdp-events.mjs`, `slow` tier, header `x-ucdp-access-token` from
+  `UCDP_ACCESS_TOKEN` in the VPS `.env` only). In the thesis model conflict data
+  is a signal or a modulator; it is a trigger only when it interrupts a node.
 - **Editing workflows through the n8n MCP** (`scripts/n8n-mcp.mjs`, token in
   `.env` as `API_MCP_N8N`):
   `node --env-file=.env scripts/n8n-mcp.mjs call <tool> '<json>'`.

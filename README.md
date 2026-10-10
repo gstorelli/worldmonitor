@@ -71,7 +71,7 @@ Le Dogane necessitano di un sistema che:
 
 Risk Sentinel risponde a queste esigenze con un approccio **multimodale e multi-sorgente**, combinando:
 
-- **Data Fusion**: aggregazione automatica di eventi geopolitici (GDELT), conflitti armati (ACLED), dati sismici (USGS), anomalie climatiche (Open-Meteo), e prezzi commodity (Yahoo Finance/Alpha Vantage)
+- **Data Fusion**: aggregazione automatica di eventi geopolitici (GDELT), conflitti armati (UCDP), dati sismici (USGS), anomalie climatiche (Open-Meteo), e prezzi commodity (Yahoo Finance/Alpha Vantage)
 - **Explainable Scoring**: punteggio a 8 dimensioni con decomposizione trasparente (motore v0: pesi provvisori, non ancora validati — vedi [`docs/thesis/`](./docs/thesis/))
 - **Low-Code Orchestration**: pipeline n8n per rendere trasparente, visiva e riproducibile l'intera catena di elaborazione dati
 - **Visual Intelligence**: interfaccia geo-spaziale che traduce i dati grezzi in consapevolezza situazionale
@@ -96,7 +96,7 @@ Risk Sentinel risponde a queste esigenze con un approccio **multimodale e multi-
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                            SORGENTI DATI                               │
-│  GDELT · USGS · Open-Meteo · ACLED · Yahoo Finance · UN Comtrade      │
+│  GDELT · USGS · Open-Meteo · UCDP · Yahoo Finance · UN Comtrade      │
 └───────────┬──────────────┬──────────────┬──────────────┬───────────────┘
             │              │              │              │
             ▼              ▼              ▼              ▼
@@ -104,7 +104,7 @@ Risk Sentinel risponde a queste esigenze con un approccio **multimodale e multi-
 │                       n8n ORCHESTRATION LAYER                          │
 │                                                                         │
 │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐    │
-│  │ GDELT    │ │ USGS     │ │ Climate  │ │Commodity │ │ ACLED    │    │
+│  │ GDELT    │ │ USGS     │ │ Climate  │ │Commodity │ │ UCDP     │    │
 │  │ Customs  │ │ Seismic  │ │ Anomaly  │ │ Prices   │ │ Conflict │    │
 │  │ Intel    │ │ Impact   │ │ Detect   │ │ (HS)     │ │ Trade    │    │
 │  └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘    │
@@ -195,7 +195,7 @@ RiskScore = 0.18 × EventSeverity
 | **GDELT** | Geopolitica | Articoli news globali con tone analysis | Ogni 2h | Doc API v2 |
 | **USGS** | Geofisica | Terremoti M4.5+ globali | Ogni 1h | GeoJSON Feed |
 | **Open-Meteo** | Clima | Anomalie temperatura/precipitazioni in 15 zone | Ogni 3h | Archive API |
-| **ACLED** | Conflitti | Battaglie, esplosioni, violenza su civili (30gg) | Ogni 6h | REST API v3 |
+| **UCDP** | Conflitti | Eventi di violenza organizzata georeferenziati (GED) | Ogni 6h | REST API con token |
 | **Yahoo Finance** | Mercati | Prezzi real-time commodity (futures, ETF) | Ogni 30min | Chart API v8 |
 | **Alpha Vantage** | Mercati | WTI, Brent, NG, Copper, Aluminum | Ogni 30min | Physical Commodity |
 | **UN Comtrade** | Commercio | Flussi commerciali bilaterali per paese | Pianificato | REST API |
@@ -224,7 +224,7 @@ I file JSON si trovano nella cartella [`n8n-workflows/`](./n8n-workflows/):
 | 02 | USGS Seismic Trade Impact | USGS GeoJSON | Terremoti → proximity scoring su rotte/porti/siti nucleari |
 | 03 | Climate Trade Anomalies | Open-Meteo | 15 zone → anomaly detection → trade impact assessment |
 | 04 | Commodity Prices (HS) | Yahoo Finance | 14 commodity con codici HS → volatilità → alert level |
-| 05 | ACLED Conflict Impact | ACLED API | Conflitti armati → proximity scoring a chokepoint marittimi |
+| 05 | ACLED Conflict Impact (legacy) | — | Disattivato: la licenza ACLED vieta l'uso con sistemi di IA/LLM |
 
 Per istruzioni dettagliate su import e configurazione, vedi [`n8n-workflows/README.md`](./n8n-workflows/README.md).
 
@@ -343,7 +343,7 @@ RISK_SENTINEL_WEBHOOK_URL=                  # URL completo usato dai workflow n8
 
 # ─── API Keys (opzionali, migliorano copertura dati) ───
 OPENROUTER_API_KEY=your-key                 # LLM per AI insights
-ACLED_ACCESS_TOKEN=your-token               # Conflict data (ACLED)
+UCDP_ACCESS_TOKEN=your-token                # Conflict data (UCDP GED)
 FRED_API_KEY=your-key                       # Macro indicators (FRED)
 EIA_API_KEY=your-key                        # Energy data (EIA)
 FINNHUB_API_KEY=your-key                    # Stock quotes
@@ -618,7 +618,7 @@ Rimosso anche il residuo `convex` dal runtime package.
 - I workflow Risk Sentinel su n8n spingono con nodi HTTP reali
   (`POST https://risksentinel.opencyber.org/api/n8n/ingest`) con header
   `Authorization: Bearer $N8N_INGEST_SECRET`.
-- **Stato operativo (15/08/2026)**: attivi USGS, Climate, Commodity, ACLED,
+- **Stato operativo (15/08/2026)**: attivi USGS, Climate, Commodity,
   Policy Monitor (trigger riparato) e Notifications; disattivati i due workflow
   legacy ("Trade Monitor" RSS — output a vicolo cieco — e "AI Enhanced" — LLM,
   parser instabile), esportati in `n8n-workflows/08-*` e `09-*` come riferimento.
@@ -633,7 +633,6 @@ Rimosso anche il residuo `convex` dal runtime package.
 | `/api/gpsjam` 503 | gpsjam.org non raggiungibile dal VPS — il pannello degrada |
 | Polymarket "No markets returned" | API Polymarket bloccata/vuota verso il VPS |
 | Military Flight Tracking "No flights" | adsb.lol/OpenSky vuoti al momento del fetch |
-| ACLED `403 Forbidden` | token ACLED servito dal webhook Token Manager con race refresh/ingest — mitigato con `retryOnFail` sul nodo di fetch |
 
 ### Popolamento dati (seeding self-hosted)
 
@@ -738,7 +737,7 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST https://risksentinel.opencyber.
 │   ├── 02-usgs-seismic-ingestion.json
 │   ├── 03-climate-anomalies-ingestion.json
 │   ├── 04-commodity-prices-ingestion.json
-│   ├── 05-acled-conflict-ingestion.json
+│   ├── 05-acled-conflict-ingestion-legacy.json   (disattivato)
 │   └── README.md
 ├── shared/                     # JSON configs cross-platform
 ├── proto/                      # Protobuf definitions
@@ -874,7 +873,7 @@ Risk Sentinel è un **fork** di [WorldMonitor](https://github.com/koala73/worldm
 
 ### Fonti dati (pipeline WorldMonitor e del fork)
 
-- **Geopolitica e conflitti**: GDELT, ACLED, UCDP, GDACS, ReliefWeb, ACAPS, NASA FIRMS, USGS, NOAA/NWS, Open-Meteo, IMF PortWatch.
+- **Geopolitica e conflitti**: GDELT, UCDP, GDACS, ReliefWeb, ACAPS, NASA FIRMS, USGS, NOAA/NWS, Open-Meteo, IMF PortWatch.
 - **Commercio e dogane**: UN Comtrade, WTO, World Customs Organization, EUR-Lex, Gazzetta Ufficiale; dataset doganali del fork.
 - **Macro e mercati**: FRED, IMF, World Bank, BIS, ECB, Eurostat, EIA, FAO, JODI, GIE AGSI, Ember, OWID, Yahoo Finance, CoinGecko/CoinPaprika, Polymarket/Kalshi.
 - **Sanità e sicurezza**: WHO, ECDC, IAEA, Radiation Watch.
