@@ -45,6 +45,7 @@ export const PANEL_TIERS: Record<string, PanelTier> = {
   'risk-chain': 1,
   'trigger-monitor': 1,
   'strategic-goods': 1,
+  'response-outlook': 1,
 
   // ── Tier 3: DISABLED (speculative / crypto / startup) ──────────────────
   'crypto': 3,

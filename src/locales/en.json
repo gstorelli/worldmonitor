@@ -342,6 +342,7 @@
     "riskChain": "Risk chain · six layers",
     "triggerMonitor": "Measured triggers at critical nodes",
     "strategicGoods": "Strategic goods & modulators",
+    "responseOutlook": "Response outlook (PoC)",
     "nodeHazards": "Critical Node Hazards",
     "securityAdvisories": "Security Advisories",
     "orefSirens": "Israel Sirens",
@@ -1678,6 +1679,62 @@
       "infoTooltip": "<strong>Global Tech Readiness</strong><br>Composite score (0-100) based on World Bank data:<br><br><strong>Metrics shown:</strong><br>🌐 Internet Users (% of population)<br>📱 Mobile Subscriptions (per 100 people)<br>🔬 R&D Expenditure (% of GDP)<br><br><strong>Weights:</strong> R&D (35%), Internet (30%), Broadband (20%), Mobile (15%)<br><br><em>— = No recent data available</em><br><em>Source: World Bank Open Data (2019-2024)</em>"
     },
     "thesis": {
+      "response": {
+        "infoTooltip": "<strong>Response outlook (proof of concept)</strong><br>What an administration could do with an alert. <strong>Responses</strong>: administrative actions inside the customs mandate, suggested only when a significant measured trigger hits a node with exposed goods. <strong>Policy scenarios</strong>: tariff and trade-defence changes are modulators of the model; the panel shows only the direction of the change in the incentive to misdeclare, never a recommendation. Not validated; in the Bari pilot it would only be logged (shadow mode).",
+        "banner": "Future outlook · proof of concept — not validated, never applied to controls",
+        "tab": {
+          "responses": "Responses",
+          "scenarios": "Policy scenarios"
+        },
+        "loading": "Waiting for the measured triggers…",
+        "noActive": "No node is hit by a significant trigger now: no response is suggested (rule of the model).",
+        "simulate": "Simulate a significant trigger at:",
+        "simulateNone": "— no simulation —",
+        "hypothetical": "hypothetical",
+        "live": "measured",
+        "blocked": {
+          "no-trigger": "No trigger in the node zone: no induced risk, no response.",
+          "minor-trigger": "Only minor triggers: monitoring, no response.",
+          "no-goods": "Strategic goods transiting this strait still have to be estimated (Comext, PortWatch): responses are not derived yet."
+        },
+        "channels": "Misdeclaration channels",
+        "channelsTbd": "Measures in force not listed yet: misdeclaration channels to be determined (Chapter 3).",
+        "channel": {
+          "origin": "origin",
+          "value": "value",
+          "classification": "classification",
+          "capacity": "office capacity"
+        },
+        "level": {
+          "office": "Office (risk profiles)",
+          "national": "National (ADM)",
+          "eu": "EU (CRMS)"
+        },
+        "window": "Arrival window: [SPERIMENTAZIONE ANNO 2 – lead time from the historical replay]",
+        "scenarioIntro": "What if a modulator changes? Direction of the incentive to misdeclare per channel (↑ more, ↓ less, = unchanged). No magnitudes: these are qualitative consequences of the treatment differential, not forecasts.",
+        "structural": "No significant trigger on the nodes of this good now: the change is structural only and creates no induced risk by itself.",
+        "amplified": "A significant trigger hits a node of this good now: the change acts on a good that may become scarce.",
+        "custom": "Build a scenario",
+        "anyGood": "Any strategic raw material",
+        "kind": {
+          "origin-specific": "Origin-specific measure (anti-dumping, sanction)",
+          "erga-omnes-duty": "Duty for all origins",
+          "export-restriction": "Producer-country export restriction"
+        },
+        "change": {
+          "introduce": "introduced",
+          "remove": "removed",
+          "raise": "raised",
+          "lower": "lowered or suspended"
+        },
+        "dir": {
+          "up": "incentive increases",
+          "down": "incentive decreases",
+          "same": "unchanged"
+        },
+        "footerResponses": "Suggestions are rule-based and generic; their form (profiles, notes, circulars) is to be defined with ADM. Shadow mode: they are logged, never applied.",
+        "footerScenarios": "Duties are decided at EU level and are outside the customs mandate: these are scenarios on modulators for the policy outlook of the thesis, not recommendations."
+      },
       "loading": "Loading measured triggers…",
       "error": "Thesis data unavailable",
       "updated": "updated",

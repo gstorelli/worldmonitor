@@ -3363,3 +3363,87 @@ a.hub-top-story {
   color: var(--text-muted);
   padding: 8px 4px 2px;
 }
+
+/* Response outlook (PoC) */
+.thesis-poc {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 4px 8px;
+  margin-bottom: 6px;
+  border: 1px dashed var(--semantic-elevated);
+  border-radius: 4px;
+  color: var(--semantic-elevated);
+}
+
+.thesis-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.thesis-tab {
+  flex: 1 1 0;
+  padding: 4px 6px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  background: var(--overlay-subtle);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.thesis-tab.active {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.thesis-response-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.thesis-response-form select {
+  max-width: 100%;
+  font-size: 11px;
+  padding: 2px 4px;
+  color: var(--text);
+  background: var(--overlay-subtle);
+  border: 1px solid var(--border-subtle);
+  border-radius: 3px;
+}
+
+.thesis-response-level {
+  margin-top: 6px;
+}
+
+.thesis-response-basis {
+  display: block;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.thesis-dir {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 11px;
+  background: var(--overlay-subtle);
+}
+
+.thesis-dir-up {
+  color: var(--semantic-critical);
+}
+
+.thesis-dir-down {
+  color: var(--semantic-normal, var(--accent));
+}
+
+.thesis-dir-same {
+  color: var(--text-muted);
+}

@@ -265,6 +265,7 @@
     "riskChain": "Catena del rischio · sei strati",
     "triggerMonitor": "Inneschi misurati sui nodi critici",
     "strategicGoods": "Beni strategici e modulatori",
+    "responseOutlook": "Risposta e scenari (PoC)",
     "nodeHazards": "Pericoli dei nodi critici",
     "startups": "Startup e VC",
     "vcblogs": "Approfondimenti VC e Saggi",
@@ -1509,6 +1510,62 @@
       "infoTooltip": "<strong>Dati UNHCR sugli sfollamenti</strong> Conteggio globale di rifugiati, richiedenti asilo e sfollati interni forniti dall'UNHCR.<ul><li><strong>Origins</strong>: Paesi in cui le persone fuggono DA</li><li><strong>Ospiti</strong>: Paesi che ospitano rifugiati</li><li>Crisi distintivi: >1M | Alto: >500.000 spostati</li></ul>Aggiornamenti dei dati ogni anno. Licenza CC BY 4.0."
     },
     "thesis": {
+      "response": {
+        "infoTooltip": "<strong>Risposta e scenari (proof of concept)</strong><br>Cosa potrebbe fare un'amministrazione con un'allerta. <strong>Risposte</strong>: azioni amministrative dentro il mandato doganale, suggerite solo quando un innesco misurato significativo colpisce un nodo con beni esposti. <strong>Scenari di policy</strong>: le variazioni di dazi e misure di difesa commerciale sono modulatori del modello; il pannello mostra solo la direzione in cui cambia l'incentivo a dichiarare il falso, mai una raccomandazione. Non validato; nel pilota di Bari verrebbe solo registrato (shadow mode).",
+        "banner": "Prospettiva futura · proof of concept — non validato, mai applicato ai controlli",
+        "tab": {
+          "responses": "Risposte",
+          "scenarios": "Scenari di policy"
+        },
+        "loading": "In attesa degli inneschi misurati…",
+        "noActive": "Nessun nodo è colpito ora da un innesco significativo: nessuna risposta suggerita (regola del modello).",
+        "simulate": "Simula un innesco significativo su:",
+        "simulateNone": "— nessuna simulazione —",
+        "hypothetical": "ipotetico",
+        "live": "misurato",
+        "blocked": {
+          "no-trigger": "Nessun innesco nella zona del nodo: nessun rischio indotto, nessuna risposta.",
+          "minor-trigger": "Solo inneschi minori: monitoraggio, nessuna risposta.",
+          "no-goods": "I beni strategici in transito nello stretto sono ancora da stimare (Comext, PortWatch): le risposte non si possono ancora derivare."
+        },
+        "channels": "Canali di mis-declaration",
+        "channelsTbd": "Misure in vigore non ancora censite: canali di mis-declaration da determinare (Capitolo 3).",
+        "channel": {
+          "origin": "origine",
+          "value": "valore",
+          "classification": "classificazione",
+          "capacity": "capacità degli uffici"
+        },
+        "level": {
+          "office": "Ufficio (profili di rischio)",
+          "national": "Nazionale (ADM)",
+          "eu": "UE (CRMS)"
+        },
+        "window": "Finestra di arrivo: [SPERIMENTAZIONE ANNO 2 – anticipo misurato sul replay storico]",
+        "scenarioIntro": "Cosa succede se cambia un modulatore? Direzione dell'incentivo a dichiarare il falso per canale (↑ aumenta, ↓ diminuisce, = invariato). Nessuna grandezza: sono conseguenze qualitative del differenziale di trattamento, non previsioni.",
+        "structural": "Nessun innesco significativo ora sui nodi di questo bene: la variazione è solo strutturale e da sola non genera rischio indotto.",
+        "amplified": "Un innesco significativo colpisce ora un nodo di questo bene: la variazione agisce su un bene che può diventare scarso.",
+        "custom": "Costruisci uno scenario",
+        "anyGood": "Qualsiasi materia prima strategica",
+        "kind": {
+          "origin-specific": "Misura per origine (antidumping, sanzione)",
+          "erga-omnes-duty": "Dazio per tutte le origini",
+          "export-restriction": "Restrizione all'export del paese produttore"
+        },
+        "change": {
+          "introduce": "introdotta",
+          "remove": "rimossa",
+          "raise": "aumentato",
+          "lower": "ridotto o sospeso"
+        },
+        "dir": {
+          "up": "l'incentivo aumenta",
+          "down": "l'incentivo diminuisce",
+          "same": "invariato"
+        },
+        "footerResponses": "Suggerimenti generici basati su regole; la forma (profili, note, circolari) va definita con ADM. Shadow mode: si registrano, non si applicano.",
+        "footerScenarios": "I dazi si decidono a livello UE e sono fuori dal mandato doganale: questi sono scenari sui modulatori per la prospettiva di policy della tesi, non raccomandazioni."
+      },
       "loading": "Caricamento degli inneschi misurati…",
       "error": "Dati della tesi non disponibili",
       "updated": "aggiornato",

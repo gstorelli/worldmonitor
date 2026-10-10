@@ -45,6 +45,13 @@ Trigger → Critical node → Strategic good → Supply vulnerability → Custom
   Rule: *dated event = trigger; lasting condition = modulator.*
 - **Signals**: measured physical data, vessel traffic, news/OSINT, customs data. They
   anticipate and corroborate; **they never measure the hazard**.
+- **Response** (future outlook, proof of concept): what an administration could do with
+  an alert. Administrative responses inside the customs mandate (risk profiles, notes to
+  offices, EU risk-information sharing) are suggested only behind the model rule and are
+  only logged in the pilot. Tariff and trade-defence changes are outside the customs
+  mandate: they enter only as "what if" scenarios on modulators (direction of the
+  misdeclaration incentive, no magnitudes) and as policy implications, never as
+  recommendations.
 
 **Rule of the model**: no trigger hitting a node, or no exposed goods → no induced
 risk. Any formula that yields a positive score with zero hazard is non-compliant.
