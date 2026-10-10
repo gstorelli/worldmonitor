@@ -189,7 +189,17 @@ export async function fetchAcledEvents({ baseUrl, token, lookbackDays = LOOKBACK
   return payload.data;
 }
 
+// ACLED is disabled in Risk Sentinel. ACLED's EULA forbids using its data with
+// AI/ML/LLM systems, academic use included, and ACLED declined an access upgrade for
+// this project (October 2026). Never return a token: callers treat null as
+// "source unavailable" and continue with the other sources.
+export const ACLED_DISABLED = true;
+
 export async function main() {
+  if (ACLED_DISABLED) {
+    console.log('[acled] disabled: the ACLED licence excludes AI/LLM use — nothing fetched, nothing written');
+    return;
+  }
   loadEnvFile(import.meta.url);
   const baseUrl = (process.env.ACLED_BASE_URL || 'https://acleddata.com').replace(/\/$/, '');
   const email = process.env.ACLED_EMAIL || process.env.ACLED_USERNAME || '';

@@ -10,7 +10,6 @@ Questa cartella contiene i workflow n8n per l'ingestion e il risk scoring dei da
 | 02 | `02-usgs-seismic-ingestion.json` | USGS GeoJSON | Ogni 1h | Terremoti M4.5+ con impatto su rotte commerciali |
 | 03 | `03-climate-anomalies-ingestion.json` | Open-Meteo Archive | Ogni 3h | Anomalie climatiche in 15 zone critiche per il commercio |
 | 04 | `04-commodity-prices-ingestion.json` | Yahoo Finance | Ogni 30min | Prezzi commodity con codici HS doganali |
-| 05 | `05-acled-conflict-ingestion.json` | ACLED API | Ogni 6h | Conflitti armati con prossimità ai chokepoint marittimi |
 | 06 | `06-policy-monitor.json` | EUR-Lex (search) | Ogni giorno | Aggiornamenti normativi UE → `policy:monitor:v1` (Policy Analysis panel) |
 | 07 | `07-intelligence-notifications.json` | Notify config API | Ogni 1h | Delivery Telegram/email dei digest di intelligence |
 
@@ -19,6 +18,7 @@ Questa cartella contiene i workflow n8n per l'ingestion e il risk scoring dei da
 | # | File | Note |
 |---|------|------|
 | 08 | `08-trade-monitor-legacy.json` | Prima generazione (RSS Google News). Output a vicolo cieco: il nodo finale "Format Alert" non spinge verso l'endpoint di ingestion. Sostituito da `01-gdelt-customs-ingestion.json`. |
+| 05 | `05-acled-conflict-ingestion-legacy.json` | ACLED disattivato: la licenza ACLED vieta l'uso dei dati con sistemi di IA/LLM. Non riattivare; i conflitti arrivano da UCDP (`scripts/seed-ucdp-events.mjs`). |
 | 09 | `09-ai-enhanced-legacy.json` | Workflow LLM (DeepSeek via OpenRouter) con structured output parser instabile. Disattivato: la funzionalità di LLM-adjudication va portata nel backend nativo della piattaforma. |
 
 ## Come Importare

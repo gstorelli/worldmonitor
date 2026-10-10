@@ -168,7 +168,14 @@ async function restoreFromRedis(): Promise<TokenState | null> {
  *   L1: In-memory `memCached` (fast-path within same isolate)
  *   L2: Redis via `getCachedJson`/`setCachedJson` (survives cold starts)
  */
+// ACLED is disabled in Risk Sentinel. ACLED's EULA forbids using its data with
+// AI/ML/LLM systems, academic use included, and ACLED declined an access upgrade for
+// this project (October 2026). Never return a token: callers treat null as
+// "source unavailable" and continue with the other sources.
+export const ACLED_DISABLED = true;
+
 export async function getAcledAccessToken(): Promise<string | null> {
+  if (ACLED_DISABLED) return null;
   const email = process.env.ACLED_EMAIL?.trim();
   const password = process.env.ACLED_PASSWORD?.trim();
 

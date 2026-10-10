@@ -84,9 +84,7 @@ services:
       FINNHUB_API_KEY: "${FINNHUB_API_KEY:-}"
       EIA_API_KEY: "${EIA_API_KEY:-}"
       FRED_API_KEY: "${FRED_API_KEY:-}"
-      ACLED_EMAIL: "${ACLED_EMAIL:-}"
-      ACLED_PASSWORD: "${ACLED_PASSWORD:-}"
-      ACLED_ACCESS_TOKEN: "${ACLED_ACCESS_TOKEN:-}"
+      # ACLED credentials are intentionally not passed: ACLED is disabled (licence excludes AI/LLM use).
       NASA_FIRMS_API_KEY: "${NASA_FIRMS_API_KEY:-}"
       CLOUDFLARE_API_TOKEN: "${CLOUDFLARE_API_TOKEN:-}"
       AVIATIONSTACK_API: "${AVIATIONSTACK_API:-}"
