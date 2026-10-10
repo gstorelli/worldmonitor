@@ -1,2 +1,4 @@
 data/
-*.pkl
+pb2002/
+out/
+__pycache__/
