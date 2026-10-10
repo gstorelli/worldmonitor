@@ -673,6 +673,10 @@ export class PanelLayoutManager implements AppModule {
       import('@/components/StrategicGoodsPanel').then(m => new m.StrategicGoodsPanel()),
     );
 
+    this.lazyPanel('response-outlook', () =>
+      import('@/components/ResponseOutlookPanel').then(m => new m.ResponseOutlookPanel()),
+    );
+
     this.lazyPanel('node-hazards', () =>
       import('@/components/NodeHazardsPanel').then(m => {
         const p = new m.NodeHazardsPanel();

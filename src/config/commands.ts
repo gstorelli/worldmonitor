@@ -162,6 +162,7 @@ export const COMMANDS: Command[] = [
   { id: 'panel:displacement', keywords: ['displacement', 'refugees', 'unhcr', 'idp'], label: 'Panel: UNHCR Displacement', icon: '\u{1F3C3}', category: 'panels' },
   { id: 'panel:risk-chain', keywords: ['risk chain', 'six layers', 'catena', 'rischio doganale', 'thesis', 'tesi'], label: 'Panel: Risk Chain (six layers)', icon: '\u{1F517}', category: 'panels' },
   { id: 'panel:trigger-monitor', keywords: ['triggers', 'inneschi', 'emsc', 'earthquakes near nodes', 'gdacs'], label: 'Panel: Measured Triggers at Nodes', icon: '\u{1F4C8}', category: 'panels' },
+  { id: 'panel:response-outlook', keywords: ['response', 'risposta', 'policy', 'tariff', 'dazi', 'scenario', 'what if', 'circolare'], label: 'Panel: Response Outlook (PoC)', icon: '\u{1F9ED}', category: 'panels' },
   { id: 'panel:strategic-goods', keywords: ['strategic goods', 'beni strategici', 'hs codes', 'crma', 'modulators'], label: 'Panel: Strategic Goods & Modulators', icon: '\u{1F4E6}', category: 'panels' },
   { id: 'panel:node-hazards', keywords: ['hazard', 'earthquake', 'volcano', 'chokepoint', 'node', 'pericoli', 'terremoti', 'vulcani'], label: 'Panel: Critical Node Hazards', icon: '\u{1F30B}', category: 'panels' },
   { id: 'panel:climate', keywords: ['climate', 'climate anomalies', 'temperature', 'weather patterns'], label: 'Panel: Climate Anomalies', icon: '\u{1F321}\uFE0F', category: 'panels' },

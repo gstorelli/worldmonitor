@@ -5,6 +5,11 @@ onto the code that exists today and onto what still has to be built. It is the
 technical reference for Chapter 4 of the thesis. Engineering details live in
 `AGENTS.md` and `ARCHITECTURE.md`; research rules live in `CLAUDE.md`.
 
+The **response** element (future outlook) sits after layer 6: administrative responses
+(risk profiles, attention notes, EU risk-information sharing) are part of the thesis
+outlook and of the shadow-mode log of the Bari pilot; tariff measures are outside the
+customs mandate and enter only as scenarios on modulators and as policy implications.
+
 Legend: **Implemented** = in the code and running. **Collected, not linked** = data
 is ingested and stored, but the customs score does not use it. **Designed** =
 specified, not implemented. **To build** = not started.
@@ -21,6 +26,7 @@ specified, not implemented. **To build** = not started.
 | 6. Customs risk | Hazard-gated combination, alert with goods/origins/window | `src/services/customs-risk-scoring.ts` (weighted sum of 8 keyword-based dimensions, mirrored in n8n 01 and `src-tauri/sidecar/services/scoring.ts`) | Implemented as a provisional v0; does not comply with the model rule (positive score with zero hazard) |
 | Modulators | Tariffs, trade defence, sanctions, export bans | Policy monitor (EUR-Lex, n8n 06, `policy:monitor:v1`); trade-policy panels inherited from WorldMonitor | Partially implemented (news-level, not measure-level) |
 | Signals | News/OSINT, vessel traffic, physical feeds | GDELT (n8n 01), UCDP, AIS relay, intelligence feeds, PortWatch | Implemented |
+| Response (outlook) | What an administration could do with an alert: administrative responses inside the customs mandate; tariff and trade-defence changes as "what if" scenarios on modulators | *Response outlook (PoC)* panel (`response-outlook`): registry `src/config/thesis-response.ts`, pure logic `src/services/thesis/response.ts` (gate rule; incentive direction per misdeclaration channel, no magnitudes) | Proof of concept, not validated; never applied to controls |
 
 ## 2. The current scoring engine (v0) and its known limits
 
