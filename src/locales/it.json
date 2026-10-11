@@ -1624,7 +1624,7 @@
         "goodsTbdDetail": "Beni strategici in transito nello stretto: da stimare con Eurostat Comext e IMF PortWatch (Capitolo 3).",
         "customsTbd": "La vulnerabilità doganale (capacità degli uffici, obsolescenza dei profili, incentivo alla mis-declaration) richiede dati ADM: pilota in shadow-mode presso l'Ufficio delle Dogane di Bari, Anno 3. Gli indicatori pubblici (spostamento delle origini, valori unitari, divario speculare) si costruiscono nell'Anno 2.",
         "history": "1922-2021, entro 300 km: {{m6}} terremoti Mw≥6, {{m7}} Mw≥7; {{erupt}} eruzioni dal 1922; limite di placca a {{km}} km (ISC-GEM, GVP, Bird 2003).",
-        "rule": "Regola: senza innesco nella zona del nodo → nessun rischio indotto. Soglie di lavoro (non validate, da calibrare nell'Anno 2): raggio {{radius}} km; significativo = Mw ≥ {{mw}} o allerta GDACS arancione/rossa. Nessun peso, nessuno score.",
+        "rule": "Regola: senza innesco nella zona del nodo → nessun rischio indotto. Proposta di lavoro (Cap. 3, non validata, da calibrare nell'Anno 2): terremoti entro {{radius}} km; significativo = intensità prevista sul nodo ≥ {{i}} MMI ({{ichips}} per i parchi dei chip), da magnitudo, profondità e distanza (Allen et al. 2012), oppure allerta GDACS arancione/rossa. Nessun peso, nessuno score.",
         "sources": "Terremoti: {{quake}}, ultimi {{days}} giorni; eventi GDACS/EONET: {{natural}}; stretti con transiti PortWatch: {{transit}}",
         "noQuakeSource": "Catalogo sismico non disponibile"
       },

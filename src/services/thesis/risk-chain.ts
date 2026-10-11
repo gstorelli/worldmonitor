@@ -6,7 +6,7 @@
  * Nothing here is a weighted score. The output is a qualitative state with the
  * evidence that produced it, so that every state can be traced to records.
  */
-import { TRIGGER_WORKING_RULES, type ThesisNode } from '@/config/thesis-model';
+import { TRIGGER_WORKING_RULES, nodeIntensityThreshold, type ThesisNode, type TriggerRules } from '@/config/thesis-model';
 
 export type TriggerKind = 'earthquake' | 'volcano' | 'flood' | 'cyclone' | 'drought' | 'wildfire' | 'other';
 
@@ -32,6 +32,8 @@ export interface TriggerEvent {
 export interface NodeTriggerMatch {
   event: TriggerEvent;
   distanceKm: number;
+  /** Median Modified Mercalli intensity expected at the node (earthquakes only). */
+  expectedIntensity?: number;
   significant: boolean;
 }
 
@@ -62,22 +64,56 @@ export function haversineKm(lat1: number, lon1: number, lat2: number, lon2: numb
   return 2 * EARTH_RADIUS_KM * Math.asin(Math.min(1, Math.sqrt(h)));
 }
 
-/** Whether a single event is a significant trigger under the working rules. */
-export function isSignificant(event: TriggerEvent, rules = TRIGGER_WORKING_RULES): boolean {
-  if (event.kind === 'earthquake') return (event.magnitude ?? 0) >= rules.significantMw;
+/**
+ * Median Modified Mercalli intensity from the intensity prediction equation of
+ * Allen, Wald and Worden (2012, J. Seismology 16:409-433), hypocentral-distance
+ * form, Table 2: derived for shallow active crust, Mw 5.0-7.9, R < 300 km; no
+ * site term. Outside that domain (deep events, other magnitude types, stable
+ * regions) the value is an extrapolation. Same function as
+ * research/hazard-stats/hazard_lib.py (mmi_allen2012_rhyp).
+ */
+export function expectedIntensityAllen2012(mw: number, hypocentralKm: number): number {
+  const rm = -0.209 + 2.042 * Math.exp(mw - 5);
+  let i = 2.085 + 1.428 * mw - 1.402 * Math.log(Math.sqrt(hypocentralKm ** 2 + rm ** 2));
+  if (hypocentralKm > 50) i += 0.078 * Math.log(hypocentralKm / 50);
+  return i;
+}
+
+/** Expected intensity of an earthquake at a point at the given epicentral distance. */
+export function expectedIntensityAt(event: TriggerEvent, distanceKm: number, rules: TriggerRules = TRIGGER_WORKING_RULES): number | undefined {
+  if (event.kind !== 'earthquake' || typeof event.magnitude !== 'number') return undefined;
+  const depth = typeof event.depthKm === 'number' && event.depthKm >= 0 ? event.depthKm : rules.defaultDepthKm;
+  return expectedIntensityAllen2012(event.magnitude, Math.hypot(distanceKm, depth));
+}
+
+/**
+ * Whether a single event is a significant trigger for a node under the working
+ * rules: for earthquakes, expected intensity at the node >= node threshold; for
+ * other triggers, a GDACS orange or red alert.
+ */
+export function isSignificant(
+  event: TriggerEvent,
+  rules: TriggerRules = TRIGGER_WORKING_RULES,
+  expectedIntensity?: number,
+  threshold: number = rules.intensityThreshold.default,
+): boolean {
+  if (event.kind === 'earthquake') return typeof expectedIntensity === 'number' && expectedIntensity >= threshold;
   return event.alertLevel === 'red' || event.alertLevel === 'orange';
 }
 
 export function matchEventsToNode(
-  node: Pick<ThesisNode, 'lat' | 'lon'>,
+  node: Pick<ThesisNode, 'lat' | 'lon'> & { goods?: readonly string[] },
   events: readonly TriggerEvent[],
-  rules = TRIGGER_WORKING_RULES,
+  rules: TriggerRules = TRIGGER_WORKING_RULES,
 ): NodeTriggerMatch[] {
   const out: NodeTriggerMatch[] = [];
+  const threshold = nodeIntensityThreshold(node, rules);
   for (const event of events) {
     if (!Number.isFinite(event.lat) || !Number.isFinite(event.lon)) continue;
     const distanceKm = haversineKm(node.lat, node.lon, event.lat, event.lon);
-    if (distanceKm <= rules.radiusKm) out.push({ event, distanceKm, significant: isSignificant(event, rules) });
+    if (distanceKm > rules.radiusKm) continue;
+    const expectedIntensity = expectedIntensityAt(event, distanceKm, rules);
+    out.push({ event, distanceKm, expectedIntensity, significant: isSignificant(event, rules, expectedIntensity, threshold) });
   }
   return out.sort((a, b) => Number(b.significant) - Number(a.significant) || b.event.time - a.event.time);
 }
@@ -93,7 +129,7 @@ export function buildNodeChain(
   node: ThesisNode,
   events: readonly TriggerEvent[],
   transit: NodeTransitStatus | null,
-  rules = TRIGGER_WORKING_RULES,
+  rules: TriggerRules = TRIGGER_WORKING_RULES,
 ): NodeChain {
   const matches = matchEventsToNode(node, events, rules);
   const reasons: string[] = [];
@@ -115,7 +151,7 @@ export function buildChains(
   nodes: readonly ThesisNode[],
   events: readonly TriggerEvent[],
   transitByChokepoint: ReadonlyMap<string, NodeTransitStatus>,
-  rules = TRIGGER_WORKING_RULES,
+  rules: TriggerRules = TRIGGER_WORKING_RULES,
 ): NodeChain[] {
   return nodes.map((n) =>
     buildNodeChain(n, events, n.chokepointId ? transitByChokepoint.get(n.chokepointId) ?? null : null, rules),

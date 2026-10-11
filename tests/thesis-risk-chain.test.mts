@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   buildChains,
   buildNodeChain,
+  expectedIntensityAllen2012,
   gdacsAlertFromTitle,
   haversineKm,
   matchEventsToNode,
@@ -10,7 +11,7 @@ import {
   quakesToTriggers,
   type TriggerEvent,
 } from '../src/services/thesis/risk-chain.ts';
-import { STRATEGIC_GOODS, THESIS_NODES, TRIGGER_WORKING_RULES } from '../src/config/thesis-model.ts';
+import { STRATEGIC_GOODS, THESIS_NODES, TRIGGER_WORKING_RULES, nodeIntensityThreshold } from '../src/config/thesis-model.ts';
 import { NODE_HAZARDS } from '../src/config/node-hazards.ts';
 import { emscQueryUrl, parseEmsc, parseUsgs, usgsQueryUrl } from '../api/thesis/_catalogue.js';
 
@@ -72,12 +73,40 @@ describe('trigger matching and gate rule', () => {
 
   it('keeps minor triggers at monitor and escalates significant ones to assess', () => {
     const hs = node('hsinchu');
-    const minor = quake({ lat: hs.lat, lon: hs.lon, magnitude: TRIGGER_WORKING_RULES.significantMw - 0.1 });
-    const major = quake({ id: 'big', lat: hs.lat + 0.5, lon: hs.lon, magnitude: TRIGGER_WORKING_RULES.significantMw });
+    const minor = quake({ lat: hs.lat + 1, lon: hs.lon, magnitude: 5.5, depthKm: 15 }); // ~111 km: weak shaking
+    const major = quake({ id: 'big', lat: hs.lat + 0.5, lon: hs.lon, magnitude: 6.5, depthKm: 15 }); // ~56 km
     assert.equal(buildNodeChain(hs, [minor], null).state, 'monitor');
     const chain = buildNodeChain(hs, [minor, major], null);
     assert.equal(chain.state, 'assess');
     assert.equal(chain.matches[0].event.id, 'big');
+  });
+
+  it('reproduces the intensity equation of the analysis scripts (Allen et al. 2012, Rhyp form)', () => {
+    // reference values from research/hazard-stats/hazard_lib.py
+    assert.ok(Math.abs(expectedIntensityAllen2012(7.0, 50) - 6.5369) < 1e-3);
+    assert.ok(Math.abs(expectedIntensityAllen2012(6.0, 20) - 6.4047) < 1e-3);
+  });
+
+  it('uses a lower intensity threshold for chip fabs than for straits', () => {
+    assert.equal(nodeIntensityThreshold(node('hsinchu')), TRIGGER_WORKING_RULES.intensityThreshold.chips);
+    assert.equal(nodeIntensityThreshold(node('suez')), TRIGGER_WORKING_RULES.intensityThreshold.default);
+    assert.ok(TRIGGER_WORKING_RULES.intensityThreshold.chips < TRIGGER_WORKING_RULES.intensityThreshold.default);
+  });
+
+  it('flags Hualien 2024 for the chip parks through expected intensity, not magnitude alone', () => {
+    const hualien = quake({ id: 'hualien', lat: 23.819, lon: 121.562, depthKm: 34.8, magnitude: 7.4 });
+    const [m] = matchEventsToNode(node('hsinchu'), [hualien]);
+    assert.ok(m.expectedIntensity !== undefined && Math.abs(m.expectedIntensity - 5.93) < 0.02);
+    assert.equal(buildNodeChain(node('hsinchu'), [hualien], null).state, 'assess');
+    assert.equal(buildNodeChain(node('tainan'), [hualien], null).state, 'assess');
+  });
+
+  it('does not escalate a deep earthquake that the old radius rule counted (Spain 1954)', () => {
+    const deep = quake({ id: 'deep', lat: 36.95, lon: -3.6, depthKm: 626, magnitude: 7.8 });
+    const [m] = matchEventsToNode(node('gibraltar'), [deep]);
+    assert.ok(m.distanceKm < TRIGGER_WORKING_RULES.radiusKm);
+    assert.ok(m.expectedIntensity !== undefined && m.expectedIntensity < 5);
+    assert.equal(buildNodeChain(node('gibraltar'), [deep], null).state, 'monitor');
   });
 
   it('treats GDACS orange/red alerts as significant non-seismic triggers', () => {
@@ -118,7 +147,8 @@ describe('earthquake catalogue normalisation', () => {
       { lat: 23.8, lon: 121.6, depth: 35, mag: 6.1, src: 'EMSC', place: 'TAIWAN' },
     );
     const triggers = quakesToTriggers(quakes);
-    assert.equal(buildNodeChain(node('hsinchu'), triggers, null).state, 'assess');
+    // Mw 6.1 at ~120 km and 35 km depth: expected intensity ~4 at Hsinchu, below the chip threshold
+    assert.equal(buildNodeChain(node('hsinchu'), triggers, null).state, 'monitor');
   });
 
   it('parses USGS FDSN GeoJSON', () => {
