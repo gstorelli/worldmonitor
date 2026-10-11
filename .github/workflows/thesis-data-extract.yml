@@ -1,0 +1,53 @@
+name: Thesis data extraction
+
+# Runs only on the research branch thesis-data-extract (never on main): downloads open data
+# for the thesis (Eurostat Comext, IMF PortWatch) and commits the derived tables back to the
+# branch. Raw PortWatch records are kept only as a workflow artifact (IMF terms of use).
+on:
+  push:
+    branches: [thesis-data-extract]
+    paths:
+      - 'research/data-extraction/**'
+      - '.github/workflows/thesis-data-extract.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: thesis-data-extract
+  cancel-in-progress: false
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Eurostat Comext
+        continue-on-error: true
+        run: python research/data-extraction/fetch_comext.py research/data-extraction/out
+      - name: IMF PortWatch
+        continue-on-error: true
+        run: python research/data-extraction/fetch_portwatch.py research/data-extraction/out
+      - name: Keep raw PortWatch records as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: portwatch-raw
+          path: research/data-extraction/out/raw
+          if-no-files-found: ignore
+          retention-days: 90
+      - name: Commit derived tables and logs
+        if: always()
+        run: |
+          rm -rf research/data-extraction/out/raw
+          date -u +"%Y-%m-%dT%H:%M:%SZ run ${GITHUB_RUN_ID}" > research/data-extraction/out/last_run.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add research/data-extraction/out
+          git commit -m "data(thesis): extraction run ${GITHUB_RUN_ID}" || echo "nothing to commit"
+          git push
