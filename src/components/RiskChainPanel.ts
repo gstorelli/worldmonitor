@@ -115,7 +115,7 @@ export class RiskChainPanel extends Panel {
           .slice(0, 8)
           .map(
             (m) =>
-              `<li>${kindIcon(m.event.kind)} <b>${eventIntensity(m.event)}</b>${m.significant ? ` <span class="thesis-sig">${escapeHtml(t('components.thesis.significant'))}</span>` : ''} — ${escapeHtml(m.event.title)} · ${Math.round(m.distanceKm)} km${typeof m.event.depthKm === 'number' ? ` · ${Math.round(m.event.depthKm)} km ${escapeHtml(t('components.thesis.depth'))}` : ''} · ${ago(m.event.time)} · ${sourceLink(m.event.source, m.event.url)}</li>`,
+              `<li>${kindIcon(m.event.kind)} <b>${eventIntensity(m.event)}</b>${m.significant ? ` <span class="thesis-sig">${escapeHtml(t('components.thesis.significant'))}</span>` : ''} — ${escapeHtml(m.event.title)} · ${Math.round(m.distanceKm)} km${typeof m.expectedIntensity === 'number' ? ` · MMI ${m.expectedIntensity.toFixed(1)}` : ''}${typeof m.event.depthKm === 'number' ? ` · ${Math.round(m.event.depthKm)} km ${escapeHtml(t('components.thesis.depth'))}` : ''} · ${ago(m.event.time)} · ${sourceLink(m.event.source, m.event.url)}</li>`,
           )
           .join('')}</ul>`
       : `<p class="thesis-muted">${escapeHtml(t('components.thesis.chain.noTriggerDetail', { radius: String(TRIGGER_WORKING_RULES.radiusKm) }))}</p>`;
@@ -173,7 +173,7 @@ export class RiskChainPanel extends Panel {
           </tr></thead>
           <tbody>${rows}</tbody>
         </table>
-        <div class="thesis-note">${escapeHtml(t('components.thesis.chain.rule', { radius: String(TRIGGER_WORKING_RULES.radiusKm), mw: String(TRIGGER_WORKING_RULES.significantMw) }))}<br>${escapeHtml(source)} · ${escapeHtml(t('components.thesis.updated'))} ${ago(s.loadedAt)}</div>
+        <div class="thesis-note">${escapeHtml(t('components.thesis.chain.rule', { radius: String(TRIGGER_WORKING_RULES.radiusKm), i: String(TRIGGER_WORKING_RULES.intensityThreshold.default), ichips: String(TRIGGER_WORKING_RULES.intensityThreshold.chips) }))}<br>${escapeHtml(source)} · ${escapeHtml(t('components.thesis.updated'))} ${ago(s.loadedAt)}</div>
       </div>`);
   }
 }

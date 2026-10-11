@@ -1793,7 +1793,7 @@
         "goodsTbdDetail": "Strategic goods transiting this strait: to be estimated from Eurostat Comext and IMF PortWatch (Chapter 3).",
         "customsTbd": "Customs vulnerability (office capacity, profile obsolescence, mis-declaration incentive) needs ADM data: shadow-mode pilot at the Bari customs office, Year 3. Public indicators (origin shifts, unit values, mirror gaps) are built in Year 2.",
         "history": "1922-2021, 300 km: {{m6}} earthquakes Mw≥6, {{m7}} Mw≥7; {{erupt}} eruptions since 1922; plate boundary at {{km}} km (ISC-GEM, GVP, Bird 2003).",
-        "rule": "Gate rule: no trigger in the node zone → no induced risk. Working thresholds (not validated, Year 2 calibration): radius {{radius}} km; significant = Mw ≥ {{mw}} or GDACS orange/red. No weights, no score.",
+        "rule": "Gate rule: no trigger in the node zone → no induced risk. Working proposal (Chapter 3, not validated, Year 2 calibration): earthquakes within {{radius}} km; significant = expected intensity at the node ≥ {{i}} MMI ({{ichips}} for chip parks), from magnitude, depth and distance (Allen et al. 2012), or GDACS orange/red. No weights, no score.",
         "sources": "Earthquakes: {{quake}}, last {{days}} days; GDACS/EONET events: {{natural}}; straits with PortWatch transits: {{transit}}",
         "noQuakeSource": "Earthquake catalogue unavailable"
       },
