@@ -1,0 +1,193 @@
+product,product_label,reporter,year,extra_eu_eur,intra_eu_eur,extra_share_of_total,hhi_extra_eu_origins,top1,top2,top3,top4,top5
+1001,Wheat and meslin,EU27_2020,2019,1100361768,5396270318,0.16937418549085434,0.1708,CA 26.5%,US 18.7%,UA 17.4%,GB 15.2%,RU 7.8%
+1001,Wheat and meslin,EU27_2020,2020,1155758923,5356007865,0.17748776340237693,0.2777,CA 45.4%,US 22.0%,UA 12.0%,RU 6.3%,GB 5.5%
+1001,Wheat and meslin,EU27_2020,2021,1226266924,6675373928,0.15519142757413698,0.1976,CA 38.3%,RU 12.2%,AU 11.5%,US 8.6%,XS 7.3%
+1001,Wheat and meslin,EU27_2020,2022,2572641870,8582532210,0.23062319346611218,0.2069,UA 35.7%,CA 22.6%,GB 11.3%,KZ 6.7%,US 6.3%
+1001,Wheat and meslin,EU27_2020,2023,3621062769,7710493391,0.31955564777433004,0.2399,UA 42.4%,CA 18.9%,GB 8.6%,RU 7.5%,TR 6.4%
+1001,Wheat and meslin,EU27_2020,2024,2712607060,6841645573,0.2839161956667092,0.3088,UA 49.9%,CA 21.4%,US 7.5%,MD 5.3%,TR 5.0%
+1001,Wheat and meslin,IT,2019,597237678,1031215249,0.3667515763567417,0.2809,CA 40.5%,US 31.9%,UA 7.4%,MD 6.9%,KZ 6.1%
+1001,Wheat and meslin,IT,2020,775950800,997869147,0.4374462026500145,0.379,CA 53.5%,US 29.3%,UA 5.7%,KZ 4.8%,RU 3.0%
+1001,Wheat and meslin,IT,2021,741121421,1205894275,0.3806448106826151,0.2867,CA 47.4%,AU 19.0%,US 12.4%,RU 7.5%,KZ 5.1%
+1001,Wheat and meslin,IT,2022,935961737,1723405722,0.35194900720938693,0.2591,CA 43.9%,US 14.7%,KZ 14.7%,UA 12.7%,AU 7.1%
+1001,Wheat and meslin,IT,2023,1295498934,1568749193,0.4522998275840367,0.2254,CA 39.5%,TR 13.3%,RU 13.1%,KZ 11.9%,US 10.5%
+1001,Wheat and meslin,IT,2024,975210297,1532569776,0.3888739317692154,0.2562,CA 42.6%,US 17.9%,UA 14.2%,TR 11.7%,KZ 9.1%
+2603,Copper ores and concentrates,EU27_2020,2019,5370841263,958126254,0.8486125499259692,0.1425,BR 22.7%,CL 20.2%,PE 15.5%,CA 11.0%,US 8.3%
+2603,Copper ores and concentrates,EU27_2020,2020,6275078413,534265688,0.9215393318246996,0.1335,BR 23.4%,CL 16.8%,PE 16.0%,CA 9.9%,GE 6.8%
+2603,Copper ores and concentrates,EU27_2020,2021,8421367259,540594180,0.9396790330242348,0.1281,BR 22.5%,CL 17.9%,PE 15.1%,PA 7.1%,CA 6.6%
+2603,Copper ores and concentrates,EU27_2020,2022,8645637027,492757283,0.9460783518105819,0.1164,BR 23.2%,CL 13.9%,PE 11.9%,ID 9.7%,AU 7.3%
+2603,Copper ores and concentrates,EU27_2020,2023,9046794697,477798218,0.9498353134602183,0.1451,BR 26.9%,ID 17.1%,PE 15.0%,CL 10.6%,AU 6.2%
+2603,Copper ores and concentrates,EU27_2020,2024,8501372519,660459045,0.927911898359366,0.1664,BR 29.4%,CL 17.7%,PE 15.9%,ID 12.8%,CA 4.6%
+2603,Copper ores and concentrates,IT,2019,248143,92579,0.7282858165894777,0.5497,CL 68.8%,CN 27.5%,ZA 2.7%,BO 0.9%,GB 0.0%
+2603,Copper ores and concentrates,IT,2020,72149,165051,0.30416947723440135,0.9352,CN 96.6%,GB 3.4%,,,
+2603,Copper ores and concentrates,IT,2021,399382,113978,0.7779764687548699,0.7017,TR 82.1%,CN 16.6%,CG 1.3%,,
+2603,Copper ores and concentrates,IT,2022,537538,162331,0.768055164609377,0.5027,TR 53.6%,CN 46.4%,,,
+2603,Copper ores and concentrates,IT,2023,266058,175720,0.602243660843229,0.9757,TR 98.8%,US 1.2%,,,
+2603,Copper ores and concentrates,IT,2024,285098,84897,0.7705455479128096,0.9893,TR 99.5%,DO 0.5%,,,
+2604,Nickel ores and concentrates,EU27_2020,2019,217862895,790152,0.996386274918913,0.6822,CA 81.6%,ZA 12.6%,GT 1.4%,US 0.7%,MY 0.6%
+2604,Nickel ores and concentrates,EU27_2020,2020,190004703,3702602,0.9808855840516701,0.5264,CA 67.8%,ZA 25.6%,RU 2.5%,KR 1.2%,JP 0.9%
+2604,Nickel ores and concentrates,EU27_2020,2021,236390977,2922804,0.9877867292565153,0.2888,CA 47.4%,BR 19.3%,ZA 12.5%,CI 8.6%,RU 5.3%
+2604,Nickel ores and concentrates,EU27_2020,2022,332305757,4948869,0.9853260159580435,0.4185,CA 51.2%,BR 39.3%,RU 2.7%,CI 1.7%,ZA 1.6%
+2604,Nickel ores and concentrates,EU27_2020,2023,237691303,7444334,0.9696317757340195,0.388,BR 57.9%,CA 18.1%,ZA 13.4%,AU 4.1%,MY 1.4%
+2604,Nickel ores and concentrates,EU27_2020,2024,286355975,10773485,0.9637414445541684,0.2533,CA 35.2%,BR 23.9%,ZM 19.6%,ZA 18.4%,US 0.7%
+2604,Nickel ores and concentrates,IT,2019,646589,414,0.9993601266145598,0.9152,GB 95.6%,CN 4.4%,,,
+2604,Nickel ores and concentrates,IT,2020,31486,26685,0.5412662666964638,0.871,CN 93.1%,US 6.9%,,,
+2604,Nickel ores and concentrates,IT,2021,24102,44066,0.35356765637835935,0.5659,CN 68.1%,US 31.9%,,,
+2604,Nickel ores and concentrates,IT,2022,46682,3443,0.9313117206982544,1.0,CN 100.0%,,,,
+2604,Nickel ores and concentrates,IT,2023,1448,780,0.6499102333931778,1.0,US 100.0%,,,,
+2604,Nickel ores and concentrates,IT,2024,2309,,,1.0,US 100.0%,,,,
+2709,"Petroleum oils and oils obtained from bituminous minerals, crude",EU27_2020,2019,211848804551,20135908514,0.9132015715692521,0.116,RU 26.8%,NG 8.2%,IQ 8.1%,KZ 7.9%,NO 6.8%
+2709,"Petroleum oils and oils obtained from bituminous minerals, crude",EU27_2020,2020,125255248293,13131725608,0.9051086584392384,0.113,RU 25.5%,US 9.4%,KZ 9.0%,NG 8.5%,NO 8.1%
+2709,"Petroleum oils and oils obtained from bituminous minerals, crude",EU27_2020,2021,193757973120,24060313725,0.8895395144571981,0.111,RU 24.9%,NO 9.4%,US 8.9%,LY 8.2%,KZ 8.1%
+2709,"Petroleum oils and oils obtained from bituminous minerals, crude",EU27_2020,2022,331748192542,35980620385,0.9021544705768195,0.0841,RU 16.5%,US 11.5%,NO 10.5%,SA 7.4%,KZ 7.3%
+2709,"Petroleum oils and oils obtained from bituminous minerals, crude",EU27_2020,2023,274988449362,29304814934,0.9036954859917837,0.0815,US 15.5%,NO 13.4%,KZ 9.4%,LY 7.7%,SA 7.5%
+2709,"Petroleum oils and oils obtained from bituminous minerals, crude",EU27_2020,2024,266317269791,31399896681,0.8945311180638517,0.0849,US 15.8%,NO 13.3%,KZ 11.8%,LY 7.6%,SA 7.4%
+2709,"Petroleum oils and oils obtained from bituminous minerals, crude",IT,2019,25992443620,1080942,0.999958414950715,0.1212,AZ 18.5%,IQ 18.2%,RU 14.5%,LY 12.8%,SA 7.9%
+2709,"Petroleum oils and oils obtained from bituminous minerals, crude",IT,2020,14185324547,10675458,0.9992479953510679,0.1161,AZ 22.4%,IQ 15.7%,SA 11.8%,RU 9.9%,KZ 7.3%
+2709,"Petroleum oils and oils obtained from bituminous minerals, crude",IT,2021,25102730047,194929829,0.9922945509602281,0.1302,AZ 23.1%,LY 18.6%,IQ 13.4%,SA 9.2%,RU 8.9%
+2709,"Petroleum oils and oils obtained from bituminous minerals, crude",IT,2022,42654848687,494752,0.9999884011718084,0.1082,AZ 16.2%,RU 16.1%,LY 15.3%,IQ 11.9%,US 7.5%
+2709,"Petroleum oils and oils obtained from bituminous minerals, crude",IT,2023,36018943065,10004101,0.9997223315753884,0.1147,AZ 19.4%,LY 16.9%,US 12.3%,KZ 11.6%,IQ 9.6%
+2709,"Petroleum oils and oils obtained from bituminous minerals, crude",IT,2024,30956109891,56655338,0.9981731607103832,0.1219,LY 21.1%,AZ 16.6%,KZ 16.1%,US 8.7%,IQ 7.5%
+271012,"Light oils and preparations, of petroleum or bituminous minerals which >= 90% by volume ""incl. losses"" distil at 210°C ""ASTM D 86 method"" (excl. containing biodiesel)",EU27_2020,2019,11160639236,21673338558,0.3399112744127965,0.2529,RU 33.6%,GB 30.2%,DZ 9.2%,NO 4.4%,US 3.1%
+271012,"Light oils and preparations, of petroleum or bituminous minerals which >= 90% by volume ""incl. losses"" distil at 210°C ""ASTM D 86 method"" (excl. containing biodiesel)",EU27_2020,2020,7884734384,14342175536,0.35473821653028054,0.2279,RU 31.8%,GB 27.9%,DZ 11.3%,NO 5.2%,US 4.7%
+271012,"Light oils and preparations, of petroleum or bituminous minerals which >= 90% by volume ""incl. losses"" distil at 210°C ""ASTM D 86 method"" (excl. containing biodiesel)",EU27_2020,2021,13206524436,25350768937,0.34251689578522015,0.1964,RU 31.9%,GB 19.7%,US 14.8%,DZ 10.5%,NO 5.5%
+271012,"Light oils and preparations, of petroleum or bituminous minerals which >= 90% by volume ""incl. losses"" distil at 210°C ""ASTM D 86 method"" (excl. containing biodiesel)",EU27_2020,2022,18218730116,40505582915,0.31024168995186896,0.2138,RU 34.6%,GB 23.7%,DZ 9.9%,US 8.9%,NO 4.9%
+271012,"Light oils and preparations, of petroleum or bituminous minerals which >= 90% by volume ""incl. losses"" distil at 210°C ""ASTM D 86 method"" (excl. containing biodiesel)",EU27_2020,2023,10685816388,35297143745,0.2323864396092075,0.1825,GB 31.9%,DZ 18.3%,US 12.0%,NO 6.1%,TR 5.8%
+271012,"Light oils and preparations, of petroleum or bituminous minerals which >= 90% by volume ""incl. losses"" distil at 210°C ""ASTM D 86 method"" (excl. containing biodiesel)",EU27_2020,2024,12103856508,35385610846,0.2548745476080919,0.198,GB 32.2%,DZ 18.5%,US 11.3%,NO 6.0%,TR 4.6%
+271012,"Light oils and preparations, of petroleum or bituminous minerals which >= 90% by volume ""incl. losses"" distil at 210°C ""ASTM D 86 method"" (excl. containing biodiesel)",IT,2019,418787224,640638834,0.3952963218505241,0.2862,DZ 39.5%,GB 33.1%,RU 12.1%,TR 5.5%,LY 5.1%
+271012,"Light oils and preparations, of petroleum or bituminous minerals which >= 90% by volume ""incl. losses"" distil at 210°C ""ASTM D 86 method"" (excl. containing biodiesel)",IT,2020,306541398,491076864,0.38432093722548194,0.2542,RU 32.0%,DZ 30.9%,GB 20.5%,IL 11.4%,TN 2.8%
+271012,"Light oils and preparations, of petroleum or bituminous minerals which >= 90% by volume ""incl. losses"" distil at 210°C ""ASTM D 86 method"" (excl. containing biodiesel)",IT,2021,250996770,634290923,0.2835200037057332,0.522,RU 70.7%,LY 10.1%,IL 8.8%,DZ 5.9%,TN 3.3%
+271012,"Light oils and preparations, of petroleum or bituminous minerals which >= 90% by volume ""incl. losses"" distil at 210°C ""ASTM D 86 method"" (excl. containing biodiesel)",IT,2022,381272565,898046054,0.29802784024047724,0.235,RU 31.5%,LY 24.9%,IL 23.0%,DZ 12.2%,US 7.9%
+271012,"Light oils and preparations, of petroleum or bituminous minerals which >= 90% by volume ""incl. losses"" distil at 210°C ""ASTM D 86 method"" (excl. containing biodiesel)",IT,2023,195702984,912846906,0.17653962691746783,0.3038,US 48.9%,TR 16.7%,GB 13.2%,TN 11.7%,DZ 7.8%
+271012,"Light oils and preparations, of petroleum or bituminous minerals which >= 90% by volume ""incl. losses"" distil at 210°C ""ASTM D 86 method"" (excl. containing biodiesel)",IT,2024,298686144,954752655,0.23829336082327543,0.4022,TN 59.3%,US 17.0%,LY 10.5%,DZ 10.1%,CA 1.0%
+271019,"Medium oils and preparations, of petroleum or bituminous minerals, not containing biodiesel, n.e.s.",EU27_2020,2019,53021751987,50558817348,0.5118889800220849,0.1764,RU 35.2%,SA 14.1%,GB 7.4%,US 7.1%,IN 6.9%
+271019,"Medium oils and preparations, of petroleum or bituminous minerals, not containing biodiesel, n.e.s.",EU27_2020,2020,30651623027,33899132796,0.4748453002014046,0.2084,RU 40.5%,SA 12.0%,GB 7.5%,US 7.1%,IN 3.8%
+271019,"Medium oils and preparations, of petroleum or bituminous minerals, not containing biodiesel, n.e.s.",EU27_2020,2021,43575336272,48489527704,0.47331125458849826,0.2182,RU 42.1%,SA 12.1%,AE 7.0%,IN 5.3%,US 3.9%
+271019,"Medium oils and preparations, of petroleum or bituminous minerals, not containing biodiesel, n.e.s.",EU27_2020,2022,82366607486,85033565475,0.49203418389053477,0.1704,RU 35.3%,SA 14.5%,IN 6.7%,GB 5.4%,AE 5.0%
+271019,"Medium oils and preparations, of petroleum or bituminous minerals, not containing biodiesel, n.e.s.",EU27_2020,2023,63166125505,80264785234,0.4403940906430055,0.0852,SA 16.5%,IN 13.6%,KW 9.5%,AE 8.9%,US 7.4%
+271019,"Medium oils and preparations, of petroleum or bituminous minerals, not containing biodiesel, n.e.s.",EU27_2020,2024,57699581849,73660981474,0.43924584661778276,0.095,US 16.1%,SA 15.3%,IN 12.1%,KW 11.9%,AE 7.8%
+271019,"Medium oils and preparations, of petroleum or bituminous minerals, not containing biodiesel, n.e.s.",IT,2019,4501916785,1813683228,0.7128248742373292,0.1676,RU 27.1%,SA 24.9%,TR 10.2%,IN 9.4%,AE 9.2%
+271019,"Medium oils and preparations, of petroleum or bituminous minerals, not containing biodiesel, n.e.s.",IT,2020,2731513942,1031093984,0.7259629479662134,0.2358,RU 33.7%,SA 32.5%,IN 7.8%,EG 6.5%,TR 5.7%
+271019,"Medium oils and preparations, of petroleum or bituminous minerals, not containing biodiesel, n.e.s.",IT,2021,4214960809,1848371168,0.6951558689163954,0.255,SA 41.4%,RU 26.4%,AE 8.2%,IN 6.5%,TR 3.1%
+271019,"Medium oils and preparations, of petroleum or bituminous minerals, not containing biodiesel, n.e.s.",IT,2022,8957762591,2754697335,0.7648062531351794,0.2304,SA 40.0%,RU 22.6%,IN 9.8%,AE 6.9%,TR 3.7%
+271019,"Medium oils and preparations, of petroleum or bituminous minerals, not containing biodiesel, n.e.s.",IT,2023,7012842738,2595559923,0.7298656171503677,0.1959,SA 38.0%,IN 15.9%,AE 9.8%,TR 7.4%,KW 6.7%
+271019,"Medium oils and preparations, of petroleum or bituminous minerals, not containing biodiesel, n.e.s.",IT,2024,6885670408,2893531527,0.7041137358413696,0.1742,SA 36.0%,KW 10.7%,AE 10.6%,IN 8.5%,EG 6.9%
+271111,"Natural gas, liquefied",EU27_2020,2019,15720112400,192178925,0.9879226114533194,0.1424,QA 19.7%,NG 17.8%,DZ 13.7%,NO 13.1%,RU 12.7%
+271111,"Natural gas, liquefied",EU27_2020,2020,9704431059,192257164,0.9805735858634819,0.1538,US 19.2%,NG 18.5%,DZ 16.8%,QA 16.2%,RU 14.8%
+271111,"Natural gas, liquefied",EU27_2020,2021,24240477234,366999398,0.9850858581118087,0.1836,US 28.9%,RU 21.5%,QA 17.3%,DZ 10.6%,NG 9.6%
+271111,"Natural gas, liquefied",EU27_2020,2022,111345213596,1071177269,0.9904713426506784,0.2387,US 43.4%,QA 14.4%,RU 14.1%,AO 4.3%,EG 4.3%
+271111,"Natural gas, liquefied",EU27_2020,2023,62164003513,1075895873,0.9829870717150733,0.2373,US 43.6%,RU 13.0%,QA 12.2%,DZ 9.3%,NO 4.8%
+271111,"Natural gas, liquefied",EU27_2020,2024,36954333652,576053970,0.9846509986573567,0.2403,US 41.0%,RU 20.6%,DZ 12.0%,QA 9.5%,NG 4.9%
+271111,"Natural gas, liquefied",IT,2019,2560326235,85592828,0.9676510029362149,0.3069,QA 46.2%,DZ 27.2%,US 10.6%,TT 8.4%,EG 2.8%
+271111,"Natural gas, liquefied",IT,2020,1772775499,81346330,0.9561267610748786,0.3585,QA 47.9%,DZ 33.3%,US 12.9%,GB 4.0%,NG 1.0%
+271111,"Natural gas, liquefied",IT,2021,2622720987,84599733,0.9687514920655577,0.5249,QA 70.0%,DZ 16.1%,US 8.8%,EG 2.1%,NG 1.7%
+271111,"Natural gas, liquefied",IT,2022,13027577124,476761345,0.9646956904927677,0.2838,QA 43.2%,US 28.9%,DZ 8.8%,EG 6.0%,TT 3.6%
+271111,"Natural gas, liquefied",IT,2023,6647882493,699266046,0.904824838876175,0.3178,QA 41.3%,US 34.3%,DZ 16.7%,EG 2.7%,NG 2.3%
+271111,"Natural gas, liquefied",IT,2024,4864658239,184368960,0.9634842608816773,0.3422,QA 44.6%,US 35.3%,DZ 13.3%,AO 1.9%,TT 1.7%
+271121,Natural gas in gaseous state,EU27_2020,2019,20847962412,14379084033,0.5918169280683219,0.329,RU 50.8%,DZ 21.5%,NO 13.0%,GB 6.9%,LY 5.1%
+271121,Natural gas in gaseous state,EU27_2020,2020,13191734393,7913832585,0.6250357740567115,0.3169,RU 48.1%,DZ 23.5%,NO 15.6%,GB 6.4%,LY 4.4%
+271121,Natural gas in gaseous state,EU27_2020,2021,39244275111,22812237036,0.6323957591757304,0.2698,RU 44.8%,NO 16.1%,DZ 16.0%,AZ 9.9%,GB 7.7%
+271121,Natural gas in gaseous state,EU27_2020,2022,112243050572,72900784288,0.606247843234287,0.1967,RU 28.0%,GB 19.3%,NO 19.0%,DZ 15.8%,AZ 13.9%
+271121,Natural gas in gaseous state,EU27_2020,2023,48244961050,35645436838,0.5750951511090775,0.2019,DZ 29.5%,NO 22.4%,RU 16.4%,GB 14.4%,AZ 12.8%
+271121,Natural gas in gaseous state,EU27_2020,2024,35872449015,22872699720,0.6106453007178687,0.2179,DZ 32.0%,NO 22.2%,RU 21.2%,AZ 12.1%,GB 8.2%
+271121,Natural gas in gaseous state,IT,2019,9796905548,1508343554,0.8665802460086297,0.4267,RU 59.5%,DZ 24.2%,LY 10.9%,NO 4.5%,CH 0.8%
+271121,Natural gas in gaseous state,IT,2020,6900407574,187618249,0.9735302531783679,0.3843,RU 54.4%,DZ 26.4%,NO 10.8%,LY 8.3%,AZ 0.0%
+271121,Natural gas in gaseous state,IT,2021,19974774990,138765903,0.9931008715104811,0.3406,RU 50.9%,DZ 21.8%,AZ 16.9%,LY 6.9%,NO 3.6%
+271121,Natural gas in gaseous state,IT,2022,48904857509,1219764482,0.9756653629783181,0.2453,DZ 29.3%,AZ 27.1%,RU 26.5%,NO 10.9%,LY 6.2%
+271121,Natural gas in gaseous state,IT,2023,21303797202,694763271,0.9684177847976589,0.3506,DZ 52.2%,AZ 23.4%,NO 12.7%,RU 6.6%,LY 5.1%
+271121,Natural gas in gaseous state,IT,2024,16742492727,406205138,0.9763127707305956,0.3472,DZ 52.1%,AZ 22.1%,RU 12.1%,NO 10.8%,LY 2.9%
+3102,"Mineral or chemical nitrogenous fertilisers (excl. those in tablets or similar forms, or in packages with a gross weight of <= 10 kg)",EU27_2020,2019,1598986004,3599600305,0.30758092853662383,0.1735,RU 28.3%,EG 26.6%,DZ 10.5%,BY 5.6%,TT 4.7%
+3102,"Mineral or chemical nitrogenous fertilisers (excl. those in tablets or similar forms, or in packages with a gross weight of <= 10 kg)",EU27_2020,2020,1383173162,3237359310,0.29935362869580545,0.1449,EG 26.3%,RU 21.0%,DZ 12.5%,BY 6.2%,UA 5.5%
+3102,"Mineral or chemical nitrogenous fertilisers (excl. those in tablets or similar forms, or in packages with a gross weight of <= 10 kg)",EU27_2020,2021,2575007053,4865037222,0.34610103889469124,0.1637,RU 25.1%,EG 25.0%,DZ 15.4%,UA 9.2%,TT 3.8%
+3102,"Mineral or chemical nitrogenous fertilisers (excl. those in tablets or similar forms, or in packages with a gross weight of <= 10 kg)",EU27_2020,2022,7404994074,10410112500,0.4156581406482918,0.1276,EG 22.9%,RU 19.8%,DZ 13.5%,US 8.4%,TT 5.7%
+3102,"Mineral or chemical nitrogenous fertilisers (excl. those in tablets or similar forms, or in packages with a gross weight of <= 10 kg)",EU27_2020,2023,3594273311,5244748654,0.40663699278407667,0.1331,EG 25.7%,RU 19.5%,DZ 10.6%,US 8.5%,CN 6.4%
+3102,"Mineral or chemical nitrogenous fertilisers (excl. those in tablets or similar forms, or in packages with a gross weight of <= 10 kg)",EU27_2020,2024,2794008277,4723187071,0.3716822761222195,0.1982,EG 33.2%,RU 25.8%,DZ 11.6%,TT 4.3%,UZ 4.1%
+3102,"Mineral or chemical nitrogenous fertilisers (excl. those in tablets or similar forms, or in packages with a gross weight of <= 10 kg)",IT,2019,198769338,127935167,0.6084070925192783,0.3136,EG 50.9%,RU 16.5%,DZ 14.5%,TR 5.3%,NO 4.1%
+3102,"Mineral or chemical nitrogenous fertilisers (excl. those in tablets or similar forms, or in packages with a gross weight of <= 10 kg)",IT,2020,204173581,101545925,0.6678461040035829,0.325,EG 54.3%,UA 11.7%,TR 9.0%,DZ 5.3%,RU 4.6%
+3102,"Mineral or chemical nitrogenous fertilisers (excl. those in tablets or similar forms, or in packages with a gross weight of <= 10 kg)",IT,2021,294135896,156991064,0.6520024784153888,0.2982,EG 49.0%,UA 18.8%,DZ 12.8%,LY 5.4%,TR 3.6%
+3102,"Mineral or chemical nitrogenous fertilisers (excl. those in tablets or similar forms, or in packages with a gross weight of <= 10 kg)",IT,2022,685367874,326817083,0.6771172296724817,0.2382,EG 41.0%,DZ 23.2%,TM 6.6%,LY 5.8%,RU 5.7%
+3102,"Mineral or chemical nitrogenous fertilisers (excl. those in tablets or similar forms, or in packages with a gross weight of <= 10 kg)",IT,2023,460857686,196054422,0.7015515171475573,0.2722,EG 49.2%,DZ 11.5%,NG 7.6%,TM 6.0%,CN 5.3%
+3102,"Mineral or chemical nitrogenous fertilisers (excl. those in tablets or similar forms, or in packages with a gross weight of <= 10 kg)",IT,2024,303081713,153962103,0.6631349170251107,0.3639,EG 56.6%,DZ 15.7%,RU 11.3%,CN 6.4%,NO 3.2%
+3105,"Mineral or chemical fertilisers containing two or three of the fertilising elements nitrogen, phosphorus and potassium; other fertilisers (excl. pure animal or vegetable fertilisers or mineral or chemical nitrogenous, phosphatic or potassic fertilisers); animal, vegetable, mineral or chemical fertilisers in tablets or similar forms or in packages of a gross weight of <= 10 kg",EU27_2020,2019,1740984081,2357758725,0.4247605091130473,0.2514,RU 44.2%,MA 20.4%,BY 6.8%,NO 6.5%,GB 4.7%
+3105,"Mineral or chemical fertilisers containing two or three of the fertilising elements nitrogen, phosphorus and potassium; other fertilisers (excl. pure animal or vegetable fertilisers or mineral or chemical nitrogenous, phosphatic or potassic fertilisers); animal, vegetable, mineral or chemical fertilisers in tablets or similar forms or in packages of a gross weight of <= 10 kg",EU27_2020,2020,1606226694,2148149488,0.42782785105576293,0.23,RU 37.4%,MA 27.5%,BY 6.5%,GB 6.0%,NO 5.4%
+3105,"Mineral or chemical fertilisers containing two or three of the fertilising elements nitrogen, phosphorus and potassium; other fertilisers (excl. pure animal or vegetable fertilisers or mineral or chemical nitrogenous, phosphatic or potassic fertilisers); animal, vegetable, mineral or chemical fertilisers in tablets or similar forms or in packages of a gross weight of <= 10 kg",EU27_2020,2021,2260476613,2775025937,0.44890784793664734,0.2532,RU 41.3%,MA 26.6%,NO 6.2%,BY 5.6%,XS 4.3%
+3105,"Mineral or chemical fertilisers containing two or three of the fertilising elements nitrogen, phosphorus and potassium; other fertilisers (excl. pure animal or vegetable fertilisers or mineral or chemical nitrogenous, phosphatic or potassic fertilisers); animal, vegetable, mineral or chemical fertilisers in tablets or similar forms or in packages of a gross weight of <= 10 kg",EU27_2020,2022,2952497418,3777993448,0.43867490154617794,0.1807,RU 32.7%,MA 22.3%,NO 11.2%,XS 5.7%,TR 4.8%
+3105,"Mineral or chemical fertilisers containing two or three of the fertilising elements nitrogen, phosphorus and potassium; other fertilisers (excl. pure animal or vegetable fertilisers or mineral or chemical nitrogenous, phosphatic or potassic fertilisers); animal, vegetable, mineral or chemical fertilisers in tablets or similar forms or in packages of a gross weight of <= 10 kg",EU27_2020,2023,1984765207,2658031484,0.42749345687426743,0.2206,MA 34.7%,RU 29.2%,NO 8.4%,GB 4.9%,XS 4.3%
+3105,"Mineral or chemical fertilisers containing two or three of the fertilising elements nitrogen, phosphorus and potassium; other fertilisers (excl. pure animal or vegetable fertilisers or mineral or chemical nitrogenous, phosphatic or potassic fertilisers); animal, vegetable, mineral or chemical fertilisers in tablets or similar forms or in packages of a gross weight of <= 10 kg",EU27_2020,2024,2474034895,2778177928,0.4710462005968108,0.2398,MA 34.7%,RU 32.6%,NO 8.8%,XS 3.5%,GB 3.2%
+3105,"Mineral or chemical fertilisers containing two or three of the fertilising elements nitrogen, phosphorus and potassium; other fertilisers (excl. pure animal or vegetable fertilisers or mineral or chemical nitrogenous, phosphatic or potassic fertilisers); animal, vegetable, mineral or chemical fertilisers in tablets or similar forms or in packages of a gross weight of <= 10 kg",IT,2019,132845075,136550837,0.4931220893953283,0.1985,RU 29.9%,MA 22.8%,TN 21.7%,CN 5.3%,JO 5.1%
+3105,"Mineral or chemical fertilisers containing two or three of the fertilising elements nitrogen, phosphorus and potassium; other fertilisers (excl. pure animal or vegetable fertilisers or mineral or chemical nitrogenous, phosphatic or potassic fertilisers); animal, vegetable, mineral or chemical fertilisers in tablets or similar forms or in packages of a gross weight of <= 10 kg",IT,2020,141060131,200872925,0.41253727454768224,0.2638,MA 45.4%,RU 16.8%,TN 13.4%,EG 7.4%,CN 5.0%
+3105,"Mineral or chemical fertilisers containing two or three of the fertilising elements nitrogen, phosphorus and potassium; other fertilisers (excl. pure animal or vegetable fertilisers or mineral or chemical nitrogenous, phosphatic or potassic fertilisers); animal, vegetable, mineral or chemical fertilisers in tablets or similar forms or in packages of a gross weight of <= 10 kg",IT,2021,196287161,145975555,0.5734985197744997,0.2143,MA 30.3%,RU 25.9%,TN 19.7%,EG 11.5%,TR 4.7%
+3105,"Mineral or chemical fertilisers containing two or three of the fertilising elements nitrogen, phosphorus and potassium; other fertilisers (excl. pure animal or vegetable fertilisers or mineral or chemical nitrogenous, phosphatic or potassic fertilisers); animal, vegetable, mineral or chemical fertilisers in tablets or similar forms or in packages of a gross weight of <= 10 kg",IT,2022,233917145,124023486,0.653508221032331,0.2373,RU 36.8%,MA 25.2%,TN 14.9%,CN 11.6%,IL 4.0%
+3105,"Mineral or chemical fertilisers containing two or three of the fertilising elements nitrogen, phosphorus and potassium; other fertilisers (excl. pure animal or vegetable fertilisers or mineral or chemical nitrogenous, phosphatic or potassic fertilisers); animal, vegetable, mineral or chemical fertilisers in tablets or similar forms or in packages of a gross weight of <= 10 kg",IT,2023,212644720,133880342,0.613648890999982,0.2505,MA 32.3%,RU 31.6%,TN 19.9%,CN 5.6%,EG 4.4%
+3105,"Mineral or chemical fertilisers containing two or three of the fertilising elements nitrogen, phosphorus and potassium; other fertilisers (excl. pure animal or vegetable fertilisers or mineral or chemical nitrogenous, phosphatic or potassic fertilisers); animal, vegetable, mineral or chemical fertilisers in tablets or similar forms or in packages of a gross weight of <= 10 kg",IT,2024,231546385,136618180,0.6289208875927536,0.2656,RU 39.6%,MA 26.5%,TN 18.2%,CN 4.8%,EG 3.9%
+720260,Ferro-nickel,EU27_2020,2019,672915146,160264765,0.807646868480486,0.1581,BR 25.5%,NC 16.0%,GT 15.7%,UA 8.0%,GB 7.7%
+720260,Ferro-nickel,EU27_2020,2020,609242649,196682871,0.7559540353058928,0.1446,BR 25.5%,NC 14.2%,GT 13.4%,DO 12.9%,CO 11.6%
+720260,Ferro-nickel,EU27_2020,2021,910626767,241089219,0.7906695557493113,0.1601,BR 28.3%,DO 16.2%,NC 13.2%,CO 12.2%,GT 9.3%
+720260,Ferro-nickel,EU27_2020,2022,1105182774,255220653,0.812393406297998,0.1917,BR 32.0%,CO 19.3%,DO 14.6%,NC 13.1%,MK 9.0%
+720260,Ferro-nickel,EU27_2020,2023,739010755,226912097,0.7650825875688051,0.3385,BR 52.1%,CO 17.7%,NC 16.2%,DO 9.8%,GT 0.9%
+720260,Ferro-nickel,EU27_2020,2024,608963176,213218511,0.7406674043324928,0.2329,BR 30.5%,CO 23.8%,ID 23.6%,NC 16.4%,XK 1.6%
+720260,Ferro-nickel,IT,2019,208874172,9065200,0.9584049457571163,0.2507,GT 40.6%,UA 21.8%,BR 16.8%,DO 6.9%,XK 5.4%
+720260,Ferro-nickel,IT,2020,155929846,2124328,0.986559494468017,0.2,GT 32.2%,BR 20.8%,CO 14.9%,XK 12.5%,DO 9.9%
+720260,Ferro-nickel,IT,2021,288173692,6173980,0.97902487232853,0.1755,BR 23.4%,GT 21.2%,UA 14.9%,XK 14.6%,CO 13.2%
+720260,Ferro-nickel,IT,2022,305354020,36444797,0.8933735426006463,0.1865,BR 27.8%,DO 18.5%,GT 17.1%,CO 14.8%,MK 11.8%
+720260,Ferro-nickel,IT,2023,115688057,54435130,0.6800252160806275,0.4633,BR 66.0%,CO 13.5%,NC 5.9%,GT 4.7%,MK 4.6%
+720260,Ferro-nickel,IT,2024,116294861,43154368,0.7293535486458828,0.2327,ID 31.4%,BR 24.5%,CO 22.6%,NC 13.1%,KR 7.4%
+7403,"Copper, refined, and copper alloys, unwrought (excl. copper alloys of heading 7405)",EU27_2020,2019,4807053245,5881149329,0.44975319392744134,0.1636,RU 28.9%,CL 21.1%,CG 11.7%,CD 11.5%,PE 4.8%
+7403,"Copper, refined, and copper alloys, unwrought (excl. copper alloys of heading 7405)",EU27_2020,2020,3904446793,6265660104,0.38391403674938185,0.1673,CL 26.4%,RU 25.0%,CD 12.7%,CG 10.3%,PE 5.8%
+7403,"Copper, refined, and copper alloys, unwrought (excl. copper alloys of heading 7405)",EU27_2020,2021,6477295816,9098817874,0.4158480057935427,0.2062,RU 35.8%,CL 21.6%,CD 13.8%,CG 8.3%,KZ 4.1%
+7403,"Copper, refined, and copper alloys, unwrought (excl. copper alloys of heading 7405)",EU27_2020,2022,7405004849,11009905910,0.40212005075185714,0.2155,RU 35.4%,CD 19.8%,CL 19.8%,CG 9.3%,PE 3.8%
+7403,"Copper, refined, and copper alloys, unwrought (excl. copper alloys of heading 7405)",EU27_2020,2023,5525315626,9400773383,0.370178391852574,0.1848,CL 32.2%,CD 23.9%,RU 9.1%,PE 8.2%,CG 6.6%
+7403,"Copper, refined, and copper alloys, unwrought (excl. copper alloys of heading 7405)",EU27_2020,2024,6356488351,9913214754,0.3906947969472489,0.226,CL 37.7%,CD 25.1%,CG 8.8%,PE 7.0%,XS 7.0%
+7403,"Copper, refined, and copper alloys, unwrought (excl. copper alloys of heading 7405)",IT,2019,1458466307,1598951855,0.47702546060822415,0.1592,CG 26.5%,CD 16.5%,CL 16.5%,PE 15.7%,KZ 7.5%
+7403,"Copper, refined, and copper alloys, unwrought (excl. copper alloys of heading 7405)",IT,2020,1030517008,1455119083,0.414588849804402,0.1691,CD 23.5%,PE 22.1%,CG 20.2%,CL 10.6%,KZ 9.1%
+7403,"Copper, refined, and copper alloys, unwrought (excl. copper alloys of heading 7405)",IT,2021,1809994174,2967544774,0.3788549279661466,0.1503,CD 22.4%,RU 15.5%,CG 14.8%,PE 14.3%,CL 13.7%
+7403,"Copper, refined, and copper alloys, unwrought (excl. copper alloys of heading 7405)",IT,2022,1843334683,3542798088,0.3422371414468052,0.1746,CD 28.2%,CG 21.0%,PE 13.7%,CL 13.7%,RU 9.4%
+7403,"Copper, refined, and copper alloys, unwrought (excl. copper alloys of heading 7405)",IT,2023,1626323715,2978902948,0.35314737666800483,0.2105,CD 28.6%,PE 27.9%,CL 16.5%,RU 14.0%,KZ 4.1%
+7403,"Copper, refined, and copper alloys, unwrought (excl. copper alloys of heading 7405)",IT,2024,1455088725,3352365351,0.30267345293305303,0.2362,PE 28.9%,CL 27.6%,CD 26.2%,CG 7.0%,XS 4.6%
+7501,"Nickel mattes, nickel oxide sinters and other intermediate products of nickel metallurgy :",EU27_2020,2019,811956177,76012039,0.9143977930399256,0.9812,RU 99.1%,ID 0.9%,US 0.0%,CA 0.0%,GB 0.0%
+7501,"Nickel mattes, nickel oxide sinters and other intermediate products of nickel metallurgy :",EU27_2020,2020,960319663,77539628,0.9252888819588551,0.9515,RU 97.5%,ID 2.3%,AU 0.1%,JP 0.0%,US 0.0%
+7501,"Nickel mattes, nickel oxide sinters and other intermediate products of nickel metallurgy :",EU27_2020,2021,1235363974,127456238,0.9064761170419154,0.9104,RU 95.3%,ID 4.5%,CA 0.1%,GB 0.0%,US 0.0%
+7501,"Nickel mattes, nickel oxide sinters and other intermediate products of nickel metallurgy :",EU27_2020,2022,1755919508,188356555,0.9031225253530265,0.9842,RU 99.2%,ID 0.4%,ZA 0.2%,UA 0.1%,CA 0.1%
+7501,"Nickel mattes, nickel oxide sinters and other intermediate products of nickel metallurgy :",EU27_2020,2023,1035328069,157756529,0.8677742305411942,0.9729,RU 98.6%,CU 1.0%,ID 0.4%,BR 0.0%,GB 0.0%
+7501,"Nickel mattes, nickel oxide sinters and other intermediate products of nickel metallurgy :",EU27_2020,2024,699092463,120006114,0.8534900226056674,0.8314,RU 91.0%,CU 4.7%,ID 3.1%,JP 0.4%,AU 0.2%
+7501,"Nickel mattes, nickel oxide sinters and other intermediate products of nickel metallurgy :",IT,2019,3111,,,1.0,US 100.0%,,,,
+7501,"Nickel mattes, nickel oxide sinters and other intermediate products of nickel metallurgy :",IT,2020,,232606,,,,,,,
+7501,"Nickel mattes, nickel oxide sinters and other intermediate products of nickel metallurgy :",IT,2021,6239840,2015081,0.7558933634858529,1.0,ID 100.0%,,,,
+7501,"Nickel mattes, nickel oxide sinters and other intermediate products of nickel metallurgy :",IT,2022,4895,43764,0.10059803941716845,0.5002,US 50.9%,GB 49.1%,,,
+7501,"Nickel mattes, nickel oxide sinters and other intermediate products of nickel metallurgy :",IT,2023,5346,407369,0.01295324860981549,0.5246,GB 61.1%,CH 38.9%,,,
+7501,"Nickel mattes, nickel oxide sinters and other intermediate products of nickel metallurgy :",IT,2024,7996677,9775,0.9987791096480688,0.9227,ID 96.0%,CN 3.1%,US 0.6%,GB 0.3%,CA 0.0%
+7502,Unwrought nickel,EU27_2020,2019,2424366410,1820037055,0.5711913181656023,0.1917,RU 32.3%,NO 19.6%,CA 13.8%,AU 11.9%,GB 11.1%
+7502,Unwrought nickel,EU27_2020,2020,2002021564,1751382682,0.5333882078205546,0.1717,RU 27.1%,NO 21.9%,CA 14.3%,GB 12.4%,AU 9.4%
+7502,Unwrought nickel,EU27_2020,2021,2694264569,2383549815,0.5305953241397569,0.2124,RU 34.1%,NO 16.6%,AU 14.1%,CA 9.8%,GB 9.3%
+7502,Unwrought nickel,EU27_2020,2022,4134796614,4091620057,0.5026242627091944,0.193,RU 33.4%,CA 15.5%,AU 15.0%,NO 14.6%,GB 8.8%
+7502,Unwrought nickel,EU27_2020,2023,3369613453,3763789699,0.47237109430093793,0.1502,NO 21.4%,AU 20.3%,RU 18.3%,GB 11.1%,ZA 8.5%
+7502,Unwrought nickel,EU27_2020,2024,2684032998,3300265145,0.4485125797316078,0.1526,NO 28.2%,CA 15.7%,GB 13.5%,RU 11.1%,AU 8.8%
+7502,Unwrought nickel,IT,2019,169025695,244211985,0.40902779001179174,0.1858,CA 26.1%,ZA 23.8%,GB 15.5%,US 13.4%,AU 9.8%
+7502,Unwrought nickel,IT,2020,122698134,252145555,0.32733146535648355,0.1843,ZA 28.9%,CA 22.4%,GB 15.2%,CN 10.0%,JP 9.9%
+7502,Unwrought nickel,IT,2021,157989076,375677065,0.29604478130082457,0.2872,ZA 36.9%,CA 36.0%,JP 10.3%,GB 8.8%,US 5.2%
+7502,Unwrought nickel,IT,2022,152608448,629968780,0.1950075245481076,0.2019,CA 30.1%,ZA 25.8%,GB 14.4%,US 12.4%,AU 6.7%
+7502,Unwrought nickel,IT,2023,186086723,554255382,0.2513523433872507,0.2417,ZA 39.9%,CA 18.5%,US 15.3%,GB 14.0%,MG 5.6%
+7502,Unwrought nickel,IT,2024,194309581,415224988,0.31878352907659285,0.2307,ZA 33.6%,GB 25.7%,US 20.2%,CA 8.3%,AU 5.1%
+7601,Unwrought aluminium,EU27_2020,2019,10875297384,8606069212,0.558240990456643,0.1257,NO 23.5%,RU 18.6%,AE 10.9%,IS 9.3%,MZ 8.2%
+7601,Unwrought aluminium,EU27_2020,2020,8954644235,6869600008,0.5658813209332995,0.1299,NO 25.5%,RU 15.3%,IS 13.1%,MZ 9.0%,AE 8.6%
+7601,Unwrought aluminium,EU27_2020,2021,13156939753,12105800230,0.5208041472086429,0.1218,NO 26.5%,IS 12.6%,RU 12.6%,AE 8.9%,CA 5.0%
+7601,Unwrought aluminium,EU27_2020,2022,20969068554,17758039003,0.5414571311099582,0.1078,NO 23.1%,IS 11.6%,RU 10.8%,AE 9.7%,IN 8.3%
+7601,Unwrought aluminium,EU27_2020,2023,15841844553,13013174955,0.5490152085535024,0.1037,NO 22.6%,IS 12.1%,AE 10.6%,IN 8.8%,RU 7.9%
+7601,Unwrought aluminium,EU27_2020,2024,14701726582,13376649170,0.5235960481422366,0.1047,NO 24.2%,IS 13.1%,AE 9.1%,MZ 7.2%,BH 6.5%
+7601,Unwrought aluminium,IT,2019,1589491777,698798044,0.6946199569709138,0.1465,RU 28.9%,MZ 17.8%,AE 11.6%,EG 7.9%,IN 6.5%
+7601,Unwrought aluminium,IT,2020,1150323434,578100849,0.6655330206327587,0.138,RU 23.8%,MZ 20.5%,EG 12.6%,AE 9.8%,BH 9.6%
+7601,Unwrought aluminium,IT,2021,1877634189,1040708572,0.6433905619628482,0.089,MZ 15.9%,AE 14.0%,RU 11.8%,EG 9.6%,BH 8.8%
+7601,Unwrought aluminium,IT,2022,3097428521,1468321689,0.6784051642194416,0.1086,MZ 18.5%,IN 17.3%,AE 15.2%,RU 8.4%,BH 6.3%
+7601,Unwrought aluminium,IT,2023,2289920078,786608084,0.7443195567926675,0.0987,AE 16.9%,IN 16.3%,MZ 12.1%,EG 10.5%,BH 7.5%
+7601,Unwrought aluminium,IT,2024,2217667061,898830364,0.7115895694988421,0.0822,MZ 15.8%,EG 13.0%,AE 12.8%,BH 7.8%,IN 5.7%
+8542,Electronic integrated circuits; parts thereof,EU27_2020,2019,28333465445,23556463579,0.5460301445372044,0.1264,MY 21.8%,TW 19.3%,US 11.2%,CN 10.7%,GB 7.2%
+8542,Electronic integrated circuits; parts thereof,EU27_2020,2020,28303465368,20218698853,0.5833100361947683,0.1263,MY 22.7%,TW 18.5%,CN 11.6%,US 9.6%,GB 7.3%
+8542,Electronic integrated circuits; parts thereof,EU27_2020,2021,35802573710,24206294459,0.5966213795129578,0.1241,MY 20.5%,TW 18.7%,CN 14.1%,US 10.3%,IL 6.5%
+8542,Electronic integrated circuits; parts thereof,EU27_2020,2022,51236183818,30813496060,0.6244531836587698,0.1223,TW 21.3%,MY 18.2%,CN 13.0%,IL 8.9%,US 8.0%
+8542,Electronic integrated circuits; parts thereof,EU27_2020,2023,45723986596,33327948546,0.5784043934391558,0.1239,TW 24.2%,MY 16.1%,CN 10.5%,US 7.9%,IL 7.6%
+8542,Electronic integrated circuits; parts thereof,EU27_2020,2024,37635462989,26196291225,0.5896040842434743,0.1202,TW 21.8%,MY 17.5%,CN 11.7%,IL 9.8%,KR 7.6%
+8542,Electronic integrated circuits; parts thereof,IT,2019,396331213,928533535,0.2991484327727014,0.1271,SG 23.7%,TW 15.0%,CN 14.0%,GB 10.3%,US 10.0%
+8542,Electronic integrated circuits; parts thereof,IT,2020,383591523,1021940641,0.2729155068983537,0.1266,SG 22.5%,GB 15.1%,CN 13.7%,TW 13.2%,US 10.0%
+8542,Electronic integrated circuits; parts thereof,IT,2021,575414319,1251010618,0.31504953055730206,0.1384,CN 24.6%,SG 20.1%,TW 13.6%,US 8.5%,MY 6.1%
+8542,Electronic integrated circuits; parts thereof,IT,2022,730221584,1567939803,0.3177416469229017,0.1549,CN 29.3%,SG 16.6%,TW 15.5%,US 8.2%,MY 6.1%
+8542,Electronic integrated circuits; parts thereof,IT,2023,635094176,1512126235,0.2957750274477994,0.1344,CN 23.2%,SG 18.8%,TW 16.4%,US 8.6%,MY 5.0%
+8542,Electronic integrated circuits; parts thereof,IT,2024,474385507,1102570040,0.3008236395137903,0.1427,SG 26.8%,CN 19.0%,TW 11.7%,US 9.9%,TN 5.8%

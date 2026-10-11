@@ -1,0 +1,9 @@
+hub search 'Daily Chokepoints Data': Daily_Chokepoints_Data -> https://services9.arcgis.com/weJ1QsnbMYJlCHdG/arcgis/rest/services/Daily_Chokepoints_Data/FeatureServer
+hub search 'Daily Chokepoints Data': Disruptions -> https://services9.arcgis.com/weJ1QsnbMYJlCHdG/arcgis/rest/services/portwatch_disruptions_database/FeatureServer
+hub search 'chokepoint transit': Daily_Chokepoints_Data -> https://services9.arcgis.com/weJ1QsnbMYJlCHdG/arcgis/rest/services/Daily_Chokepoints_Data/FeatureServer
+hub search 'chokepoint transit': Chokepoints -> https://services9.arcgis.com/weJ1QsnbMYJlCHdG/arcgis/rest/services/PortWatch_chokepoints_database/FeatureServer
+hub search 'Daily Chokepoint': Daily_Chokepoints_Data -> https://services9.arcgis.com/weJ1QsnbMYJlCHdG/arcgis/rest/services/Daily_Chokepoints_Data/FeatureServer
+hub search 'Daily Chokepoint': Disruptions -> https://services9.arcgis.com/weJ1QsnbMYJlCHdG/arcgis/rest/services/portwatch_disruptions_database/FeatureServer
+https://services9.arcgis.com/weJ1QsnbMYJlCHdG/arcgis/rest/services/Daily_Chokepoints_Data/FeatureServer/0: 79352 records; fields: ['ObjectId', 'capacity', 'capacity_cargo', 'capacity_container', 'capacity_dry_bulk', 'capacity_general_cargo', 'capacity_roro', 'capacity_tanker', 'date', 'day', 'month', 'n_cargo', 'n_container', 'n_dry_bulk', 'n_general_cargo', 'n_roro', 'n_tanker', 'n_total', 'portid', 'portname', 'year']
+using dataset: Daily_Chokepoints_Data
+name field portname, total field n_total, date field date
