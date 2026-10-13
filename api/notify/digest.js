@@ -13,9 +13,12 @@
 
 import { getPublicCorsHeaders } from '../_cors.js';
 
+// Fork (13/10/2026): ACLED is excluded by licence and its n8n key is retired,
+// so the `conflicts` topic (ACLED only) is gone and `chokepoints` reads the
+// seismic feed only. Conflict events come from UCDP, which has its own panel
+// and is not part of this digest. An unknown topic in a request is ignored.
 const TOPIC_SOURCES = {
-  chokepoints: ['risk_sentinel:n8n:acled', 'risk_sentinel:n8n:usgs'],
-  conflicts: ['risk_sentinel:n8n:acled'],
+  chokepoints: ['risk_sentinel:n8n:usgs'],
   commodities: ['risk_sentinel:n8n:commodities', 'risk_sentinel:n8n:gdelt'],
   // UN Comtrade concentration materializer: single-supplier dependency per
   // HS4 (n8n workflow 10). Kept as its own topic so the OSINT workspace and
@@ -29,7 +32,6 @@ const TOPIC_SOURCES = {
 
 const TOPIC_LABELS = {
   chokepoints: 'Chokepoints & Trade Routes',
-  conflicts: 'Conflict Events',
   commodities: 'Commodities & Customs',
   trade: 'Trade Concentration (HS4)',
   climate: 'Climate Anomalies',
