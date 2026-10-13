@@ -105,7 +105,6 @@ const CACHE_TTL = 10800; // 3h — 6x the 30 min cron interval. Shorter = key ex
                          // is gated at brief-selection time (see pickBriefCluster + briefSystemPrompt
                          // in _insights-brief.mjs), not by aging out fast.
 const MAX_HEADLINE_LEN = 500;
-const GROQ_MODEL = 'llama-3.3-70b-versatile';
 const INSIGHTS_SOURCE_VERSION = 'digest-clustering-v2-importance-diversity';
 const INSIGHTS_MAX_CONSECUTIVE_FAILURES = 100;
 const INSIGHTS_RUN_OUTCOMES = Object.freeze({
@@ -382,8 +381,8 @@ async function readExistingInsights() {
 }
 
 // Provider config — mirrors server/_shared/llm.ts getProviderCredentials()
-// Order: ollama → openrouter → groq (canonical chain since #4944: DeepSeek
-// V4 Flash primary with reasoning disabled, groq 70B free-tier fallback)
+// Order: ollama → openrouter (DeepSeek V4 Flash, reasoning disabled). The fork
+// removed Groq on 13/10/2026: the project has no Groq account.
 const LLM_PROVIDERS = [
   {
     name: 'ollama',
@@ -409,11 +408,14 @@ const LLM_PROVIDERS = [
     timeout: 20_000,
   },
   {
-    name: 'groq',
-    envKey: 'GROQ_API_KEY',
-    apiUrl: 'https://api.groq.com/openai/v1/chat/completions',
-    model: GROQ_MODEL,
-    headers: (key) => ({ 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json', 'User-Agent': CHROME_UA }),
+    // Fork: optional OpenAI-compatible fallback (LLM_API_URL + LLM_API_KEY,
+    // model LLM_MODEL) in the slot Groq held upstream; unset by default, so
+    // production runs on OpenRouter alone. Groq was removed on 13/10/2026.
+    name: 'generic',
+    envKey: 'LLM_API_KEY',
+    get apiUrl() { return process.env.LLM_API_URL || ''; },
+    get model() { return process.env.LLM_MODEL || 'gpt-3.5-turbo'; },
+    headers: (key) => ({ Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', 'User-Agent': CHROME_UA }),
     timeout: 15_000,
   },
 ];
@@ -517,8 +519,8 @@ async function callLLM(headline, options = {}) {
         });
         if (!response.ok) {
           // #6110: `usableBudgetMs()` is a real remaining wall clock, so pass it
-          // as `remainingBudgetMs` — a hint longer than that (groq's daily-quota
-          // 429 asks for ~20 minutes) makes the error nonRetryable and we fall
+          // as `remainingBudgetMs` — a hint longer than that (a provider's daily-quota
+          // 429 can ask for ~20 minutes) makes the error nonRetryable and we fall
           // through to the next provider immediately, instead of clamping the
           // hint to the ceiling and sleeping it away twice.
           throw httpRetryError(response, {

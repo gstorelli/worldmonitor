@@ -831,12 +831,14 @@ describe('news digest methodology parity', () => {
       .map((m) => m[1]);
     const weeklyTemperature = extractNumericConst(weeklyBriefSrc, 'BRIEF_TEMPERATURE');
 
-    assert.deepEqual(providerNames, ['openrouter', 'groq']);
-    assert.deepEqual(providerModels, ['deepseek/deepseek-v4-flash', 'llama-3.3-70b-versatile']);
+    // Fork: Groq removed (13/10/2026); `generic` (model from LLM_MODEL, a getter)
+    // holds the optional fallback slot.
+    assert.deepEqual(providerNames, ['openrouter', 'generic']);
+    assert.deepEqual(providerModels, ['deepseek/deepseek-v4-flash']);
     assert.equal(weeklyTemperature, 0.3);
 
     assertDocMatches(
-      /Regional weekly briefs[\s\S]*tr(?:y|ies) OpenRouter first[\s\S]*`deepseek\/deepseek-v4-flash`[\s\S]*Groq `llama-3\.3-70b-versatile`[\s\S]*temperature\s+`0\.3`/,
+      /Regional weekly briefs[\s\S]*tr(?:y|ies) OpenRouter[\s\S]*`deepseek\/deepseek-v4-flash`[\s\S]*temperature\s+`0\.3`/,
       'regional weekly brief provider order, models, and temperature',
     );
     assertDocMatches(
@@ -844,7 +846,7 @@ describe('news digest methodology parity', () => {
       'regional weekly brief chain differs from digest prose and whyMatters',
     );
     assertDocMatches(
-      /provider chain to OpenRouter by skipping Ollama and Groq[\s\S]*`google\/gemini-2\.5-flash`/,
+      /provider chain to OpenRouter by skipping Ollama[\s\S]*`google\/gemini-2\.5-flash`/,
       'digest prose and whyMatters OpenRouter-only posture',
     );
   });

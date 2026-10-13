@@ -27,8 +27,7 @@ const MENU_HELP_GITHUB_ID: &str = "help.github";
 #[cfg(feature = "devtools")]
 const MENU_HELP_DEVTOOLS_ID: &str = "help.devtools";
 const TRUSTED_WINDOWS: [&str; 3] = ["main", "settings", "live-channels"];
-const SUPPORTED_SECRET_KEYS: [&str; 28] = [
-    "GROQ_API_KEY",
+const SUPPORTED_SECRET_KEYS: [&str; 27] = [
     "OPENROUTER_API_KEY",
     "TAVILY_API_KEYS",
     "BRAVE_API_KEYS",

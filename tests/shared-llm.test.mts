@@ -6,7 +6,6 @@ import { __testing__ as llmHealth, isModelUsable } from '../server/_shared/llm-h
 
 const originalFetch = globalThis.fetch;
 const originalAbortSignalTimeout = AbortSignal.timeout;
-const originalGroqApiKey = process.env.GROQ_API_KEY;
 const originalOpenRouterApiKey = process.env.OPENROUTER_API_KEY;
 const originalOllamaApiUrl = process.env.OLLAMA_API_URL;
 const originalLlmApiUrl = process.env.LLM_API_URL;
@@ -26,8 +25,6 @@ afterEach(() => {
   if (originalLlmReasoningModel === undefined) delete process.env.LLM_REASONING_MODEL;
   else process.env.LLM_REASONING_MODEL = originalLlmReasoningModel;
 
-  if (originalGroqApiKey === undefined) delete process.env.GROQ_API_KEY;
-  else process.env.GROQ_API_KEY = originalGroqApiKey;
 
   if (originalOpenRouterApiKey === undefined) delete process.env.OPENROUTER_API_KEY;
   else process.env.OPENROUTER_API_KEY = originalOpenRouterApiKey;
@@ -52,7 +49,6 @@ describe('callLlm', () => {
 
   it('wires the DeepSeek Flash deadline into the shared chat-completion request', async () => {
     process.env.OPENROUTER_API_KEY = 'or-test-key';
-    delete process.env.GROQ_API_KEY;
     delete process.env.OLLAMA_API_URL;
     delete process.env.LLM_API_URL;
     delete process.env.LLM_API_KEY;
@@ -81,7 +77,6 @@ describe('callLlm', () => {
 
   it('excludes China-hosted providers and sorts by throughput on every OpenRouter call', async () => {
     process.env.OPENROUTER_API_KEY = 'or-test-key';
-    delete process.env.GROQ_API_KEY;
     delete process.env.OLLAMA_API_URL;
     delete process.env.LLM_API_URL;
     delete process.env.LLM_API_KEY;
@@ -114,11 +109,10 @@ describe('callLlm', () => {
   });
 
   it('preserves the default provider order (openrouter-first since #4944)', async () => {
-    process.env.GROQ_API_KEY = 'groq-test-key';
+    process.env.LLM_API_URL = 'https://generic.example.test/v1/chat/completions';
+    process.env.LLM_API_KEY = 'generic-test-key';
     process.env.OPENROUTER_API_KEY = 'or-test-key';
     delete process.env.OLLAMA_API_URL;
-    delete process.env.LLM_API_URL;
-    delete process.env.LLM_API_KEY;
 
     const postUrls: string[] = [];
     const postBodies: Array<Record<string, unknown>> = [];
@@ -132,9 +126,9 @@ describe('callLlm', () => {
 
       postUrls.push(url);
       postBodies.push(JSON.parse(String(init?.body || '{}')) as Record<string, unknown>);
-      if (url.includes('api.groq.com')) {
+      if (url.includes('generic.example.test')) {
         return new Response(JSON.stringify({
-          choices: [{ message: { content: 'groq response' } }],
+          choices: [{ message: { content: 'generic response' } }],
           usage: { total_tokens: 42 },
         }), { status: 200 });
       }
@@ -162,7 +156,6 @@ describe('callLlm', () => {
 
   it('preserves the provider finish reason on non-streaming completions', async () => {
     process.env.OPENROUTER_API_KEY = 'or-test-key';
-    delete process.env.GROQ_API_KEY;
     delete process.env.OLLAMA_API_URL;
     delete process.env.LLM_API_URL;
     delete process.env.LLM_API_KEY;
@@ -188,10 +181,9 @@ describe('callLlm', () => {
 
   it('retries the provider chain on token-limited completions only when opted in', async () => {
     process.env.OPENROUTER_API_KEY = 'or-test-key';
-    process.env.GROQ_API_KEY = 'groq-test-key';
+    process.env.LLM_API_URL = 'https://generic.example.test/v1/chat/completions';
+    process.env.LLM_API_KEY = 'generic-test-key';
     delete process.env.OLLAMA_API_URL;
-    delete process.env.LLM_API_URL;
-    delete process.env.LLM_API_KEY;
 
     const postUrls: string[] = [];
     globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -213,22 +205,21 @@ describe('callLlm', () => {
     const result = await callLlm({
       messages: [{ role: 'user', content: 'Return a bounded response.' }],
       maxTokens: 40,
-      providerOrder: ['openrouter', 'groq'],
+      providerOrder: ['openrouter', 'generic'],
       retryOnLengthLimit: true,
     });
 
     assert.ok(result);
-    assert.equal(result.provider, 'groq');
+    assert.equal(result.provider, 'generic');
     assert.equal(result.content, 'Complete fallback response.');
     assert.deepEqual(postUrls, [
       'https://openrouter.ai/api/v1/chat/completions',
-      'https://api.groq.com/openai/v1/chat/completions',
+      'https://generic.example.test/v1/chat/completions',
     ]);
   });
 
   it('rejects token-limit aliases and missing or unknown reasons at the requested ceiling', async () => {
     process.env.OPENROUTER_API_KEY = 'or-test-key';
-    delete process.env.GROQ_API_KEY;
     delete process.env.OLLAMA_API_URL;
     delete process.env.LLM_API_URL;
     delete process.env.LLM_API_KEY;
@@ -265,7 +256,6 @@ describe('callLlm', () => {
 
   it('omits the reasoning-off body when the reasoning profile opts in', async () => {
     process.env.OPENROUTER_API_KEY = 'or-test-key';
-    delete process.env.GROQ_API_KEY;
     delete process.env.OLLAMA_API_URL;
     delete process.env.LLM_API_URL;
     delete process.env.LLM_API_KEY;
@@ -299,7 +289,6 @@ describe('callLlm', () => {
     process.env.OPENROUTER_API_KEY = 'or-test-key';
     process.env.LLM_REASONING_PROVIDER = 'openrouter';
     process.env.LLM_REASONING_MODEL = 'deepseek/deepseek-v4-pro';
-    delete process.env.GROQ_API_KEY;
     delete process.env.OLLAMA_API_URL;
     delete process.env.LLM_API_URL;
     delete process.env.LLM_API_KEY;
@@ -339,7 +328,6 @@ describe('callLlm', () => {
 
   it('ignores DeepSeek reasoning message fields and serves content untouched', async () => {
     process.env.OPENROUTER_API_KEY = 'or-test-key';
-    delete process.env.GROQ_API_KEY;
     delete process.env.OLLAMA_API_URL;
     delete process.env.LLM_API_URL;
     delete process.env.LLM_API_KEY;
@@ -372,10 +360,9 @@ describe('callLlm', () => {
 
   it('falls through when a provider returns only reasoning with empty content', async () => {
     process.env.OPENROUTER_API_KEY = 'or-test-key';
-    process.env.GROQ_API_KEY = 'groq-test-key';
+    process.env.LLM_API_URL = 'https://generic.example.test/v1/chat/completions';
+    process.env.LLM_API_KEY = 'generic-test-key';
     delete process.env.OLLAMA_API_URL;
-    delete process.env.LLM_API_URL;
-    delete process.env.LLM_API_KEY;
 
     globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
@@ -390,7 +377,7 @@ describe('callLlm', () => {
         }), { status: 200 });
       }
       return new Response(JSON.stringify({
-        choices: [{ message: { content: 'groq fallback answer' } }],
+        choices: [{ message: { content: 'generic fallback answer' } }],
         usage: { total_tokens: 20 },
       }), { status: 200 });
     }) as typeof fetch;
@@ -400,16 +387,15 @@ describe('callLlm', () => {
     });
 
     assert.ok(result);
-    assert.equal(result.provider, 'groq');
-    assert.equal(result.content, 'groq fallback answer');
+    assert.equal(result.provider, 'generic');
+    assert.equal(result.content, 'generic fallback answer');
   });
 
-  it('supports explicitly bypassing groq with a stronger model override', async () => {
-    process.env.GROQ_API_KEY = 'groq-test-key';
+  it('supports explicitly bypassing generic with a stronger model override', async () => {
+    process.env.LLM_API_URL = 'https://generic.example.test/v1/chat/completions';
+    process.env.LLM_API_KEY = 'generic-test-key';
     process.env.OPENROUTER_API_KEY = 'or-test-key';
     delete process.env.OLLAMA_API_URL;
-    delete process.env.LLM_API_URL;
-    delete process.env.LLM_API_KEY;
 
     const postBodies: Array<{ url: string; body: Record<string, unknown> }> = [];
 
@@ -423,9 +409,9 @@ describe('callLlm', () => {
       const body = JSON.parse(String(init?.body || '{}')) as Record<string, unknown>;
       postBodies.push({ url, body });
 
-      if (url.includes('api.groq.com')) {
+      if (url.includes('generic.example.test')) {
         return new Response(JSON.stringify({
-          choices: [{ message: { content: 'groq response' } }],
+          choices: [{ message: { content: 'generic response' } }],
           usage: { total_tokens: 12 },
         }), { status: 200 });
       }
@@ -455,10 +441,9 @@ describe('callLlm', () => {
 
   it('logs a bounded error-body slice on non-stream provider failure', async () => {
     process.env.OPENROUTER_API_KEY = 'or-test-key';
-    process.env.GROQ_API_KEY = 'groq-test-key';
+    process.env.LLM_API_URL = 'https://generic.example.test/v1/chat/completions';
+    process.env.LLM_API_KEY = 'generic-test-key';
     delete process.env.OLLAMA_API_URL;
-    delete process.env.LLM_API_URL;
-    delete process.env.LLM_API_KEY;
 
     const warns: string[] = [];
     const originalWarn = console.warn;
@@ -473,7 +458,7 @@ describe('callLlm', () => {
         return new Response(JSON.stringify({ error: { message: 'This model is not available in your region' } }), { status: 403 });
       }
       return new Response(JSON.stringify({
-        choices: [{ message: { content: 'groq fallback' } }],
+        choices: [{ message: { content: 'generic fallback' } }],
         usage: { total_tokens: 5 },
       }), { status: 200 });
     }) as typeof fetch;
@@ -481,7 +466,7 @@ describe('callLlm', () => {
     try {
       const result = await callLlm({ messages: [{ role: 'user', content: 'hi' }] });
       assert.ok(result);
-      assert.equal(result.provider, 'groq');
+      assert.equal(result.provider, 'generic');
       const errLine = warns.find((w) => w.includes('HTTP 403'));
       assert.ok(errLine, 'a 403 warn line must be emitted');
       assert.ok(errLine.includes('not available in your region'), 'the error body must be visible in the log');
@@ -492,10 +477,9 @@ describe('callLlm', () => {
 
   it('reads at most the cap from an oversized/never-ending error body before falling back', async () => {
     process.env.OPENROUTER_API_KEY = 'or-test-key';
-    process.env.GROQ_API_KEY = 'groq-test-key';
+    process.env.LLM_API_URL = 'https://generic.example.test/v1/chat/completions';
+    process.env.LLM_API_KEY = 'generic-test-key';
     delete process.env.OLLAMA_API_URL;
-    delete process.env.LLM_API_URL;
-    delete process.env.LLM_API_KEY;
 
     const warns: string[] = [];
     const originalWarn = console.warn;
@@ -525,7 +509,7 @@ describe('callLlm', () => {
         return new Response(body, { status: 403 });
       }
       return new Response(JSON.stringify({
-        choices: [{ message: { content: 'groq fallback' } }],
+        choices: [{ message: { content: 'generic fallback' } }],
         usage: { total_tokens: 5 },
       }), { status: 200 });
     }) as typeof fetch;
@@ -533,7 +517,7 @@ describe('callLlm', () => {
     try {
       const result = await callLlm({ messages: [{ role: 'user', content: 'hi' }] });
       assert.ok(result, 'fallback must complete despite the never-ending error body');
-      assert.equal(result.provider, 'groq');
+      assert.equal(result.provider, 'generic');
       const errLine = warns.find((w) => w.includes('HTTP 403'));
       assert.ok(errLine, 'a 403 warn line must be emitted');
       assert.ok(errLine.includes('REGION_BLOCK'), 'the leading body slice must be visible');
@@ -546,11 +530,10 @@ describe('callLlm', () => {
   });
 
   it('falls back within an explicit provider order when the upper model fails', async () => {
-    process.env.GROQ_API_KEY = 'groq-test-key';
+    process.env.LLM_API_URL = 'https://generic.example.test/v1/chat/completions';
+    process.env.LLM_API_KEY = 'generic-test-key';
     process.env.OPENROUTER_API_KEY = 'or-test-key';
     delete process.env.OLLAMA_API_URL;
-    delete process.env.LLM_API_URL;
-    delete process.env.LLM_API_KEY;
 
     const postUrls: string[] = [];
 
@@ -567,34 +550,33 @@ describe('callLlm', () => {
       }
 
       return new Response(JSON.stringify({
-        choices: [{ message: { content: 'groq fallback response' } }],
+        choices: [{ message: { content: 'generic fallback response' } }],
         usage: { total_tokens: 21 },
       }), { status: 200 });
     }) as typeof fetch;
 
     const result = await callLlm({
       messages: [{ role: 'user', content: 'Try the stronger model first.' }],
-      providerOrder: ['openrouter', 'groq'],
+      providerOrder: ['openrouter', 'generic'],
       modelOverrides: {
         openrouter: 'google/gemini-2.5-pro',
       },
     });
 
     assert.ok(result);
-    assert.equal(result.provider, 'groq');
-    assert.equal(result.model, 'llama-3.3-70b-versatile');
+    assert.equal(result.provider, 'generic');
+    assert.equal(result.model, 'gpt-3.5-turbo');
     assert.deepEqual(postUrls.filter(url => url.includes('/chat/completions')), [
       'https://openrouter.ai/api/v1/chat/completions',
-      'https://api.groq.com/openai/v1/chat/completions',
+      'https://generic.example.test/v1/chat/completions',
     ]);
   });
 
   it('stops re-sending the prompt to a model the provider rejects as unknown', async () => {
-    process.env.GROQ_API_KEY = 'groq-test-key';
+    process.env.LLM_API_URL = 'https://generic.example.test/v1/chat/completions';
+    process.env.LLM_API_KEY = 'generic-test-key';
     process.env.OPENROUTER_API_KEY = 'or-test-key';
     delete process.env.OLLAMA_API_URL;
-    delete process.env.LLM_API_URL;
-    delete process.env.LLM_API_KEY;
 
     const postUrls: string[] = [];
 
@@ -614,7 +596,7 @@ describe('callLlm', () => {
       }
 
       return new Response(JSON.stringify({
-        choices: [{ message: { content: 'groq fallback response' } }],
+        choices: [{ message: { content: 'generic fallback response' } }],
         usage: { total_tokens: 7 },
       }), { status: 200 });
     }) as typeof fetch;
@@ -624,7 +606,7 @@ describe('callLlm', () => {
         messages: [{ role: 'user', content: `attempt ${attempt}` }],
         modelOverrides: { openrouter: 'ghost/ghost-model-v9' },
       });
-      assert.equal(result?.provider, 'groq', 'the fallback must keep serving every call');
+      assert.equal(result?.provider, 'generic', 'the fallback must keep serving every call');
     }
 
     const rejectedModelPosts = postUrls.filter(url => url.includes('openrouter.ai'));
@@ -637,7 +619,6 @@ describe('callLlm', () => {
 
   it('clears a prior model rejection as soon as the provider accepts the model', async () => {
     process.env.OPENROUTER_API_KEY = 'or-test-key';
-    delete process.env.GROQ_API_KEY;
     delete process.env.OLLAMA_API_URL;
     delete process.env.LLM_API_URL;
     delete process.env.LLM_API_KEY;
@@ -681,12 +662,11 @@ describe('callLlm', () => {
 
   it('quarantines a rejected reasoning-stream model while its fallback keeps streaming', async () => {
     process.env.OPENROUTER_API_KEY = 'or-test-key';
-    process.env.GROQ_API_KEY = 'groq-test-key';
+    process.env.LLM_API_URL = 'https://generic.example.test/v1/chat/completions';
+    process.env.LLM_API_KEY = 'generic-test-key';
     process.env.LLM_REASONING_PROVIDER = 'openrouter';
     process.env.LLM_REASONING_MODEL = 'ghost/ghost-model-v9';
     delete process.env.OLLAMA_API_URL;
-    delete process.env.LLM_API_URL;
-    delete process.env.LLM_API_KEY;
 
     const postUrls: string[] = [];
     globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -701,7 +681,7 @@ describe('callLlm', () => {
       }
 
       const body = [
-        'data: {"choices":[{"delta":{"content":"groq fallback"}}]}',
+        'data: {"choices":[{"delta":{"content":"generic fallback"}}]}',
         '',
         'data: [DONE]',
         '',
@@ -716,7 +696,7 @@ describe('callLlm', () => {
       const output = await new Response(callLlmReasoningStream({
         messages: [{ role: 'user', content: `attempt ${attempt}` }],
       })).text();
-      assert.match(output, /groq fallback/);
+      assert.match(output, /generic fallback/);
       assert.match(output, /"done":true/);
     }
 
@@ -726,7 +706,7 @@ describe('callLlm', () => {
       'the quarantined stream model must be skipped before another completion request',
     );
     assert.equal(
-      postUrls.filter(url => url.includes('api.groq.com')).length,
+      postUrls.filter(url => url.includes('generic.example.test')).length,
       4,
       'the fallback must continue serving every stream',
     );
@@ -736,7 +716,6 @@ describe('callLlm', () => {
     process.env.OPENROUTER_API_KEY = 'or-test-key';
     process.env.LLM_REASONING_PROVIDER = 'openrouter';
     process.env.LLM_REASONING_MODEL = 'ghost/ghost-model-v9';
-    delete process.env.GROQ_API_KEY;
     delete process.env.OLLAMA_API_URL;
     delete process.env.LLM_API_URL;
     delete process.env.LLM_API_KEY;
