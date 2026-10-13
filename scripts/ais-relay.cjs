@@ -3675,8 +3675,17 @@ function classifyCacheKey(title) {
 }
 
 // LLM provider fallback chain — mirrors seed-insights.mjs LLM_PROVIDERS
-// Order: ollama → openrouter (mirrors server/_shared/llm.ts: DeepSeek V4 Flash
-// with reasoning disabled). Groq removed from the fork on 13/10/2026.
+// Order: ollama → openrouter → generic. Groq removed from the fork on 13/10/2026.
+// Fork: headline classification is a fast-tier task. The relay image copies only
+// the files listed in Dockerfile.relay, so the defaults of scripts/_llm-models.mjs
+// are copied here (tests/llm-models-parity keeps them in step).
+const RELAY_DEFAULT_LLM_FAST_MODEL = 'anthropic/claude-haiku-5.5';
+const RELAY_DEFAULT_OPENROUTER_API_BASE = 'https://openrouter.ai/api/v1';
+function relayOpenRouterApiBase() {
+  const raw = (process.env.OPENROUTER_BASE_URL || '').trim();
+  if (!raw.startsWith('https://')) return RELAY_DEFAULT_OPENROUTER_API_BASE;
+  return raw.replace(/\/+$/, '');
+}
 const CLASSIFY_LLM_PROVIDERS = [
   {
     name: 'ollama',
@@ -3695,9 +3704,9 @@ const CLASSIFY_LLM_PROVIDERS = [
   {
     name: 'openrouter',
     envKey: 'OPENROUTER_API_KEY',
-    apiUrl: 'https://openrouter.ai/api/v1/chat/completions',
-    model: 'deepseek/deepseek-v4-flash',
-    headers: (key) => ({ Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://worldmonitor.app', 'X-Title': 'World Monitor', 'User-Agent': CHROME_UA }),
+    get apiUrl() { return `${relayOpenRouterApiBase()}/chat/completions`; },
+    get model() { return (process.env.LLM_FAST_MODEL || '').trim() || RELAY_DEFAULT_LLM_FAST_MODEL; },
+    headers: (key) => ({ Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://risksentinel.opencyber.org', 'X-Title': 'Risk Sentinel', 'User-Agent': CHROME_UA }),
     extraBody: { reasoning: { enabled: false } },
     timeout: 30000,
   },

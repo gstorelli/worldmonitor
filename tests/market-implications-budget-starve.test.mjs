@@ -29,6 +29,10 @@ import {
   __setForecastLlmCallOverrideForTests,
 } from '../scripts/seed-forecasts.mjs';
 
+// Fork (13/10/2026): the market-implications LLM stage is off unless this is
+// set (scripts/_llm-models.mjs); these tests exercise the stage itself.
+process.env.LLM_INHERITED_MARKET_FEATURES = 'true';
+
 // callForecastLLM's failure-reason contract (mirrors the FORECAST_LLM_FAILURE_*
 // constants in seed-forecasts.mjs; not exported, asserted here as the wire value).
 const BUDGET_EXHAUSTED = 'budget_exhausted';

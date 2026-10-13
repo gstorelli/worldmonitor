@@ -834,11 +834,13 @@ describe('news digest methodology parity', () => {
     // Fork: Groq removed (13/10/2026); `generic` (model from LLM_MODEL, a getter)
     // holds the optional fallback slot.
     assert.deepEqual(providerNames, ['openrouter', 'generic']);
-    assert.deepEqual(providerModels, ['deepseek/deepseek-v4-flash']);
+    // Fork: the OpenRouter model is the quality tier (a getter), not a literal.
+    assert.deepEqual(providerModels, []);
+    assert.ok(weeklyBriefSrc.includes('get model() { return getLlmQualityModel(); }'));
     assert.equal(weeklyTemperature, 0.3);
 
     assertDocMatches(
-      /Regional weekly briefs[\s\S]*tr(?:y|ies) OpenRouter[\s\S]*`deepseek\/deepseek-v4-flash`[\s\S]*temperature\s+`0\.3`/,
+      /Regional weekly briefs[\s\S]*tr(?:y|ies) OpenRouter[\s\S]*`LLM_QUALITY_MODEL`[\s\S]*temperature\s+`0\.3`/,
       'regional weekly brief provider order, models, and temperature',
     );
     assertDocMatches(
@@ -846,7 +848,7 @@ describe('news digest methodology parity', () => {
       'regional weekly brief chain differs from digest prose and whyMatters',
     );
     assertDocMatches(
-      /provider chain to OpenRouter by skipping Ollama[\s\S]*`google\/gemini-2\.5-flash`/,
+      /provider chain to OpenRouter by skipping Ollama[\s\S]*`LLM_QUALITY_MODEL`/,
       'digest prose and whyMatters OpenRouter-only posture',
     );
   });

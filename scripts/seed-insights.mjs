@@ -54,6 +54,7 @@ import { buildLlmCallEvent, emitLlmEvents, flushPendingLlmEvents } from './lib/l
 // line above. PR #3836 review caught this. See skill
 // railway-deploy-gotchas/reference/nixpacks-root-dir-scripts-cross-dir-import-escape.
 import { validateNoHallucinatedProperNouns } from './shared/brief-llm-core.js';
+import { getOpenRouterChatUrl, getLlmQualityModel } from './_llm-models.mjs';
 
 // Hallucination validator rollout mode (PR-2 of brief-content-quality
 // regressions). `shadow` = log violations to Sentry but ship the LLM
@@ -401,11 +402,12 @@ const LLM_PROVIDERS = [
   {
     name: 'openrouter',
     envKey: 'OPENROUTER_API_KEY',
-    apiUrl: 'https://openrouter.ai/api/v1/chat/completions',
-    model: 'deepseek/deepseek-v4-flash',
-    headers: (key) => ({ 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://worldmonitor.app', 'X-Title': 'World Monitor', 'User-Agent': CHROME_UA }),
+    get apiUrl() { return getOpenRouterChatUrl(); },
+    // Fork: quality-tier model from scripts/_llm-models.mjs (13/10/2026).
+    get model() { return getLlmQualityModel(); },
+    headers: (key) => ({ 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://risksentinel.opencyber.org', 'X-Title': 'Risk Sentinel', 'User-Agent': CHROME_UA }),
     extraBody: { reasoning: { enabled: false } },
-    timeout: 20_000,
+    timeout: 30_000, // fork: quality-tier prose, not yet measured on the VPS
   },
   {
     // Fork: optional OpenAI-compatible fallback (LLM_API_URL + LLM_API_KEY,

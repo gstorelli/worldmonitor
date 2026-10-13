@@ -6,7 +6,14 @@ import {
   getLlmAttemptTimeoutMs,
   OPENROUTER_PROVIDER_ROUTING,
 } from '../../scripts/_llm-model-timeouts.mjs';
+import {
+  getLlmFastModel,
+  getLlmQualityModel,
+  getOpenRouterChatUrl,
+  OPENROUTER_ATTRIBUTION_HEADERS,
+} from '../../scripts/_llm-models.mjs';
 
+export { getLlmFastModel, getLlmQualityModel } from '../../scripts/_llm-models.mjs';
 export { getLlmAttemptTimeoutMs } from '../../scripts/_llm-model-timeouts.mjs';
 
 function promptChars(messages: Array<{ role: string; content: string }>): number {
@@ -91,13 +98,13 @@ export function getProviderCredentials(
     const apiKey = process.env.OPENROUTER_API_KEY;
     if (!apiKey) return null;
     return {
-      apiUrl: 'https://openrouter.ai/api/v1/chat/completions',
-      model: overrides.model || 'deepseek/deepseek-v4-flash',
+      // Fork: base URL and default (fast-tier) model come from scripts/_llm-models.mjs.
+      apiUrl: getOpenRouterChatUrl(),
+      model: overrides.model || getLlmFastModel(),
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://worldmonitor.app',
-        'X-Title': 'World Monitor',
+        ...OPENROUTER_ATTRIBUTION_HEADERS,
       },
       // Hybrid-reasoning models (DeepSeek V4) reason by default via
       // OpenRouter's normalized `reasoning` param; utility calls must not
@@ -279,13 +286,15 @@ function callLlmProfile(
   providerEnv: string,
   modelEnv: string,
   defaultProvider: LlmProviderName,
+  defaultOpenRouterModel?: () => string,
 ): Promise<LlmCallResult | null> {
   const envProvider = process.env[providerEnv];
   const provider = (envProvider && PROVIDER_SET.has(envProvider) ? envProvider : (() => {
     if (envProvider) console.warn(`[llm] ${providerEnv}="${envProvider}" is not a known provider; falling back to "${defaultProvider}"`);
     return defaultProvider;
   })()) as LlmProviderName;
-  const model = process.env[modelEnv];
+  const model = process.env[modelEnv]
+    || (provider === 'openrouter' && defaultOpenRouterModel ? defaultOpenRouterModel() : undefined);
   const remaining = PROVIDER_CHAIN.filter((p) => p !== provider);
   return callLlm({
     ...opts,
@@ -308,7 +317,14 @@ export const callLlmTool = (opts: Omit<LlmCallOptions, 'providerOrder' | 'modelO
  * budget on hidden reasoning tokens and return empty content (#4983).
  */
 export const callLlmReasoning = (opts: Omit<LlmCallOptions, 'providerOrder' | 'modelOverrides'>) =>
-  callLlmProfile({ enableReasoning: true, ...opts }, 'LLM_REASONING_PROVIDER', 'LLM_REASONING_MODEL', 'openrouter');
+  callLlmProfile({ enableReasoning: true, ...opts }, 'LLM_REASONING_PROVIDER', 'LLM_REASONING_MODEL', 'openrouter', getLlmQualityModel);
+
+/**
+ * Fork: quality-tier model (narrative synthesis, briefs) with reasoning off.
+ * Same provider chain as callLlm; only the OpenRouter model differs.
+ */
+export const callLlmQuality = (opts: Omit<LlmCallOptions, 'providerOrder' | 'modelOverrides'>) =>
+  callLlm({ ...opts, modelOverrides: { openrouter: getLlmQualityModel() } });
 
 // enableReasoning is omitted too: the reasoning stream hardcodes it on —
 // exposing the knob on the stream type would be a silent no-op for callers.
@@ -327,7 +343,8 @@ export type LlmStreamOptions = Omit<LlmCallOptions, 'stripThinkingTags' | 'valid
 export function callLlmReasoningStream(opts: LlmStreamOptions): ReadableStream<Uint8Array> {
   const envProvider = process.env.LLM_REASONING_PROVIDER;
   const provider = (envProvider && PROVIDER_SET.has(envProvider) ? envProvider : 'openrouter') as LlmProviderName;
-  const model = process.env.LLM_REASONING_MODEL;
+  const model = process.env.LLM_REASONING_MODEL
+    || (provider === 'openrouter' ? getLlmQualityModel() : undefined);
   const remaining = PROVIDER_CHAIN.filter((p) => p !== provider);
   const providerOrder = [provider, ...remaining];
   const modelOverrides = model ? { [provider]: model } as Partial<Record<LlmProviderName, string>> : undefined;

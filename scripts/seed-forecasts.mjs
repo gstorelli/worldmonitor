@@ -44,6 +44,7 @@ import {
   VALID_RUN_ID_RE,
   pkgFingerprint,
 } from './_simulation-queue-constants.mjs';
+import { getLlmFastModel, getOpenRouterChatUrl, isInheritedMarketLlmEnabled } from './_llm-models.mjs';
 
 const _isDirectRun = process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/\\/g, '/'));
 if (_isDirectRun) loadEnvFile(import.meta.url);
@@ -14670,10 +14671,13 @@ const FORECAST_LLM_PROVIDERS = [
   // this is the routing that DEEPSEEK_V4_FLASH_COMPLETION_TIMEOUT_MS has always
   // assumed but never had. Fallbacks stay enabled, so a fast backend going down
   // degrades latency rather than hard-failing the call.
-  // This 25s timeout governs NON-Flash models only (critical_signals overrides this
-  // same entry onto google/gemini-2.5-flash and must keep its 25s window). Flash uses
+  // This 25s timeout governs NON-Flash models only (the fork's fast-tier default and
+  // the critical_signals pin both use it). DeepSeek Flash, if set by env, uses
   // its own completion deadline via getLlmAttemptTimeoutMs — see _llm-model-timeouts.
-  { name: 'openrouter', envKey: 'OPENROUTER_API_KEY', apiUrl: 'https://openrouter.ai/api/v1/chat/completions', model: 'deepseek/deepseek-v4-flash', timeout: 25_000, extraBody: { reasoning: { enabled: false }, provider: OPENROUTER_PROVIDER_ROUTING } },
+  // Fork (13/10/2026): fast-tier model and base URL from scripts/_llm-models.mjs.
+  // The forecasts are inherited WorldMonitor surfaces, not thesis results; the
+  // 25s window suits a fast model, so they stay on the fast tier.
+  { name: 'openrouter', envKey: 'OPENROUTER_API_KEY', get apiUrl() { return getOpenRouterChatUrl(); }, get model() { return getLlmFastModel(); }, timeout: 25_000, extraBody: { reasoning: { enabled: false }, provider: OPENROUTER_PROVIDER_ROUTING } },
   // Fork: optional OpenAI-compatible fallback (LLM_API_URL + LLM_API_KEY, model
   // LLM_MODEL) in the slot Groq held upstream; unset by default. Groq removed 13/10/2026.
   { name: 'generic', envKey: 'LLM_API_KEY', get apiUrl() { return process.env.LLM_API_URL || ''; }, get model() { return process.env.LLM_MODEL || 'gpt-3.5-turbo'; }, timeout: 20_000 },
@@ -14787,7 +14791,8 @@ function getForecastLlmCallOptions(stage = 'default') {
         // ONLY the stage-scoped model env may change the pinned fallback —
         // a global FORECAST_LLM_MODEL_OPENROUTER must not move the
         // probability-coupled stage either (review finding on #4965).
-        openrouter: process.env.FORECAST_LLM_CRITICAL_MODEL_OPENROUTER || 'google/gemini-2.5-flash',
+        // Fork: Gemini 2.5 Flash removed (13/10/2026); fast tier instead.
+        openrouter: process.env.FORECAST_LLM_CRITICAL_MODEL_OPENROUTER || getLlmFastModel(),
       },
       // Legacy request-body parity: the pinned models predate the
       // reasoning-off extraBody on the table's openrouter entry. Keep that
@@ -17314,6 +17319,26 @@ async function preserveMarketImplicationsLastGoodOnStarve() {
 }
 
 async function buildAndSeedMarketImplications(inputs) {
+  // Fork (13/10/2026): market-implications cards are an inherited WorldMonitor
+  // feature that does not serve the thesis; the LLM stage is off unless
+  // LLM_INHERITED_MARKET_FEATURES=true. The seed-meta says so with
+  // sourceState 'unavailable', which /api/health reports as NOT_CONFIGURED
+  // (ok bucket) instead of an eternal STALE_SEED.
+  if (!isInheritedMarketLlmEnabled()) {
+    const { url: metaUrl, token: metaToken } = getRedisCredentials();
+    try {
+      await redisSet(metaUrl, metaToken, MARKET_IMPLICATIONS_META_KEY, {
+        fetchedAt: Date.now(),
+        recordCount: 0,
+        sourceState: 'unavailable',
+        reason: 'disabled: LLM_INHERITED_MARKET_FEATURES is not true',
+      }, MARKET_IMPLICATIONS_META_TTL);
+    } catch (err) {
+      console.warn(`  [MarketImplications] disabled-state meta write failed: ${err.message}`);
+    }
+    console.log('  [MarketImplications] Skipped: inherited market LLM features are disabled');
+    return;
+  }
   const startMs = Date.now();
   console.log('  [MarketImplications] Building world-state context...');
   const context = buildMarketImplicationsContext(inputs);

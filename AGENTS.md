@@ -106,8 +106,20 @@ npm run lint:safe-html    # OPT-IN ONLY: see "Pre-Push" (fork baseline fails thi
 ## Runtime Knobs (fork defaults)
 
 - **LLM chain**: `ollama → openrouter → generic` (`server/_shared/llm.ts`).
-  OpenRouter (`deepseek/deepseek-v4-flash`) is the production provider. **Groq was
-  removed from the fork on 13/10/2026** (no account): do not re-add it to any chain.
+  OpenRouter is the production provider. **Groq was removed from the fork on
+  13/10/2026** (no account): do not re-add it to any chain.
+- **LLM models** (since 13/10/2026): chosen in ONE place, `scripts/_llm-models.mjs`.
+  Fast tier `LLM_FAST_MODEL` (default `anthropic/claude-haiku-5.5`: classification,
+  extraction, short summaries, forecasts); quality tier `LLM_QUALITY_MODEL` (default
+  `mistralai/mistral-large-4-0`: World Brief, digest prose, country/regional briefs,
+  second resolution judge, reasoning profile unless `LLM_REASONING_MODEL` is set).
+  All uses are text-only. `OPENROUTER_BASE_URL=https://eu.openrouter.ai/api/v1`
+  keeps inference in the EU (Business/Enterprise plans). Do not hardcode a model id
+  or the OpenRouter URL in a runtime file: `tests/llm-models-parity.test.mjs` fails.
+  The CommonJS chain, the relay and `api/customs/classify.js` keep copies of the
+  defaults, checked by the same test. Inherited market LLM features (stock analysis,
+  market implications, daily-brief AI summary) are off unless
+  `LLM_INHERITED_MARKET_FEATURES=true` / `VITE_MARKET_LLM_ENABLED=1`.
   `LLM_TOOL_PROVIDER`/`LLM_REASONING_PROVIDER` override the per-profile default
   provider (both default to `openrouter`).
 - **Notify auth**: anonymous `GET /api/notify/config` is redacted; changing a stored

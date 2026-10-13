@@ -17,6 +17,15 @@ function stripReasoningPreamble(text) {
   return trimmed;
 }
 
+// Copies of scripts/_llm-models.mjs defaults (kept in step by tests/llm-models-parity).
+const DEFAULT_LLM_QUALITY_MODEL = 'mistralai/mistral-large-4-0';
+const DEFAULT_OPENROUTER_API_BASE = 'https://openrouter.ai/api/v1';
+function openRouterApiBase() {
+  const raw = (process.env.OPENROUTER_BASE_URL || '').trim();
+  if (!raw.startsWith('https://')) return DEFAULT_OPENROUTER_API_BASE;
+  return raw.replace(/\/+$/, '');
+}
+
 const LLM_PROVIDERS = [
   {
     name: 'ollama',
@@ -34,16 +43,18 @@ const LLM_PROVIDERS = [
   },
   // NOTE (#4944): this chain is the brief-prose transport (sole requirer:
   // seed-digest-notifications → brief-llm, pinned to openrouter via
-  // skipProviders). Its model moves to DeepSeek in the U4 brief-voice
-  // cutover — gated on the U3 shadow evaluation — together with the
-  // brief cache-version bumps. Do not swap it in isolation.
+  // skipProviders). Fork (13/10/2026): the prose is a quality-tier task and
+  // leaves Gemini 2.5 Flash. Defaults are copied from scripts/_llm-models.mjs
+  // because CommonJS cannot import it synchronously (tests/llm-models-parity).
+  // The brief cache keys were NOT bumped: their TTLs are 24 h at most, so old
+  // and new prose coexist for a day at worst, which the fork accepts.
   {
     name: 'openrouter',
     envKey: 'OPENROUTER_API_KEY',
-    apiUrl: 'https://openrouter.ai/api/v1/chat/completions',
-    model: 'google/gemini-2.5-flash',
-    headers: (key) => ({ 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://worldmonitor.app', 'X-Title': 'World Monitor', 'User-Agent': SERVICE_UA }),
-    timeout: 20_000,
+    get apiUrl() { return `${openRouterApiBase()}/chat/completions`; },
+    get model() { return (process.env.LLM_QUALITY_MODEL || '').trim() || DEFAULT_LLM_QUALITY_MODEL; },
+    headers: (key) => ({ 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://risksentinel.opencyber.org', 'X-Title': 'Risk Sentinel', 'User-Agent': SERVICE_UA }),
+    timeout: 30_000,
   },
   {
     // Fork: optional OpenAI-compatible fallback (LLM_API_URL + LLM_API_KEY,

@@ -67,7 +67,9 @@ function coverage(timeoutMs) {
 // controlled here, or the reservation silently computes against an empty chain.
 const ENV_KEYS = [
   'OPENROUTER_API_KEY',
-  'GROQ_API_KEY',
+  'LLM_API_KEY',
+  'LLM_API_URL',
+  'LLM_FAST_MODEL',
   'FORECAST_LLM_PROVIDER_ORDER',
   'FORECAST_LLM_MARKET_IMPLICATIONS_PROVIDER_ORDER',
 ];
@@ -76,10 +78,15 @@ let savedEnv = {};
 beforeEach(() => {
   savedEnv = Object.fromEntries(ENV_KEYS.map((k) => [k, process.env[k]]));
   process.env.OPENROUTER_API_KEY = 'test-openrouter-key';
-  process.env.GROQ_API_KEY = 'test-groq-key';
-  // Production sets this to `openrouter,groq`. market_implications must NOT
-  // inherit it — that is the precedence this fix deliberately breaks.
-  process.env.FORECAST_LLM_PROVIDER_ORDER = 'openrouter,groq';
+  process.env.LLM_API_KEY = 'test-generic-key';
+  process.env.LLM_API_URL = 'https://llm.example.test/v1/chat/completions';
+  // Fork (13/10/2026): Flash is no longer the default fast-tier model; these
+  // tests cover its timeout and routing policy, so they select it explicitly.
+  process.env.LLM_FAST_MODEL = 'deepseek/deepseek-v4-flash';
+  // A two-provider global order (upstream: `openrouter,groq`; fork: the generic
+  // fallback). market_implications must NOT inherit it — that is the
+  // precedence this fix deliberately breaks.
+  process.env.FORECAST_LLM_PROVIDER_ORDER = 'openrouter,generic';
   delete process.env.FORECAST_LLM_MARKET_IMPLICATIONS_PROVIDER_ORDER;
 });
 
