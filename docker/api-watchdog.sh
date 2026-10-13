@@ -2,14 +2,16 @@
 # Liveness watchdog for the Node API (local-api-server.mjs).
 #
 # Why: supervisord restarts the API only when the process EXITS. If the process
-# stays alive but stops answering (event loop blocked, memory thrashing), nginx
-# keeps serving the static SPA while every /api/* call times out (504 at the
-# outer proxy), and Docker only marks the container "unhealthy" without
-# restarting it. On 13/10/2026 this left production down until a manual
-# `docker compose restart worldmonitor`.
+# stays alive but stops serving (event loop blocked, or every outbound-fetch slot
+# leaked), nginx keeps serving the static SPA while every /api/* call times out
+# (504 at the outer proxy), and Docker at most marks the container "unhealthy"
+# without restarting it. From 12/10/2026 15:05 to 13/10 15:24 this left
+# production down until a manual `docker compose restart worldmonitor`.
 #
-# What: probe the auth-exempt /api/sidecar-health route directly on the API port
-# every INTERVAL seconds; after MAX_FAILS consecutive failures, log the process
+# What: probe the auth-exempt /api/sidecar-health?deep=1 route directly on the
+# API port every INTERVAL seconds. The deep probe also fails (503) when the
+# outbound-fetch limiter is stuck; the shallow route kept answering 200 for the
+# whole 12-13/10 outage. After MAX_FAILS consecutive failures, log the process
 # state and kill the API so supervisord (autorestart=true) starts a fresh one.
 # An outage then lasts about MAX_FAILS x INTERVAL seconds instead of hours.
 #
@@ -22,7 +24,7 @@ INTERVAL="${API_WATCHDOG_INTERVAL:-30}"
 MAX_FAILS="${API_WATCHDOG_MAX_FAILS:-3}"
 TIMEOUT="${API_WATCHDOG_TIMEOUT:-10}"
 GRACE="${API_WATCHDOG_GRACE:-90}"
-URL="http://127.0.0.1:${PORT}/api/sidecar-health"
+URL="http://127.0.0.1:${PORT}/api/sidecar-health?deep=1"
 # Anchored on the exact supervisord command so nothing else can match.
 MATCH="${API_WATCHDOG_MATCH:-^node /app/local-api-server.mjs}"
 
