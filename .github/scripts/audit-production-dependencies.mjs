@@ -58,16 +58,10 @@ export const BASELINE_ADVISORIES_BY_LOCKFILE = {
   'blog-site/package-lock.json': [],
   'pro-test/package-lock.json': [
     {
-      id: 'GHSA-395f-4hp3-45gv',
-      expiresAt: '2026-11-05',
-      reason:
-        'shell-quote quadratic-complexity DoS in parse() reaches pro-test only via react-native -> react-devtools-core, a mobile/dev-tooling chain the Vite web build never bundles into public/pro/. The parse() DoS is unreachable from the shipped browser bundle, and forcing shell-quote up (an `overrides` pin bump) would drag an otherwise-untouched public/pro/ rebuild into a lockfile-hygiene change. Drop once react-native leaves pro-test\'s tree.',
-    },
-    {
       id: 'GHSA-5p2g-fcmc-qvqq',
       expiresAt: '2026-11-05',
       reason:
-        'image-size JXL/HEIF infinite-loop DoS reaches pro-test only via metro under the same react-native mobile/dev-tooling chain as GHSA-395f-4hp3-45gv — never bundled into public/pro/, never fed untrusted image bytes. No patched release exists (every version <= 2.0.2 affected, first_patched_version null), so there is nothing to bump; drop when a fixed image-size ships or react-native leaves pro-test\'s tree.',
+        'image-size JXL/HEIF infinite-loop DoS reaches pro-test only via metro under the react-native mobile/dev-tooling chain — never bundled into public/pro/, never fed untrusted image bytes. No patched release exists (every version <= 2.0.2 affected, first_patched_version null), so there is nothing to bump; drop when a fixed image-size ships or react-native leaves pro-test\'s tree.',
     },
     {
       id: 'GHSA-w3rx-r6r6-pgpr',

@@ -203,8 +203,13 @@ export async function fetchBootstrapData(): Promise<void> {
   //   digest server-side (~11 s measured on the Contabo VPS), so those budgets aborted the request and left
   //   the dashboard half-hydrated until the operator reloaded (with a now-warm cache). 12 s / 25 s cover the
   //   cold path with headroom; the retry below then absorbs any remaining transient slowness.
-  const fastMs = desktop ? 12_000 : 1_200;
-  const slowMs = desktop ? 25_000 : 3_000;
+  // - Risk Sentinel fork: the web build is served only by the self-hosted VPS stack (no CDN edge cache), so
+  //   the 1.2 s / 3 s upstream web budgets were tuned for an infrastructure this fork does not have. A production
+  //   HAR of 13/10/2026 shows all four bootstrap requests (two attempts x two tiers) aborted by the browser: the
+  //   app then wasted ~6.5 s and fell back to ~50 per-panel fetches. 6 s / 12 s let a warm self-hosted cache
+  //   answer in one shot; desktop keeps its larger cold-path budget.
+  const fastMs = desktop ? 12_000 : 6_000;
+  const slowMs = desktop ? 25_000 : 12_000;
 
   const completed = await runBootstrapAttempt(fastMs, slowMs);
   if (!completed) {
