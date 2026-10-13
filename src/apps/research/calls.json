@@ -1,7 +1,7 @@
 {
   "$comment": "Risk Sentinel — recurring scholarly venues for the research themes. WIP: deadlines recur yearly and MUST be verified on the official site; this curated list is a starting calendar, not a live CFP feed. Themes: A=customs AI, B=supply-chain/maritime, C=multi-hazard/geospatial, D=LLM/XAI/accountability, E=methodology/infrastructure.",
   "schema_version": 1,
-  "updated_at": "2026-09-11",
+  "updated_at": "2026-10-13",
   "calls": [
     {
       "id": "wco-tech",
@@ -74,22 +74,22 @@
       "name": "ISCRAM Conference",
       "scope": "Information systems for crisis response and management",
       "themes": ["C"],
-      "typicalWindow": "Submission ~gennaio, conferenza maggio",
+      "typicalWindow": "ISCRAM 2027 a Perth, 30 maggio - 2 giugno 2027; call da verificare",
       "deadline": null,
       "location": "Rotante",
       "url": "https://iscram.org/",
-      "notes": "Ponte tra multi-hazard e impatto su supply chain: utile per la dimensione geophysicalImpact."
+      "notes": "Possibile sede del paper C (artefatto e protocollo), solo con i risultati del replay dell'Anno 2. Date verificate il 12/10/2026 su iscram.org."
     },
     {
       "id": "egu",
       "name": "EGU General Assembly",
       "scope": "Geosciences, climate extremes, natural hazards",
       "themes": ["C"],
-      "typicalWindow": "Abstract deadline ~gennaio, assemblea aprile",
+      "typicalWindow": "Assemblea 2027: Vienna, 4-9 aprile 2027; scadenza degli abstract non ancora pubblicata (nel 2026 era il 15 gennaio)",
       "deadline": null,
       "location": "Vienna, Austria",
-      "url": "https://www.egu.eu/",
-      "notes": "Venue per la componente climate/geophysical e per i dataset multi-hazard."
+      "url": "https://meetingorganizer.copernicus.org/EGU27",
+      "notes": "Prima sede del paper A della tesi (pericolo sismico e vulcanico dei nodi critici); abstract da preparare a novembre 2026 con le tutor. Verificato il 12/10/2026 sulla pagina EGU27."
     },
     {
       "id": "agu",
@@ -145,6 +145,28 @@
       "location": "Europa/Asia",
       "url": "https://www.gtreview.com/events/",
       "notes": "Industry-facing: utile per validare i casi d'uso con operatori e ADM."
+    },
+    {
+      "id": "desrist-dc",
+      "name": "DESRIST — Doctoral Consortium",
+      "scope": "Design Science Research in Information Systems and Technology",
+      "themes": ["E"],
+      "typicalWindow": "Doctoral Consortium di solito con scadenza a marzo; date 2027 da verificare",
+      "deadline": null,
+      "location": "Rotante",
+      "url": "https://desrist.org/",
+      "notes": "Sede per presentare l'impianto design science della tesi senza risultati sperimentali (paper C). Data da verificare sul sito ufficiale."
+    },
+    {
+      "id": "wco-picard",
+      "name": "WCO PICARD Conference",
+      "scope": "Customs research: risk management, enforcement, trade facilitation",
+      "themes": ["A", "E"],
+      "typicalWindow": "Call for papers di solito in primavera; conferenza in autunno; date 2027 da verificare",
+      "deadline": null,
+      "location": "Rotante",
+      "url": "https://www.wcoomd.org/",
+      "notes": "Sede del paper B (costrutto di vulnerabilità doganale), con dati pubblici e previa verifica delle autorizzazioni interne ADM. Pagina della call e date da verificare sul sito WCO."
     }
   ]
 }

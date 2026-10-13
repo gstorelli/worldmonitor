@@ -49,9 +49,9 @@ export default [
     "doi": "10.2760/1286492",
     "url": "https://data.europa.eu/doi/10.2760/1286492",
     "themeArea": "A",
-    "summary": "Antologia di 75 progetti UE finanziati 2015-2024 (~EUR 376M): fusione multi-sensore (radar, AIS, ottica, OSINT) e NLP documentale doganale; explainability come requisito emergente.",
-    "limitation": "È una mappa, non una soluzione: i progetti restano prototipi, senza architetture di fusione multimodale unificate né segnali di hazard esterni in tempo reale.",
-    "contribution": "Legittima il gap del progetto e la richiesta istituzionale di XAI per l'enforcement.",
+    "summary": "Antologia di 75 progetti UE su IA per la gestione delle frontiere e i controlli doganali, finanziati tra il 2015 e il 2024 con circa 376 milioni di euro.",
+    "limitation": "Le affermazioni sulla maturità dei progetti e sull'uso di segnali esterni di pericolo non sono state verificate nel report completo (segnaposto P2-04 della tesi): non usarle finché non lo sono.",
+    "contribution": "Documenta la scala dell'investimento UE nell'IA per le dogane; utile per collocare il gap dei sistemi legati alla dichiarazione.",
     "dimensions": [
       "customsRelevance",
       "sourceConfidence"
@@ -134,25 +134,6 @@ export default [
     "verified": true
   },
   {
-    "ref": 8,
-    "authors": "Mercer, D. R.",
-    "year": 2026,
-    "title": "AI-Driven Risk Identification and Early-Warning Systems: A Cross-Domain Systematic Survey of Methods, Applications, and Trustworthiness",
-    "type": "journal",
-    "venue": "Annals of Applied Sciences, 7(1)",
-    "doi": null,
-    "url": "https://annalsofappliedsciences.com/index.php/aas/article/view/44",
-    "themeArea": "D",
-    "summary": "Survey sistematica cross-domain di 196 studi (2023-2026): pipeline concettuale unificata per early-warning AI, con fusione multi-sorgente, XAI (feature attribution, calibrazione) e graph learning per il contagio di rischio.",
-    "limitation": "Omette il dominio doganale, nessuna valutazione empirica, identifica ma non risolve i problemi di affidabilità LLM in contesti ad alto rischio.",
-    "contribution": "Fornisce la pipeline concettuale di riferimento per la nostra architettura di early-warning.",
-    "dimensions": [
-      "sourceConfidence",
-      "escalationMomentum"
-    ],
-    "verified": true
-  },
-  {
     "ref": 9,
     "authors": "Novelli, C.; Taddeo, M.; Floridi, L.",
     "year": 2023,
@@ -181,7 +162,7 @@ export default [
     "url": "https://www.oecd.org/en/publications/oecd-supply-chain-resilience-review_94e3a8ea-en.html",
     "themeArea": "B",
     "summary": "Quantifica vulnerabilità da dipendenze commerciali e cascate di disruption (COVID-19, guerra Russia-Ucraina, eventi Suez/Panama), integrando indici di rischio geopolitico da analisi news (OSINT) con flussi commerciali.",
-    "limitation": "Metodi econometrici tradizionali, nessun monitoraggio real-time, livello macro-policy e non targeting doganale operativo.",
+    "limitation": "Per questa fonte è verificato solo il titolo: le affermazioni sul metodo econometrico e sulle conclusioni vanno controllate sul testo prima di usarle nella tesi.",
     "contribution": "Valida che le disruption ai chokepoint generano cascate globali rilevabili come pattern commerciali anomali.",
     "dimensions": [
       "tradeExposure",
@@ -292,9 +273,9 @@ export default [
     "doi": "10.5194/nhess-26-1325-2026",
     "url": "https://nhess.copernicus.org/articles/26/1325/2026/",
     "themeArea": "C",
-    "summary": "Sintesi del progetto MYRIAD-EU: 88% dei casi analizzati confonde terminologia e framework di multi-risk e multi-hazard; la fusione multi-hazard migliora significativamente l'accuratezza.",
+    "summary": "Chiede un approccio più olistico alla valutazione e alla gestione del rischio multi-hazard e multi-risk e un linguaggio comune tra discipline.",
     "limitation": "Nessun dominio doganale/commerciale; focus su disaster risk.",
-    "contribution": "Impone definizioni rigorose di hazard vs risk e giustifica empiricamente la fusione multimodale (Risk = H×E×V).",
+    "contribution": "Motiva le definizioni esplicite del modello a sei strati della tesi. Attenzione: non contiene la cifra dell'88% (che è di White et al. 2025) né l'affermazione che l'approccio multi-hazard migliori l'accuratezza.",
     "dimensions": [
       "eventSeverity",
       "geophysicalClimate"
@@ -335,6 +316,25 @@ export default [
     "contribution": "Valida l'architettura neuro-simbolica con vincoli Knowledge-Graph e corroborazione multi-fonte contro l'OSINT sintetico.",
     "dimensions": [
       "sourceConfidence"
+    ],
+    "verified": true
+  },
+  {
+    "ref": 19,
+    "authors": "White, C. J.; Adnan, M. S. G.; Arosio, M.; Buller, S.; Cha, Y.; Ciurean, R.; Crummy, J. M.; Duncan, M.; Gill, J.; Kennedy, C.; Nobile, E.; Smale, L.; Ward, P. J.",
+    "year": 2025,
+    "title": "Review article: Towards multi-hazard and multi-risk indicators – a review and recommendations for development and implementation",
+    "type": "journal",
+    "venue": "Natural Hazards and Earth System Sciences 25(11):4263–4281",
+    "doi": "10.5194/nhess-25-4263-2025",
+    "url": "https://doi.org/10.5194/nhess-25-4263-2025",
+    "themeArea": "C",
+    "summary": "Revisione sistematica di 192 pubblicazioni su indicatori multi-hazard e multi-risk: l'88% riguarda indicatori di pericolo e non di rischio, e solo il 20% integra pericolo, vulnerabilità e rischio o impatto.",
+    "limitation": "Dominio del rischio di disastri, non doganale.",
+    "contribution": "È la fonte corretta dell'88%: un conteggio di eventi vicino a un nodo è un indicatore di pericolo, non ancora di rischio; integrare la vulnerabilità è ciò che la letteratura più spesso omette.",
+    "dimensions": [
+      "geophysicalClimate",
+      "eventSeverity"
     ],
     "verified": true
   }
