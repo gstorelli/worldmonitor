@@ -343,14 +343,16 @@ feed data. Cached briefs preserve their structured sources with the cached
 summary; older source-free cache entries are discarded before reuse.
 
 The canonical digest prose and direct fallback `whyMatters` paths pin the
-provider chain to OpenRouter by skipping Ollama and Groq, so the live brief
+provider chain to OpenRouter by skipping Ollama, so the live brief
 uses Gemini 2.5 Flash (`google/gemini-2.5-flash`) for those surfaces when the
 LLM layer is enabled. Digest prose and
 story-description calls use temperature `0.4`. Regional weekly briefs
 intentionally differ from those digest prose and `whyMatters` surfaces:
 `scripts/regional-snapshot/weekly-brief.mjs`
-tries OpenRouter first with `deepseek/deepseek-v4-flash`, then falls back to
-Groq `llama-3.3-70b-versatile`, and sends both providers temperature
+tries OpenRouter with `deepseek/deepseek-v4-flash`, then the optional
+OpenAI-compatible `generic` provider when `LLM_API_URL` and `LLM_API_KEY` are
+set (the Risk Sentinel fork removed the upstream Groq fallback on 13/10/2026),
+at temperature
 `0.3` because the output is structured weekly JSON for regional snapshots
 rather than per-user digest prose. The digest prompt requires a named
 actor/event lead, bans generic editorial phrases such as "the global stage"

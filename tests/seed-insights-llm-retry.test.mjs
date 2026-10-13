@@ -6,7 +6,8 @@ import { callLLM, __setInsightsLlmTransportForTests } from '../scripts/seed-insi
 const LONG_BRIEF = 'Insights brief succeeded with more than enough narrative content to pass.';
 
 const originalEnv = {
-  GROQ_API_KEY: process.env.GROQ_API_KEY,
+  LLM_API_KEY: process.env.LLM_API_KEY,
+  LLM_API_URL: process.env.LLM_API_URL,
   OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
   OLLAMA_API_URL: process.env.OLLAMA_API_URL,
 };
@@ -30,7 +31,8 @@ function okResponse(content) {
 
 describe('seed-insights callLLM retry/budget', () => {
   it('honors a 429 Retry-After on the same provider before falling through', async () => {
-    process.env.GROQ_API_KEY = 'groq-test-key';
+    process.env.LLM_API_KEY = 'generic-test-key';
+    process.env.LLM_API_URL = 'https://llm.example.test/v1/chat/completions';
     process.env.OPENROUTER_API_KEY = 'openrouter-test-key';
     delete process.env.OLLAMA_API_URL;
     const originalSetTimeout = globalThis.setTimeout;
@@ -62,7 +64,8 @@ describe('seed-insights callLLM retry/budget', () => {
   });
 
   it('caps an oversized Retry-After hint before retrying', async () => {
-    process.env.GROQ_API_KEY = 'groq-test-key';
+    process.env.LLM_API_KEY = 'generic-test-key';
+    process.env.LLM_API_URL = 'https://llm.example.test/v1/chat/completions';
     process.env.OPENROUTER_API_KEY = 'openrouter-test-key';
     delete process.env.OLLAMA_API_URL;
     const originalSetTimeout = globalThis.setTimeout;
@@ -97,9 +100,10 @@ describe('seed-insights callLLM retry/budget', () => {
   //   usable 12s (callBudget 17s − 5s guard), hint 3s, retryDelayMs 8s
   //   wait0 = max(8s, 3s) = 8s → rem 4s
   //   wait1 = max(16s, 3s) = 16s (3s < 4s so still slept) → rem < 0
-  //   attempt2: usable <= 0 → createLlmBudgetError (no groq)
+  //   attempt2: usable <= 0 → createLlmBudgetError (no generic)
   it('stops at the call budget without falling through to the next provider', async () => {
-    process.env.GROQ_API_KEY = 'groq-test-key';
+    process.env.LLM_API_KEY = 'generic-test-key';
+    process.env.LLM_API_URL = 'https://llm.example.test/v1/chat/completions';
     process.env.OPENROUTER_API_KEY = 'openrouter-test-key';
     delete process.env.OLLAMA_API_URL;
     const originalDateNow = Date.now;
@@ -114,7 +118,7 @@ describe('seed-insights callLLM retry/budget', () => {
       __setInsightsLlmTransportForTests({
         fetch: async (url) => {
           calls += 1;
-          assert.ok(String(url).includes('openrouter.ai'), 'budget stop must not fall through to groq');
+          assert.ok(String(url).includes('openrouter.ai'), 'budget stop must not fall through to generic');
           return { ok: false, status: 429, headers: { get: (n) => (n.toLowerCase() === 'retry-after' ? '3' : null) } };
         },
       });
@@ -131,7 +135,8 @@ describe('seed-insights callLLM retry/budget', () => {
   });
 
   it('falls through to the next provider after a non-retryable 402', async () => {
-    process.env.GROQ_API_KEY = 'groq-test-key';
+    process.env.LLM_API_KEY = 'generic-test-key';
+    process.env.LLM_API_URL = 'https://llm.example.test/v1/chat/completions';
     process.env.OPENROUTER_API_KEY = 'openrouter-test-key';
     delete process.env.OLLAMA_API_URL;
     const providers = [];
@@ -139,7 +144,7 @@ describe('seed-insights callLLM retry/budget', () => {
     __setInsightsLlmTransportForTests({
       fetch: async (url) => {
         const href = String(url);
-        providers.push(href.includes('api.groq.com') ? 'groq' : 'openrouter');
+        providers.push(href.includes('llm.example.test') ? 'generic' : 'openrouter');
         if (href.includes('openrouter.ai')) return { ok: false, status: 402, headers: { get: () => null } };
         return okResponse(LONG_BRIEF);
       },
@@ -147,14 +152,15 @@ describe('seed-insights callLLM retry/budget', () => {
 
     const result = await callLLM('Some breaking headline', { retryDelayMs: 0 });
 
-    assert.deepEqual(providers, ['openrouter', 'groq']);
-    assert.equal(result?.provider, 'groq');
+    assert.deepEqual(providers, ['openrouter', 'generic']);
+    assert.equal(result?.provider, 'generic');
   });
 });
 
 // #6110: the exact production shape from seed-insights 2026-08-03 12:10Z and
 // 12:20Z. openrouter answered but the composer gates rejected it, the chain
-// fell through to groq, and groq returned 429 with
+// fell through to the fallback (Groq, upstream; `generic` in the fork since
+// 13/10/2026), and it returned 429 with
 //   "tokens per day (TPD): Limit 100000, Used 100000 ... try again in 20m13.92s"
 // The 1213s hint was clamped to the 10s ceiling and retried TWICE — 20s of a
 // 60s LLM budget and a 120s seed lock spent on a daily quota that could not
@@ -165,9 +171,10 @@ describe('seed-insights callLLM retry/budget', () => {
 // because the symptom was in the CHAIN — the assertion that matters is that no
 // sleep happens at all, and it can only be observed here.
 describe('seed-insights callLLM does not sleep on an unreachable Retry-After (#6110)', () => {
-  it('fails groq over immediately when its hint outruns the run budget', async () => {
+  it('fails the generic fallback over immediately when its hint outruns the run budget', async () => {
     process.env.OPENROUTER_API_KEY = 'openrouter-test-key';
-    process.env.GROQ_API_KEY = 'groq-test-key';
+    process.env.LLM_API_KEY = 'generic-test-key';
+    process.env.LLM_API_URL = 'https://llm.example.test/v1/chat/completions';
     delete process.env.OLLAMA_API_URL;
 
     const originalSetTimeout = globalThis.setTimeout;
@@ -181,7 +188,7 @@ describe('seed-insights callLLM does not sleep on an unreachable Retry-After (#6
           const target = String(url);
           calls.push(target);
           if (target.includes('openrouter')) return okResponse(`${LONG_BRIEF} REJECT_ME`);
-          // groq: daily token quota exhausted, ~20 minutes out.
+          // fallback: daily token quota exhausted, ~20 minutes out.
           return {
             ok: false,
             status: 429,
@@ -198,9 +205,9 @@ describe('seed-insights callLLM does not sleep on an unreachable Retry-After (#6
 
       assert.deepEqual(waits, [], 'a hint 20 minutes out must not be slept on at all');
       assert.equal(
-        calls.filter((u) => u.includes('groq')).length,
+        calls.filter((u) => u.includes('llm.example.test')).length,
         1,
-        'groq must be attempted once and abandoned, not retried against a wall',
+        'generic must be attempted once and abandoned, not retried against a wall',
       );
       // The rejected openrouter candidate still comes back so the caller can
       // classify the failure as GATE rather than mislabel it a provider outage.
@@ -213,7 +220,8 @@ describe('seed-insights callLLM does not sleep on an unreachable Retry-After (#6
 
   it('still honors a short hint that fits inside the budget', async () => {
     process.env.OPENROUTER_API_KEY = 'openrouter-test-key';
-    process.env.GROQ_API_KEY = 'groq-test-key';
+    process.env.LLM_API_KEY = 'generic-test-key';
+    process.env.LLM_API_URL = 'https://llm.example.test/v1/chat/completions';
     delete process.env.OLLAMA_API_URL;
 
     const originalSetTimeout = globalThis.setTimeout;
@@ -247,7 +255,8 @@ describe('seed-insights callLLM does not sleep on an unreachable Retry-After (#6
     // next withRetry attempt would throw createLlmBudgetError, aborting every
     // later provider. `>=` keeps the budget for fallthrough instead.
     process.env.OPENROUTER_API_KEY = 'openrouter-test-key';
-    process.env.GROQ_API_KEY = 'groq-test-key';
+    process.env.LLM_API_KEY = 'generic-test-key';
+    process.env.LLM_API_URL = 'https://llm.example.test/v1/chat/completions';
     delete process.env.OLLAMA_API_URL;
 
     const originalSetTimeout = globalThis.setTimeout;
@@ -262,7 +271,7 @@ describe('seed-insights callLLM does not sleep on an unreachable Retry-After (#6
       __setInsightsLlmTransportForTests({
         fetch: async (url) => {
           const href = String(url);
-          providers.push(href.includes('api.groq.com') ? 'groq' : 'openrouter');
+          providers.push(href.includes('llm.example.test') ? 'generic' : 'openrouter');
           if (href.includes('openrouter.ai')) {
             return {
               ok: false,
@@ -280,8 +289,8 @@ describe('seed-insights callLLM does not sleep on an unreachable Retry-After (#6
       });
 
       assert.deepEqual(waits, [], 'equality must fail-fast, not sleep the full remainder');
-      assert.deepEqual(providers, ['openrouter', 'groq'], 'saved budget must reach the next provider');
-      assert.equal(result?.provider, 'groq');
+      assert.deepEqual(providers, ['openrouter', 'generic'], 'saved budget must reach the next provider');
+      assert.equal(result?.provider, 'generic');
       assert.equal(result?.text, LONG_BRIEF);
     } finally {
       globalThis.setTimeout = originalSetTimeout;
@@ -294,12 +303,13 @@ describe('seed-insights callLLM does not sleep on an unreachable Retry-After (#6
 // primary model returned well-formed text that the brief composer then
 // rejected on its editorial gates, seed-insights gave up and published
 // degraded — never trying a fallback model that would have passed. Measured
-// against a live digest: openrouter composed 2/6, groq 6/6, yet production
+// against a live digest: openrouter composed 2/6, the upstream Groq fallback 6/6, yet production
 // only ever asked openrouter.
 describe('seed-insights callLLM output acceptance (#6001)', () => {
   it('falls through to the next provider when the caller rejects the output', async () => {
     process.env.OPENROUTER_API_KEY = 'openrouter-test-key';
-    process.env.GROQ_API_KEY = 'groq-test-key';
+    process.env.LLM_API_KEY = 'generic-test-key';
+    process.env.LLM_API_URL = 'https://llm.example.test/v1/chat/completions';
     delete process.env.OLLAMA_API_URL;
 
     const seen = [];
@@ -317,14 +327,15 @@ describe('seed-insights callLLM output acceptance (#6001)', () => {
     });
 
     assert.ok(result, 'an accepted provider result must be returned');
-    assert.equal(result.provider, 'groq');
+    assert.equal(result.provider, 'generic');
     assert.equal(result.text, LONG_BRIEF);
     assert.equal(seen.length, 2, 'both providers must be attempted');
   });
 
   it('returns the last attempt when every provider is rejected, so the failure stays classifiable', async () => {
     process.env.OPENROUTER_API_KEY = 'openrouter-test-key';
-    process.env.GROQ_API_KEY = 'groq-test-key';
+    process.env.LLM_API_KEY = 'generic-test-key';
+    process.env.LLM_API_URL = 'https://llm.example.test/v1/chat/completions';
     delete process.env.OLLAMA_API_URL;
 
     __setInsightsLlmTransportForTests({ fetch: async () => okResponse(`${LONG_BRIEF} REJECT_ME`) });
@@ -343,7 +354,8 @@ describe('seed-insights callLLM output acceptance (#6001)', () => {
 
   it('keeps the first provider when no acceptor is supplied', async () => {
     process.env.OPENROUTER_API_KEY = 'openrouter-test-key';
-    process.env.GROQ_API_KEY = 'groq-test-key';
+    process.env.LLM_API_KEY = 'generic-test-key';
+    process.env.LLM_API_URL = 'https://llm.example.test/v1/chat/completions';
     delete process.env.OLLAMA_API_URL;
 
     const seen = [];
@@ -361,7 +373,8 @@ describe('seed-insights callLLM output acceptance (#6001)', () => {
   // must be fault-tolerant, and seed-insights makes composeFromText defensive.
   it('does not propagate an acceptor fault out of callLLM', async () => {
     process.env.OPENROUTER_API_KEY = 'openrouter-test-key';
-    process.env.GROQ_API_KEY = 'groq-test-key';
+    process.env.LLM_API_KEY = 'generic-test-key';
+    process.env.LLM_API_URL = 'https://llm.example.test/v1/chat/completions';
     delete process.env.OLLAMA_API_URL;
 
     __setInsightsLlmTransportForTests({ fetch: async () => okResponse(LONG_BRIEF) });
@@ -376,7 +389,8 @@ describe('seed-insights callLLM output acceptance (#6001)', () => {
 
   it('prefers a cleanly-rejected response over one whose acceptor threw', async () => {
     process.env.OPENROUTER_API_KEY = 'openrouter-test-key';
-    process.env.GROQ_API_KEY = 'groq-test-key';
+    process.env.LLM_API_KEY = 'generic-test-key';
+    process.env.LLM_API_URL = 'https://llm.example.test/v1/chat/completions';
     delete process.env.OLLAMA_API_URL;
 
     __setInsightsLlmTransportForTests({
@@ -396,7 +410,8 @@ describe('seed-insights callLLM output acceptance (#6001)', () => {
 
   it('reports the FIRST rejection so the failure code names the primary model stage', async () => {
     process.env.OPENROUTER_API_KEY = 'openrouter-test-key';
-    process.env.GROQ_API_KEY = 'groq-test-key';
+    process.env.LLM_API_KEY = 'generic-test-key';
+    process.env.LLM_API_URL = 'https://llm.example.test/v1/chat/completions';
     delete process.env.OLLAMA_API_URL;
 
     __setInsightsLlmTransportForTests({

@@ -86,7 +86,8 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 COPY docker/nginx.conf /etc/nginx/nginx.conf.template
 COPY docker/supervisord.conf /etc/supervisor/conf.d/worldmonitor.conf
 COPY docker/entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
+COPY docker/api-watchdog.sh /app/api-watchdog.sh
+RUN chmod +x /app/entrypoint.sh /app/api-watchdog.sh
 
 # Ensure writable dirs for non-root
 RUN chown -R appuser:appgroup /app /tmp/nginx-client-body /tmp/nginx-proxy \
@@ -103,7 +104,8 @@ EXPOSE 8080
 # through nginx's /api/ proxy verifies BOTH nginx and the node sidecar are up,
 # unlike a static "/" probe which only proves nginx is serving. Keep this off
 # /api/health so the public compact data-health contract still reaches api/health.js.
+# ?deep=1 also reports 503 when the outbound-fetch limiter is stuck (12/10/2026 outage).
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-  CMD wget -qO- http://127.0.0.1:8080/api/sidecar-health >/dev/null 2>&1 || exit 1
+  CMD wget -qO- 'http://127.0.0.1:8080/api/sidecar-health?deep=1' >/dev/null 2>&1 || exit 1
 
 CMD ["/app/entrypoint.sh"]

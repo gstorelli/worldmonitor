@@ -87,7 +87,10 @@ for f in scripts/seed-*.mjs; do
   echo "RUN  ${name}"
   seedlog="$(mktemp /tmp/seed-one.XXXXXX.log)"
   echo "### ${name} ($(date -u +%FT%TZ))" >> "${LOG}"
-  if docker run --rm --network "${NET}" \
+  # Memory cap per seeder container (SEED_MEMORY_LIMIT, default 1g): a runaway
+  # seeder is OOM-killed inside its own container instead of starving the API
+  # on the same VPS.
+  if docker run --rm --network "${NET}" --memory "${SEED_MEMORY_LIMIT:-1g}" \
     --env-file "${REPO_PATH}/.env" \
     -e UPSTASH_REDIS_REST_URL=http://redis-rest:80 \
     -e UPSTASH_REDIS_REST_TOKEN="${RT}" \

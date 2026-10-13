@@ -31,7 +31,7 @@ export interface ProviderCredentials {
   extraBody?: Record<string, unknown>;
 }
 
-export type LlmProviderName = 'ollama' | 'groq' | 'openrouter' | 'generic';
+export type LlmProviderName = 'ollama' | 'openrouter' | 'generic';
 
 export interface ProviderCredentialOverrides {
   model?: string;
@@ -84,19 +84,6 @@ export function getProviderCredentials(
       model: overrides.model || process.env.OLLAMA_MODEL || 'llama3.1:8b',
       headers,
       extraBody: { think: false },
-    };
-  }
-
-  if (provider === 'groq') {
-    const apiKey = process.env.GROQ_API_KEY;
-    if (!apiKey) return null;
-    return {
-      apiUrl: 'https://api.groq.com/openai/v1/chat/completions',
-      model: overrides.model || 'llama-3.3-70b-versatile',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
     };
   }
 
@@ -188,11 +175,10 @@ export function stripThinkingTags(text: string): string {
 }
 
 
-// openrouter ahead of groq since #4944: core surfaces run DeepSeek V4 Flash
-// via OpenRouter; groq (llama-3.3-70b-versatile) is the free-tier/outage
-// fallback. Ollama stays first so self-hosted deployments are untouched —
-// it is skipped in cloud where OLLAMA_API_URL is unset.
-const PROVIDER_CHAIN = ['ollama', 'openrouter', 'groq', 'generic'] as const;
+// Risk Sentinel fork: Groq was removed (13/10/2026) — the project has no Groq
+// account. Chain: ollama (only where OLLAMA_API_URL is set) → openrouter
+// (DeepSeek V4 Flash, the production provider) → generic OpenAI-compatible.
+const PROVIDER_CHAIN = ['ollama', 'openrouter', 'generic'] as const;
 const PROVIDER_SET = new Set<string>(PROVIDER_CHAIN);
 
 export interface LlmCallOptions {
@@ -310,7 +296,7 @@ function callLlmProfile(
 
 /** Cheap/fast model for extraction and parsing tasks. Configurable via LLM_TOOL_PROVIDER / LLM_TOOL_MODEL. */
 export const callLlmTool = (opts: Omit<LlmCallOptions, 'providerOrder' | 'modelOverrides'>) =>
-  callLlmProfile(opts, 'LLM_TOOL_PROVIDER', 'LLM_TOOL_MODEL', 'groq');
+  callLlmProfile(opts, 'LLM_TOOL_PROVIDER', 'LLM_TOOL_MODEL', 'openrouter');
 
 /**
  * Powerful model for synthesis and reasoning tasks. Configurable via

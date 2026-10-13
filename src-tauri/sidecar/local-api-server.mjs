@@ -60,9 +60,23 @@ function isTransientVerificationError(error) {
 }
 
 // Global concurrency limiter for upstream requests.
+//
+// Fork fix (13/10/2026): on 12/10 production lost all six slots and every
+// outbound call (Redis included) then queued forever for ~24 h, while
+// /api/sidecar-health (no fetch) kept answering 200. Two leaks in ipv4Fetch
+// below caused it: an abort after the response headers had arrived destroyed
+// the socket but never settled the promise (so `finally` never released the
+// slot), and a request without an AbortSignal had no timeout at all. The
+// wrapper now settles exactly once on every path and bounds each request;
+// the limiter also records progress so the deep liveness probe can detect a
+// stuck limiter (see /api/sidecar-health?deep=1 and docker/api-watchdog.sh).
 let _activeUpstream = 0;
 const _upstreamQueue = [];
 const MAX_CONCURRENT_UPSTREAM = 6;
+// Idle-socket and whole-request caps for calls made without their own signal.
+const UPSTREAM_IDLE_TIMEOUT_MS = Number(process.env.UPSTREAM_IDLE_TIMEOUT_MS) || 60_000;
+const UPSTREAM_MAX_REQUEST_MS = Number(process.env.UPSTREAM_MAX_REQUEST_MS) || 120_000;
+let _lastUpstreamReleaseAt = Date.now();
 function acquireUpstreamSlot() {
   if (_activeUpstream < MAX_CONCURRENT_UPSTREAM) {
     _activeUpstream++;
@@ -71,11 +85,27 @@ function acquireUpstreamSlot() {
   return new Promise(resolve => _upstreamQueue.push(resolve));
 }
 function releaseUpstreamSlot() {
+  _lastUpstreamReleaseAt = Date.now();
   if (_upstreamQueue.length > 0) {
     _upstreamQueue.shift()();
   } else {
     _activeUpstream--;
   }
+}
+export function getUpstreamLimiterState() {
+  return {
+    active: _activeUpstream,
+    queued: _upstreamQueue.length,
+    max: MAX_CONCURRENT_UPSTREAM,
+    msSinceLastRelease: Date.now() - _lastUpstreamReleaseAt,
+  };
+}
+function makeAbortError(signal) {
+  const reason = signal?.reason;
+  if (reason instanceof Error) return reason;
+  const err = new Error('The operation was aborted');
+  err.name = 'AbortError';
+  return err;
 }
 
 // Global Yahoo Finance rate gate — shared across ALL handler bundles.
@@ -96,8 +126,11 @@ globalThis.fetch = async function ipv4Fetch(input, init) {
   try { url = new URL(typeof input === 'string' ? input : input.url); } catch { return _originalFetch(input, init); }
   if (url.protocol !== 'https:' && url.protocol !== 'http:') return _originalFetch(input, init);
   if (url.hostname.includes('finance.yahoo.com')) await sidecarYahooGate();
+  const signal = init?.signal || (isRequest ? input.signal : undefined);
+  if (signal?.aborted) throw makeAbortError(signal);
   await acquireUpstreamSlot();
   try {
+    if (signal?.aborted) throw makeAbortError(signal);
     const mod = url.protocol === 'https:' ? https : http;
     const method = init?.method || (isRequest ? input.method : 'GET');
     const body = await resolveRequestBody(input, init, method, isRequest);
@@ -109,9 +142,39 @@ globalThis.fetch = async function ipv4Fetch(input, init) {
       Object.assign(headers, h);
     }
     return await new Promise((resolve, reject) => {
-      const req = mod.request({ hostname: url.hostname, port: url.port || (url.protocol === 'https:' ? 443 : 80), path: url.pathname + url.search, method, headers, family: 4 }, (res) => {
+      let settled = false;
+      let req = null;
+      const cleanup = () => {
+        clearTimeout(maxTimer);
+        signal?.removeEventListener('abort', onAbort);
+      };
+      // Every exit path goes through settle(), so the promise always settles
+      // and `finally` always returns the slot.
+      const settle = (fn, value) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        fn(value);
+      };
+      const fail = (error) => {
+        settle(reject, error);
+        try { req?.destroy(); } catch { /* already destroyed */ }
+      };
+      const onAbort = () => fail(makeAbortError(signal));
+      const maxTimer = setTimeout(() => {
+        const err = new Error(`upstream request exceeded ${UPSTREAM_MAX_REQUEST_MS}ms: ${url.hostname}`);
+        err.code = 'ETIMEDOUT';
+        fail(err);
+      }, UPSTREAM_MAX_REQUEST_MS);
+      signal?.addEventListener('abort', onAbort, { once: true });
+      req = mod.request({ hostname: url.hostname, port: url.port || (url.protocol === 'https:' ? 443 : 80), path: url.pathname + url.search, method, headers, family: 4 }, (res) => {
         const chunks = [];
         res.on('data', (c) => chunks.push(c));
+        res.on('error', fail);
+        res.on('aborted', () => fail(Object.assign(new Error('upstream response aborted'), { code: 'ECONNRESET' })));
+        res.on('close', () => {
+          if (!res.complete) fail(Object.assign(new Error('upstream response closed before end'), { code: 'ECONNRESET' }));
+        });
         res.on('end', () => {
           const buf = Buffer.concat(chunks);
           const responseHeaders = new Headers();
@@ -119,14 +182,18 @@ globalThis.fetch = async function ipv4Fetch(input, init) {
             if (v) responseHeaders.set(k, Array.isArray(v) ? v.join(', ') : v);
           }
           try {
-            resolve(buildSafeResponse(res.statusCode, res.statusMessage, responseHeaders, buf));
+            settle(resolve, buildSafeResponse(res.statusCode, res.statusMessage, responseHeaders, buf));
           } catch (error) {
-            reject(error);
+            settle(reject, error);
           }
         });
       });
-      req.on('error', reject);
-      if (init?.signal) { init.signal.addEventListener('abort', () => req.destroy()); }
+      req.setTimeout(UPSTREAM_IDLE_TIMEOUT_MS, () => {
+        const err = new Error(`upstream socket idle for ${UPSTREAM_IDLE_TIMEOUT_MS}ms: ${url.hostname}`);
+        err.code = 'ETIMEDOUT';
+        fail(err);
+      });
+      req.on('error', fail);
       if (body != null) req.write(body);
       req.end();
     });
@@ -136,7 +203,7 @@ globalThis.fetch = async function ipv4Fetch(input, init) {
 };
 
 const ALLOWED_ENV_KEYS = new Set([
-  'GROQ_API_KEY', 'OPENROUTER_API_KEY', 'EXA_API_KEYS', 'BRAVE_API_KEYS', 'SERPAPI_API_KEYS', 'FRED_API_KEY', 'EIA_API_KEY',
+  'OPENROUTER_API_KEY', 'EXA_API_KEYS', 'BRAVE_API_KEYS', 'SERPAPI_API_KEYS', 'FRED_API_KEY', 'EIA_API_KEY',
   'CLOUDFLARE_API_TOKEN', 'ACLED_ACCESS_TOKEN', 'URLHAUS_AUTH_KEY',
   'OTX_API_KEY', 'ABUSEIPDB_API_KEY', 'WINGBITS_API_KEY', 'WS_RELAY_URL',
   'VITE_OPENSKY_RELAY_URL', 'OPENSKY_CLIENT_ID', 'OPENSKY_CLIENT_SECRET',
@@ -729,17 +796,6 @@ async function validateSecretAgainstProvider(key, rawValue, context = {}) {
 
   try {
     switch (key) {
-    case 'GROQ_API_KEY': {
-      const response = await fetchWithTimeout('https://api.groq.com/openai/v1/models', {
-        headers: { Authorization: `Bearer ${value}`, 'User-Agent': CHROME_UA },
-      });
-      const text = await response.text();
-      if (isCloudflareChallenge403(response, text)) return ok('Groq key stored (Cloudflare blocked verification)');
-      if (isAuthFailure(response.status, text)) return fail('Groq rejected this key');
-      if (!response.ok) return fail(`Groq probe failed (${response.status})`);
-      return ok('Groq key verified');
-    }
-
     case 'OPENROUTER_API_KEY': {
       const response = await fetchWithTimeout('https://openrouter.ai/api/v1/models', {
         headers: { Authorization: `Bearer ${value}`, 'User-Agent': CHROME_UA },
@@ -1163,6 +1219,16 @@ async function dispatch(requestUrl, req, routes, context) {
   // through nginx proves BOTH nginx and this server are up, so it must stay
   // exempt from the token gate below.
   if (requestUrl.pathname === '/api/sidecar-health') {
+    // ?deep=1 (container healthcheck + docker/api-watchdog.sh): also fail when
+    // the upstream limiter is stuck — every slot busy and none released for
+    // UPSTREAM_STUCK_MS. The shallow probe answered 200 throughout the 12/10
+    // outage because it never touches fetch.
+    if (requestUrl.searchParams.get('deep') === '1') {
+      const limiter = getUpstreamLimiterState();
+      const stuckMs = Number(process.env.UPSTREAM_STUCK_MS) || 150_000;
+      const stuck = limiter.active >= limiter.max && limiter.msSinceLastRelease > stuckMs;
+      return json({ ok: !stuck, mode: context.mode, upstream: limiter }, stuck ? 503 : 200);
+    }
     return json({ ok: true, mode: context.mode });
   }
 
@@ -1241,7 +1307,6 @@ async function dispatch(requestUrl, req, routes, context) {
     const providers = [];
     const providerChecks = [];
     const ollamaUrl = process.env.OLLAMA_API_URL || process.env.LLM_API_URL;
-    const groqKey = process.env.GROQ_API_KEY;
     const openrouterKey = process.env.OPENROUTER_API_KEY;
 
     if (ollamaUrl) {
@@ -1251,11 +1316,6 @@ async function dispatch(requestUrl, req, routes, context) {
           probeOrigin(origin).then((available) => ({ name: 'ollama', url: origin, available })),
         );
       } catch {}
-    }
-    if (groqKey && groqKey.startsWith('gsk_')) {
-      providerChecks.push(
-        probeOrigin('https://api.groq.com').then((available) => ({ name: 'groq', url: 'https://api.groq.com', available })),
-      );
     }
     if (openrouterKey) {
       providerChecks.push(
@@ -1675,7 +1735,6 @@ export async function createLocalApiServer(options = {}) {
       (async () => {
         const urls = [
           process.env.OLLAMA_API_URL || process.env.LLM_API_URL,
-          process.env.GROQ_API_KEY ? 'https://api.groq.com' : null,
           process.env.OPENROUTER_API_KEY ? 'https://openrouter.ai' : null,
         ].filter(Boolean);
         for (const url of urls) {

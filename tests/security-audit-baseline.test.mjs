@@ -392,11 +392,13 @@ describe('introduced-vs-inherited split', () => {
 
 describe('security audit baseline', () => {
   it('allows a currently baselined high advisory', () => {
+    // The shell-quote baseline (GHSA-395f-4hp3-45gv) was dropped on 13/10/2026:
+    // pro-test now pins shell-quote 1.12.0, which fixes it.
     const report = auditReportWith({
-      name: 'shell-quote',
+      name: 'image-size',
       severity: 'high',
-      title: 'shell-quote DoS',
-      url: 'https://github.com/advisories/GHSA-395f-4hp3-45gv',
+      title: 'image-size JXL/HEIF DoS',
+      url: 'https://github.com/advisories/GHSA-5p2g-fcmc-qvqq',
     });
 
     assert.deepEqual(collectUnbaselinedFindings(report, 'pro-test/package-lock.json'), []);
@@ -494,16 +496,6 @@ describe('security audit baseline', () => {
     // report for the no-stale case — one package (image-size) carries two.
     const withAllBaselined = {
       vulnerabilities: {
-        'shell-quote': {
-          name: 'shell-quote',
-          severity: 'high',
-          via: [{
-            name: 'shell-quote',
-            severity: 'high',
-            title: 'shell-quote DoS',
-            url: 'https://github.com/advisories/GHSA-395f-4hp3-45gv',
-          }],
-        },
         'image-size': {
           name: 'image-size',
           severity: 'high',
@@ -527,7 +519,6 @@ describe('security audit baseline', () => {
 
     assert.deepEqual(collectStaleBaselineEntries(withAllBaselined, 'pro-test/package-lock.json'), []);
     assert.deepEqual(collectStaleBaselineEntries({ vulnerabilities: {} }, 'pro-test/package-lock.json'), [
-      'GHSA-395f-4hp3-45gv',
       'GHSA-5p2g-fcmc-qvqq',
       'GHSA-w3rx-r6r6-pgpr',
     ]);

@@ -14,7 +14,10 @@ import { buildLlmCallEvent, emitLlmEvents, flushPendingLlmEvents } from '../scri
 import { callLLM } from '../scripts/lib/llm-chain.cjs';
 import { callLlmDefault as callNarrativeLlm, __setNarrativeTransportForTests } from '../scripts/regional-snapshot/narrative.mjs';
 
-const ENV_KEYS = ['USAGE_TELEMETRY', 'AXIOM_API_TOKEN', 'GROQ_API_KEY', 'OPENROUTER_API_KEY', 'OLLAMA_API_URL'];
+const ENV_KEYS = ['USAGE_TELEMETRY', 'AXIOM_API_TOKEN', 'LLM_API_URL', 'LLM_API_KEY', 'OPENROUTER_API_KEY', 'OLLAMA_API_URL'];
+// The fork's fallback slot (Groq upstream, removed 13/10/2026) is the generic
+// OpenAI-compatible provider, after OpenRouter in every chain.
+const GENERIC_URL = 'https://generic.example.test/v1/chat/completions';
 const originalEnv = Object.fromEntries(ENV_KEYS.map((k) => [k, process.env[k]]));
 const realFetch = global.fetch;
 
@@ -30,7 +33,8 @@ afterEach(() => {
 function baseEnv() {
   process.env.USAGE_TELEMETRY = '1';
   process.env.AXIOM_API_TOKEN = 'axiom-test-token';
-  process.env.GROQ_API_KEY = 'groq-test';
+  process.env.LLM_API_URL = GENERIC_URL;
+  process.env.LLM_API_KEY = 'generic-test';
   process.env.OPENROUTER_API_KEY = 'or-test';
   delete process.env.OLLAMA_API_URL;
 }
@@ -68,10 +72,10 @@ test('llm-chain: fallback emits one event per attempt with the caller stage', as
       captured.push(...JSON.parse(String(init.body || '[]')));
       return { ok: true, json: async () => ({}) };
     }
-    if (raw.includes('api.groq.com')) {
+    if (raw.includes('openrouter.ai')) {
       return { ok: false, status: 500, json: async () => ({}) };
     }
-    if (raw.includes('openrouter.ai')) {
+    if (raw === GENERIC_URL) {
       return { ok: true, json: async () => llmJson('brief prose output') };
     }
     throw new Error(`unexpected fetch: ${raw}`);
@@ -79,14 +83,14 @@ test('llm-chain: fallback emits one event per attempt with the caller stage', as
 
   const text = await callLLM('system', 'user prompt', { stage: 'brief-digest-cron' });
   assert.equal(text, 'brief prose output');
-  assert.equal(captured.length, 2, 'failed groq attempt + openrouter fallback success');
+  assert.equal(captured.length, 2, 'failed openrouter attempt + generic fallback success');
   const [fail, ok] = captured;
-  assert.equal(fail.provider, 'groq');
+  assert.equal(fail.provider, 'openrouter');
   assert.equal(fail.ok, false);
   assert.equal(fail.reason, 'http_500');
   assert.equal(fail.fallback_index, 0);
   assert.equal(fail.stage, 'brief-digest-cron');
-  assert.equal(ok.provider, 'openrouter');
+  assert.equal(ok.provider, 'generic');
   assert.equal(ok.ok, true);
   assert.equal(ok.fallback_index, 1);
   assert.equal(ok.tokens_total, 30);
@@ -102,7 +106,7 @@ test('llm-chain: rejects length-limited prose and falls through to the next prov
       captured.push(...JSON.parse(String(init.body || '[]')));
       return { ok: true, json: async () => ({}) };
     }
-    if (raw.includes('api.groq.com')) {
+    if (raw.includes('openrouter.ai')) {
       return {
         ok: true,
         json: async () => llmJson(
@@ -112,7 +116,7 @@ test('llm-chain: rejects length-limited prose and falls through to the next prov
         ),
       };
     }
-    if (raw.includes('openrouter.ai')) {
+    if (raw === GENERIC_URL) {
       return { ok: true, json: async () => llmJson('Complete fallback prose.') };
     }
     throw new Error(`unexpected fetch: ${raw}`);
@@ -122,10 +126,10 @@ test('llm-chain: rejects length-limited prose and falls through to the next prov
 
   assert.equal(text, 'Complete fallback prose.');
   assert.equal(captured.length, 2);
-  assert.equal(captured[0].provider, 'groq');
+  assert.equal(captured[0].provider, 'openrouter');
   assert.equal(captured[0].ok, false);
   assert.equal(captured[0].reason, 'length');
-  assert.equal(captured[1].provider, 'openrouter');
+  assert.equal(captured[1].provider, 'generic');
   assert.equal(captured[1].ok, true);
 });
 
@@ -138,10 +142,10 @@ test('llm-chain: records empty length-limited responses as length before falling
       captured.push(...JSON.parse(String(init.body || '[]')));
       return { ok: true, json: async () => ({}) };
     }
-    if (raw.includes('api.groq.com')) {
+    if (raw.includes('openrouter.ai')) {
       return { ok: true, json: async () => llmJson('', undefined, 'length') };
     }
-    if (raw.includes('openrouter.ai')) {
+    if (raw === GENERIC_URL) {
       return { ok: true, json: async () => llmJson('Complete fallback prose.') };
     }
     throw new Error(`unexpected fetch: ${raw}`);
@@ -151,10 +155,10 @@ test('llm-chain: records empty length-limited responses as length before falling
 
   assert.equal(text, 'Complete fallback prose.');
   assert.equal(captured.length, 2);
-  assert.equal(captured[0].provider, 'groq');
+  assert.equal(captured[0].provider, 'openrouter');
   assert.equal(captured[0].ok, false);
   assert.equal(captured[0].reason, 'length');
-  assert.equal(captured[1].provider, 'openrouter');
+  assert.equal(captured[1].provider, 'generic');
   assert.equal(captured[1].ok, true);
 });
 
@@ -226,7 +230,8 @@ test('narrative: validate_reject and success attempts both reach the ingest', as
     throw new Error(`unexpected global fetch: ${raw}`);
   };
   // Provider transport is injected: openrouter (first since #4944 U6)
-  // answers but fails validation, groq answers with the accepted payload.
+  // answers but fails validation, the generic fallback answers with the
+  // accepted payload.
   __setNarrativeTransportForTests({
     fetch: async (url) => {
       const raw = String(url);
@@ -242,14 +247,14 @@ test('narrative: validate_reject and success attempts both reach the ingest', as
     { validate: (text) => text.startsWith('{') },
   );
   assert.ok(res);
-  assert.equal(res.provider, 'groq');
+  assert.equal(res.provider, 'generic');
   assert.equal(captured.length, 2);
   assert.equal(captured[0].stage, 'regional-narrative');
   assert.equal(captured[0].provider, 'openrouter');
   assert.equal(captured[0].ok, false);
   assert.equal(captured[0].reason, 'validate_reject');
   assert.equal(captured[0].fallback_index, 0);
-  assert.equal(captured[1].provider, 'groq');
+  assert.equal(captured[1].provider, 'generic');
   assert.equal(captured[1].ok, true);
   assert.equal(captured[1].fallback_index, 1);
 });

@@ -1530,14 +1530,14 @@ describe('country intel brief caching behavior', { concurrency: 1 }, () => {
   function installIntelFetchMock({ store, setKeys, userPrompts, counters }) {
     globalThis.fetch = async (url, init = {}) => {
       const raw = String(url);
-      if (raw === 'https://api.groq.com') {
+      if (raw === 'https://openrouter.ai') {
         return jsonResponse({});
       }
-      if (raw.includes('api.groq.com/openai/v1/chat/completions')) {
-        counters.groqCalls += 1;
+      if (raw.includes('openrouter.ai/api/v1/chat/completions')) {
+        counters.llmCalls += 1;
         const body = JSON.parse(String(init.body || '{}'));
         userPrompts.push(body.messages?.[1]?.content || '');
-        return jsonResponse({ choices: [{ message: { content: `brief-${counters.groqCalls}` } }] });
+        return jsonResponse({ choices: [{ message: { content: `brief-${counters.llmCalls}` } }] });
       }
       if (raw.includes('/get/')) {
         const key = parseRedisKey(raw, 'get');
@@ -1554,11 +1554,9 @@ describe('country intel brief caching behavior', { concurrency: 1 }, () => {
   }
 
   const INTEL_TEST_ENV = {
-    GROQ_API_KEY: 'test-key',
-    // The default chain is openrouter-first since #4944; clear these so the
-    // groq-only fetch mock deterministically sees groq as the first provider
-    // regardless of ambient shell env.
-    OPENROUTER_API_KEY: undefined,
+    // Groq was removed from the fork (13/10/2026): the mock provider is
+    // OpenRouter, the first provider of the chain once ollama is cleared.
+    OPENROUTER_API_KEY: 'test-key',
     OLLAMA_API_URL: undefined,
     UPSTASH_REDIS_REST_URL: 'https://redis.test',
     UPSTASH_REDIS_REST_TOKEN: 'token',
@@ -1584,7 +1582,7 @@ describe('country intel brief caching behavior', { concurrency: 1 }, () => {
     }));
     const setKeys = [];
     const userPrompts = [];
-    const counters = { groqCalls: 0 };
+    const counters = { llmCalls: 0 };
     installIntelFetchMock({ store, setKeys, userPrompts, counters });
 
     try {
@@ -1592,7 +1590,7 @@ describe('country intel brief caching behavior', { concurrency: 1 }, () => {
       const alpha = await module.getCountryIntelBrief(makeCtx('https://example.com/api/intelligence/v1/get-country-intel-brief?country_code=IL&context=alpha'), req);
       const beta = await module.getCountryIntelBrief(makeCtx('https://example.com/api/intelligence/v1/get-country-intel-brief?country_code=IL&context=beta'), req);
 
-      assert.equal(counters.groqCalls, 1, 'anon context variations must share one cache entry');
+      assert.equal(counters.llmCalls, 1, 'anon context variations must share one cache entry');
       assert.equal(setKeys.length, 1, 'one shared cache write');
       assert.ok(setKeys[0]?.startsWith('ci-sebuf:v5:IL:en:shared'), `anon key should use the shared v5 namespace, got ${setKeys[0]}`);
       assert.equal(alpha.brief, 'brief-1');
@@ -1617,7 +1615,7 @@ describe('country intel brief caching behavior', { concurrency: 1 }, () => {
     const store = new Map();
     const setKeys = [];
     const userPrompts = [];
-    const counters = { groqCalls: 0 };
+    const counters = { llmCalls: 0 };
     installIntelFetchMock({ store, setKeys, userPrompts, counters });
 
     try {
@@ -1626,7 +1624,7 @@ describe('country intel brief caching behavior', { concurrency: 1 }, () => {
       const beta = await module.getCountryIntelBrief(makeCtx('https://example.com/api/intelligence/v1/get-country-intel-brief?country_code=IL&context=beta'), req);
       const alphaCached = await module.getCountryIntelBrief(makeCtx('https://example.com/api/intelligence/v1/get-country-intel-brief?country_code=IL&context=alpha'), req);
 
-      assert.equal(counters.groqCalls, 2, 'different premium contexts should not share one cache entry');
+      assert.equal(counters.llmCalls, 2, 'different premium contexts should not share one cache entry');
       assert.equal(setKeys.length, 2, 'one cache write per unique premium context');
       assert.notEqual(setKeys[0], setKeys[1], 'context hash should differentiate premium cache keys');
       assert.ok(setKeys[0]?.startsWith('ci-sebuf:v5:IL:'), 'cache key should use the v5 country-intel namespace');
@@ -1646,10 +1644,7 @@ describe('country intel brief caching behavior', { concurrency: 1 }, () => {
   it('uses base cache key and prompt when context is missing or blank', async () => {
     const { module, cleanup } = await importCountryIntelBrief();
     const restoreEnv = withEnv({
-      GROQ_API_KEY: 'test-key',
-      // Deterministic groq-first for this groq-only mock (chain is
-      // openrouter-first since #4944).
-      OPENROUTER_API_KEY: undefined,
+      OPENROUTER_API_KEY: 'test-key',
       OLLAMA_API_URL: undefined,
       UPSTASH_REDIS_REST_URL: 'https://redis.test',
       UPSTASH_REDIS_REST_TOKEN: 'token',
@@ -1661,11 +1656,11 @@ describe('country intel brief caching behavior', { concurrency: 1 }, () => {
     const store = new Map();
     const setKeys = [];
     const userPrompts = [];
-    let groqCalls = 0;
+    let llmCalls = 0;
 
     globalThis.fetch = async (url, init = {}) => {
       const raw = String(url);
-      if (raw === 'https://api.groq.com') {
+      if (raw === 'https://openrouter.ai') {
         return jsonResponse({});
       }
       if (raw.includes('/get/')) {
@@ -1678,8 +1673,8 @@ describe('country intel brief caching behavior', { concurrency: 1 }, () => {
         if (!key.startsWith('seed-meta:')) setKeys.push(key);
         return jsonResponse({ result: 'OK' });
       }
-      if (raw.includes('api.groq.com/openai/v1/chat/completions')) {
-        groqCalls += 1;
+      if (raw.includes('openrouter.ai/api/v1/chat/completions')) {
+        llmCalls += 1;
         const body = JSON.parse(String(init.body || '{}'));
         userPrompts.push(body.messages?.[1]?.content || '');
         return jsonResponse({ choices: [{ message: { content: 'base-brief' } }] });
@@ -1692,7 +1687,7 @@ describe('country intel brief caching behavior', { concurrency: 1 }, () => {
       const first = await module.getCountryIntelBrief(makeCtx('https://example.com/api/intelligence/v1/get-country-intel-brief?country_code=US'), req);
       const second = await module.getCountryIntelBrief(makeCtx('https://example.com/api/intelligence/v1/get-country-intel-brief?country_code=US&context=%20%20%20'), req);
 
-      assert.equal(groqCalls, 1, 'blank context should reuse the shared cache entry');
+      assert.equal(llmCalls, 1, 'blank context should reuse the shared cache entry');
       assert.equal(setKeys.length, 1);
       assert.ok(setKeys[0]?.startsWith('ci-sebuf:v5:US:en:shared'), `anon callers land on the shared key, got ${setKeys[0]}`);
       assert.ok(!userPrompts[0]?.includes('Context snapshot:'), 'prompt should omit context block when digest grounding is unavailable');
