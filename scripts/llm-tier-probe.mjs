@@ -42,9 +42,11 @@ async function call(model, messages, maxTokens, timeoutMs) {
       body: JSON.stringify({ model, messages, max_tokens: maxTokens, temperature: 0.2, reasoning: { enabled: false }, provider: OPENROUTER_PROVIDER_ROUTING }),
       signal: AbortSignal.timeout(timeoutMs),
     });
-    const ms = Date.now() - t0;
-    if (!resp.ok) return { ok: false, ms, err: `HTTP ${resp.status}` };
+    if (!resp.ok) return { ok: false, ms: Date.now() - t0, err: `HTTP ${resp.status}` };
+    // Time the whole answer: OpenRouter sends headers before the model has finished,
+    // so stopping the clock at fetch() resolution measured only time-to-headers.
     const body = await resp.json();
+    const ms = Date.now() - t0;
     const text = body?.choices?.[0]?.message?.content || '';
     return { ok: true, ms, model: body?.model || model, provider: body?.provider || '?', out: body?.usage?.completion_tokens ?? null, text };
   } catch (err) {
@@ -76,7 +78,8 @@ for (const [tier, model] of tiers) {
     const max = lat.length ? lat[lat.length - 1] : null;
     const extra = job === 'classify'
       ? `json ${ok.filter((r) => jsonOk(r.text)).length}/${ok.length}`
-      : `words ${ok.map((r) => r.text.split(/\s+/).filter(Boolean).length).join(',')}`;
+      : `words ${ok.map((r) => r.text.split(/\s+/).filter(Boolean).length).join(',')}`
+        + ` tok/s ${ok.map((r) => (r.out ? Math.round(r.out / (r.ms / 1000)) : '?')).join(',')}`;
     const errs = runs.filter((r) => !r.ok).map((r) => r.err);
     console.log(`${tier.padEnd(7)} ${model.padEnd(32)} ${job.padEnd(9)} ok ${ok.length}/${runs.length} p50 ${p50 ?? '-'}ms max ${max ?? '-'}ms ${extra}`
       + ` providers ${[...new Set(ok.map((r) => r.provider))].join('/') || '-'}${errs.length ? ` errors ${errs.join('; ')}` : ''}`);
