@@ -4,6 +4,10 @@
  * A standalone application (not a dashboard variant): topic-scoped signals from
  * the n8n intelligence digest, ranked by severity/score, with a source link per
  * signal. Shares only the header/footer shell.
+ *
+ * Fork (13/10/2026): the per-item numeric score is no longer shown. For GDELT
+ * items it is the provisional v0 score, whose weights the thesis declares
+ * unjustified; it still breaks ties after severity in the digest ordering.
  */
 
 import { escapeHtml } from '@/utils/sanitize';
@@ -118,7 +122,6 @@ export function createOsintWorkspace(): AppWorkspace {
             <article class="rs-card rs-card-osint rs-sev-${escapeHtml((item.severity || 'low').toLowerCase())}">
               <div class="rs-card-head">
                 <span class="rs-sev">${escapeHtml(item.severity || 'low')}</span>
-                ${typeof item.score === 'number' ? `<span class="rs-score">score ${Math.round(item.score)}</span>` : ''}
               </div>
               <h3>${escapeHtml(item.title)}</h3>
               ${item.summary ? `<p>${escapeHtml(item.summary)}</p>` : ''}

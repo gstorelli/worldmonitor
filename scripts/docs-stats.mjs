@@ -927,9 +927,8 @@ function claims(s) {
     { file: 'README.md', re: /Protocol Buffers \((\d+)\s+protos/, value: s.protoFiles },
     { file: 'README.md', re: /(\d+)\s+services\)/, value: s.protoServices },
     { file: 'README.md', re: /(\d+)\s+languages/, value: s.locales },
-    { file: 'public/llms.txt', re: /(\d+)\s+languages with RTL support/, value: s.locales },
-    { file: 'public/llms-full.txt', re: /(\d+)\s+languages with RTL support/, value: s.locales },
-    { file: 'public/llms-full.txt', re: /(\d+)\+\s+observed upstream hosts/, value: s.sourceAttributionHosts },
+    // Risk Sentinel fork (13/10/2026): public/llms.txt and llms-full.txt describe the
+    // fork and carry none of the upstream platform-count claims.
     { file: 'README.md', re: /(\d+)\+\s+curated news feeds/, value: s.feedDefinitions, min: true },
     { file: 'README.md', re: /(\d+)\+\s+observed upstream hosts/, value: s.sourceAttributionHosts },
     { file: 'README.md', re: /(\d+)\s+stock exchanges/, value: s.stockExchangeCount },
