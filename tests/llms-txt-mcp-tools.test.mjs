@@ -7,7 +7,9 @@ import { fileURLToPath } from 'node:url';
 const __filename = fileURLToPath(import.meta.url);
 const ROOT = resolve(dirname(__filename), '..');
 const REGISTRY_DIR = join(ROOT, 'api/mcp/registry');
-const LLMS_FILES = ['public/llms.txt', 'public/llms-full.txt', 'public/api/llms.txt'];
+// Risk Sentinel fork (13/10/2026): public/llms.txt and llms-full.txt describe this
+// deployment, which exposes no MCP server, so they cite no MCP tool on purpose.
+const LLMS_FILES = ['public/api/llms.txt'];
 
 // Every MCP tool name uses a verb prefix (get_/generate_/analyze_/search_/
 // describe_), so this picks tool citations out of the backticked prose

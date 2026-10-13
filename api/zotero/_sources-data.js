@@ -4,137 +4,135 @@
 export default [
   {
     "ref": 1,
-    "authors": "European Commission",
-    "year": 2024,
-    "title": "Customs Risk Management Framework (CRMF) — Taxation and Customs Union",
+    "key": "noauthor_customs_nodate",
+    "authors": "European Commission, DG TAXUD",
+    "year": 2026,
+    "title": "Customs Risk Management Framework (CRMF) – Taxation and Customs Union",
     "type": "institutional",
-    "venue": "European Commission",
+    "venue": "",
     "doi": null,
     "url": "https://taxation-customs.ec.europa.eu/customs/customs-risk-management/customs-risk-management-framework-crmf_en",
-    "themeArea": "E",
-    "summary": "Framework istituzionale UE che standardizza l'approccio alla gestione del rischio doganale europeo.",
-    "limitation": "Quadro normativo/organizzativo, non tecnico: nessuna architettura di fusione multimodale né early-warning operativo.",
-    "contribution": "Base normativa e istituzionale del progetto; ancora per la dimensione Customs Relevance e per la validazione ADM.",
-    "dimensions": [
-      "customsRelevance"
+    "layers": [
+      "customs"
     ],
-    "verified": true
+    "verified": true,
+    "verification": "P",
+    "summary": "Framework istituzionale UE che standardizza l'approccio alla gestione del rischio doganale europeo.",
+    "limitation": "Quadro normativo/organizzativo, non tecnico: nessuna architettura di fusione multimodale né early-warning operativo."
   },
   {
     "ref": 2,
+    "key": "noauthor_imf_nodate",
     "authors": "International Monetary Fund",
-    "year": 2024,
-    "title": "IMF PortWatch — Data & Methodology",
+    "year": 2026,
+    "title": "IMF PortWatch Data & Methodology",
     "type": "institutional",
-    "venue": "IMF",
+    "venue": "",
     "doi": null,
     "url": "https://portwatch.imf.org/pages/data-and-methodology",
-    "themeArea": "E",
-    "summary": "Dati satellitari su 2065 porti e 28 chokepoint maggiori, incrociati con gli alert di disastro GDACS.",
-    "limitation": "Dataset di riferimento, non un sistema di rischio: nessun early-warning AI né scoring doganale.",
-    "contribution": "Fonte di riferimento per il monitoraggio di porti/chokepoint (Route Criticality, Geophysical/Climate).",
-    "dimensions": [
-      "routeCriticality",
-      "geophysicalClimate"
+    "layers": [
+      "node",
+      "good"
     ],
-    "verified": true
+    "verified": true,
+    "verification": "P",
+    "summary": "Dati satellitari su 2065 porti e 28 chokepoint maggiori, incrociati con gli alert di disastro GDACS.",
+    "limitation": "Dataset di riferimento, non un sistema di rischio: nessun early-warning AI né scoring doganale."
   },
   {
     "ref": 3,
-    "authors": "Anderson, D.; Belcineanu, A. I.; Tzvetkova, M. (European Commission JRC)",
+    "key": "european_commission_joint_research_centre_ai_2025",
+    "authors": "European Commission. Joint Research Centre; Anderson, D.; Belcineanu, A. I.; Tzvetkova, M.",
     "year": 2025,
     "title": "AI for border management and customs controls",
     "type": "report",
-    "venue": "Publications Office of the European Union (EUR)",
+    "venue": "Publications Office of the European Union",
     "doi": "10.2760/1286492",
-    "url": "https://data.europa.eu/doi/10.2760/1286492",
-    "themeArea": "A",
-    "summary": "Antologia di 75 progetti UE su IA per la gestione delle frontiere e i controlli doganali, finanziati tra il 2015 e il 2024 con circa 376 milioni di euro.",
-    "limitation": "Le affermazioni sulla maturità dei progetti e sull'uso di segnali esterni di pericolo non sono state verificate nel report completo (segnaposto P2-04 della tesi): non usarle finché non lo sono.",
-    "contribution": "Documenta la scala dell'investimento UE nell'IA per le dogane; utile per collocare il gap dei sistemi legati alla dichiarazione.",
-    "dimensions": [
-      "customsRelevance",
-      "sourceConfidence"
+    "url": "https://doi.org/10.2760/1286492",
+    "layers": [
+      "customs"
     ],
-    "verified": true
+    "verified": true,
+    "verification": "P",
+    "summary": "Antologia di 75 progetti UE su IA per la gestione delle frontiere e i controlli doganali, finanziati tra il 2015 e il 2024 con circa 376 milioni di euro.",
+    "limitation": "Le affermazioni sulla maturità dei progetti e sull'uso di segnali esterni di pericolo non sono state verificate nel report completo (segnaposto P2-04 della tesi): non usarle finché non lo sono."
   },
   {
     "ref": 4,
+    "key": "gmbh_n8n_2023",
     "authors": "n8n GmbH",
     "year": 2023,
     "title": "n8n: Workflow Automation Platform",
-    "type": "software",
-    "venue": "n8n GmbH",
+    "type": "institutional",
+    "venue": "",
     "doi": null,
-    "url": "https://n8n.io",
-    "themeArea": "E",
-    "summary": "Piattaforma open-source di automazione workflow per l'orchestrazione di sorgenti eterogenee e servizi AI.",
-    "limitation": "General-purpose: nessuna capacità doganale, nessuna Knowledge Graph integration, nessun reasoning LLM nativo.",
-    "contribution": "Strato di orchestrazione agentica del progetto (pipeline di ingestione e notifiche, explainability audit trail).",
-    "dimensions": [
-      "sourceConfidence"
+    "url": "",
+    "layers": [
+      "platform"
     ],
-    "verified": true
+    "verified": false,
+    "verification": null,
+    "summary": "Piattaforma open-source di automazione workflow per l'orchestrazione di sorgenti eterogenee e servizi AI.",
+    "limitation": "General-purpose: nessuna capacità doganale, nessuna Knowledge Graph integration, nessun reasoning LLM nativo."
   },
   {
     "ref": 5,
+    "key": "key_potential_2024",
     "authors": "Key, R.; Parrado, R.; Delpiazzo, E.; King, R.; Bosello, F.",
     "year": 2024,
     "title": "Potential climate-induced impacts on trade: the case of agricultural commodities and maritime chokepoints",
     "type": "journal",
-    "venue": "Journal of Shipping and Trade, 9(1):11",
+    "venue": "Journal of Shipping and Trade",
     "doi": "10.1186/s41072-024-00170-3",
-    "url": "https://jshippingandtrade.springeropen.com/articles/10.1186/s41072-024-00170-3",
-    "themeArea": "B",
-    "summary": "Modello logistico marittimo accoppiato a CGE per stimare impatti climatici su Panama, Suez e Stretti Turchi: perdite GDP fino a USD 34 miliardi (prezzi 2014) con effetti a cascata sull'UE.",
-    "limitation": "Statico e scenario-based: nessun metodo AI/ML, nessun monitoraggio real-time, livello aggregato di flussi e non targeting a livello di spedizione.",
-    "contribution": "Quantifica la cascata esposizione→perdita economica che motiva il foresight pre-arrival 7-30 giorni.",
-    "dimensions": [
-      "tradeExposure",
-      "routeCriticality",
-      "geophysicalClimate"
+    "url": "https://doi.org/10.1186/s41072-024-00170-3",
+    "layers": [
+      "node",
+      "good"
     ],
-    "verified": true
+    "verified": true,
+    "verification": "P",
+    "summary": "Modello logistico marittimo accoppiato a CGE per stimare impatti climatici su Panama, Suez e Stretti Turchi: perdite GDP fino a USD 34 miliardi (prezzi 2014) con effetti a cascata sull'UE.",
+    "limitation": "Statico e scenario-based: nessun metodo AI/ML, nessun monitoraggio real-time, livello aggregato di flussi e non targeting a livello di spedizione."
   },
   {
     "ref": 6,
+    "key": "lee_explainable_2023",
     "authors": "Lee, E.; Kim, S.; Kim, S.; Jung, S.; Kim, H.; Cha, M.",
     "year": 2023,
     "title": "Explainable Product Classification for Customs",
     "type": "preprint",
-    "venue": "arXiv:2311.10922",
-    "doi": "10.8080/1020220078265",
+    "venue": "arXiv preprint arXiv:2311.10922",
+    "doi": null,
     "url": "https://arxiv.org/abs/2311.10922",
-    "themeArea": "A",
-    "summary": "Modello XAI a due stadi per la classificazione HS: 93.9% top-3 accuracy con evidence retrieval interpretabile dai manuali HS; esplora anche zero-shot LLM con spiegazioni.",
-    "limitation": "Limiti dichiarati dagli autori: distribution shift, assenza di dati esterni real-time, nessuna capacità di early-warning.",
-    "contribution": "Valida la fattibilità dell'XAI nella classificazione HS — il mattone della spiegabilità per i codici doganali.",
-    "dimensions": [
-      "customsRelevance"
+    "layers": [
+      "customs"
     ],
-    "verified": true
+    "verified": true,
+    "verification": "P",
+    "summary": "Modello XAI a due stadi per la classificazione HS: 93.9% top-3 accuracy con evidence retrieval interpretabile dai manuali HS; esplora anche zero-shot LLM con spiegazioni.",
+    "limitation": "Limiti dichiarati dagli autori: distribution shift, assenza di dati esterni real-time, nessuna capacità di early-warning."
   },
   {
     "ref": 7,
+    "key": "mai_customs_2021",
     "authors": "Mai, T.-D.; Hoang, K.; Baigutanova, A.; Alina, G.; Kim, S.",
     "year": 2021,
     "title": "Customs Fraud Detection in the Presence of Concept Drift",
     "type": "preprint",
-    "venue": "arXiv:2109.14155",
+    "venue": "arXiv preprint arXiv:2109.14155",
     "doi": null,
     "url": "https://arxiv.org/abs/2109.14155",
-    "themeArea": "A",
-    "summary": "Framework ADAPT: rilevamento frode doganale con concept drift (Earth Mover's Distance) come trigger di warning per pattern fraudolenti in evoluzione.",
-    "limitation": "Opera solo su dati dichiarativi: nessuna fusione multimodale, nessuna XAI per operatori umani; cattura il 'quando' del drift ma non il 'perché' causale esterno.",
-    "contribution": "Dimostra che l'adattamento continuo è necessario; motiva il monitoraggio del drift sulle nostre pipeline OSINT.",
-    "dimensions": [
-      "customsRelevance",
-      "escalationMomentum"
+    "layers": [
+      "customs"
     ],
-    "verified": true
+    "verified": true,
+    "verification": "P",
+    "summary": "Framework ADAPT: rilevamento frode doganale con concept drift (Earth Mover's Distance) come trigger di warning per pattern fraudolenti in evoluzione.",
+    "limitation": "Opera solo su dati dichiarativi: nessuna fusione multimodale, nessuna XAI per operatori umani; cattura il 'quando' del drift ma non il 'perché' causale esterno."
   },
   {
     "ref": 9,
+    "key": "novelli_accountability_2023",
     "authors": "Novelli, C.; Taddeo, M.; Floridi, L.",
     "year": 2023,
     "title": "Accountability in artificial intelligence: what it is and how it works",
@@ -142,200 +140,1426 @@ export default [
     "venue": "AI & Society",
     "doi": "10.1007/s00146-023-01635-y",
     "url": "https://doi.org/10.1007/s00146-023-01635-y",
-    "themeArea": "D",
-    "summary": "Definisce l'accountability come relazione di 'answerability': architettura a 7 elementi (contesto, raggio, agente, foro, standard, processo, implicazioni) e 4 obiettivi (compliance, report, oversight, enforcement).",
-    "limitation": "Concettuale: nessuna fusione multimodale, nessun early-warning real-time, nessuna sfida doganale specifica.",
-    "contribution": "Spina dorsale di governance del progetto: ogni alert spiegabile e auditable (EU AI Act, GDPR).",
-    "dimensions": [
-      "customsRelevance"
+    "layers": [
+      "customs"
     ],
-    "verified": true
+    "verified": true,
+    "verification": "P",
+    "summary": "Definisce l'accountability come relazione di 'answerability': architettura a 7 elementi (contesto, raggio, agente, foro, standard, processo, implicazioni) e 4 obiettivi (compliance, report, oversight, enforcement).",
+    "limitation": "Concettuale: nessuna fusione multimodale, nessun early-warning real-time, nessuna sfida doganale specifica."
   },
   {
     "ref": 10,
+    "key": "oecd_oecd_2025",
     "authors": "OECD",
     "year": 2025,
     "title": "OECD Supply Chain Resilience Review: Navigating Risks",
-    "type": "report",
+    "type": "institutional",
     "venue": "OECD Publishing",
     "doi": null,
-    "url": "https://www.oecd.org/en/publications/oecd-supply-chain-resilience-review_94e3a8ea-en.html",
-    "themeArea": "B",
-    "summary": "Quantifica vulnerabilità da dipendenze commerciali e cascate di disruption (COVID-19, guerra Russia-Ucraina, eventi Suez/Panama), integrando indici di rischio geopolitico da analisi news (OSINT) con flussi commerciali.",
-    "limitation": "Per questa fonte è verificato solo il titolo: le affermazioni sul metodo econometrico e sulle conclusioni vanno controllate sul testo prima di usarle nella tesi.",
-    "contribution": "Valida che le disruption ai chokepoint generano cascate globali rilevabili come pattern commerciali anomali.",
-    "dimensions": [
-      "tradeExposure",
-      "routeCriticality"
+    "url": "",
+    "layers": [
+      "node",
+      "good"
     ],
-    "verified": true
+    "verified": true,
+    "verification": "P",
+    "summary": "Quantifica vulnerabilità da dipendenze commerciali e cascate di disruption (COVID-19, guerra Russia-Ucraina, eventi Suez/Panama), integrando indici di rischio geopolitico da analisi news (OSINT) con flussi commerciali.",
+    "limitation": "Per questa fonte è verificato solo il titolo: le affermazioni sul metodo econometrico e sulle conclusioni vanno controllate sul testo prima di usarle nella tesi."
   },
   {
     "ref": 11,
+    "key": "outram_modern_2026",
     "authors": "Outram, M.; Swartz, P.",
     "year": 2026,
     "title": "Modern Border Management: Leveraging AI Systems for Strategic Advantage",
     "type": "journal",
-    "venue": "World Customs Journal, 20(1)",
+    "venue": "World Customs Journal",
     "doi": "10.55596/001c.159458",
-    "url": "https://www.worldcustomsjournal.org/article/159458-modern-border-management-leveraging-ai-systems-for-strategic-advantage",
-    "themeArea": "A",
-    "summary": "Visione strategica di border management AI basato sul loop OODA: mapping value-chain real-time, architetture federate multi-agenzia, explainability come requisito di primo livello; 'weaponization of economic interdependence'.",
-    "limitation": "Strategico, non tecnico: nessuna metodologia di fusione multimodale, nessun dato hazard ambientale, nessuna valutazione quantitativa.",
-    "contribution": "Fonte del paradigma 'networked targeting' e 'see beyond the border' del progetto.",
-    "dimensions": [
-      "customsRelevance",
-      "tradeExposure"
+    "url": "https://doi.org/10.55596/001c.159458",
+    "layers": [
+      "customs"
     ],
-    "verified": true
+    "verified": true,
+    "verification": "P",
+    "summary": "Visione strategica di border management AI basato sul loop OODA: mapping value-chain real-time, architetture federate multi-agenzia, explainability come requisito di primo livello; 'weaponization of economic interdependence'.",
+    "limitation": "Strategico, non tecnico: nessuna metodologia di fusione multimodale, nessun dato hazard ambientale, nessuna valutazione quantitativa."
   },
   {
     "ref": 12,
+    "key": "peffers_design_2007",
     "authors": "Peffers, K.; Tuunanen, T.; Rothenberger, M. A.; Chatterjee, S.",
     "year": 2007,
     "title": "A Design Science Research Methodology for Information Systems Research",
     "type": "journal",
-    "venue": "Journal of Management Information Systems, 24(3):45-77",
+    "venue": "Journal of Management Information Systems",
     "doi": "10.2753/MIS0742-1222240302",
-    "url": "https://www.tandfonline.com/doi/full/10.2753/MIS0742-1222240302",
-    "themeArea": "E",
+    "url": "https://doi.org/10.2753/MIS0742-1222240302",
+    "layers": [
+      "method"
+    ],
+    "verified": true,
+    "verification": "P",
     "summary": "DSRM: framework a 6 attività (identificazione problema, definizione obiettivi, design e sviluppo, dimostrazione, valutazione, comunicazione) per artefatti IS.",
-    "limitation": "Metodologico: nessuna prescrizione tecnica di dominio.",
-    "contribution": "Metodologia fondante della tesi, dal problema (falsi positivi, assenza di early-warning multimodale) alla valutazione dell'artefatto.",
-    "dimensions": [],
-    "verified": true
+    "limitation": "Metodologico: nessuna prescrizione tecnica di dominio."
   },
   {
     "ref": 13,
-    "authors": "van Maanen, N.; de Ruiter, M.; Jäger, W.; et al.",
+    "key": "van_maanen_bridging_2025",
+    "authors": "van Maanen, N.; de Ruiter, M.; Jäger, W.; Casartelli, V.; Ciurean, R.; Padrón-Fumero, N.; Daloz, A. S.; Geurts, D.; Gottardo, S.; Hochrainer-Stigler, S.; López Diez, A.; Díaz Pacheco, J.; Dorta Antequera, P.; Febles Arévalo, T.; García González, S.; Hernández-Martín, R.; Alvarez-Albelo, C.; Diaz-Hernandez, J. J.; Ma, L.; Monteleone, L.; Reiter, K.; Stolte, T.; Šakić Trogrlić, R.; Torresan, S.; Tatman, S.; Romero Manrique de Lara, D.; Hernández González, Y.; Ward, P. J.",
     "year": 2025,
     "title": "Bridging science and practice on multi-hazard risk drivers: stakeholder insights from five pilot studies in Europe",
     "type": "journal",
-    "venue": "Earth System Dynamics, 16(6):2295-2311",
+    "venue": "Earth System Dynamics",
     "doi": "10.5194/esd-16-2295-2025",
-    "url": "https://esd.copernicus.org/articles/16/2295/2025/",
-    "themeArea": "C",
-    "summary": "Interviste a stakeholder in 5 regioni europee: il problema principale del multi-hazard non è ambientale ma burocratico — la frammentazione istituzionale crea feedback loop con impatti a cascata.",
-    "limitation": "Focus su disaster risk, non doganale; nessun dato commerciale né illicit-trade.",
-    "contribution": "Insight cruciale: l'efficacia del sistema dipende dal modellare anche la risposta istituzionale che mitiga o amplifica il rischio.",
-    "dimensions": [
-      "customsRelevance",
-      "geophysicalClimate"
+    "url": "https://doi.org/10.5194/esd-16-2295-2025",
+    "layers": [
+      "trigger"
     ],
-    "verified": true
+    "verified": true,
+    "verification": "P",
+    "summary": "Interviste a stakeholder in 5 regioni europee: il problema principale del multi-hazard non è ambientale ma burocratico — la frammentazione istituzionale crea feedback loop con impatti a cascata.",
+    "limitation": "Focus su disaster risk, non doganale; nessun dato commerciale né illicit-trade."
   },
   {
     "ref": 14,
+    "key": "verschuur_systemic_2025",
     "authors": "Verschuur, J.; Lumma, J.; Hall, J. W.",
     "year": 2025,
     "title": "Systemic impacts of disruptions at maritime chokepoints",
     "type": "journal",
-    "venue": "Nature Communications, 16(1):10421",
+    "venue": "Nature Communications",
     "doi": "10.1038/s41467-025-65403-w",
-    "url": "https://www.nature.com/articles/s41467-025-65403-w",
-    "themeArea": "B",
-    "summary": "Framework multi-hazard quantitativo per i chokepoint marittimi: USD 192 miliardi/anno di commercio atteso interrotto (Stretto di Taiwan, Suez, Bab el-Mandeb), perdite USD 10.7 miliardi/anno + USD 3.4 miliardi di noli.",
-    "limitation": "Retrospettivo e scenario-based: nessun monitoraggio real-time, nessun ML/LLM; dice 'quanto siamo esposti', non come rilevare una disruption in corso.",
-    "contribution": "La prova quantitativa più forte che l'early-warning doganale deve incorporare segnali di hazard esterni.",
-    "dimensions": [
-      "tradeExposure",
-      "routeCriticality",
-      "eventSeverity"
+    "url": "https://doi.org/10.1038/s41467-025-65403-w",
+    "layers": [
+      "node",
+      "good"
     ],
-    "verified": true
+    "verified": true,
+    "verification": "P",
+    "summary": "Framework multi-hazard quantitativo per i chokepoint marittimi: USD 192 miliardi/anno di commercio atteso interrotto (Stretto di Taiwan, Suez, Bab el-Mandeb), perdite USD 10.7 miliardi/anno + USD 3.4 miliardi di noli.",
+    "limitation": "Retrospettivo e scenario-based: nessun monitoraggio real-time, nessun ML/LLM; dice 'quanto siamo esposti', non come rilevare una disruption in corso."
   },
   {
     "ref": 15,
+    "key": "vijayakumar_technology-centric_2025",
     "authors": "Vijayakumar, S.",
     "year": 2025,
     "title": "Technology-centric and Data-Driven Customs Risk Management for Supply Chain Security",
     "type": "journal",
-    "venue": "World Customs Journal, 19(1)",
+    "venue": "World Customs Journal",
     "doi": "10.55596/001c.131745",
-    "url": "https://www.worldcustomsjournal.org/article/131745-technology-centric-and-data-driven-customs-risk-management-for-supply-chain-security",
-    "themeArea": "A",
-    "summary": "Benchmark dell'esperienza doganale indiana: anomaly detection ML, network analysis delle relazioni tra trader, NLP per la verifica delle dichiarazioni; necessità di XAI per decisioni sotto scrutinio legale.",
-    "limitation": "Nessuna integrazione OSINT/weather/seismica real-time, nessuna fusione multimodale, approccio reattivo post-clearance.",
-    "contribution": "Conferma la necessità di spiegabilità nelle decisioni di targeting sotto scrutinio legale.",
-    "dimensions": [
-      "customsRelevance",
-      "sourceConfidence"
+    "url": "https://doi.org/10.55596/001c.131745",
+    "layers": [
+      "customs"
     ],
-    "verified": true
+    "verified": true,
+    "verification": "P",
+    "summary": "Benchmark dell'esperienza doganale indiana: anomaly detection ML, network analysis delle relazioni tra trader, NLP per la verifica delle dichiarazioni; necessità di XAI per decisioni sotto scrutinio legale.",
+    "limitation": "Nessuna integrazione OSINT/weather/seismica real-time, nessuna fusione multimodale, approccio reattivo post-clearance."
   },
   {
     "ref": 16,
-    "authors": "Ward, P. J.; Buijs, S. L.; Ciurean, R.; et al.",
+    "key": "ward_reducing_2026",
+    "authors": "Ward, P. J.; Buijs, S. L.; Ciurean, R.; Claassen, J. N.; Daniell, J.; De Polt, K.; Duncan, M.; Gottardo, S.; Hochrainer-Stigler, S.; Šakić Trogrlić, R.; Schlumberger, J.; Tiggeloven, T.; Torresan, S.; van Maanen, N.; Warren, A.; Álvarez Albelo, C. D.; Banks, V.; Blanz, B.; Casartelli, V.; Correa, J.; Crummy, J.; Daloz, A. S.; de Ruiter, M. C.; Díaz-Hernández, J. J.; Díaz-Pacheco, J.; Dorta Antequera, P.; Ferrario, D.; Geurts, D.; García-González, S.; Gill, J. C.; Hernández-Martín, R.; Jäger, W. S.; López-Díez, A.; Ma, L.; Mysiak, J.; Nguyen, D. N.; Padrón Fumero, N.; Petrescu, E.-C.; Reiter, K.; Sillmann, J.; Smale, L.; Stolte, T.",
     "year": 2026,
     "title": "Reducing risk together: moving towards a more holistic approach to multi-hazard and multi-risk assessment and management",
     "type": "journal",
-    "venue": "Natural Hazards and Earth System Sciences, 26(3):1325-1345",
+    "venue": "Natural Hazards and Earth System Sciences",
     "doi": "10.5194/nhess-26-1325-2026",
-    "url": "https://nhess.copernicus.org/articles/26/1325/2026/",
-    "themeArea": "C",
-    "summary": "Chiede un approccio più olistico alla valutazione e alla gestione del rischio multi-hazard e multi-risk e un linguaggio comune tra discipline.",
-    "limitation": "Nessun dominio doganale/commerciale; focus su disaster risk.",
-    "contribution": "Motiva le definizioni esplicite del modello a sei strati della tesi. Attenzione: non contiene la cifra dell'88% (che è di White et al. 2025) né l'affermazione che l'approccio multi-hazard migliori l'accuratezza.",
-    "dimensions": [
-      "eventSeverity",
-      "geophysicalClimate"
+    "url": "https://doi.org/10.5194/nhess-26-1325-2026",
+    "layers": [
+      "trigger"
     ],
-    "verified": true
+    "verified": true,
+    "verification": "P",
+    "summary": "Chiede un approccio più olistico alla valutazione e alla gestione del rischio multi-hazard e multi-risk e un linguaggio comune tra discipline.",
+    "limitation": "Nessun dominio doganale/commerciale; focus su disaster risk."
   },
   {
     "ref": 17,
+    "key": "yadav_who_2026",
     "authors": "Yadav, S.; Gajcin, J.; Miehling, E.; Daly, E.",
     "year": 2026,
     "title": "Who Sees the Risk? Stakeholder Conflicts and Explanatory Policies in LLM-based Risk Assessment",
-    "type": "report",
-    "venue": "IBM Research",
+    "type": "conference",
+    "venue": "Proceedings of the AAAI Conference on Artificial Intelligence (AAAI 2026)",
     "doi": null,
-    "url": "https://research.ibm.com/publications/who-sees-the-risk-stakeholder-conflicts-and-explanatory-policies-in-llm-based-risk-assessment",
-    "themeArea": "D",
-    "summary": "Framework stakeholder-grounded: LLM come 'giudice' che predice e spiega i rischi da prospettive multiple, generando spiegazioni a livello di policy dove emergono accordi/divergenze.",
-    "limitation": "Statico, solo tassonomie testuali di rischio, nessun dato multimodale real-time, nessun early-warning.",
-    "contribution": "Blueprint metodologico per il nostro modulo di reasoning LLM multi-stakeholder.",
-    "dimensions": [
-      "customsRelevance",
-      "sourceConfidence"
+    "url": "https://arxiv.org/abs/2511.03152",
+    "layers": [
+      "customs"
     ],
-    "verified": true
+    "verified": true,
+    "verification": "P",
+    "summary": "Framework stakeholder-grounded: LLM come 'giudice' che predice e spiega i rischi da prospettive multiple, generando spiegazioni a livello di policy dove emergono accordi/divergenze.",
+    "limitation": "Statico, solo tassonomie testuali di rischio, nessun dato multimodale real-time, nessun early-warning."
   },
   {
     "ref": 18,
+    "key": "zhou_synthetic_2023",
     "authors": "Zhou, J.; Zhang, Y.; Luo, Q.; Parker, A. G.; De Choudhury, M.",
     "year": 2023,
     "title": "Synthetic Lies: Understanding AI-Generated Misinformation and Evaluating Algorithmic and Human Solutions",
     "type": "conference",
-    "venue": "CHI '23 (ACM), doi 10.1145/3544548.3581318",
+    "venue": "Proceedings of the 2023 CHI Conference on Human Factors in Computing Systems (CHI '23)",
     "doi": "10.1145/3544548.3581318",
     "url": "https://doi.org/10.1145/3544548.3581318",
-    "themeArea": "D",
-    "summary": "La misinformazione generata da LLM (GPT-3) mostra pattern linguistici distinti che la rendono più credibile del contenuto umano; i rilevatori esistenti degradano nettamente sul testo AI.",
-    "limitation": "Solo testo, nessuna fusione multimodale, nessuna spiegabilità dei fallimenti di rilevamento.",
-    "contribution": "Valida l'architettura neuro-simbolica con vincoli Knowledge-Graph e corroborazione multi-fonte contro l'OSINT sintetico.",
-    "dimensions": [
-      "sourceConfidence"
+    "layers": [
+      "customs"
     ],
-    "verified": true
+    "verified": true,
+    "verification": "P",
+    "summary": "La misinformazione generata da LLM (GPT-3) mostra pattern linguistici distinti che la rendono più credibile del contenuto umano; i rilevatori esistenti degradano nettamente sul testo AI.",
+    "limitation": "Solo testo, nessuna fusione multimodale, nessuna spiegabilità dei fallimenti di rilevamento."
   },
   {
     "ref": 19,
+    "key": "white_multi_2025",
     "authors": "White, C. J.; Adnan, M. S. G.; Arosio, M.; Buller, S.; Cha, Y.; Ciurean, R.; Crummy, J. M.; Duncan, M.; Gill, J.; Kennedy, C.; Nobile, E.; Smale, L.; Ward, P. J.",
     "year": 2025,
     "title": "Review article: Towards multi-hazard and multi-risk indicators – a review and recommendations for development and implementation",
     "type": "journal",
-    "venue": "Natural Hazards and Earth System Sciences 25(11):4263–4281",
+    "venue": "Natural Hazards and Earth System Sciences",
     "doi": "10.5194/nhess-25-4263-2025",
     "url": "https://doi.org/10.5194/nhess-25-4263-2025",
-    "themeArea": "C",
-    "summary": "Revisione sistematica di 192 pubblicazioni su indicatori multi-hazard e multi-risk: l'88% riguarda indicatori di pericolo e non di rischio, e solo il 20% integra pericolo, vulnerabilità e rischio o impatto.",
-    "limitation": "Dominio del rischio di disastri, non doganale.",
-    "contribution": "È la fonte corretta dell'88%: un conteggio di eventi vicino a un nodo è un indicatore di pericolo, non ancora di rischio; integrare la vulnerabilità è ciò che la letteratura più spesso omette.",
-    "dimensions": [
-      "geophysicalClimate",
-      "eventSeverity"
+    "layers": [
+      "trigger"
     ],
-    "verified": true
+    "verified": true,
+    "verification": "T",
+    "summary": "Revisione sistematica di 192 pubblicazioni su indicatori multi-hazard e multi-risk: l'88% riguarda indicatori di pericolo e non di rischio, e solo il 20% integra pericolo, vulnerabilità e rischio o impatto.",
+    "limitation": "Dominio del rischio di disastri, non doganale."
+  },
+  {
+    "ref": 20,
+    "key": "hevner_design_2004",
+    "authors": "Hevner, A. R.; March, S. T.; Park, J.; Ram, S.",
+    "year": 2004,
+    "title": "Design Science in Information Systems Research",
+    "type": "journal",
+    "venue": "MIS Quarterly",
+    "doi": null,
+    "url": "",
+    "layers": [
+      "method"
+    ],
+    "verified": true,
+    "verification": "P",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 21,
+    "key": "bird_updated_2003",
+    "authors": "Bird, P.",
+    "year": 2003,
+    "title": "An updated digital model of plate boundaries",
+    "type": "journal",
+    "venue": "Geochemistry, Geophysics, Geosystems",
+    "doi": "10.1029/2001GC000252",
+    "url": "https://doi.org/10.1029/2001GC000252",
+    "layers": [
+      "trigger"
+    ],
+    "verified": true,
+    "verification": "P",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 22,
+    "key": "isc_gem_2026",
+    "authors": "International Seismological Centre",
+    "year": 2026,
+    "title": "ISC-GEM Earthquake Catalogue",
+    "type": "institutional",
+    "venue": "",
+    "doi": "10.31905/D808B825",
+    "url": "https://doi.org/10.31905/D808B825",
+    "layers": [
+      "trigger"
+    ],
+    "verified": true,
+    "verification": "P",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 23,
+    "key": "storchak_public_2013",
+    "authors": "Storchak, D. A.; Di Giacomo, D.; Bondár, I.; Engdahl, E. R.; Harris, J.; Lee, W. H. K.; Villaseñor, A.; Bormann, P.",
+    "year": 2013,
+    "title": "Public Release of the ISC-GEM Global Instrumental Earthquake Catalogue (1900–2009)",
+    "type": "journal",
+    "venue": "Seismological Research Letters",
+    "doi": "10.1785/0220130034",
+    "url": "https://doi.org/10.1785/0220130034",
+    "layers": [
+      "trigger"
+    ],
+    "verified": true,
+    "verification": "P",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 24,
+    "key": "di_giacomo_isc-gem_2018",
+    "authors": "Di Giacomo, D.; Engdahl, E. R.; Storchak, D. A.",
+    "year": 2018,
+    "title": "The ISC-GEM Earthquake Catalogue (1904–2014): status after the Extension Project",
+    "type": "journal",
+    "venue": "Earth System Science Data",
+    "doi": "10.5194/essd-10-1877-2018",
+    "url": "https://doi.org/10.5194/essd-10-1877-2018",
+    "layers": [
+      "trigger"
+    ],
+    "verified": true,
+    "verification": "P",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 25,
+    "key": "gvp_votw_2026",
+    "authors": "Global Volcanism Program",
+    "year": 2026,
+    "title": "Volcanoes of the World (v. 5.4.0)",
+    "type": "institutional",
+    "venue": "Smithsonian Institution",
+    "doi": "10.5479/si.GVP.VOTW5-2026.5.4",
+    "url": "https://doi.org/10.5479/si.GVP.VOTW5-2026.5.4",
+    "layers": [
+      "trigger"
+    ],
+    "verified": true,
+    "verification": "T",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 26,
+    "key": "emdat_2026",
+    "authors": "Centre for Research on the Epidemiology of Disasters (CRED)",
+    "year": 2026,
+    "title": "EM-DAT: The International Disaster Database",
+    "type": "institutional",
+    "venue": "",
+    "doi": null,
+    "url": "https://www.emdat.be",
+    "layers": [
+      "trigger"
+    ],
+    "verified": true,
+    "verification": "T",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 27,
+    "key": "usgs_comcat_2017",
+    "authors": "U.S. Geological Survey, Earthquake Hazards Program",
+    "year": 2017,
+    "title": "Advanced National Seismic System (ANSS) Comprehensive Catalog of Earthquake Events and Products",
+    "type": "institutional",
+    "venue": "",
+    "doi": "10.5066/F7MS3QZH",
+    "url": "https://doi.org/10.5066/F7MS3QZH",
+    "layers": [
+      "trigger"
+    ],
+    "verified": true,
+    "verification": "P",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 28,
+    "key": "sillitoe_porphyry_2010",
+    "authors": "Sillitoe, R. H.",
+    "year": 2010,
+    "title": "Porphyry Copper Systems",
+    "type": "journal",
+    "venue": "Economic Geology",
+    "doi": "10.2113/gsecongeo.105.1.3",
+    "url": "https://doi.org/10.2113/gsecongeo.105.1.3",
+    "layers": [
+      "node"
+    ],
+    "verified": true,
+    "verification": "P",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 29,
+    "key": "choi_geochemical_2021",
+    "authors": "Choi, Y.; Lee, I.; Moon, I.",
+    "year": 2021,
+    "title": "Geochemical and Mineralogical Characteristics of Garnierite From the Morowali Ni-Laterite Deposit in Sulawesi, Indonesia",
+    "type": "journal",
+    "venue": "Frontiers in Earth Science",
+    "doi": "10.3389/feart.2021.761748",
+    "url": "https://doi.org/10.3389/feart.2021.761748",
+    "layers": [
+      "node"
+    ],
+    "verified": true,
+    "verification": "P",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 30,
+    "key": "usgs_mcs_2026",
+    "authors": "U.S. Geological Survey",
+    "year": 2026,
+    "title": "Mineral Commodity Summaries 2026",
+    "type": "institutional",
+    "venue": "",
+    "doi": null,
+    "url": "https://pubs.usgs.gov/periodicals/mcs2026/",
+    "layers": [
+      "node",
+      "good"
+    ],
+    "verified": true,
+    "verification": "P",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 31,
+    "key": "crma_2024",
+    "authors": "Parliament, E.; Union, C. o. t. E.",
+    "year": 2024,
+    "title": "Regulation (EU) 2024/1252 of 11 April 2024 establishing a framework for ensuring a secure and sustainable supply of critical raw materials (Critical Raw Materials Act)",
+    "type": "institutional",
+    "venue": "Official Journal of the European Union, L series",
+    "doi": null,
+    "url": "",
+    "layers": [
+      "supply",
+      "modulator"
+    ],
+    "verified": true,
+    "verification": "P",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 32,
+    "key": "taipei_times_2024",
+    "authors": "Wang, L.",
+    "year": 2024,
+    "title": "Chip companies report limited damage from earthquake",
+    "type": "report",
+    "venue": "Taipei Times, 4 April 2024",
+    "doi": null,
+    "url": "",
+    "layers": [
+      "node",
+      "good"
+    ],
+    "verified": true,
+    "verification": "P",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 33,
+    "key": "unctad_rmt_2025",
+    "authors": "UNCTAD",
+    "year": 2025,
+    "title": "Review of Maritime Transport 2025: Staying the course in turbulent waters",
+    "type": "institutional",
+    "venue": "United Nations Conference on Trade and Development, Geneva (UNCTAD/RMT/2025)",
+    "doi": null,
+    "url": "",
+    "layers": [
+      "node",
+      "good"
+    ],
+    "verified": true,
+    "verification": "P",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 34,
+    "key": "devita_mar_2024",
+    "authors": "De Vita, E.; Visconti, A. C.",
+    "year": 2024,
+    "title": "Crisi nel Mar Rosso e rischi nelle forniture: un'analisi settoriale dell'import italiano",
+    "type": "report",
+    "venue": "Intesa Sanpaolo, Direzione Studi e Ricerche",
+    "doi": null,
+    "url": "",
+    "layers": [
+      "node",
+      "good"
+    ],
+    "verified": true,
+    "verification": "T",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 35,
+    "key": "srm_suez_2023",
+    "authors": "SRM – Studi e Ricerche per il Mezzogiorno; Alexbank",
+    "year": 2023,
+    "title": "Rapporto sul Canale di Suez",
+    "type": "institutional",
+    "venue": "Intesa Sanpaolo, press summary of 17 April 2023",
+    "doi": null,
+    "url": "",
+    "layers": [
+      "node",
+      "good"
+    ],
+    "verified": true,
+    "verification": "P",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 36,
+    "key": "jrc_rmis_2024",
+    "authors": "European Commission, Joint Research Centre",
+    "year": 2024,
+    "title": "Critical and strategic materials",
+    "type": "institutional",
+    "venue": "Raw Materials Information System (RMIS)",
+    "doi": null,
+    "url": "",
+    "layers": [
+      "supply",
+      "modulator"
+    ],
+    "verified": true,
+    "verification": "P",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 37,
+    "key": "varas_strengthening_2021",
+    "authors": "Varas, A.; Varadarajan, R.; Goodrich, J.; Yinug, F.",
+    "year": 2021,
+    "title": "Strengthening the Global Semiconductor Supply Chain in an Uncertain Era",
+    "type": "report",
+    "venue": "Boston Consulting Group and Semiconductor Industry Association",
+    "doi": null,
+    "url": "",
+    "layers": [
+      "node",
+      "good"
+    ],
+    "verified": true,
+    "verification": "T",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 38,
+    "key": "ec_chips_2022",
+    "authors": "European Commission",
+    "year": 2022,
+    "title": "A Chips Act for Europe",
+    "type": "institutional",
+    "venue": "Communication COM(2022) 45 final, Brussels, 8 February 2022",
+    "doi": null,
+    "url": "",
+    "layers": [
+      "node",
+      "good"
+    ],
+    "verified": true,
+    "verification": "P",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 39,
+    "key": "silver_ophiolite_1983",
+    "authors": "Silver, E. A.; McCaffrey, R.; Joyodiwiryo, Y.; Stevens, S. H.",
+    "year": 1983,
+    "title": "Ophiolite emplacement by collision between the Sula Platform and the Sulawesi Island Arc, Indonesia",
+    "type": "journal",
+    "venue": "Journal of Geophysical Research: Solid Earth",
+    "doi": "10.1029/JB088iB11p09419",
+    "url": "https://doi.org/10.1029/JB088iB11p09419",
+    "layers": [
+      "node"
+    ],
+    "verified": true,
+    "verification": "P",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 40,
+    "key": "hall_neogene_2000",
+    "authors": "Hall, R.; Wilson, M. E. J.",
+    "year": 2000,
+    "title": "Neogene sutures in eastern Indonesia",
+    "type": "journal",
+    "venue": "Journal of Asian Earth Sciences",
+    "doi": "10.1016/S1367-9120(00)00040-7",
+    "url": "https://doi.org/10.1016/S1367-9120(00)00040-7",
+    "layers": [
+      "node"
+    ],
+    "verified": true,
+    "verification": "P",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 41,
+    "key": "konopka_ni-co_2022",
+    "authors": "Konopka, G.; Szamałek, K.; Zglinicki, K.",
+    "year": 2022,
+    "title": "Ni-Co Bearing Laterites from Halmahera Island (Indonesia)",
+    "type": "journal",
+    "venue": "Applied Sciences",
+    "doi": "10.3390/app12157586",
+    "url": "https://doi.org/10.3390/app12157586",
+    "layers": [
+      "node"
+    ],
+    "verified": true,
+    "verification": "P",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 42,
+    "key": "di_giacomo_isc-gem_2015",
+    "authors": "Di Giacomo, D.; Bondár, I.; Storchak, D. A.; Engdahl, E. R.; Bormann, P.; Harris, J.",
+    "year": 2015,
+    "title": "ISC-GEM: Global Instrumental Earthquake Catalogue (1900–2009), III. Re-computed MS and mb, proxy MW, final magnitude composition and completeness assessment",
+    "type": "journal",
+    "venue": "Physics of the Earth and Planetary Interiors",
+    "doi": "10.1016/j.pepi.2014.06.005",
+    "url": "https://doi.org/10.1016/j.pepi.2014.06.005",
+    "layers": [
+      "trigger"
+    ],
+    "verified": true,
+    "verification": "P",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 43,
+    "key": "chung_source_1976",
+    "authors": "Chung, W.-Y.; Kanamori, H.",
+    "year": 1976,
+    "title": "Source process and tectonic implications of the Spanish deep-focus earthquake of March 29, 1954",
+    "type": "journal",
+    "venue": "Physics of the Earth and Planetary Interiors",
+    "doi": "10.1016/0031-9201(76)90073-X",
+    "url": "https://doi.org/10.1016/0031-9201(76)90073-X",
+    "layers": [
+      "trigger"
+    ],
+    "verified": true,
+    "verification": "P",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 44,
+    "key": "ec_swd_dependencies_2021",
+    "authors": "European Commission",
+    "year": 2021,
+    "title": "Strategic dependencies and capacities",
+    "type": "institutional",
+    "venue": "Commission Staff Working Document SWD(2021) 352 final, Brussels, 5 May 2021",
+    "doi": null,
+    "url": "",
+    "layers": [
+      "supply",
+      "modulator"
+    ],
+    "verified": true,
+    "verification": "P",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 45,
+    "key": "eurostat_comext_2026",
+    "authors": "Eurostat",
+    "year": 2026,
+    "title": "International trade in goods, detailed data (Comext), dataset DS-045409",
+    "type": "institutional",
+    "venue": "",
+    "doi": null,
+    "url": "",
+    "layers": [
+      "node",
+      "good"
+    ],
+    "verified": true,
+    "verification": "API",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 46,
+    "key": "adm_libro_blu_2022",
+    "authors": "Agenzia delle Dogane e dei Monopoli",
+    "year": 2023,
+    "title": "Libro Blu 2022. Relazione",
+    "type": "institutional",
+    "venue": "ADM, Rome",
+    "doi": null,
+    "url": "",
+    "layers": [
+      "customs"
+    ],
+    "verified": true,
+    "verification": "S",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 47,
+    "key": "adm_circolare_19_2025",
+    "authors": "Agenzia delle Dogane e dei Monopoli",
+    "year": 2025,
+    "title": "Circolare n. 19 del 29 luglio 2025",
+    "type": "institutional",
+    "venue": "ADM, Rome",
+    "doi": null,
+    "url": "",
+    "layers": [
+      "customs"
+    ],
+    "verified": true,
+    "verification": "S",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 48,
+    "key": "eca_customs_2021",
+    "authors": "European Court of Auditors",
+    "year": 2021,
+    "title": "Customs controls: insufficient harmonisation hampers EU financial interests",
+    "type": "institutional",
+    "venue": "Special report 04/2021",
+    "doi": null,
+    "url": "",
+    "layers": [
+      "customs"
+    ],
+    "verified": true,
+    "verification": "P",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 49,
+    "key": "notteboom_red_2025",
+    "authors": "Notteboom, T.; Pallis, A.; Rodrigue, J.-P.",
+    "year": 2025,
+    "title": "Impact of the Red Sea Crisis on Port Arrivals",
+    "type": "report",
+    "venue": "Port Economics, Management and Policy (online edition), chapter 11.1",
+    "doi": null,
+    "url": "",
+    "layers": [
+      "node",
+      "good"
+    ],
+    "verified": true,
+    "verification": "P",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 50,
+    "key": "lloyds_list_2024",
+    "authors": "Lloyd's List",
+    "year": 2024,
+    "title": "Red Sea rerouting hits east Mediterranean transhipment hubs",
+    "type": "institutional",
+    "venue": "Lloyd's List, 20 March 2024",
+    "doi": null,
+    "url": "",
+    "layers": [
+      "node",
+      "good"
+    ],
+    "verified": true,
+    "verification": "P",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 51,
+    "key": "saltelli_global_2008",
+    "authors": "Saltelli, A.; Ratto, M.; Andres, T.; Campolongo, F.; Cariboni, J.; Gatelli, D.; Saisana, M.; Tarantola, S.",
+    "year": 2008,
+    "title": "Global Sensitivity Analysis. The Primer",
+    "type": "report",
+    "venue": "John Wiley & Sons",
+    "doi": "10.1002/9780470725184",
+    "url": "https://doi.org/10.1002/9780470725184",
+    "layers": [
+      "method"
+    ],
+    "verified": true,
+    "verification": "P",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 52,
+    "key": "saisana_uncertainty_2005",
+    "authors": "Saisana, M.; Saltelli, A.; Tarantola, S.",
+    "year": 2005,
+    "title": "Uncertainty and sensitivity analysis techniques as tools for the quality assessment of composite indicators",
+    "type": "journal",
+    "venue": "Journal of the Royal Statistical Society: Series A (Statistics in Society)",
+    "doi": "10.1111/j.1467-985X.2005.00350.x",
+    "url": "https://doi.org/10.1111/j.1467-985X.2005.00350.x",
+    "layers": [
+      "method"
+    ],
+    "verified": true,
+    "verification": "P",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 53,
+    "key": "chpl_2024",
+    "authors": "European Commission",
+    "year": 2024,
+    "title": "List of Common High Priority Items (Version of February 2024)",
+    "type": "institutional",
+    "venue": "",
+    "doi": null,
+    "url": "",
+    "layers": [
+      "supply",
+      "modulator"
+    ],
+    "verified": true,
+    "verification": "P",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 54,
+    "key": "adsp_2025",
+    "authors": "Autorità di Sistema Portuale del Mare Adriatico Meridionale",
+    "year": 2025,
+    "title": "AdSPMAM: i porti dell'Adriatico meridionale tengono il passo",
+    "type": "institutional",
+    "venue": "Press release, Bari, 7 November 2025",
+    "doi": null,
+    "url": "",
+    "layers": [
+      "customs"
+    ],
+    "verified": true,
+    "verification": "P",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 55,
+    "key": "gardner_knopoff_1974",
+    "authors": "Gardner, J. K.; Knopoff, L.",
+    "year": 1974,
+    "title": "Is the sequence of earthquakes in Southern California, with aftershocks removed, Poissonian?",
+    "type": "journal",
+    "venue": "Bulletin of the Seismological Society of America",
+    "doi": null,
+    "url": "",
+    "layers": [
+      "trigger"
+    ],
+    "verified": true,
+    "verification": "P",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 56,
+    "key": "van_stiphout_2012",
+    "authors": "van Stiphout, T.; Zhuang, J.; Marsan, D.",
+    "year": 2012,
+    "title": "Seismicity declustering",
+    "type": "report",
+    "venue": "Community Online Resource for Statistical Seismicity Analysis (CORSSA)",
+    "doi": "10.5078/corssa-52382934",
+    "url": "https://doi.org/10.5078/corssa-52382934",
+    "layers": [
+      "trigger"
+    ],
+    "verified": true,
+    "verification": "P",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 57,
+    "key": "luen_stark_2012",
+    "authors": "Luen, B.; Stark, P. B.",
+    "year": 2012,
+    "title": "Poisson tests of declustered catalogues",
+    "type": "journal",
+    "venue": "Geophysical Journal International",
+    "doi": "10.1111/j.1365-246X.2012.05400.x",
+    "url": "https://doi.org/10.1111/j.1365-246X.2012.05400.x",
+    "layers": [
+      "trigger"
+    ],
+    "verified": true,
+    "verification": "P",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 58,
+    "key": "wiemer_wyss_2000",
+    "authors": "Wiemer, S.; Wyss, M.",
+    "year": 2000,
+    "title": "Minimum Magnitude of Completeness in Earthquake Catalogs: Examples from Alaska, the Western United States, and Japan",
+    "type": "journal",
+    "venue": "Bulletin of the Seismological Society of America",
+    "doi": "10.1785/0119990114",
+    "url": "https://doi.org/10.1785/0119990114",
+    "layers": [
+      "trigger"
+    ],
+    "verified": true,
+    "verification": "T",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 59,
+    "key": "woessner_wiemer_2005",
+    "authors": "Woessner, J.; Wiemer, S.",
+    "year": 2005,
+    "title": "Assessing the quality of earthquake catalogues: Estimating the magnitude of completeness and its uncertainty",
+    "type": "journal",
+    "venue": "Bulletin of the Seismological Society of America",
+    "doi": "10.1785/0120040007",
+    "url": "https://doi.org/10.1785/0120040007",
+    "layers": [
+      "trigger"
+    ],
+    "verified": true,
+    "verification": "T",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 60,
+    "key": "weichert_1980",
+    "authors": "Weichert, D. H.",
+    "year": 1980,
+    "title": "Estimation of the earthquake recurrence parameters for unequal observation periods for different magnitudes",
+    "type": "journal",
+    "venue": "Bulletin of the Seismological Society of America",
+    "doi": null,
+    "url": "",
+    "layers": [
+      "trigger"
+    ],
+    "verified": true,
+    "verification": "T",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 61,
+    "key": "allen_intensity_2012",
+    "authors": "Allen, T. I.; Wald, D. J.; Worden, C. B.",
+    "year": 2012,
+    "title": "Intensity attenuation for active crustal regions",
+    "type": "journal",
+    "venue": "Journal of Seismology",
+    "doi": "10.1007/s10950-012-9278-7",
+    "url": "https://doi.org/10.1007/s10950-012-9278-7",
+    "layers": [
+      "trigger"
+    ],
+    "verified": true,
+    "verification": "T",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 62,
+    "key": "wood_neumann_1931",
+    "authors": "Wood, H. O.; Neumann, F.",
+    "year": 1931,
+    "title": "Modified Mercalli intensity scale of 1931",
+    "type": "journal",
+    "venue": "Bulletin of the Seismological Society of America",
+    "doi": null,
+    "url": "",
+    "layers": [
+      "trigger"
+    ],
+    "verified": true,
+    "verification": "P",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 63,
+    "key": "newhall_self_1982",
+    "authors": "Newhall, C. G.; Self, S.",
+    "year": 1982,
+    "title": "The volcanic explosivity index (VEI): an estimate of explosive magnitude for historical volcanism",
+    "type": "journal",
+    "venue": "Journal of Geophysical Research: Oceans",
+    "doi": "10.1029/JC087iC02p01231",
+    "url": "https://doi.org/10.1029/JC087iC02p01231",
+    "layers": [
+      "trigger"
+    ],
+    "verified": true,
+    "verification": "P",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 64,
+    "key": "brown_population_2015",
+    "authors": "Brown, S. K.; Auker, M. R.; Sparks, R. S. J.",
+    "year": 2015,
+    "title": "Populations around Holocene volcanoes and development of a Population Exposure Index",
+    "type": "conference",
+    "venue": "Global Volcanic Hazards and Risk",
+    "doi": "10.1017/CBO9781316276273.006",
+    "url": "https://doi.org/10.1017/CBO9781316276273.006",
+    "layers": [
+      "trigger"
+    ],
+    "verified": true,
+    "verification": "P",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 65,
+    "key": "openquake_engine",
+    "authors": "GEM Foundation",
+    "year": 2026,
+    "title": "OpenQuake Engine and Hazard Modeller's Toolkit, source code",
+    "type": "institutional",
+    "venue": "",
+    "doi": null,
+    "url": "https://github.com/gem/oq-engine",
+    "layers": [
+      "trigger"
+    ],
+    "verified": true,
+    "verification": "P",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 66,
+    "key": "ahlenius_pb2002_2014",
+    "authors": "Ahlenius, H.",
+    "year": 2014,
+    "title": "World tectonic plates and boundaries: a conversion of the PB2002 model of Bird (2003)",
+    "type": "report",
+    "venue": "",
+    "doi": null,
+    "url": "https://github.com/fraxen/tectonicplates",
+    "layers": [
+      "trigger"
+    ],
+    "verified": true,
+    "verification": "P",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 67,
+    "key": "natural_earth",
+    "authors": "Natural Earth",
+    "year": 2026,
+    "title": "Natural Earth vector data, 1:50m land polygons",
+    "type": "institutional",
+    "venue": "",
+    "doi": null,
+    "url": "https://www.naturalearthdata.com",
+    "layers": [
+      "trigger"
+    ],
+    "verified": true,
+    "verification": "P",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 68,
+    "key": "eia_hormuz_2025",
+    "authors": "Dunn, C.; Barden, J.",
+    "year": 2025,
+    "title": "Amid regional conflict, the Strait of Hormuz remains critical oil chokepoint",
+    "type": "report",
+    "venue": "U.S. Energy Information Administration, Today in Energy, 16 June 2025",
+    "doi": null,
+    "url": "",
+    "layers": [
+      "node",
+      "good"
+    ],
+    "verified": true,
+    "verification": "P",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 69,
+    "key": "wco_hs_2022",
+    "authors": "World Customs Organization",
+    "year": 2022,
+    "title": "Harmonized System Nomenclature, 2022 edition",
+    "type": "institutional",
+    "venue": "WCO, Brussels",
+    "doi": null,
+    "url": "",
+    "layers": [
+      "node",
+      "good"
+    ],
+    "verified": true,
+    "verification": "P",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 70,
+    "key": "eurostat_comext_ch3_2026",
+    "authors": "Eurostat",
+    "year": 2026,
+    "title": "International trade in goods, detailed data (Comext), dataset DS-045409: EU and Italian imports by partner, 2019–2024",
+    "type": "institutional",
+    "venue": "",
+    "doi": null,
+    "url": "",
+    "layers": [
+      "node",
+      "good"
+    ],
+    "verified": true,
+    "verification": "API",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 71,
+    "key": "reg_2025_1227",
+    "authors": "Parliament, E.; Union, C. o. t. E.",
+    "year": 2025,
+    "title": "Regulation (EU) 2025/1227 of 17 June 2025 on the modification of customs duties applicable to imports of certain goods originating in or exported from the Russian Federation and the Republic of Belarus",
+    "type": "institutional",
+    "venue": "Official Journal of the European Union, L series, 20.6.2025",
+    "doi": null,
+    "url": "",
+    "layers": [
+      "supply",
+      "modulator"
+    ],
+    "verified": true,
+    "verification": "T",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 72,
+    "key": "council_cereals_2024",
+    "authors": "Council of the European Union",
+    "year": 2024,
+    "title": "Council sets higher tariffs on Russian and Belarusian grain products",
+    "type": "institutional",
+    "venue": "Press release, 30 May 2024 (as republished by the EEAS)",
+    "doi": null,
+    "url": "",
+    "layers": [
+      "supply",
+      "modulator"
+    ],
+    "verified": true,
+    "verification": "P",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 73,
+    "key": "ucdp_ged_2026",
+    "authors": "Uppsala Conflict Data Program",
+    "year": 2026,
+    "title": "UCDP Georeferenced Event Dataset (GED), global version 26.1",
+    "type": "institutional",
+    "venue": "Department of Peace and Conflict Research, Uppsala University",
+    "doi": null,
+    "url": "",
+    "layers": [
+      "trigger"
+    ],
+    "verified": true,
+    "verification": "P",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 74,
+    "key": "era5_cds",
+    "authors": "Copernicus Climate Change Service",
+    "year": 2026,
+    "title": "ERA5 hourly data on single levels from 1940 to present",
+    "type": "institutional",
+    "venue": "Climate Data Store",
+    "doi": null,
+    "url": "",
+    "layers": [
+      "trigger"
+    ],
+    "verified": true,
+    "verification": "P",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 75,
+    "key": "gdacs_2026",
+    "authors": "GDACS",
+    "year": 2026,
+    "title": "Global Disaster Alert and Coordination System: overview",
+    "type": "institutional",
+    "venue": "United Nations and European Commission",
+    "doi": null,
+    "url": "",
+    "layers": [
+      "trigger"
+    ],
+    "verified": true,
+    "verification": "P",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 76,
+    "key": "emsc_2026",
+    "authors": "European-Mediterranean Seismological Centre",
+    "year": 2026,
+    "title": "EMSC: earthquake information",
+    "type": "institutional",
+    "venue": "",
+    "doi": null,
+    "url": "",
+    "layers": [
+      "trigger"
+    ],
+    "verified": true,
+    "verification": "P",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 77,
+    "key": "gdelt_data_2026",
+    "authors": "The GDELT Project",
+    "year": 2026,
+    "title": "GDELT 2.0: data",
+    "type": "institutional",
+    "venue": "",
+    "doi": null,
+    "url": "",
+    "layers": [
+      "trigger"
+    ],
+    "verified": true,
+    "verification": "P",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 78,
+    "key": "mignan_woessner_2012",
+    "authors": "Mignan, A.; Woessner, J.",
+    "year": 2012,
+    "title": "Estimating the magnitude of completeness for earthquake catalogs",
+    "type": "report",
+    "venue": "Community Online Resource for Statistical Seismicity Analysis (CORSSA)",
+    "doi": "10.5078/corssa-00180805",
+    "url": "https://doi.org/10.5078/corssa-00180805",
+    "layers": [
+      "trigger"
+    ],
+    "verified": true,
+    "verification": "P",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 79,
+    "key": "reg_2021_2012",
+    "authors": "European Commission",
+    "year": 2021,
+    "title": "Commission Implementing Regulation (EU) 2021/2012 imposing a definitive anti-dumping duty and definitively collecting the provisional duty imposed on imports of certain cold-rolled flat products of stainless steel originating in India and Indonesia",
+    "type": "institutional",
+    "venue": "Official Journal of the European Union, L series",
+    "doi": null,
+    "url": "",
+    "layers": [
+      "supply",
+      "modulator"
+    ],
+    "verified": true,
+    "verification": "P",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 80,
+    "key": "wto_ds592",
+    "authors": "World Trade Organization",
+    "year": 2022,
+    "title": "DS592: Indonesia – Measures Relating to Raw Materials",
+    "type": "institutional",
+    "venue": "Dispute settlement, case page",
+    "doi": null,
+    "url": "",
+    "layers": [
+      "supply",
+      "modulator"
+    ],
+    "verified": true,
+    "verification": "P",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 81,
+    "key": "emdat_criteria_2026",
+    "authors": "Centre for Research on the Epidemiology of Disasters (CRED)",
+    "year": 2026,
+    "title": "EM-DAT documentation: Entry criteria",
+    "type": "institutional",
+    "venue": "UCLouvain, Brussels",
+    "doi": null,
+    "url": "",
+    "layers": [
+      "trigger"
+    ],
+    "verified": true,
+    "verification": "P",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 82,
+    "key": "reg_2025_395",
+    "authors": "Council of the European Union",
+    "year": 2025,
+    "title": "Council Regulation (EU) 2025/395 of 24 February 2025 amending Regulation (EU) No 833/2014 concerning restrictive measures in view of Russia's actions destabilising the situation in Ukraine",
+    "type": "institutional",
+    "venue": "Official Journal of the European Union, L series, 24.2.2025",
+    "doi": null,
+    "url": "",
+    "layers": [
+      "supply",
+      "modulator"
+    ],
+    "verified": true,
+    "verification": "T",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 83,
+    "key": "tsmc_ar_2025",
+    "authors": "Taiwan Semiconductor Manufacturing Company",
+    "year": 2026,
+    "title": "2025 Annual Report",
+    "type": "institutional",
+    "venue": "TSMC, Hsinchu",
+    "doi": null,
+    "url": "",
+    "layers": [
+      "node",
+      "good"
+    ],
+    "verified": true,
+    "verification": "T",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 84,
+    "key": "reg_833_consolidated_2026",
+    "authors": "Council of the European Union",
+    "year": 2026,
+    "title": "Regolamento (UE) n. 833/2014 del Consiglio concernente misure restrittive in considerazione delle azioni della Russia che destabilizzano la situazione in Ucraina, testo consolidato",
+    "type": "institutional",
+    "venue": "EUR-Lex, CELEX 02014R0833-20260724",
+    "doi": null,
+    "url": "",
+    "layers": [
+      "supply",
+      "modulator"
+    ],
+    "verified": true,
+    "verification": "T",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 85,
+    "key": "reg_2025_2033",
+    "authors": "Council of the European Union",
+    "year": 2025,
+    "title": "Council Regulation (EU) 2025/2033 of 23 October 2025 amending Regulation (EU) No 833/2014",
+    "type": "institutional",
+    "venue": "Official Journal of the European Union, L series, 23.10.2025",
+    "doi": null,
+    "url": "",
+    "layers": [
+      "supply",
+      "modulator"
+    ],
+    "verified": true,
+    "verification": "P",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 86,
+    "key": "taric_2026",
+    "authors": "European Commission, DG TAXUD",
+    "year": 2026,
+    "title": "TARIC: integrated tariff of the European Union, measures by goods code",
+    "type": "institutional",
+    "venue": "Extract of 5 October 2026",
+    "doi": null,
+    "url": "",
+    "layers": [
+      "node",
+      "good"
+    ],
+    "verified": true,
+    "verification": "API",
+    "summary": "",
+    "limitation": ""
   }
 ];

@@ -104,11 +104,12 @@ describe('SDK publish workflows', () => {
 });
 
 describe('SDK discovery surfaces', () => {
-  it('llms.txt advertises every registry package', () => {
+  // Risk Sentinel fork (13/10/2026): public/llms.txt describes this deployment,
+  // which offers no SDK; it must not advertise the upstream packages as its own.
+  it('llms.txt does not advertise the upstream SDK packages as this deployment', () => {
     const llms = read('public/llms.txt');
-    assert.match(llms, /pypi\.org\/project\/worldmonitor-sdk/);
-    assert.match(llms, /rubygems\.org\/gems\/worldmonitor/);
-    assert.match(llms, /pkg\.go\.dev\/github\.com\/koala73\/worldmonitor\/sdk\/go/);
+    assert.doesNotMatch(llms, /pypi\.org\/project\/worldmonitor-sdk/);
+    assert.match(llms, /no SDK/);
   });
 
   it('api/llms.txt advertises the SDK surface', () => {

@@ -1,15 +1,16 @@
 /**
  * Research — academic workbench.
  *
- * Views: Bibliografia · Copertura · Novità accademiche (WIP) · Call for papers
- * (WIP) · Zotero · Note · Tesi. Independent application (shared shell only);
+ * Views: Bibliografia · Copertura · Novità accademiche (WIP) · Conferenze
+ * (WIP) · Zotero · Note. The bibliography is generated from the thesis
+ * repository and classified by the layers of the thesis model (layers.ts). Independent application (shared shell only);
  * the state (notes, reading workflow, enrichment overrides, imports) is
  * persisted per user through /api/prefs/research.
  */
 
 import { escapeHtml } from '@/utils/sanitize';
 import type { AppWorkspace } from '../types';
-import { CALLS_UPDATED_AT, callsForThemes, daysUntil } from './calls';
+import { CALL_TOPICS, CALLS_UPDATED_AT, callsForThemes, daysUntil } from './calls';
 import {
   citationKey,
   formatApa,
@@ -18,12 +19,7 @@ import {
   toCsv,
   toRisCollection,
 } from './citations';
-import {
-  computeDimensionCoverage,
-  computeThemeDistribution,
-  computeTypeDistribution,
-  computeYearHistogram,
-} from './coverage';
+import { computeLayerDistribution, computeTypeDistribution, computeYearHistogram } from './coverage';
 import { matchesResearchQuery, parseResearchQuery, sortSources, type SortDirection, type SortKey } from './filters';
 import { assignRefs, parseBibliography } from './importers';
 import {
@@ -38,24 +34,19 @@ import {
   type ResearchState,
 } from './model';
 import { loadResearchState, scheduleResearchStateSave } from './state';
-import { generateThesisLatex, generateThesisMarkdown } from './thesis';
+import {
+  computeLayerCoverage,
+  findWeakLayers,
+  LAYER_LABELS,
+  LAYER_SHORT_LABELS,
+  MODEL_LAYERS,
+  sourceLayers,
+  VERIFICATION_LABELS,
+  VERIFICATION_LEVELS,
+} from './layers';
 import type { ResearchPayload, ResearchSource, ZoteroItem } from './types';
 
-const THEME_LABELS: Record<string, string> = {
-  A: 'Customs AI',
-  B: 'Supply chain / maritime',
-  C: 'Multi-hazard / geospatial',
-  D: 'LLM / XAI / accountability',
-  E: 'Methodology / infrastructure',
-};
-
-const THEME_QUERIES: Record<string, string> = {
-  A: 'customs risk artificial intelligence border management',
-  B: 'supply chain maritime disruption chokepoint',
-  C: 'multi-hazard early warning climate extremes',
-  D: 'explainable AI accountability large language models',
-  E: 'trade facilitation customs digital infrastructure',
-};
+const LAYER_QUERIES: Record<string, string> = Object.fromEntries(MODEL_LAYERS.map((layer) => [layer.id, layer.query]));
 
 const STATE_LABELS: Record<ReadingState, string> = {
   'to-read': 'Da leggere',
@@ -77,7 +68,7 @@ interface AcademicItem {
   abstract: string;
 }
 
-type TabId = 'library' | 'coverage' | 'news' | 'calls' | 'zotero' | 'notes' | 'thesis';
+type TabId = 'library' | 'coverage' | 'news' | 'calls' | 'zotero' | 'notes';
 
 async function copyText(text: string): Promise<boolean> {
   try {
@@ -104,7 +95,7 @@ const SORT_COLUMNS: { key: SortKey; label: string }[] = [
   { key: 'year', label: 'Anno' },
   { key: 'title', label: 'Titolo' },
   { key: 'venue', label: 'Sede' },
-  { key: 'themeArea', label: 'Tema' },
+  { key: 'layers', label: 'Strato' },
 ];
 
 export function createResearchWorkspace(): AppWorkspace {
@@ -123,8 +114,8 @@ export function createResearchWorkspace(): AppWorkspace {
   let statusMessage = '';
   let importOpen = false;
 
-  let newsTheme = 'A';
-  let newsQuery: string = THEME_QUERIES.A ?? '';
+  let newsTheme = 'trigger';
+  let newsQuery: string = LAYER_QUERIES.trigger ?? '';
   let newsDays = 365;
   let newsItems: AcademicItem[] = [];
   let newsError = '';
@@ -132,12 +123,6 @@ export function createResearchWorkspace(): AppWorkspace {
   let lastEnrichment: { ref: number; fields: { doi?: string; venue?: string; year?: number; url?: string } } | null = null;
 
   let callsTheme = '';
-  const thesisThemes = new Set<string>();
-  let thesisIncludeNotes = true;
-  let thesisIncludeCoverage = true;
-  let thesisIncludeWorkflow = true;
-  let thesisFormat: 'markdown' | 'latex' = 'markdown';
-  let thesisPreview = '';
 
   const sources = (): ResearchSource[] => allSources(curated, state);
 
@@ -202,9 +187,9 @@ export function createResearchWorkspace(): AppWorkspace {
               <td class="rs-bib-ref">${source.ref}</td>
               <td>${escapeHtml(source.authors)}</td>
               <td class="rs-bib-year">${source.year || '—'}</td>
-              <td class="rs-bib-title">${escapeHtml(source.title)}${source.themeArea ? '' : ' <span class="rs-chip rs-chip-muted">importata</span>'}</td>
+              <td class="rs-bib-title">${escapeHtml(source.title)}${sourceLayers(source).length ? '' : ' <span class="rs-chip rs-chip-muted">importata</span>'}</td>
               <td class="rs-bib-venue">${escapeHtml(source.venue)}</td>
-              <td><span class="rs-chip">${escapeHtml(source.themeArea || '—')}</span></td>
+              <td>${sourceLayers(source).map((layer) => `<span class="rs-chip" title="${escapeHtml(LAYER_LABELS[layer] ?? layer)}">${escapeHtml(LAYER_SHORT_LABELS[layer] ?? layer)}</span>`).join(' ') || '—'}</td>
               <td class="rs-bib-type">${entry.state ? `<span class="rs-wf-badge ${entry.state}">${STATE_LABELS[entry.state]}</span>` : escapeHtml(source.type)}</td>
             </tr>`;
               })
@@ -219,9 +204,9 @@ export function createResearchWorkspace(): AppWorkspace {
         const entry = readingEntry(state, source.ref);
         detailEl.innerHTML = `
           <div class="rs-detail-head">
-            <span class="rs-chip">${source.themeArea ? `Tema ${escapeHtml(source.themeArea)} — ${escapeHtml(THEME_LABELS[source.themeArea] ?? '')}` : 'importata'}</span>
+            ${sourceLayers(source).map((layer) => `<span class="rs-chip">${escapeHtml(LAYER_LABELS[layer] ?? layer)}</span>`).join('') || '<span class="rs-chip">importata</span>'}
             <span class="rs-chip rs-chip-muted">${escapeHtml(source.type)}</span>
-            ${source.verified ? '<span class="rs-chip rs-chip-ok">verificata</span>' : ''}
+            ${source.verified ? `<span class="rs-chip rs-chip-ok" title="${escapeHtml(VERIFICATION_LABELS[source.verification ?? ''] ?? '')}">verificata${source.verification ? ` · ${escapeHtml(source.verification)}` : ''}</span>` : '<span class="rs-chip rs-chip-muted">non verificata</span>'}
           </div>
           <h2>${escapeHtml(source.title)}</h2>
           <p class="rs-meta">${escapeHtml(source.authors)} · ${source.year} · ${escapeHtml(source.venue)}</p>
@@ -258,11 +243,10 @@ export function createResearchWorkspace(): AppWorkspace {
             </div>
           </div>
 
-          <h3>Sintesi</h3><p>${escapeHtml(source.summary || '—')}</p>
-          <h3>Limiti</h3><p>${escapeHtml(source.limitation || '—')}</p>
-          <h3>Contributo alla tesi</h3><p>${escapeHtml(source.contribution || '—')}</p>
+          ${source.summary ? `<h3>Sintesi</h3><p>${escapeHtml(source.summary)}</p>` : ''}
+          ${source.limitation ? `<h3>Limiti</h3><p>${escapeHtml(source.limitation)}</p>` : ''}
+          ${source.verified ? `<p class="rs-meta">Verifica: ${escapeHtml(VERIFICATION_LABELS[source.verification ?? ''] ?? 'registrata')}. Il dettaglio di cosa è stato verificato è nel registro privato della tesi (docs/FONTI_VERIFICATE.md).</p>` : ''}
           <div class="rs-detail-foot">
-            ${(source.dimensions ?? []).map((dim) => `<span class="rs-chip rs-chip-dim">${escapeHtml(dim)}</span>`).join('')}
             ${source.doi ? `<a class="rs-link" href="https://doi.org/${escapeHtml(source.doi)}" target="_blank" rel="noopener">DOI ↗</a>` : ''}
             ${source.url ? `<a class="rs-link" href="${escapeHtml(source.url)}" target="_blank" rel="noopener">Fonte ↗</a>` : ''}
           </div>
@@ -274,13 +258,12 @@ export function createResearchWorkspace(): AppWorkspace {
         const container = root.querySelector<HTMLElement>('#rsResearchCoverage');
         if (!container) return;
         const list = sources();
-        const matrix = computeDimensionCoverage(list);
-        const gaps = matrix.filter((entry) => entry.count === 0);
-        const fragile = matrix.filter((entry) => entry.count === 1);
-        const themes = computeThemeDistribution(list, THEME_LABELS);
+        const coverage = computeLayerCoverage(list);
+        const { empty, noFullText } = findWeakLayers(coverage);
+        const layers = computeLayerDistribution(list);
         const types = computeTypeDistribution(list);
         const years = computeYearHistogram(list);
-        const maxCount = Math.max(1, ...matrix.map((entry) => entry.count));
+        const maxCount = Math.max(1, ...coverage.map((entry) => entry.count));
         const bars = (entries: { key: string; label: string; count: number }[]) => {
           const max = Math.max(1, entries[0]?.count ?? 1);
           return entries
@@ -294,37 +277,35 @@ export function createResearchWorkspace(): AppWorkspace {
             )
             .join('');
         };
+        const levels = [...VERIFICATION_LEVELS, 'none'];
+        const levelHead = (level: string) => (level === 'none' ? 'non verif.' : level);
 
         container.innerHTML = `
           <div class="rs-cov-summary">
-            <div class="rs-callout ${gaps.length ? 'rs-callout-warn' : 'rs-callout-ok'}">
-              <strong>${gaps.length} dimensioni senza copertura</strong>
-              <span>${gaps.map((entry) => escapeHtml(entry.label)).join(', ') || 'nessuna'}</span>
+            <div class="rs-callout ${empty.length ? 'rs-callout-warn' : 'rs-callout-ok'}">
+              <strong>${empty.length} strati senza fonti</strong>
+              <span>${empty.map((entry) => escapeHtml(entry.label)).join(', ') || 'nessuno'}</span>
             </div>
-            ${fragile.length ? `<div class="rs-callout"><strong>${fragile.length} dimensioni fragili (1 sola fonte)</strong><span>${fragile.map((entry) => escapeHtml(entry.label)).join(', ')}</span></div>` : ''}
+            ${noFullText.length ? `<div class="rs-callout"><strong>${noFullText.length} strati senza fonti lette per intero o dati estratti</strong><span>${noFullText.map((entry) => escapeHtml(entry.label)).join(', ')}</span></div>` : ''}
           </div>
           <table class="rs-cov-table">
-            <thead><tr><th>Dimensione (modello 8D)</th>${list.map((source) => `<th title="${escapeHtml(source.title)}">${source.ref}</th>`).join('')}<th class="rs-cov-count">Fonti</th></tr></thead>
+            <thead><tr><th>Strato del modello</th>${levels.map((level) => `<th title="${escapeHtml(VERIFICATION_LABELS[level] ?? 'non verificata')}">${levelHead(level)}</th>`).join('')}<th class="rs-cov-count">Fonti</th></tr></thead>
             <tbody>
-              ${matrix
+              ${coverage
                 .map(
                   (entry) => `
                 <tr class="${entry.count === 0 ? 'rs-cov-gap' : ''}">
                   <th scope="row">${escapeHtml(entry.label)}</th>
-                  ${list
-                    .map(
-                      (source) =>
-                        `<td class="rs-cov-cell${entry.refs.includes(source.ref) ? ' covered' : ''}">${entry.refs.includes(source.ref) ? '●' : ''}</td>`,
-                    )
-                    .join('')}
+                  ${levels.map((level) => `<td class="rs-cov-cell${entry.byLevel[level] ? ' covered' : ''}">${entry.byLevel[level] || ''}</td>`).join('')}
                   <td class="rs-cov-count"><span class="rs-cov-bar"><span style="width:${Math.round((entry.count / maxCount) * 100)}%"></span></span>${entry.count}</td>
                 </tr>`,
                 )
                 .join('')}
             </tbody>
           </table>
+          <p class="rs-meta">Strato e livello di verifica vengono dal registro delle fonti della tesi: T testo completo letto, API dati estratti dal servizio della fonte, P pagina dell'editore o abstract, S copia secondaria. Una fonte può stare in più strati.</p>
           <div class="rs-cov-distributions">
-            <section><h3>Temi</h3>${bars(themes)}</section>
+            <section><h3>Strati</h3>${bars(layers)}</section>
             <section><h3>Tipi</h3>${bars(types)}</section>
             <section><h3>Anni</h3>${bars(years)}</section>
           </div>
@@ -341,9 +322,7 @@ export function createResearchWorkspace(): AppWorkspace {
           </div>
           <div class="rs-ws-controls">
             <select class="rs-select" id="rsNewsTheme">
-              ${Object.entries(THEME_LABELS)
-                .map(([key, label]) => `<option value="${key}"${newsTheme === key ? ' selected' : ''}>${key} — ${escapeHtml(label)}</option>`)
-                .join('')}
+              ${MODEL_LAYERS.map((layer) => `<option value="${layer.id}"${newsTheme === layer.id ? ' selected' : ''}>${escapeHtml(layer.label)}</option>`).join('')}
             </select>
             <input class="rs-input" id="rsNewsQuery" value="${escapeHtml(newsQuery)}" placeholder="Parole chiave…">
             <select class="rs-select" id="rsNewsDays">
@@ -383,12 +362,12 @@ export function createResearchWorkspace(): AppWorkspace {
         const calls = callsForThemes(callsTheme ? [callsTheme] : []);
         container.innerHTML = `
           <div class="rs-wip"><span class="rs-chip rs-chip-wip">WIP</span>
-            <p>Calendario curato delle venue ricorrenti (customs, supply chain, multi-hazard, XAI, metodologia) con la finestra tipica di sottomissione. Gli avvisi con data sono ordinati per scadenza; dove la deadline non è affidabile viene mostrata la finestra tipica — verifica sempre sul sito ufficiale. Una ricerca CFP live è pianificata.</p>
+            <p>Sedi ricorrenti pertinenti alla tesi (Scienze della Terra e rischio, dogane, commercio marittimo, IA applicata, metodo) con la finestra tipica di sottomissione. Una scadenza compare, con il conto alla rovescia, solo quando è stata verificata sul sito ufficiale.</p>
           </div>
           <div class="rs-chipbar">
             <button class="rs-chip-btn${callsTheme === '' ? ' active' : ''}" data-call-theme="">Tutti</button>
-            ${Object.entries(THEME_LABELS)
-              .map(([key, label]) => `<button class="rs-chip-btn${callsTheme === key ? ' active' : ''}" data-call-theme="${key}">${key} — ${escapeHtml(label)}</button>`)
+            ${Object.entries(CALL_TOPICS)
+              .map(([key, label]) => `<button class="rs-chip-btn${callsTheme === key ? ' active' : ''}" data-call-theme="${key}">${escapeHtml(label)}</button>`)
               .join('')}
             <span class="rs-meta">aggiornato ${escapeHtml(CALLS_UPDATED_AT)}</span>
           </div>
@@ -399,7 +378,7 @@ export function createResearchWorkspace(): AppWorkspace {
                 return `
               <article class="rs-call">
                 <div class="rs-card-head">
-                  ${call.themes.map((theme) => `<span class="rs-chip">${escapeHtml(theme)}</span>`).join('')}
+                  ${call.themes.map((theme) => `<span class="rs-chip">${escapeHtml(CALL_TOPICS[theme] ?? theme)}</span>`).join('')}
                   ${days !== null ? `<span class="rs-chip rs-chip-wip">${days} giorni</span>` : `<span class="rs-chip rs-chip-muted">${escapeHtml(call.typicalWindow)}</span>`}
                 </div>
                 <h3>${escapeHtml(call.name)}</h3>
@@ -408,7 +387,7 @@ export function createResearchWorkspace(): AppWorkspace {
                 <div class="rs-card-foot"><a class="rs-link" href="${escapeHtml(call.url)}" target="_blank" rel="noopener">Sito ufficiale ↗</a></div>
               </article>`;
               })
-              .join('') || '<div class="rs-empty">Nessuna call per il tema selezionato.</div>'}
+              .join('') || '<div class="rs-empty">Nessuna sede per il tema selezionato.</div>'}
           </div>
         `;
       };
@@ -481,33 +460,6 @@ export function createResearchWorkspace(): AppWorkspace {
         `;
       };
 
-      // ── Thesis ────────────────────────────────────────────────────────────
-      const renderThesis = () => {
-        const container = root.querySelector<HTMLElement>('#rsResearchThesis');
-        if (!container) return;
-        container.innerHTML = `
-          <div class="rs-ws-controls">
-            <span class="rs-meta">Temi</span>
-            ${Object.entries(THEME_LABELS)
-              .map(([key, label]) => `<button class="rs-chip-btn${thesisThemes.has(key) ? ' active' : ''}" data-thesis-theme="${key}">${key} — ${escapeHtml(label)}</button>`)
-              .join('')}
-            <span class="rs-meta">(nessuno = tutti)</span>
-          </div>
-          <div class="rs-ws-controls">
-            <label class="rs-meta"><input type="checkbox" id="rsThesisNotes"${thesisIncludeNotes ? ' checked' : ''}> note di lettura</label>
-            <label class="rs-meta"><input type="checkbox" id="rsThesisCoverage"${thesisIncludeCoverage ? ' checked' : ''}> tabella copertura</label>
-            <label class="rs-meta"><input type="checkbox" id="rsThesisWorkflow"${thesisIncludeWorkflow ? ' checked' : ''}> stato/priorità/tag</label>
-            <select class="rs-select" id="rsThesisFormat">
-              <option value="markdown"${thesisFormat === 'markdown' ? ' selected' : ''}>Markdown</option>
-              <option value="latex"${thesisFormat === 'latex' ? ' selected' : ''}>LaTeX</option>
-            </select>
-            <button class="rs-button" id="rsThesisGenerate">Genera</button>
-            <button class="rs-button rs-button-ghost" id="rsThesisDownload">Scarica</button>
-          </div>
-          <pre class="rs-thesis-preview" id="rsThesisPreview">${escapeHtml(thesisPreview || 'Genera un capitolo di literature review con citazioni, note e tabella di copertura.')}</pre>
-        `;
-      };
-
       const renderTabs = () => {
         root.querySelectorAll<HTMLElement>('.rs-tab').forEach((tab) => tab.classList.toggle('active', tab.dataset.tab === activeTab));
         root.querySelectorAll<HTMLElement>('.rs-tab-panel').forEach((panel) => {
@@ -526,10 +478,11 @@ export function createResearchWorkspace(): AppWorkspace {
           <div class="rs-ws-toolbar">
             <div class="rs-ws-heading">
               <h1>Research Workbench</h1>
-              <p>Revisione della letteratura, citazioni ed export per il dottorato${fetchedAt ? ` · aggiornato ${escapeHtml(new Date(fetchedAt).toLocaleString())}` : ''}</p>
+              <p>Bibliografia della tesi per strato del modello, citazioni ed export${fetchedAt ? ` · aggiornato ${escapeHtml(new Date(fetchedAt).toLocaleString())}` : ''}</p>
             </div>
             <div class="rs-ws-stats">
               <div class="rs-stat"><span class="rs-stat-value">${sources().length}</span><span class="rs-stat-label">fonti</span></div>
+              <div class="rs-stat"><span class="rs-stat-value">${sources().filter((source) => source.verified).length}</span><span class="rs-stat-label">verificate</span></div>
               <div class="rs-stat"><span class="rs-stat-value">${Object.values(state.reading).filter((entry) => entry.state === 'reviewed').length}</span><span class="rs-stat-label">revisionate</span></div>
               <div class="rs-stat"><span class="rs-stat-value">${Object.keys(state.notes).length}</span><span class="rs-stat-label">note</span></div>
             </div>
@@ -539,15 +492,14 @@ export function createResearchWorkspace(): AppWorkspace {
             <button class="rs-tab active" data-tab="library" role="tab">Bibliografia</button>
             <button class="rs-tab" data-tab="coverage" role="tab">Copertura</button>
             <button class="rs-tab" data-tab="news" role="tab">Novità accademiche <span class="rs-chip rs-chip-wip">WIP</span></button>
-            <button class="rs-tab" data-tab="calls" role="tab">Call for papers <span class="rs-chip rs-chip-wip">WIP</span></button>
+            <button class="rs-tab" data-tab="calls" role="tab">Conferenze <span class="rs-chip rs-chip-wip">WIP</span></button>
             <button class="rs-tab" data-tab="zotero" role="tab">Zotero</button>
             <button class="rs-tab" data-tab="notes" role="tab">Note</button>
-            <button class="rs-tab" data-tab="thesis" role="tab">Tesi</button>
           </div>
 
           <div class="rs-tab-panel" data-panel="library">
             <div class="rs-ws-controls">
-              <input id="rsResearchQuery" class="rs-input" type="search" placeholder="Cerca… (author: / year: / theme:A / type:journal / dim:… / status:reviewed / prio:high / tag:customs)">
+              <input id="rsResearchQuery" class="rs-input" type="search" placeholder="Cerca… (author: / year: / layer:innesco / verif:T / type:journal / status:reviewed / prio:high / tag:customs)">
               <span class="rs-meta" id="rsResearchResultCount"></span>
               <button class="rs-button rs-button-ghost" id="rsImportToggle">Importa BibTeX/RIS</button>
               <span class="rs-bib-export">
@@ -574,6 +526,7 @@ export function createResearchWorkspace(): AppWorkspace {
                             sortKey === column.key ? (sortDirection === 'asc' ? ' ▲' : ' ▼') : ''
                           }</th>`,
                       ).join('')}
+                      <th class="rs-bib-th">Tipo / stato</th>
                     </tr>
                   </thead>
                   <tbody id="rsResearchTableBody"></tbody>
@@ -589,7 +542,6 @@ export function createResearchWorkspace(): AppWorkspace {
           <div class="rs-tab-panel" data-panel="calls" hidden><div id="rsResearchCalls"></div></div>
           <div class="rs-tab-panel" data-panel="zotero" hidden><div id="rsResearchZotero"></div></div>
           <div class="rs-tab-panel" data-panel="notes" hidden><div id="rsResearchNotes"></div></div>
-          <div class="rs-tab-panel" data-panel="thesis" hidden><div id="rsResearchThesis"></div></div>
         </div>
       `;
 
@@ -606,7 +558,6 @@ export function createResearchWorkspace(): AppWorkspace {
           if (activeTab === 'calls') renderCalls();
           if (activeTab === 'zotero') renderZotero();
           if (activeTab === 'notes') renderNotes();
-          if (activeTab === 'thesis') renderThesis();
           return;
         }
 
@@ -782,7 +733,7 @@ export function createResearchWorkspace(): AppWorkspace {
 
         if (target.id === 'rsNewsSearch') {
           const queryInputEl = root.querySelector<HTMLInputElement>('#rsNewsQuery');
-          newsQuery = queryInputEl?.value.trim() || THEME_QUERIES[newsTheme] || '';
+          newsQuery = queryInputEl?.value.trim() || LAYER_QUERIES[newsTheme] || '';
           newsLoading = true;
           newsError = '';
           renderNews();
@@ -805,39 +756,6 @@ export function createResearchWorkspace(): AppWorkspace {
           return;
         }
 
-        const thesisThemeButton = target.closest<HTMLElement>('[data-thesis-theme]');
-        if (thesisThemeButton?.dataset.thesisTheme) {
-          const key = thesisThemeButton.dataset.thesisTheme;
-          if (thesisThemes.has(key)) thesisThemes.delete(key);
-          else thesisThemes.add(key);
-          renderThesis();
-          return;
-        }
-
-        if (target.id === 'rsThesisGenerate' || target.id === 'rsThesisDownload') {
-          const options = {
-            themes: [...thesisThemes],
-            includeNotes: thesisIncludeNotes,
-            includeCoverage: thesisIncludeCoverage,
-            includeWorkflow: thesisIncludeWorkflow,
-          };
-          const content =
-            thesisFormat === 'latex'
-              ? generateThesisLatex(sources(), state, options)
-              : generateThesisMarkdown(sources(), state, options);
-          if (target.id === 'rsThesisDownload') {
-            download(
-              thesisFormat === 'latex' ? 'risk-sentinel-literature-review.tex' : 'risk-sentinel-literature-review.md',
-              content,
-              thesisFormat === 'latex' ? 'application/x-tex' : 'text/markdown',
-            );
-            setStatus('Capitolo esportato.');
-          } else {
-            thesisPreview = content;
-            renderThesis();
-            setStatus('Anteprima generata.');
-          }
-        }
       });
 
       root.addEventListener('change', (event) => {
@@ -861,19 +779,13 @@ export function createResearchWorkspace(): AppWorkspace {
         }
         if (target.id === 'rsNewsTheme') {
           newsTheme = (target as HTMLSelectElement).value;
-          newsQuery = THEME_QUERIES[newsTheme] ?? '';
+          newsQuery = LAYER_QUERIES[newsTheme] ?? '';
           renderNews();
           return;
         }
         if (target.id === 'rsNewsDays') {
           newsDays = Number((target as HTMLSelectElement).value) || 365;
           return;
-        }
-        if (target.id === 'rsThesisNotes') thesisIncludeNotes = (target as HTMLInputElement).checked;
-        if (target.id === 'rsThesisCoverage') thesisIncludeCoverage = (target as HTMLInputElement).checked;
-        if (target.id === 'rsThesisWorkflow') thesisIncludeWorkflow = (target as HTMLInputElement).checked;
-        if (target.id === 'rsThesisFormat') {
-          thesisFormat = (target as HTMLSelectElement).value === 'latex' ? 'latex' : 'markdown';
         }
       });
 

@@ -45,8 +45,13 @@ export function firstAuthorToken(authors: string): string {
     .toLowerCase() || 'anon';
 }
 
-/** Stable-ish BibTeX key: `<author><year><firstTitleWord>`, e.g. `european2024customs`. */
+/**
+ * BibTeX key. Entries generated from the thesis keep their key in
+ * thesis/references.bib, so an export pastes straight into the thesis; imported
+ * entries get `<author><year><firstTitleWord>`, e.g. `european2024customs`.
+ */
 export function citationKey(source: ResearchSource): string {
+  if (source.key) return source.key;
   const word = String(source.title ?? '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
@@ -86,7 +91,8 @@ export function formatBibtex(source: ResearchSource): string {
   if (source.venue) lines.push(`  ${venueField} = {${escapeBibtex(source.venue)}},`);
   if (source.doi) lines.push(`  doi       = {${escapeBibtex(source.doi)}},`);
   if (source.url) lines.push(`  url       = {${escapeBibtex(source.url)}},`);
-  lines.push(`  note      = {Risk Sentinel literature review — theme ${source.themeArea}}`);
+  // Drop the trailing comma of the last field.
+  lines[lines.length - 1] = lines[lines.length - 1]!.replace(/,$/, '');
   lines.push('}');
   return lines.join('\n');
 }
@@ -117,10 +123,11 @@ function csvCell(value: string | number | null | undefined): string {
 }
 
 export function toCsv(sources: ResearchSource[]): string {
-  const header = ['ref', 'authors', 'year', 'title', 'type', 'venue', 'doi', 'url', 'themeArea', 'dimensions', 'verified'];
+  const header = ['ref', 'key', 'authors', 'year', 'title', 'type', 'venue', 'doi', 'url', 'layers', 'verified', 'verification'];
   const rows = sources.map((source) =>
     [
       source.ref,
+      source.key ?? '',
       source.authors,
       source.year,
       source.title,
@@ -128,9 +135,9 @@ export function toCsv(sources: ResearchSource[]): string {
       source.venue,
       source.doi ?? '',
       source.url,
-      source.themeArea,
-      (source.dimensions ?? []).join(' '),
+      (source.layers ?? []).join(' '),
       source.verified ? 'yes' : 'no',
+      source.verification ?? '',
     ]
       .map(csvCell)
       .join(','),

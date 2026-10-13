@@ -2,11 +2,12 @@
  * Risk Sentinel — Source Validation (PhD literature) endpoint.
  *
  * GET /api/zotero/library
- *   → { sources: <curated 18-entry bibliography from data/zotero-sources.json>,
+ *   → { sources: <thesis bibliography from data/zotero-sources.json>,
  *       library: <live Zotero library cache>, librarySource: 'zotero'|'none' }
  *
- * The curated `sources` array is the doctoral literature review with the
- * per-source limit/bias assessment; the live `library` comes from the Zotero
+ * The `sources` array is generated from the thesis repository by
+ * scripts/build-research-bibliography.mjs (metadata, model layer, verification
+ * level; the verification notes stay private); the live `library` comes from the Zotero
  * Web API v3 (https://api.zotero.org/users/<ZOTERO_USER_ID>/items) and is
  * cached in Redis for 24h. `?refresh=1` forces a refetch.
  */
