@@ -40833,7 +40833,7 @@ components:
                 provider:
                     type: string
                     minLength: 1
-                    description: 'LLM provider: "ollama", "openrouter"'
+                    description: 'LLM provider: "ollama", "groq", "openrouter"'
                 headlines:
                     type: array
                     items:
