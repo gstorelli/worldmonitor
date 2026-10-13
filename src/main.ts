@@ -784,10 +784,13 @@ if (urlParams.get('settings') === '1') {
     // Risk Sentinel user auth gate: no-op unless the server has AUTH_REQUIRED=true.
     const { ensureAuthenticated, installLogoutControl } = await import('./services/user-auth');
     if (!(await ensureAuthenticated())) return;
-    const { loadPanelPolicy } = await import('./services/panel-policy');
-    await loadPanelPolicy();
-    const { hydratePanelPrefs } = await import('./services/user-panel-prefs');
-    await hydratePanelPrefs();
+    // Independent reads (global panel policy, per-user prefs): fetch them in
+    // parallel instead of paying two sequential round trips before the app boots.
+    const [{ loadPanelPolicy }, { hydratePanelPrefs }] = await Promise.all([
+      import('./services/panel-policy'),
+      import('./services/user-panel-prefs'),
+    ]);
+    await Promise.all([loadPanelPolicy(), hydratePanelPrefs()]);
     const { seedAppDefaults } = await import('./services/app-selection');
     seedAppDefaults();
     installUtmInterceptor();

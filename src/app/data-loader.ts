@@ -405,8 +405,14 @@ export class DataLoaderManager implements AppModule {
       }
     };
 
-    const shouldLoad = (id: string): boolean => forceAll || this.isPanelNearViewport(id);
-    const shouldLoadAny = (ids: string[]): boolean => forceAll || this.isAnyPanelNearViewport(ids);
+    // Risk Sentinel: the boot pass (forceAll) loads only panels that exist in
+    // the active app. Apps such as the thesis view create a dozen panels; without
+    // this gate the first load fired ~70 endpoints for panels that were never
+    // created (markets, FRED, BIS, predictions, forecasts, ...), delaying the
+    // panels that are on screen and loading the self-hosted API for nothing.
+    const panelExists = (id: string): boolean => Boolean(this.ctx.panels[id]);
+    const shouldLoad = (id: string): boolean => (forceAll && panelExists(id)) || this.isPanelNearViewport(id);
+    const shouldLoadAny = (ids: string[]): boolean => (forceAll && ids.some(panelExists)) || this.isAnyPanelNearViewport(ids);
 
     const tasks: Array<{ name: string; task: Promise<void> }> = [
       { name: 'news', task: runGuarded('news', () => this.loadNews()) },
@@ -558,28 +564,24 @@ export class DataLoaderManager implements AppModule {
       tasks.push({ name: 'crossSourceSignals', task: runGuarded('crossSourceSignals', () => this.loadCrossSourceSignals()) });
     }
 
-    // Stagger startup: run tasks in small batches to avoid hammering upstreams
-    const BATCH_SIZE = 4;
-    const BATCH_DELAY_MS = 300;
-    for (let i = 0; i < tasks.length; i += BATCH_SIZE) {
-      const batch = tasks.slice(i, i + BATCH_SIZE);
-      const results = await Promise.allSettled(batch.map(t => t.task));
-      results.forEach((result, idx) => {
-        if (result.status === 'rejected') {
-          console.error(`[App] ${batch[idx]?.name} load failed:`, result.reason);
-        }
-      });
-      if (i + BATCH_SIZE < tasks.length) {
-        await new Promise(r => setTimeout(r, BATCH_DELAY_MS));
+    // Every task above is already running (runGuarded starts on creation), so
+    // the former 4-task batches with a 300 ms pause did not stagger the requests:
+    // they only delayed the end of the initial load by ~0.3 s per batch.
+    // Throttling of constrained upstreams belongs in their loader/service
+    // (see tests/load-all-data-scheduling.test.mts).
+    const results = await Promise.allSettled(tasks.map(t => t.task));
+    results.forEach((result, idx) => {
+      if (result.status === 'rejected') {
+        console.error(`[App] ${tasks[idx]?.name} load failed:`, result.reason);
       }
-    }
+    });
 
     this.updateSearchIndex();
 
-    await Promise.allSettled([
-      this.loadDailyMarketBrief(),
-      this.loadMarketImplications(),
-    ]);
+    const marketFollowUps: Promise<void>[] = [];
+    if (shouldLoad('daily-market-brief')) marketFollowUps.push(this.loadDailyMarketBrief());
+    if (shouldLoad('market-implications')) marketFollowUps.push(this.loadMarketImplications());
+    await Promise.allSettled(marketFollowUps);
 
     const bootstrapTemporal = consumeServerAnomalies();
     if (bootstrapTemporal.anomalies.length > 0 || bootstrapTemporal.trackedTypes.length > 0) {
