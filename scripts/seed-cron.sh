@@ -9,6 +9,7 @@
 #   ./scripts/seed-cron.sh signals  # gdelt-intel, cross-source, chokepoints, FX (hourly)
 #   ./scripts/seed-cron.sh slow     # sanctions + UCDP                    (every 6h)
 #   ./scripts/seed-cron.sh thesis   # thesis triggers: USGS quakes, GDACS/EONET, climate (hourly)
+#   ./scripts/seed-cron.sh context  # context panels of the thesis view: trade policy, shipping (every 6h)
 #   ./scripts/seed-cron.sh full     # everything else                     (weekly)
 #
 # Rules that keep the box predictable:
@@ -65,13 +66,20 @@ case "$TIER" in
     run natural-events 240
     run climate-anomalies 300
     ;;
+  context)
+    # Context panels allowed in the thesis view (trade-policy, supply-chain).
+    # seed-supply-chain-trade writes shipping indices, tariffs, barriers and
+    # restrictions with an 8h TTL designed for a 6h cadence: left to the weekly
+    # sweep, those panels were empty for most of the week.
+    run supply-chain-trade 600
+    ;;
   full)
     # Everything without a tier of its own: the weekly catch-all.
-    export SEED_SKIP="market-quotes,commodity,insights,forecasts,correlation,gdelt-intel,cross-source,chokepoint,ecb-fx,acled,sanctions,ucdp,earthquakes,natural-events,climate-anomalies"
+    export SEED_SKIP="market-quotes,commodity,insights,forecasts,correlation,gdelt-intel,cross-source,chokepoint,ecb-fx,acled,sanctions,ucdp,earthquakes,natural-events,climate-anomalies,supply-chain-trade"
     run "" 240
     ;;
   *)
-    echo "usage: seed-cron.sh {quotes|intel|signals|slow|thesis|full}" >&2
+    echo "usage: seed-cron.sh {quotes|intel|signals|slow|thesis|context|full}" >&2
     exit 2
     ;;
 esac
