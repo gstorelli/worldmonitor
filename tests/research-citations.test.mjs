@@ -16,12 +16,11 @@ const source = {
   venue: 'Publications Office of the European Union (EUR)',
   doi: '10.2760/1286492',
   url: 'https://data.europa.eu/doi/10.2760/1286492',
-  themeArea: 'A',
+  layers: ['customs'],
   summary: 's',
   limitation: 'l',
-  contribution: 'c',
-  dimensions: ['customsRelevance'],
   verified: true,
+  verification: 'P',
 };
 
 describe('research citation formatting', () => {
@@ -32,6 +31,8 @@ describe('research citation formatting', () => {
       'Tzvetkova, M. (European Commission JRC)',
     ]);
     assert.equal(citations.citationKey(source), 'anderson2025border');
+    // Entries generated from the thesis keep their references.bib key.
+    assert.equal(citations.citationKey({ ...source, key: 'european_commission_joint_research_centre_ai_2025' }), 'european_commission_joint_research_centre_ai_2025');
   });
 
   it('formats APA with DOI preference over URL', () => {
@@ -50,6 +51,7 @@ describe('research citation formatting', () => {
     assert.match(journal, /^@article\{/);
     assert.match(journal, /title {5}= \{A \\& B study\\_1\}/);
     assert.match(journal, /journal = \{/);
+    assert.match(bibtex, /\}\n\}$/, 'the last field has no trailing comma');
   });
 
   it('formats RIS with one AU per author and a terminator', () => {
@@ -65,7 +67,7 @@ describe('research citation formatting', () => {
     assert.equal((collection.match(/@techreport/g) ?? []).length, 2);
 
     const csv = citations.toCsv([{ ...source, title: 'Title, with "quotes"' }]);
-    assert.match(csv, /^ref,authors,year,title,type,venue,doi,url,themeArea,dimensions,verified/);
+    assert.match(csv, /^ref,key,authors,year,title,type,venue,doi,url,layers,verified,verification/);
     assert.match(csv, /"Title, with ""quotes"""/);
   });
 });

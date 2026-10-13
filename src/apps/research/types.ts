@@ -2,6 +2,8 @@
 
 export interface ResearchSource {
   ref: number;
+  /** BibTeX key in the thesis repository (thesis/references.bib); absent for imports. */
+  key?: string;
   authors: string;
   year: number;
   title: string;
@@ -9,12 +11,13 @@ export interface ResearchSource {
   venue: string;
   doi: string | null;
   url: string;
-  themeArea: string;
-  summary: string;
-  limitation: string;
-  contribution: string;
-  dimensions: string[];
+  /** Layers of the six-layer model (see layers.ts); empty for imported entries. */
+  layers: string[];
   verified: boolean;
+  /** How it was verified: T full text, API data service, P publisher/abstract, S secondary. */
+  verification?: string | null;
+  summary?: string;
+  limitation?: string;
 }
 
 export interface ZoteroItem {
