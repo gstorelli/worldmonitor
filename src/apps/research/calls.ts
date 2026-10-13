@@ -19,6 +19,15 @@ export interface CallForPapers {
   notes: string;
 }
 
+/** Topic tags of the venues (13/10/2026: replace the A-E theme areas). */
+export const CALL_TOPICS: Record<string, string> = {
+  rischio: 'Scienze della Terra e rischio',
+  dogane: 'Dogane',
+  commercio: 'Commercio e trasporto marittimo',
+  ia: 'IA applicata',
+  metodo: 'Metodo',
+};
+
 export const CALLS_UPDATED_AT: string = callsData.updated_at;
 
 export function listCalls(): CallForPapers[] {
