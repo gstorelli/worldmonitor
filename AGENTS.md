@@ -105,11 +105,11 @@ npm run lint:safe-html    # OPT-IN ONLY: see "Pre-Push" (fork baseline fails thi
 
 ## Runtime Knobs (fork defaults)
 
-- **LLM chain**: `ollama → openrouter → groq → generic` (`server/_shared/llm.ts`).
-  OpenRouter is tried first with `deepseek/deepseek-v4-flash`; **Groq is optional**
-  (free fallback). A 429 usually means the OpenRouter free-tier quota, not a config
-  error; add a Groq key to absorb it. `LLM_TOOL_PROVIDER`/`LLM_REASONING_PROVIDER`
-  override the per-profile default provider.
+- **LLM chain**: `ollama → openrouter → generic` (`server/_shared/llm.ts`).
+  OpenRouter (`deepseek/deepseek-v4-flash`) is the production provider. **Groq was
+  removed from the fork on 13/10/2026** (no account): do not re-add it to any chain.
+  `LLM_TOOL_PROVIDER`/`LLM_REASONING_PROVIDER` override the per-profile default
+  provider (both default to `openrouter`).
 - **Notify auth**: anonymous `GET /api/notify/config` is redacted; changing a stored
   delivery credential (`chatId`/`to`/`botToken`/`smtpUrl`) requires the
   `N8N_INGEST_SECRET` bearer. The settings UI keeps that token in `localStorage`

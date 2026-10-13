@@ -54,7 +54,6 @@ services:
       LLM_API_URL: "${LLM_API_URL:-}"
       LLM_API_KEY: "${LLM_API_KEY:-}"
       LLM_MODEL: "${LLM_MODEL:-}"
-      GROQ_API_KEY: "${GROQ_API_KEY:-}"
       OPENROUTER_API_KEY: "${OPENROUTER_API_KEY:-}"
       # n8n ingestion auth (Risk Sentinel): required by POST /api/n8n/ingest
       # when set. Generate with: openssl rand -hex 32
@@ -92,7 +91,7 @@ services:
     # Docker secrets (recommended for API keys — keeps them out of docker inspect).
     # Create secrets/ dir with one file per key, then uncomment below.
     # secrets:
-    #   - GROQ_API_KEY
+    #   - OPENROUTER_API_KEY
     #   - AISSTREAM_API_KEY
     #   - FINNHUB_API_KEY
     #   - FRED_API_KEY
@@ -168,10 +167,10 @@ services:
     restart: unless-stopped
 
 # Docker secrets — uncomment and point to your secret files.
-# Example: echo "gsk_abc123" > secrets/groq_api_key.txt
+# Example: echo "sk-or-..." > secrets/openrouter_api_key.txt
 # secrets:
-#   GROQ_API_KEY:
-#     file: ./secrets/groq_api_key.txt
+#   OPENROUTER_API_KEY:
+#     file: ./secrets/openrouter_api_key.txt
 #   AISSTREAM_API_KEY:
 #     file: ./secrets/aisstream_api_key.txt
 #   FINNHUB_API_KEY:

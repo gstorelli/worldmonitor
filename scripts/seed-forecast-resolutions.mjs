@@ -501,12 +501,16 @@ function createLiveJudgeModels(options = {}) {
           || 'deepseek/deepseek-v4-flash',
       },
     }),
+    // Fork (13/10/2026): the second judge was Groq llama-3.3-70b. The project has
+    // no Groq account, so the pair never completed and every judged forecast
+    // stayed pending. The second judge is now a different model family on
+    // OpenRouter, which keeps the dual-model agreement rule meaningful.
     (entry, archiveItems, nowMs) => callLiveJudgedModel(entry, archiveItems, nowMs, {
       ...common,
-      stage: 'forecast_resolution_judge_groq',
-      providerOrder: ['groq'],
+      stage: 'forecast_resolution_judge_openrouter_second',
+      providerOrder: ['openrouter'],
       modelOverrides: {
-        groq: process.env.FORECAST_RESOLUTION_JUDGE_MODEL_GROQ || 'llama-3.3-70b-versatile',
+        openrouter: process.env.FORECAST_RESOLUTION_JUDGE_MODEL_SECOND || 'google/gemini-2.5-flash',
       },
     }),
   ];

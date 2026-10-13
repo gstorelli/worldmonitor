@@ -3675,9 +3675,8 @@ function classifyCacheKey(title) {
 }
 
 // LLM provider fallback chain — mirrors seed-insights.mjs LLM_PROVIDERS
-// Order: ollama → openrouter → groq (canonical chain since #4944, mirrors
-// server/_shared/llm.ts: DeepSeek V4 Flash primary with reasoning disabled,
-// groq llama-3.3-70b-versatile as the free-tier/outage fallback).
+// Order: ollama → openrouter (mirrors server/_shared/llm.ts: DeepSeek V4 Flash
+// with reasoning disabled). Groq removed from the fork on 13/10/2026.
 const CLASSIFY_LLM_PROVIDERS = [
   {
     name: 'ollama',
@@ -3703,10 +3702,13 @@ const CLASSIFY_LLM_PROVIDERS = [
     timeout: 30000,
   },
   {
-    name: 'groq',
-    envKey: 'GROQ_API_KEY',
-    apiUrl: 'https://api.groq.com/openai/v1/chat/completions',
-    model: 'llama-3.3-70b-versatile',
+    // Fork: optional OpenAI-compatible fallback (LLM_API_URL + LLM_API_KEY,
+    // model LLM_MODEL) in the slot Groq held upstream; unset by default, so
+    // production runs on OpenRouter alone. Groq was removed on 13/10/2026.
+    name: 'generic',
+    envKey: 'LLM_API_KEY',
+    get apiUrl() { return process.env.LLM_API_URL || ''; },
+    get model() { return process.env.LLM_MODEL || 'gpt-3.5-turbo'; },
     headers: (key) => ({ Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', 'User-Agent': CHROME_UA }),
     timeout: 30000,
   },

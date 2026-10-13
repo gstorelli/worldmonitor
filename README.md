@@ -265,7 +265,7 @@ I valori di *criticality* sono costanti provvisorie del motore v0, senza giustif
 |---------|-----------|
 | **Frontend** | TypeScript, Vite, Vanilla JS (class-based components) |
 | **Visualizzazione** | globe.gl + Three.js (3D), deck.gl + MapLibre GL (2D) |
-| **AI / LLM** | OpenRouter (default `deepseek/deepseek-v4-flash`), Groq (fallback opzionale), Ollama (locale) |
+| **AI / LLM** | OpenRouter (default `deepseek/deepseek-v4-flash`), Ollama (locale) |
 | **Orchestrazione Dati** | n8n (5 workflow JSON importabili) |
 | **Caching** | Redis (Upstash REST compatibile, self-hosted via `redis-rest` in Docker) — cache tiers: 5min/10min/30min/2h/24h |
 | **Deployment** | **Docker Compose 100% self-hosted** (Nginx + Node.js API + Redis REST proxy), PWA |

@@ -3609,7 +3609,6 @@ async function extractCriticalSignalBundle(inputs) {
   const criticalRouteTag = [
     (criticalLlmOptions.providerOrder || []).join('-') || 'default',
     criticalLlmOptions.modelOverrides?.openrouter || 'table',
-    criticalLlmOptions.modelOverrides?.groq || 'table',
   ].join('_').replace(/[^a-zA-Z0-9._/-]/g, '-');
   const cacheKey = `forecast:critical-signals:llm:${criticalRouteTag}:${buildCriticalSignalCandidateHash(candidates)}`;
   const fallbackSignalsFromCandidates = (coveredIndexes = new Set()) =>
@@ -14661,8 +14660,8 @@ function selectForecastsForEnrichment(predictions, options = {}) {
 
 // ── Phase 2: LLM Scenario Enrichment ───────────────────────
 // openrouter-first since #4944 U6: forecast NARRATIVE (never probabilities —
-// detectors own those) runs DeepSeek V4 Flash with reasoning disabled; groq
-// llama-3.3-70b-versatile is the free-tier/outage fallback. Per-stage
+// detectors own those) runs DeepSeek V4 Flash with reasoning disabled. Groq
+// (the upstream free-tier fallback) was removed from the fork on 13/10/2026. Per-stage
 // FORECAST_LLM_*_PROVIDER_ORDER env still overrides.
 const FORECAST_LLM_PROVIDERS = [
   // `provider.sort: 'throughput'` makes OpenRouter dispatch to its fastest backend
@@ -14675,15 +14674,14 @@ const FORECAST_LLM_PROVIDERS = [
   // same entry onto google/gemini-2.5-flash and must keep its 25s window). Flash uses
   // its own completion deadline via getLlmAttemptTimeoutMs — see _llm-model-timeouts.
   { name: 'openrouter', envKey: 'OPENROUTER_API_KEY', apiUrl: 'https://openrouter.ai/api/v1/chat/completions', model: 'deepseek/deepseek-v4-flash', timeout: 25_000, extraBody: { reasoning: { enabled: false }, provider: OPENROUTER_PROVIDER_ROUTING } },
-  { name: 'groq', envKey: 'GROQ_API_KEY', apiUrl: 'https://api.groq.com/openai/v1/chat/completions', model: 'llama-3.3-70b-versatile', timeout: 20_000 },
+  // Fork: optional OpenAI-compatible fallback (LLM_API_URL + LLM_API_KEY, model
+  // LLM_MODEL) in the slot Groq held upstream; unset by default. Groq removed 13/10/2026.
+  { name: 'generic', envKey: 'LLM_API_KEY', get apiUrl() { return process.env.LLM_API_URL || ''; }, get model() { return process.env.LLM_MODEL || 'gpt-3.5-turbo'; }, timeout: 20_000 },
 ];
 
-// market_implications does NOT fall back to groq. Groq's free tier caps at 100k
-// tokens/day and this stage alone needs ~114k (4,749 tokens x 24 hourly runs), so
-// the fallback 429s for most of the day. Reserving 20s of run budget for a provider
-// that returns 429 in 86ms only raises the admission bar and starves the stage.
-// OpenRouter is the primary and, with throughput routing, succeeds 100% of measured
-// runs. Still overridable via FORECAST_LLM_MARKET_IMPLICATIONS_PROVIDER_ORDER.
+// market_implications runs on OpenRouter only (upstream measured it at 100% of runs
+// with throughput routing). Still overridable via
+// FORECAST_LLM_MARKET_IMPLICATIONS_PROVIDER_ORDER.
 const MARKET_IMPLICATIONS_DEFAULT_PROVIDER_ORDER = ['openrouter'];
 
 // Requested window for DeepSeek-Flash in forecast stages. Kept above the Flash
@@ -14752,9 +14750,9 @@ function getForecastLlmCallOptions(stage = 'default') {
       ? (criticalProviderOrder || globalProviderOrder || defaultProviderOrder)
       : stage === 'impact_expansion'
         ? (impactProviderOrder || globalProviderOrder || defaultProviderOrder)
-      // Deliberately does NOT fall through to globalProviderOrder: that env is set
-      // to `openrouter,groq` in production, which would re-add the groq fallback
-      // this stage must not depend on (see MARKET_IMPLICATIONS_DEFAULT_PROVIDER_ORDER).
+      // Deliberately does NOT fall through to globalProviderOrder: a global order
+      // could add a fallback this stage must not depend on (see
+      // MARKET_IMPLICATIONS_DEFAULT_PROVIDER_ORDER).
       // Its own stage env still overrides.
       : stage === 'market_implications'
         ? (marketImplicationsProviderOrder || MARKET_IMPLICATIONS_DEFAULT_PROVIDER_ORDER)
@@ -14781,9 +14779,11 @@ function getForecastLlmCallOptions(stage = 'default') {
   // probability-coupled stage as a side effect (review finding on #4965).
   if (stage === 'critical_signals' && !criticalProviderOrder) {
     return {
-      providerOrder: ['groq', 'openrouter'],
+      // Fork: the pinned Groq primary (llama-3.1-8b-instant) was removed on
+      // 13/10/2026; it was never configured here, so this stage always ran on
+      // the OpenRouter pin below. Behaviour is unchanged.
+      providerOrder: ['openrouter'],
       modelOverrides: {
-        groq: 'llama-3.1-8b-instant',
         // ONLY the stage-scoped model env may change the pinned fallback —
         // a global FORECAST_LLM_MODEL_OPENROUTER must not move the
         // probability-coupled stage either (review finding on #4965).
@@ -14791,8 +14791,8 @@ function getForecastLlmCallOptions(stage = 'default') {
       },
       // Legacy request-body parity: the pinned models predate the
       // reasoning-off extraBody on the table's openrouter entry. Keep that
-      // omission, but never drop the mandatory provider-routing policy: a
-      // Groq fallback still sends this probability-bearing prompt to OpenRouter.
+      // omission, but never drop the mandatory provider-routing policy: this
+      // probability-bearing prompt goes to OpenRouter.
       extraBodyOverrides: { openrouter: { provider: OPENROUTER_PROVIDER_ROUTING } },
     };
   }
@@ -17084,8 +17084,8 @@ const MARKET_IMPLICATIONS_STAGE_CACHE_PREFIX = 'forecast:llm-market-implications
 // overridden) order that actually has an API key, ONE attempt each (market_implications
 // forces maxRetries:0), summed with the 5s stage guard that getUsableForecastLlmBudgetMs
 // subtracts. Reserving only the PRIMARY timeout (the original 30_000) was a latent bug:
-// with the default openrouter→groq order a DeepSeek Flash timeout drained the
-// budget so the groq FALLBACK was stranded and a recoverable timeout was misreported as
+// with a two-provider default order a DeepSeek Flash timeout drained the
+// budget so the FALLBACK was stranded and a recoverable timeout was misreported as
 // SEED_ERROR (health WARNING). Reserving the full chain means an admitted call can exhaust
 // the primary AND still run the fallback; below that we skip and preserve last-good (green,
 // age-based STALE_SEED still escalates past 2h) rather than attempt a chain we cannot finish.

@@ -203,7 +203,7 @@ globalThis.fetch = async function ipv4Fetch(input, init) {
 };
 
 const ALLOWED_ENV_KEYS = new Set([
-  'GROQ_API_KEY', 'OPENROUTER_API_KEY', 'EXA_API_KEYS', 'BRAVE_API_KEYS', 'SERPAPI_API_KEYS', 'FRED_API_KEY', 'EIA_API_KEY',
+  'OPENROUTER_API_KEY', 'EXA_API_KEYS', 'BRAVE_API_KEYS', 'SERPAPI_API_KEYS', 'FRED_API_KEY', 'EIA_API_KEY',
   'CLOUDFLARE_API_TOKEN', 'ACLED_ACCESS_TOKEN', 'URLHAUS_AUTH_KEY',
   'OTX_API_KEY', 'ABUSEIPDB_API_KEY', 'WINGBITS_API_KEY', 'WS_RELAY_URL',
   'VITE_OPENSKY_RELAY_URL', 'OPENSKY_CLIENT_ID', 'OPENSKY_CLIENT_SECRET',
@@ -796,17 +796,6 @@ async function validateSecretAgainstProvider(key, rawValue, context = {}) {
 
   try {
     switch (key) {
-    case 'GROQ_API_KEY': {
-      const response = await fetchWithTimeout('https://api.groq.com/openai/v1/models', {
-        headers: { Authorization: `Bearer ${value}`, 'User-Agent': CHROME_UA },
-      });
-      const text = await response.text();
-      if (isCloudflareChallenge403(response, text)) return ok('Groq key stored (Cloudflare blocked verification)');
-      if (isAuthFailure(response.status, text)) return fail('Groq rejected this key');
-      if (!response.ok) return fail(`Groq probe failed (${response.status})`);
-      return ok('Groq key verified');
-    }
-
     case 'OPENROUTER_API_KEY': {
       const response = await fetchWithTimeout('https://openrouter.ai/api/v1/models', {
         headers: { Authorization: `Bearer ${value}`, 'User-Agent': CHROME_UA },
@@ -1318,7 +1307,6 @@ async function dispatch(requestUrl, req, routes, context) {
     const providers = [];
     const providerChecks = [];
     const ollamaUrl = process.env.OLLAMA_API_URL || process.env.LLM_API_URL;
-    const groqKey = process.env.GROQ_API_KEY;
     const openrouterKey = process.env.OPENROUTER_API_KEY;
 
     if (ollamaUrl) {
@@ -1328,11 +1316,6 @@ async function dispatch(requestUrl, req, routes, context) {
           probeOrigin(origin).then((available) => ({ name: 'ollama', url: origin, available })),
         );
       } catch {}
-    }
-    if (groqKey && groqKey.startsWith('gsk_')) {
-      providerChecks.push(
-        probeOrigin('https://api.groq.com').then((available) => ({ name: 'groq', url: 'https://api.groq.com', available })),
-      );
     }
     if (openrouterKey) {
       providerChecks.push(
@@ -1752,7 +1735,6 @@ export async function createLocalApiServer(options = {}) {
       (async () => {
         const urls = [
           process.env.OLLAMA_API_URL || process.env.LLM_API_URL,
-          process.env.GROQ_API_KEY ? 'https://api.groq.com' : null,
           process.env.OPENROUTER_API_KEY ? 'https://openrouter.ai' : null,
         ].filter(Boolean);
         for (const url of urls) {
