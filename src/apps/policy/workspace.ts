@@ -20,6 +20,14 @@ interface PolicyEntry {
   summary: string;
   gap: string;
   customsImplication: string;
+  /** 13/10/2026: how the content was checked ("verificata (T, …)", "da verificare…"). */
+  status?: string;
+  /** Role in the six-layer model: "modulatore", "quadro", or empty. */
+  role?: string;
+  /** HS codes of the strategic goods the measure applies to. */
+  goods?: string[];
+  /** Key in thesis/references.bib when the measure is a thesis source. */
+  thesisKey?: string | null;
 }
 
 interface PolicyPayload {
@@ -28,7 +36,9 @@ interface PolicyPayload {
   fetchedAt: string;
 }
 
-const JURISDICTION_LABELS: Record<string, string> = { eu: 'Unione Europea', it: 'Italia' };
+const JURISDICTION_LABELS: Record<string, string> = { eu: 'Unione Europea', it: 'Italia', wto: 'OMC (WTO)' };
+
+const isVerified = (entry: PolicyEntry): boolean => /^(verificata|in riesame)/i.test(entry.status ?? '');
 
 function monitorCard(item: Record<string, unknown>): string {
   const title = String(item.title ?? item.name ?? item.headline ?? item.reference ?? 'Aggiornamento normativo');
@@ -74,6 +84,7 @@ export function createPolicyWorkspace(): AppWorkspace {
       let selectedId = entries[0]?.id ?? '';
       let jurisdiction = 'ALL';
       let category = 'ALL';
+      let roleFilter = 'ALL';
       let query = '';
 
       root.innerHTML = `
@@ -81,10 +92,11 @@ export function createPolicyWorkspace(): AppWorkspace {
           <div class="rs-ws-toolbar">
             <div class="rs-ws-heading">
               <h1>Policy &amp; Compliance</h1>
-              <p>Registro normativo aperto e gap regolatori mappati sulle categorie di rischio</p>
+              <p>Registro normativo aperto: misure che la tesi usa come modulatori, quadro doganale e voci ancora da verificare</p>
             </div>
             <div class="rs-ws-stats">
               <div class="rs-stat"><span class="rs-stat-value">${entries.length}</span><span class="rs-stat-label">norme</span></div>
+              <div class="rs-stat"><span class="rs-stat-value">${entries.filter(isVerified).length}</span><span class="rs-stat-label">verificate</span></div>
               <div class="rs-stat"><span class="rs-stat-value">${monitor.length}</span><span class="rs-stat-label">monitor</span></div>
               <div class="rs-stat"><span class="rs-stat-value">${jurisdictions.length}</span><span class="rs-stat-label">giurisdizioni</span></div>
             </div>
@@ -101,6 +113,12 @@ export function createPolicyWorkspace(): AppWorkspace {
               <select id="rsPolicyJurisdiction" class="rs-select">
                 <option value="ALL">Tutte le giurisdizioni</option>
                 ${jurisdictions.map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(JURISDICTION_LABELS[value] ?? value)}</option>`).join('')}
+              </select>
+              <select id="rsPolicyRole" class="rs-select">
+                <option value="ALL">Tutte le voci</option>
+                <option value="modulatore">Modulatori (misure del Cap. 3)</option>
+                <option value="verified">Solo verificate</option>
+                <option value="unverified">Solo da verificare</option>
               </select>
               <select id="rsPolicyCategory" class="rs-select">
                 <option value="ALL">Tutte le categorie di rischio</option>
@@ -128,8 +146,11 @@ export function createPolicyWorkspace(): AppWorkspace {
         entries.filter((entry) => {
           if (jurisdiction !== 'ALL' && entry.jurisdiction !== jurisdiction) return false;
           if (category !== 'ALL' && !(entry.riskCategories ?? []).includes(category)) return false;
+          if (roleFilter === 'modulatore' && entry.role !== 'modulatore') return false;
+          if (roleFilter === 'verified' && !isVerified(entry)) return false;
+          if (roleFilter === 'unverified' && isVerified(entry)) return false;
           if (!query) return true;
-          const haystack = `${entry.title} ${entry.reference} ${entry.topic} ${entry.summary}`.toLowerCase();
+          const haystack = `${entry.title} ${entry.reference} ${entry.topic} ${entry.summary} ${(entry.goods ?? []).join(' ')}`.toLowerCase();
           return haystack.includes(query);
         });
 
@@ -142,13 +163,16 @@ export function createPolicyWorkspace(): AppWorkspace {
         detailEl.innerHTML = `
           <div class="rs-detail-head">
             <span class="rs-chip">${escapeHtml(JURISDICTION_LABELS[entry.jurisdiction] ?? entry.jurisdiction)}</span>
-            <span class="rs-chip rs-chip-muted">${escapeHtml(entry.reference)}</span>
+            ${entry.role ? `<span class="rs-chip">${escapeHtml(entry.role)}</span>` : ''}
+            <span class="rs-chip ${isVerified(entry) ? 'rs-chip-ok' : 'rs-chip-wip'}">${escapeHtml(entry.status || 'da verificare')}</span>
           </div>
           <h2>${escapeHtml(entry.title)}</h2>
-          <p class="rs-meta">${escapeHtml(entry.topic)}</p>
+          <p class="rs-meta">${escapeHtml(entry.reference)}</p>
+          <p class="rs-meta">${escapeHtml(entry.topic)}${(entry.goods ?? []).length ? ` · HS ${escapeHtml((entry.goods ?? []).join(', '))}` : ''}</p>
           <h3>Sintesi</h3><p>${escapeHtml(entry.summary)}</p>
-          <h3>Gap regolatorio</h3><p>${escapeHtml(entry.gap)}</p>
-          <h3>Implicazione doganale</h3><p>${escapeHtml(entry.customsImplication)}</p>
+          ${entry.gap ? `<h3>Gap regolatorio</h3><p>${escapeHtml(entry.gap)}</p>` : ''}
+          <h3>${entry.role === 'modulatore' ? 'Ruolo nel modello' : 'Implicazione doganale'}</h3><p>${escapeHtml(entry.customsImplication)}</p>
+          ${entry.thesisKey ? `<p class="rs-meta">Fonte della tesi: <code>${escapeHtml(entry.thesisKey)}</code> (verificata nel registro delle fonti).</p>` : ''}
           <div class="rs-detail-foot">
             ${(entry.riskCategories ?? []).map((value) => `<span class="rs-chip rs-chip-dim">${escapeHtml(value)}</span>`).join('')}
             ${(entry.chokepoints ?? []).map((value) => `<span class="rs-chip rs-chip-muted">${escapeHtml(value)}</span>`).join('')}
@@ -166,6 +190,7 @@ export function createPolicyWorkspace(): AppWorkspace {
             <button class="rs-list-item${entry.id === selectedId ? ' active' : ''}" data-id="${escapeHtml(entry.id)}">
               <span class="rs-list-title">${escapeHtml(entry.title)}</span>
               <span class="rs-list-sub">${escapeHtml(entry.reference)}</span>
+              <span class="rs-list-sub">${isVerified(entry) ? '✓ ' : '… '}${escapeHtml(entry.status || 'da verificare')}</span>
               <span class="rs-list-tags">${(entry.riskCategories ?? [])
                 .slice(0, 3)
                 .map((value) => `<span class="rs-chip">${escapeHtml(value)}</span>`)
@@ -189,6 +214,10 @@ export function createPolicyWorkspace(): AppWorkspace {
       });
       root.querySelector<HTMLSelectElement>('#rsPolicyJurisdiction')?.addEventListener('change', (event) => {
         jurisdiction = (event.target as HTMLSelectElement).value;
+        renderList();
+      });
+      root.querySelector<HTMLSelectElement>('#rsPolicyRole')?.addEventListener('change', (event) => {
+        roleFilter = (event.target as HTMLSelectElement).value;
         renderList();
       });
       root.querySelector<HTMLSelectElement>('#rsPolicyCategory')?.addEventListener('change', (event) => {
