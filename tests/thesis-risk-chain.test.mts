@@ -1,4 +1,5 @@
 import { describe, it } from 'node:test';
+import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import {
   buildChains,
@@ -174,5 +175,14 @@ describe('seismic trigger fetch (endpoint and seeder)', () => {
     const out = await fetchSeismicTriggers({ nowMs: now, fetchFn: async () => reply(204, null) });
     assert.equal(out.source, 'EMSC');
     assert.deepEqual(out.quakes, []);
+  });
+});
+
+describe('trigger catalogue mirror for the seeder', () => {
+  it('scripts/_thesis-catalogue.mjs is api/thesis/_catalogue.js plus its header', () => {
+    const api = readFileSync(new URL('../api/thesis/_catalogue.js', import.meta.url), 'utf8');
+    const mirror = readFileSync(new URL('../scripts/_thesis-catalogue.mjs', import.meta.url), 'utf8');
+    const body = mirror.split('\n').slice(4).join('\n');
+    assert.equal(body, api, 'copy api/thesis/_catalogue.js into scripts/_thesis-catalogue.mjs after the 4-line header');
   });
 });

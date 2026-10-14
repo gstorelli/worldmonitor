@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 // Seismic triggers of the thesis view (EMSC, USGS fallback, 30 days, M>=4.5)
 // written to Redis for /api/thesis/triggers. Same fetch and normalisation as
-// the endpoint (api/thesis/_catalogue.js). Runs hourly in the `thesis` tier of
-// scripts/seed-cron.sh.
+// the endpoint (api/thesis/_catalogue.js, mirrored in _thesis-catalogue.mjs).
+// Runs hourly in the `thesis` tier of scripts/seed-cron.sh.
 
 import { loadEnvFile, runSeed } from './_seed-utils.mjs';
-import { TRIGGERS_REDIS_KEY, fetchSeismicTriggers } from '../api/thesis/_catalogue.js';
+import { TRIGGERS_REDIS_KEY, fetchSeismicTriggers } from './_thesis-catalogue.mjs';
 
 loadEnvFile(import.meta.url);
 
