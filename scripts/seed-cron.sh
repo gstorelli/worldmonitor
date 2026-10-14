@@ -84,12 +84,18 @@ case "$TIER" in
     run seed-portwatch.mjs 360
     ;;
   full)
+    # Climate zone normals (1991-2020, Open-Meteo) first and on their own: one
+    # zone at a time to stay under Open-Meteo's rate limit, which takes far
+    # longer than the 240 s of the sweep. Without them the hourly climate
+    # anomalies (thesis tier) fail. Key TTL 95 days, so one good weekly run
+    # in a month is enough.
+    run seed-climate-zone-normals.mjs 3000
     # Everything without a tier of its own: the weekly catch-all.
     # The second line lists the seeders of the scope groups switched off on
     # 14/10/2026 (src/config/scope.ts): finance, tech/startup, consumer
     # indices, live media, military. They never run on this box.
     OUT_OF_SCOPE_SEEDERS="aaii-sentiment,crypto-quotes,crypto-sectors,etf-flows,stablecoin-markets,token-panels,prediction-markets,fear-greed,seed-cot.mjs,earnings-calendar,hyperliquid-flow,market-breadth,sec-8k-stream,sec-cik-map,china-stock-connect,china-corporate-disclosures,gold-etf-flows,gulf-quotes,bundle-market-backup,seed-research.mjs,bigmac,grocery-basket,consumer-prices,webcams,military-bases,military-cii,military-flights,military-maritime-news,iran-events,defense-patents,thermal-escalation,cross-strait-activity"
-    export SEED_SKIP="market-quotes,commodity,insights,forecasts,correlation,gdelt-intel,cross-source,chokepoint,ecb-fx,acled,sanctions,ucdp,earthquakes,thesis-triggers,natural-events,climate-anomalies,supply-chain-trade,seed-portwatch.mjs,${OUT_OF_SCOPE_SEEDERS}"
+    export SEED_SKIP="seed-climate-zone-normals.mjs,market-quotes,commodity,insights,forecasts,correlation,gdelt-intel,cross-source,chokepoint,ecb-fx,acled,sanctions,ucdp,earthquakes,thesis-triggers,natural-events,climate-anomalies,supply-chain-trade,seed-portwatch.mjs,${OUT_OF_SCOPE_SEEDERS}"
     run "" 240
     ;;
   *)
