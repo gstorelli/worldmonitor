@@ -33,7 +33,9 @@ secrets/
 .vercel
 api/\[domain\]/v1/\[rpc\].js
 api/\[\[...path\]\].js
-.claude/
+.claude/*
+# Shared project settings for Claude Code (attribution off) are tracked.
+!.claude/settings.json
 .cursor/
 .env.vercel-backup
 .env.vercel-export
