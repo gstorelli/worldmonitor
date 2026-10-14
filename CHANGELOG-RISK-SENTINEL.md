@@ -8,6 +8,7 @@ Formato di ogni voce: numero della PR, cosa cambia per chi usa il portale, event
 
 ## 14 ottobre 2026
 
+- **#44**: il proxy `redis-rest` accetta richieste fino a 16 MB invece di 1 MB. Con il limite precedente il seeder OFAC falliva a ogni giro scrivendo il suo indice di circa 2,1 MB, e la scheda USA delle sanzioni non si aggiornava.
 - **#43** (#92 della tesi): Sanctions pressure con la scheda "UE" (predefinita) accanto a "USA (OFAC)". La lista consolidata UE delle sanzioni finanziarie, aggregata: soggetti per regime, enti per paese, nuove designazioni negli ultimi 30 giorni e data dell'ultima. Solo conteggi, nessun dato personale. Nuovo seeder `seed-eu-sanctions` nel livello `slow`; il seeder OFAC ora ha il nome esatto nel cron.
 - **#42** (#91 della tesi): Trade Policy su UE e Italia per gli 8 beni. Scheda "Importazioni UE/IT" con importazioni e primi fornitori (Eurostat Comext DS-045409, 2025) e scheda "Dazi UE" con dazio MFN e preferenziale minimo per sottovoce HS6 (WTO, 2024). Nella vista tesi solo queste due; le schede USA restano nella Full dashboard. OSINT prende i fornitori dell'Italia da Comext (8 beni su 8). Nuovo seeder `seed-eu-trade` nel livello `context`.
 - **#41**: le previsioni (`seed-forecasts`, LLM DeepSeek dalle `FORECAST_LLM_*`) si calcolano solo nelle 24 ore dopo che qualcuno ha aperto il pannello Previsioni (`POST /api/forecast/viewed`); altrimenti il giro orario si ferma senza chiamare l'LLM. `FORECAST_ALWAYS_RUN=1` ripristina il comportamento precedente.
