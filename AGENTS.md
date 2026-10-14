@@ -137,7 +137,12 @@ npm run lint:safe-html    # OPT-IN ONLY: see "Pre-Push" (fork baseline fails thi
 - **Scope switches (14/10/2026)**: `src/config/scope.ts` switches off whole inherited
   groups: finance (crypto, stablecoins, tokens, predictions, stocks), tech/startup,
   consumer indices, live media (webcams, live channels) and military (flights,
-  vessels, bases, USNI, sirens, strikes, GPS jamming, Telegram, PizzINT). A switched-off
+  vessels, bases, USNI, sirens, strikes, GPS jamming, Telegram, PizzINT); since
+  15/10/2026 also macro (BIS, ECB rates, FRED, FSI, US/China macro, FX) and
+  upstreamExtra (tenders, China coverage, resilience, health, radiation, CO2/ocean
+  ice, cyber, internet outages, aviation, service status, advisories, unrest,
+  displacement, humanitarian). Energy and gas seeders run in the `context` tier.
+  A switched-off
   group is tier 3, never fetched by the SPA (`isScopeOff` in the loaders), absent from the
   map layer picker, out of the `full` seed sweep (`scripts/seed-cron.sh`), out of the
   relay loops (`RS_RELAY_DISABLED_LOOPS`, `RS_FINANCE_SCOPE` in `scripts/ais-relay.cjs`)

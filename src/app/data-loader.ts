@@ -1853,7 +1853,11 @@ export class DataLoaderManager implements AppModule {
     const _desktopLocked = isDesktopRuntime() && !getSecretState('WORLDMONITOR_API_KEY').present;
     const tasks: Promise<void>[] = [];
 
-    tasks.push((async () => {
+    // Risk Sentinel scope (15/10/2026): outages, protests, HAPI, UNHCR and
+    // security advisories belong to the switched-off upstreamExtra group.
+    const extraOff = isScopeOff('upstreamExtra');
+
+    if (!extraOff) tasks.push((async () => {
       try {
         const outages = await fetchInternetOutages();
         this.ctx.intelligenceCache.outages = outages;
@@ -1881,6 +1885,7 @@ export class DataLoaderManager implements AppModule {
     })());
 
     const protestsTask = (async (): Promise<SocialUnrestEvent[]> => {
+      if (extraOff) return [];
       try {
         const protestData = await fetchProtestEvents();
         this.ctx.intelligenceCache.protests = protestData;
@@ -1934,7 +1939,7 @@ export class DataLoaderManager implements AppModule {
       }
     })());
 
-    tasks.push((async () => {
+    if (!extraOff) tasks.push((async () => {
       try {
         const summaries = await fetchHapiSummary();
         ingestHapiForCII(summaries);
@@ -2040,7 +2045,7 @@ export class DataLoaderManager implements AppModule {
       }
     })());
 
-    tasks.push((async () => {
+    if (!extraOff) tasks.push((async () => {
       try {
         const unhcrResult = await fetchUnhcrPopulation();
         if (!unhcrResult.ok) {
@@ -2064,7 +2069,7 @@ export class DataLoaderManager implements AppModule {
     tasks.push(this.loadClimateAnomalies());
 
     // Security advisories
-    tasks.push(this.loadSecurityAdvisories());
+    if (!extraOff) tasks.push(this.loadSecurityAdvisories());
 
     // Telegram Intel (premium-locked on desktop without API key)
     if (!_desktopLocked) {

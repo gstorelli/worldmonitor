@@ -513,7 +513,10 @@ async function bootSeedDelayMs(label, metaKey, intervalMs) {
 // and SocialVelocity are retail-finance Reddit signals, TechEvents is the
 // upstream tech variant, DodoPrices is the removed payments provider.
 // RS_RELAY_DISABLED_LOOPS (comma list, "none" to clear) overrides the default.
-const RS_DEFAULT_DISABLED_LOOPS = ['USNI', 'PizzINT', 'WsbTickers', 'SocialVelocity', 'TechEvents', 'DodoPrices'];
+// 15/10/2026: Cyber (no API keys), Spending (US federal spending, macro) and
+// ServiceStatuses (upstream service status page) belong to the macro and
+// upstreamExtra scope groups.
+const RS_DEFAULT_DISABLED_LOOPS = ['USNI', 'PizzINT', 'WsbTickers', 'SocialVelocity', 'TechEvents', 'DodoPrices', 'Cyber', 'Spending', 'ServiceStatuses'];
 // Each starter of a listed loop checks rsLoopDisabled(label) before calling
 // startBootSeedLoop (kept untouched: tests evaluate its source in isolation).
 const RS_DISABLED_LOOPS = new Set(
@@ -3429,6 +3432,7 @@ async function startCyberThreatsSeedLoop() {
     return;
   }
   console.log(`[Cyber] Seed loop starting (interval ${CYBER_SEED_INTERVAL_MS / 1000 / 60 / 60}h, urlhaus:${URLHAUS_AUTH_KEY ? 'yes' : 'no'} otx:${OTX_API_KEY ? 'yes' : 'no'} abuseipdb:${ABUSEIPDB_API_KEY ? 'yes' : 'no'})`);
+  if (rsLoopDisabled('Cyber')) return;
   startBootSeedLoop('Cyber', 'seed-meta:cyber:threats', CYBER_SEED_INTERVAL_MS, seedCyberThreats, (e) => console.warn('[Cyber] Initial seed error:', e?.message || e), (e) => console.warn('[Cyber] Seed error:', e?.message || e));
 }
 
@@ -4078,6 +4082,7 @@ async function seedServiceStatuses() {
 
 function startServiceStatusesSeedLoop() {
   console.log(`[ServiceStatuses] Seed loop starting (interval ${SERVICE_STATUSES_SEED_INTERVAL_MS / 1000 / 60}min)`);
+  if (rsLoopDisabled('ServiceStatuses')) return;
   startBootSeedLoop('ServiceStatuses', 'seed-meta:infra:service-statuses', SERVICE_STATUSES_SEED_INTERVAL_MS, seedServiceStatuses, (e) => console.warn('[ServiceStatuses] Initial seed error:', e?.message || e), (e) => console.warn('[ServiceStatuses] Seed error:', e?.message || e));
 }
 
@@ -5125,6 +5130,7 @@ async function startSpendingSeedLoop() {
     return;
   }
   console.log(`[Spending] Seed loop starting (interval ${SPENDING_SEED_INTERVAL_MS / 1000 / 60}min)`);
+  if (rsLoopDisabled('Spending')) return;
   startBootSeedLoop('Spending', 'seed-meta:economic:spending', SPENDING_SEED_INTERVAL_MS, seedUsaSpending, (e) => console.warn('[Spending] Initial seed error:', e?.message || e), (e) => console.warn('[Spending] Seed error:', e?.message || e));
 }
 

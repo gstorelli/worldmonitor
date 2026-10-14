@@ -152,6 +152,24 @@ const OUT_OF_SCOPE_HEALTH_CHECKS = new Set([
   'defensePatents', 'pizzint', 'telegramFeed',
   // acled
   'acledIntel', 'intelHistoryIngestConflictAcled',
+  // macro (15/10/2026): BIS, ECB rates, FRED, US/China macro, EU financial stress
+  'bisCredit', 'bisDsr', 'bisExchange', 'bisPolicy', 'bisPropertyCommercial', 'bisPropertyResidential',
+  'blsSeries', 'cbrRates', 'chinaMacro', 'chinaPolicyEvents', 'chinaReleaseCalendar',
+  'ecbEstr', 'ecbEuribor1y', 'ecbEuribor3m', 'ecbEuribor6m', 'econCalendar', 'economicStress',
+  'euFsi', 'euYieldCurve', 'eurostatCountryData', 'fxYoy', 'fredBatch', 'fredRatesSeeder', 'macroSignals',
+  'forecastFredCpiaucsl', 'forecastFredDcoilwtico', 'forecastFredDgs10', 'forecastFredGdp', 'forecastFredM2sl',
+  'forecastFredT10y2y', 'forecastFredUnrate', 'forecastFredVixcls', 'forecastFredWalcl',
+  // upstreamExtra (15/10/2026): upstream domains outside the thesis and services without API keys
+  'chinaCorporateDisclosures', 'chinaCoverage', 'chinaDecisionSignals', 'climateAirQuality', 'healthAirQuality',
+  'co2Monitoring', 'oceanIce', 'companyMonitoringWorker', 'cyberThreats', 'cyberThreatsRpc', 'ddosAttacks',
+  'trafficAnomalies', 'outages', 'digestNotifications', 'diseaseOutbreaks', 'vpdTrackerHistorical',
+  'vpdTrackerRealtime', 'displacement', 'displacementPrev', 'electricityPrices', 'fatfListing', 'flightDelays',
+  'intlDelays', 'notamClosures', 'globalTendersCanadaBuys', 'globalTendersContractsFinder', 'globalTendersGets',
+  'globalTendersSam', 'globalTendersTed', 'globalTendersWorldBank', 'humanitarianSummary', 'newsFeedHealth',
+  'newsRecallBenchmark', 'productCatalog', 'radiationWatch', 'recoveryImportHhi', 'recoveryReexportShare',
+  'regionalSnapshots', 'regulatoryActions', 'resilienceIntervals', 'resilienceRanking', 'securityAdvisories',
+  'serviceStatuses', 'simulationOutcomeLatest', 'simulationPackageLatest', 'unrestEvents', 'energyIntelligence',
+  'intelHistoryIngestEnergyIntelligence',
 ]);
 function isOutOfScopeCheck(name) {
   return OUT_OF_SCOPE_HEALTH_CHECKS.has(name) || name.startsWith('consumerPricesCoverage');
