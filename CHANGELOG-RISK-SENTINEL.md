@@ -8,6 +8,8 @@ Formato di ogni voce: numero della PR, cosa cambia per chi usa il portale, event
 
 ## 14 ottobre 2026
 
+- **#34**: il tooltip "Fonti dei dati" di Alert feed e OSINT dice che il workflow n8n 01 (notizie GDELT) non esiste nell'istanza, come risulta dal log di `n8n-sync`.
+- **#33**: questo changelog; autorizzazione permanente al merge per gli agenti, registrata in `AGENTS.md`.
 - **#32**: icona "Fonti dei dati" accanto al titolo di ogni pannello della vista tesi, sulla mappa e in ogni sezione di OSINT, Research e Policy. Il tooltip cita la fonte esatta, l'indirizzo chiamato dal codice e il file che la chiama. Registro in `src/config/data-sources.ts`, da aggiornare quando un pannello cambia fonte.
 - **#31**: i pannelli di notizie rispettano perimetro, regole admin e allowlist dell'app. La vista tesi mostra solo i suoi 12 pannelli; spariscono ovunque `finance`, `tech`, `ai` e `layoffs`.
 - **#30**: tolti la pipeline GDELT con adjudicator LLM mai usata e le rotte `/api/trigger-ingestion` e `/api/customs-events`, che restituiva coordinate casuali. L'Alert feed legge solo il digest n8n.

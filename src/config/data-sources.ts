@@ -91,7 +91,7 @@ const N8N_DIGEST: DataSource[] = [
     source: 'GDELT Project, DOC 2.0 API (workflow n8n 01)',
     url: 'https://api.gdeltproject.org/api/v2/doc/doc',
     code: 'n8n-workflows/01-gdelt-customs-ingestion.json',
-    note: 'GDELT è un segnale, non una misura del pericolo.',
+    note: 'Il workflow 01 non esiste nell’istanza n8n (log di n8n-sync del 14/10/2026): oggi questo tema riceve solo i prezzi. GDELT è un segnale, non una misura del pericolo.',
   },
   {
     what: 'Tema “Concentrazione del commercio (HS4)”',
