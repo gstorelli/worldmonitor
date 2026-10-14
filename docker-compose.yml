@@ -84,6 +84,10 @@ services:
       # Zotero Web API v3 (Source Validation panel) — https://www.zotero.org/settings/keys
       ZOTERO_API_KEY: "${ZOTERO_API_KEY:-}"
       ZOTERO_USER_ID: "${ZOTERO_USER_ID:-}"
+      # OpenAlex (Research → "Novità accademiche") — https://openalex.org/settings/api
+      # With a key OpenAlex is searched first; without it Crossref is.
+      OPENALEX_API_KEY: "${OPENALEX_API_KEY:-}"
+      CROSSREF_MAILTO: "${CROSSREF_MAILTO:-}"
       # Data source API keys (optional — features degrade gracefully)
       AISSTREAM_API_KEY: "${AISSTREAM_API_KEY:-}"
       FINNHUB_API_KEY: "${FINNHUB_API_KEY:-}"
