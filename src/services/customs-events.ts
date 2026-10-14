@@ -12,27 +12,6 @@ export interface CustomsEvent {
   timestamp: number;
 }
 
-export async function fetchCustomsEvents(): Promise<CustomsEvent[]> {
-  try {
-    const url = toApiUrl('/api/customs-events');
-    const response = await fetch(url.toString(), {
-      headers: {
-        'Accept': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      console.error(`[CustomsEvents] HTTP ${response.status}`);
-      return [];
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error('[CustomsEvents] Fetch error:', error);
-    return [];
-  }
-}
-
 const SEVERITY_SCORES: Record<string, number> = {
   critical: 0.95,
   extreme: 0.95,
@@ -44,10 +23,10 @@ const SEVERITY_SCORES: Record<string, number> = {
 };
 
 /**
- * Fallback feed for the Global Risk Alerts panel: the n8n digest
- * (risk_sentinel:n8n:* + policy monitor) reshaped as alert cards. The SQLite
- * customs-events table has no writer in the self-hosted deploy, so without
- * this the panel stays empty while the pipelines are producing signals.
+ * Feed of the Global Risk Alerts panel: the n8n digest
+ * (risk_sentinel:n8n:* + policy monitor) reshaped as alert cards. The former
+ * /api/customs-events SQLite route (random coordinates, written only by the
+ * removed sidecar ingestion pipeline) is gone.
  */
 export async function fetchDigestSignals(limit = 12): Promise<CustomsEvent[]> {
   try {
