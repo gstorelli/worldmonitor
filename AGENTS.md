@@ -176,8 +176,17 @@ npm run lint:safe-html    # OPT-IN ONLY: see "Pre-Push" (fork baseline fails thi
   `panelLayout.init()` — the dashboard (map, panels, data loader) never initialises for
   them. Add new panels/features inside the app workspace, not as dashboard panels.
   Research owns its academic layer as pure modules with tests:
-  `src/apps/research/{citations,coverage,filters}.ts` (APA/BibTeX/RIS/CSV, 8D coverage
-  matrix and field-qualified search) — extend those instead of the workspace DOM code.
+  `src/apps/research/{citations,coverage,filters,layers}.ts` (APA/BibTeX/RIS/CSV,
+  coverage by thesis-model layer × verification level, field-qualified search with
+  `layer:`/`verif:`) — extend those instead of the workspace DOM code. The bibliography
+  (`data/zotero-sources.json` + `api/zotero/_sources-data.js`) is GENERATED from the
+  private thesis repo by `scripts/build-research-bibliography.mjs` (metadata, layer and
+  verification level only; verification notes never enter this public repo).
+- **Seeder logs on the VPS**: `scripts/seed-cron.sh` tiers (quotes 20', intel/signals/
+  thesis hourly, context/slow 6h, full weekly) write one-line RUN/OK summaries to the
+  crontab logs; each seeder's full output goes to `/tmp/seed-all.*.log`. Exit 0 ("OK")
+  does not mean the seeder published: read the full log (e.g. `news:insights` exits 0
+  when its synthesis is rejected and the last good payload is preserved).
 
 ## Runtime Architecture
 
