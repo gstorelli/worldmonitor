@@ -1671,7 +1671,15 @@ export class DataLoaderManager implements AppModule {
     }
   }
 
+  private forecastViewSignalled = false;
+
   async loadForecasts(): Promise<void> {
+    // Risk Sentinel: tell the server someone is looking at the forecasts, so
+    // the hourly seeder computes them for the next 24 h (once per page load).
+    if (!this.forecastViewSignalled) {
+      this.forecastViewSignalled = true;
+      void fetch(toApiUrl('/api/forecast/viewed'), { method: 'POST', credentials: 'same-origin' }).catch(() => {});
+    }
     try {
       const hydrated = getHydratedData('forecasts') as { predictions?: import('@/generated/client/worldmonitor/forecast/v1/service_client').Forecast[] } | undefined;
       if (hydrated?.predictions?.length) {
