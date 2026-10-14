@@ -527,9 +527,12 @@ export class DataLoaderManager implements AppModule {
         }
       } catch { /* non-fatal */ }
     }
-    // Intelligence signals: run for any variant that shows these panels
-    if (shouldLoadAny(['cii', 'strategic-risk', 'strategic-posture', 'climate', 'population-exposure', 'security-advisories', 'radiation-watch', 'displacement', 'ucdp-events', 'satellite-fires', 'oref-sirens'])) {
+    // Intelligence signals: run for any variant that shows these panels.
+    // The climate panel alone (thesis view) only needs its own anomalies.
+    if (shouldLoadAny(['cii', 'strategic-risk', 'strategic-posture', 'population-exposure', 'security-advisories', 'radiation-watch', 'displacement', 'ucdp-events', 'satellite-fires', 'oref-sirens'])) {
       tasks.push({ name: 'intelligence', task: runGuarded('intelligence', () => this.loadIntelligenceSignals()) });
+    } else if (shouldLoad('climate') || this.ctx.mapLayers.climate) {
+      tasks.push({ name: 'climate', task: runGuarded('climate', () => this.loadClimateAnomalies()) });
     }
 
     if (SITE_VARIANT === 'full' && (shouldLoad('satellite-fires') || this.ctx.mapLayers.natural)) {
@@ -665,9 +668,11 @@ export class DataLoaderManager implements AppModule {
         case 'radiationWatch':
           await this.loadRadiationWatch();
           break;
+        case 'climate':
+          await this.loadClimateAnomalies();
+          break;
         case 'ucdpEvents':
         case 'displacement':
-        case 'climate':
         case 'gpsJamming':
           await this.loadIntelligenceSignals();
           break;
@@ -1266,7 +1271,12 @@ export class DataLoaderManager implements AppModule {
       let stocksResult: Awaited<ReturnType<typeof fetchMultipleStocks>>;
       const marketsPanel = this.ctx.panels['markets'] as MarketPanel | undefined;
 
-      if (customEntries.length === 0 && hydratedMarkets?.quotes?.length) {
+      if (isScopeOff('finance')) {
+        // Stock quotes only feed the markets panels, switched off with the
+        // finance group (src/config/scope.ts): the commodities panel does not
+        // need them.
+        stocksResult = { data: [] };
+      } else if (customEntries.length === 0 && hydratedMarkets?.quotes?.length) {
         const symbolMetaMap = new Map(effectiveSymbols.map((s) => [s.symbol, s]));
         const data = hydratedMarkets.quotes.map((q) => ({
           symbol: q.symbol,
@@ -1292,7 +1302,9 @@ export class DataLoaderManager implements AppModule {
 
       const finnhubConfigMsg = 'FINNHUB_API_KEY not configured — add in Settings';
 
-      if (stocksResult.rateLimited && stocksResult.data.length === 0) {
+      if (isScopeOff('finance')) {
+        // Finnhub is not called: nothing to report.
+      } else if (stocksResult.rateLimited && stocksResult.data.length === 0) {
         const rlMsg = 'Market data temporarily unavailable (rate limited) — retrying shortly';
         this.ctx.panels['commodities']?.showError(rlMsg);
       } else if (stocksResult.skipped) {
@@ -1305,6 +1317,7 @@ export class DataLoaderManager implements AppModule {
       }
 
       // Sector heatmap: always attempt loading regardless of market rate-limit status
+      // (finance scope only: the heatmap is switched off with it).
       const hydratedSectors = getHydratedData('sectors') as GetSectorSummaryResponse | undefined;
       const heatmapPanel = this.ctx.panels['heatmap'] as HeatmapPanel | undefined;
       const sectorNameMap = new Map(SECTORS.map((s) => [s.symbol, s.name]));
@@ -1315,7 +1328,9 @@ export class DataLoaderManager implements AppModule {
       });
       const toSectorBar = (s: { symbol?: string; name: string; change: number | null }) =>
         s.symbol && Number.isFinite(s.change) ? { symbol: s.symbol, name: s.name, change1d: s.change as number } : null;
-      if (hydratedSectors?.sectors?.length) {
+      if (isScopeOff('finance')) {
+        // switched off: src/config/scope.ts
+      } else if (hydratedSectors?.sectors?.length) {
         warmSectorCache(hydratedSectors);
         const items = hydratedSectors.sectors.map(toHeatmapItem);
         const sectorBars = items.map(toSectorBar).filter((s): s is NonNullable<typeof s> => s !== null);
@@ -1798,6 +1813,33 @@ export class DataLoaderManager implements AppModule {
     }
   }
 
+  /**
+   * Climate anomalies on their own: the thesis view shows the climate panel but
+   * none of the CII panels, so it must not pull the whole intelligence bundle
+   * (outages, protests, HAPI, UNHCR, advisories…). loadIntelligenceSignals
+   * still calls this, so the CII keeps its climate input.
+   */
+  async loadClimateAnomalies(): Promise<void> {
+    try {
+      const climateResult = await fetchClimateAnomalies();
+      if (!climateResult.ok) {
+        dataFreshness.recordError('climate', 'Climate anomalies unavailable (retaining prior climate state)');
+        return;
+      }
+      const anomalies = climateResult.anomalies;
+      this.callPanel('climate', 'setAnomalies', anomalies);
+      ingestClimateForCII(anomalies);
+      if (this.ctx.mapLayers.climate) {
+        this.ctx.map?.setClimateAnomalies(anomalies);
+      }
+      if (anomalies.length > 0) dataFreshness.recordUpdate('climate', anomalies.length);
+    } catch (error) {
+      console.error('[Intelligence] Climate anomalies fetch failed:', error);
+      this.callPanel('climate', 'showError');
+      dataFreshness.recordError('climate', String(error));
+    }
+  }
+
   async loadIntelligenceSignals(): Promise<void> {
     resetHotspotActivity();
     const _desktopLocked = isDesktopRuntime() && !getSecretState('WORLDMONITOR_API_KEY').present;
@@ -2011,26 +2053,7 @@ export class DataLoaderManager implements AppModule {
       }
     })());
 
-    tasks.push((async () => {
-      try {
-        const climateResult = await fetchClimateAnomalies();
-        if (!climateResult.ok) {
-          dataFreshness.recordError('climate', 'Climate anomalies unavailable (retaining prior climate state)');
-          return;
-        }
-        const anomalies = climateResult.anomalies;
-        this.callPanel('climate', 'setAnomalies', anomalies);
-        ingestClimateForCII(anomalies);
-        if (this.ctx.mapLayers.climate) {
-          this.ctx.map?.setClimateAnomalies(anomalies);
-        }
-        if (anomalies.length > 0) dataFreshness.recordUpdate('climate', anomalies.length);
-      } catch (error) {
-        console.error('[Intelligence] Climate anomalies fetch failed:', error);
-        this.callPanel('climate', 'showError');
-        dataFreshness.recordError('climate', String(error));
-      }
-    })());
+    tasks.push(this.loadClimateAnomalies());
 
     // Security advisories
     tasks.push(this.loadSecurityAdvisories());
