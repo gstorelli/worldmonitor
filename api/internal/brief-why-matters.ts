@@ -46,7 +46,7 @@ import {
   buildAnalystWhyMattersPrompt,
   sanitizeStoryFields,
 } from '../../server/worldmonitor/intelligence/v1/brief-why-matters-prompt';
-import { callLlm } from '../../server/_shared/llm';
+import { callLlm, getLlmFastModel } from '../../server/_shared/llm';
 import { readRawJsonFromUpstash, setCachedData, redisPipeline } from '../_upstash-json.js';
 // @ts-expect-error — JS module, no declaration file
 import { captureSilentError } from '../_sentry-edge.js';
@@ -125,7 +125,8 @@ const SHADOW_TTL_SEC = 7 * 24 * 60 * 60; // 7d
 // fork on 13/10/2026). Reasoning stays off
 // (callLlm default). Both whyMatters paths share this route.
 const WHY_MATTERS_PROVIDER_ORDER = ['openrouter', 'generic'];
-const WHY_MATTERS_MODEL_OVERRIDES = { openrouter: 'deepseek/deepseek-v4-flash' } as const;
+// Fork: the short blurb is a fast-tier task (scripts/_llm-models.mjs).
+const whyMattersModelOverrides = () => ({ openrouter: getLlmFastModel() });
 
 // ── Validation ────────────────────────────────────────────────────────
 const VALID_THREAT_LEVELS = new Set(['critical', 'high', 'medium', 'low']);
@@ -259,10 +260,10 @@ async function runAnalystPath(story: StoryPayload, iso2: string | null): Promise
       temperature: 0.4,
       timeoutMs: 15_000,
       stage: 'brief-why-matters-analyst',
-      // Fast utility model (deepseek-v4-flash), reasoning off — see the
+      // Fast-tier model (scripts/_llm-models.mjs), reasoning off — see the
       // WHY_MATTERS_* constants above. Decoupled from LLM_REASONING_MODEL.
       providerOrder: WHY_MATTERS_PROVIDER_ORDER,
-      modelOverrides: WHY_MATTERS_MODEL_OVERRIDES,
+      modelOverrides: whyMattersModelOverrides(),
       // A provider's explicit token-limit signal is deterministic, so retry
       // the next provider in-request. The parser remains post-call because
       // parse rejection is ambiguous and should not trigger duplicate spend.
@@ -312,10 +313,10 @@ async function runGeminiPath(story: StoryPayload): Promise<string | null> {
       temperature: 0.4,
       timeoutMs: 10_000,
       stage: 'brief-why-matters-gemini',
-      // Fast utility model (deepseek-v4-flash), reasoning off — see the
+      // Fast-tier model (scripts/_llm-models.mjs), reasoning off — see the
       // WHY_MATTERS_* constants above. Decoupled from LLM_REASONING_MODEL.
       providerOrder: WHY_MATTERS_PROVIDER_ORDER,
-      modelOverrides: WHY_MATTERS_MODEL_OVERRIDES,
+      modelOverrides: whyMattersModelOverrides(),
       // Match the analyst path: retry only deterministic token-limit signals,
       // while leaving prose-shape validation outside the provider loop.
       retryOnLengthLimit: true,

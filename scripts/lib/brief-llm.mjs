@@ -122,8 +122,8 @@ const DIGEST_PROSE_TTL_SEC = 4 * 60 * 60;
 const STORY_DESCRIPTION_TTL_SEC = 24 * 60 * 60;
 const WHY_MATTERS_CONCURRENCY = 5;
 
-// Pin to openrouter (google/gemini-2.5-flash until the #4944 U4 brief-voice
-// cutover, which is gated on the U3 shadow evaluation). Ollama isn't deployed
+// Pin to openrouter (fork: the quality-tier model of scripts/_llm-models.mjs,
+// via scripts/lib/llm-chain.cjs). Ollama isn't deployed
 // in Railway, and pinning keeps the brief's editorial voice on one model
 // across environments instead of drifting to a fallback model.
 const BRIEF_LLM_SKIP_PROVIDERS = ['ollama', 'generic'];

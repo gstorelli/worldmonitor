@@ -55,6 +55,12 @@ services:
       LLM_API_KEY: "${LLM_API_KEY:-}"
       LLM_MODEL: "${LLM_MODEL:-}"
       OPENROUTER_API_KEY: "${OPENROUTER_API_KEY:-}"
+      # Model tiers and OpenRouter base (scripts/_llm-models.mjs); empty = defaults.
+      LLM_FAST_MODEL: "${LLM_FAST_MODEL:-}"
+      LLM_QUALITY_MODEL: "${LLM_QUALITY_MODEL:-}"
+      LLM_REASONING_MODEL: "${LLM_REASONING_MODEL:-}"
+      OPENROUTER_BASE_URL: "${OPENROUTER_BASE_URL:-}"
+      LLM_INHERITED_MARKET_FEATURES: "${LLM_INHERITED_MARKET_FEATURES:-}"
       # n8n ingestion auth (Risk Sentinel): required by POST /api/n8n/ingest
       # when set. Generate with: openssl rand -hex 32
       N8N_INGEST_SECRET: "${N8N_INGEST_SECRET:-}"

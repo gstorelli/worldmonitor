@@ -70,11 +70,16 @@ export default async function handler(req) {
     // OpenRouter is the fork's provider. Before 13/10/2026 an OpenRouter-only
     // deployment sent its key to api.openai.com (the URL was chosen only by
     // the presence of a Groq key), so every call failed.
+    // Edge functions are self-contained, so the fast-tier default and the base
+    // URL are copied from scripts/_llm-models.mjs (tests/llm-models-parity).
     const useOpenRouter = Boolean(process.env.OPENROUTER_API_KEY);
+    const openRouterBase = (process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1').replace(/\/+$/, '');
     const apiUrl = useOpenRouter
-      ? 'https://openrouter.ai/api/v1/chat/completions'
+      ? `${openRouterBase}/chat/completions`
       : 'https://api.openai.com/v1/chat/completions';
-    const model = useOpenRouter ? 'deepseek/deepseek-v4-flash' : 'gpt-3.5-turbo';
+    const model = useOpenRouter
+      ? (process.env.LLM_FAST_MODEL || 'anthropic/claude-haiku-5.5')
+      : 'gpt-3.5-turbo';
 
     const llmResp = await fetch(apiUrl, {
       method: 'POST',

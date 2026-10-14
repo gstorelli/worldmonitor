@@ -85,6 +85,7 @@ import {
   __setForecastLlmRunDeadlineForTests,
 } from '../scripts/seed-forecasts.mjs';
 import { OPENROUTER_PROVIDER_ROUTING } from '../scripts/_llm-model-timeouts.mjs';
+import { DEFAULT_LLM_FAST_MODEL } from '../scripts/_llm-models.mjs';
 import { CONFLICT_COUNT_SOURCE_FEED } from '../scripts/_forecast-resolution.mjs';
 
 const originalForecastEnv = {
@@ -93,6 +94,7 @@ const originalForecastEnv = {
   FORECAST_LLM_MODEL_OPENROUTER: process.env.FORECAST_LLM_MODEL_OPENROUTER,
   FORECAST_LLM_COMBINED_MODEL_OPENROUTER: process.env.FORECAST_LLM_COMBINED_MODEL_OPENROUTER,
   LLM_API_KEY: process.env.LLM_API_KEY,
+  LLM_FAST_MODEL: process.env.LLM_FAST_MODEL,
   LLM_API_URL: process.env.LLM_API_URL,
   LLM_MODEL: process.env.LLM_MODEL,
   OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
@@ -1604,7 +1606,17 @@ describe('forecast llm overrides', () => {
     // `generic` provider holds the fallback slot.
     assert.deepEqual(options.providerOrder, ['openrouter', 'generic']);
     assert.equal(providers[0]?.name, 'openrouter');
-    assert.equal(providers[0]?.model, 'deepseek/deepseek-v4-flash');
+    // Fork (13/10/2026): the default is the fast tier of scripts/_llm-models.mjs;
+    // a non-Flash model keeps the entry's 25s window.
+    assert.equal(providers[0]?.model, DEFAULT_LLM_FAST_MODEL);
+    assert.equal(providers[0]?.timeout, 25_000);
+    assert.equal(providers[1]?.name, 'generic');
+    assert.equal(providers[1]?.timeout, 20_000, 'the fallback keeps its provider-specific window');
+
+    // DeepSeek V4 Flash remains selectable by env and keeps its own deadline.
+    process.env.LLM_FAST_MODEL = 'deepseek/deepseek-v4-flash';
+    const flashProviders = resolveForecastLlmProviders(getForecastLlmCallOptions('combined'));
+    assert.equal(flashProviders[0]?.model, 'deepseek/deepseek-v4-flash');
     // Was 15_000: a 'stall cutoff' that treated the SYMPTOM of unrouted OpenRouter
     // requests landing on slow backends. The cause is now fixed at the source (the
     // openrouter entry carries OPENROUTER_PROVIDER_ROUTING, so calls go to the
@@ -1612,9 +1624,7 @@ describe('forecast llm overrides', () => {
     // 22.4s, so a 15s cutoff did not prevent stalls — it GUARANTEED failure, and
     // every market_implications run wrote a SEED_ERROR. Flash now gets a completion
     // deadline that covers its measured distribution.
-    assert.equal(providers[0]?.timeout, 40_000, 'Flash gets its measured completion deadline under pinned routing');
-    assert.equal(providers[1]?.name, 'generic');
-    assert.equal(providers[1]?.timeout, 20_000, 'the fallback keeps its provider-specific window');
+    assert.equal(flashProviders[0]?.timeout, 40_000, 'Flash gets its measured completion deadline under pinned routing');
   });
 
   it('pins critical_signals to the pre-#4944 chain (probability-coupled stage)', () => {
@@ -1629,13 +1639,13 @@ describe('forecast llm overrides', () => {
     const options = getForecastLlmCallOptions('critical_signals');
     const providers = resolveForecastLlmProviders(options);
 
-    // Fork: the Groq primary of this pin was removed; the pinned Gemini model is
-    // now the only provider (it was already the only one with a key here).
+    // Fork: the Groq primary of this pin was removed, and Gemini 2.5 Flash was
+    // replaced by the fast tier (13/10/2026); OpenRouter is the only provider.
     assert.deepEqual(options.providerOrder, ['openrouter']);
     assert.equal(providers.length, 1);
     assert.equal(providers[0]?.name, 'openrouter');
-    assert.equal(providers[0]?.model, 'google/gemini-2.5-flash');
-    assert.equal(providers[0]?.timeout, 25_000, 'the DeepSeek stall cutoff must not change the pinned Gemini model');
+    assert.equal(providers[0]?.model, DEFAULT_LLM_FAST_MODEL);
+    assert.equal(providers[0]?.timeout, 25_000, 'the DeepSeek stall cutoff must not change the pinned model');
     assert.deepEqual(
       providers[0]?.extraBody,
       { provider: OPENROUTER_PROVIDER_ROUTING },
@@ -1668,7 +1678,7 @@ describe('forecast llm overrides', () => {
     const providers = resolveForecastLlmProviders(options);
 
     assert.deepEqual(options.providerOrder, ['openrouter']);
-    assert.equal(providers[0]?.model, 'google/gemini-2.5-flash');
+    assert.equal(providers[0]?.model, DEFAULT_LLM_FAST_MODEL);
 
     delete process.env.FORECAST_LLM_PROVIDER_ORDER;
   });
@@ -1684,7 +1694,7 @@ describe('forecast llm overrides', () => {
     const options = getForecastLlmCallOptions('critical_signals');
     const providers = resolveForecastLlmProviders(options);
 
-    assert.equal(providers[0]?.model, 'google/gemini-2.5-flash');
+    assert.equal(providers[0]?.model, DEFAULT_LLM_FAST_MODEL);
     assert.deepEqual(providers[0]?.extraBody, { provider: OPENROUTER_PROVIDER_ROUTING });
 
     // The stage-scoped model env DOES reach the pinned slot.
@@ -1713,8 +1723,8 @@ describe('forecast llm overrides', () => {
 
     assert.deepEqual(scenarioOptions.providerOrder, ['openrouter', 'generic']);
     assert.equal(scenarioProviders[0]?.name, 'openrouter');
-    assert.equal(scenarioProviders[0]?.model, 'deepseek/deepseek-v4-flash');
-    assert.equal(scenarioProviders[0]?.timeout, 40_000, 'Flash completion deadline (see above); non-Flash overrides keep 25s');
+    assert.equal(scenarioProviders[0]?.model, DEFAULT_LLM_FAST_MODEL);
+    assert.equal(scenarioProviders[0]?.timeout, 25_000, 'non-Flash models keep the 25s window (Flash: see above)');
   });
 
   it('lets a global provider order and openrouter model apply to non-combined stages', () => {
@@ -1731,6 +1741,8 @@ describe('forecast llm overrides', () => {
   });
 
   it('falls through immediately after a DeepSeek Flash stall instead of retrying the hung provider', async () => {
+    // Fork: Flash is no longer the default; select it to exercise its fail-fast rule.
+    process.env.LLM_FAST_MODEL = 'deepseek/deepseek-v4-flash';
     process.env.OPENROUTER_API_KEY = 'openrouter-test-key';
     process.env.LLM_API_KEY = 'generic-test-key';
     process.env.LLM_API_URL = 'https://llm.example.test/v1/chat/completions';

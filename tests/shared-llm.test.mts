@@ -37,6 +37,8 @@ afterEach(() => {
 
   if (originalLlmApiKey === undefined) delete process.env.LLM_API_KEY;
   else process.env.LLM_API_KEY = originalLlmApiKey;
+
+  delete process.env.LLM_FAST_MODEL;
 });
 
 describe('callLlm', () => {
@@ -48,6 +50,8 @@ describe('callLlm', () => {
   });
 
   it('wires the DeepSeek Flash deadline into the shared chat-completion request', async () => {
+    // Fork (13/10/2026): Flash is no longer the default fast-tier model; select it.
+    process.env.LLM_FAST_MODEL = 'deepseek/deepseek-v4-flash';
     process.env.OPENROUTER_API_KEY = 'or-test-key';
     delete process.env.OLLAMA_API_URL;
     delete process.env.LLM_API_URL;
@@ -145,7 +149,8 @@ describe('callLlm', () => {
 
     assert.ok(result);
     assert.equal(result.provider, 'openrouter');
-    assert.equal(result.model, 'deepseek/deepseek-v4-flash');
+    // Fork: the default OpenRouter model is the fast tier of scripts/_llm-models.mjs.
+    assert.equal(result.model, 'anthropic/claude-haiku-5.5');
     assert.equal(result.finishReason, null, 'providers that omit finish_reason normalize to null');
     assert.deepEqual(postUrls.filter(url => url.includes('/chat/completions')), [
       'https://openrouter.ai/api/v1/chat/completions',

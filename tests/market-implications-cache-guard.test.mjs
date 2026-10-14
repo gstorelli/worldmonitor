@@ -15,6 +15,10 @@ import {
   __setRedisStoreForTests,
 } from '../scripts/seed-forecasts.mjs';
 
+// Fork (13/10/2026): the market-implications LLM stage is off unless this is
+// set (scripts/_llm-models.mjs); these tests exercise the stage itself.
+process.env.LLM_INHERITED_MARKET_FEATURES = 'true';
+
 const realFetch = global.fetch;
 afterEach(() => {
   global.fetch = realFetch;
@@ -86,4 +90,25 @@ test('cache miss with no provider writes error meta and no stage cache entry', a
     !Object.keys(store).some((k) => k.startsWith('forecast:llm-market-implications:')),
     'no stage cache entry may be written on failure',
   );
+});
+
+test('fork: with LLM_INHERITED_MARKET_FEATURES unset the stage makes no LLM call and reports NOT_CONFIGURED', async () => {
+  const store = {};
+  __setRedisStoreForTests(store);
+  let fetchCalls = 0;
+  global.fetch = async (url) => {
+    fetchCalls += 1;
+    throw new Error(`unexpected fetch while disabled: ${url}`);
+  };
+  delete process.env.LLM_INHERITED_MARKET_FEATURES;
+  try {
+    await buildAndSeedMarketImplications({});
+  } finally {
+    process.env.LLM_INHERITED_MARKET_FEATURES = 'true';
+  }
+  assert.equal(fetchCalls, 0, 'a disabled stage must not reach any provider');
+  const meta = store['seed-meta:intelligence:market-implications'];
+  assert.equal(meta?.sourceState, 'unavailable', '/api/health maps sourceState unavailable to NOT_CONFIGURED');
+  assert.equal(meta?.recordCount, 0);
+  assert.equal(store['intelligence:market-implications:v1'], undefined, 'no cards are published');
 });
