@@ -83,7 +83,11 @@ case "$TIER" in
     ;;
   full)
     # Everything without a tier of its own: the weekly catch-all.
-    export SEED_SKIP="market-quotes,commodity,insights,forecasts,correlation,gdelt-intel,cross-source,chokepoint,ecb-fx,acled,sanctions,ucdp,earthquakes,natural-events,climate-anomalies,supply-chain-trade,seed-portwatch.mjs"
+    # The second line lists the seeders of the scope groups switched off on
+    # 14/10/2026 (src/config/scope.ts): finance, tech/startup, consumer
+    # indices, live media, military. They never run on this box.
+    OUT_OF_SCOPE_SEEDERS="aaii-sentiment,crypto-quotes,crypto-sectors,etf-flows,stablecoin-markets,token-panels,prediction-markets,fear-greed,seed-cot.mjs,earnings-calendar,hyperliquid-flow,market-breadth,sec-8k-stream,sec-cik-map,china-stock-connect,china-corporate-disclosures,gold-etf-flows,gulf-quotes,bundle-market-backup,seed-research.mjs,bigmac,grocery-basket,consumer-prices,webcams,military-bases,military-cii,military-flights,military-maritime-news,iran-events,defense-patents,thermal-escalation,cross-strait-activity"
+    export SEED_SKIP="market-quotes,commodity,insights,forecasts,correlation,gdelt-intel,cross-source,chokepoint,ecb-fx,acled,sanctions,ucdp,earthquakes,natural-events,climate-anomalies,supply-chain-trade,seed-portwatch.mjs,${OUT_OF_SCOPE_SEEDERS}"
     run "" 240
     ;;
   *)

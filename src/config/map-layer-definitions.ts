@@ -1,6 +1,7 @@
 import type { MapLayers } from '@/types';
 // boundary-ignore: isDesktopRuntime is a pure env probe with no service dependencies
 import { isDesktopRuntime } from '@/services/runtime';
+import { OUT_OF_SCOPE_LAYERS } from './scope';
 
 export type MapRenderer = 'flat' | 'globe';
 export type MapVariant = 'full' | 'tech' | 'finance' | 'happy' | 'commodity' | 'energy';
@@ -153,15 +154,22 @@ const VARIANT_LAYER_ORDER: Record<MapVariant, Array<keyof MapLayers>> = {
 
 const I18N_PREFIX = 'components.deckgl.layers.';
 
-export function getLayersForVariant(variant: MapVariant, renderer: MapRenderer): LayerDefinition[] {
+// Risk Sentinel: layers of switched-off scope groups (src/config/scope.ts) are
+// dropped from every variant, so they leave the picker and stored toggles are
+// forced off by sanitizeLayersForVariant.
+function variantLayerKeys(variant: MapVariant): Array<keyof MapLayers> {
   const keys = VARIANT_LAYER_ORDER[variant] ?? VARIANT_LAYER_ORDER.full;
-  return keys
+  return keys.filter(k => !OUT_OF_SCOPE_LAYERS.has(k));
+}
+
+export function getLayersForVariant(variant: MapVariant, renderer: MapRenderer): LayerDefinition[] {
+  return variantLayerKeys(variant)
     .map(k => LAYER_REGISTRY[k])
     .filter(d => d.renderers.includes(renderer));
 }
 
 export function getAllowedLayerKeys(variant: MapVariant): Set<keyof MapLayers> {
-  return new Set(VARIANT_LAYER_ORDER[variant] ?? VARIANT_LAYER_ORDER.full);
+  return new Set(variantLayerKeys(variant));
 }
 
 export function sanitizeLayersForVariant(layers: MapLayers, variant: MapVariant): MapLayers {

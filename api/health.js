@@ -125,6 +125,38 @@ const HEALTH_VERDICT_RELEASE_LOCK_SCRIPT = [
 // *_ENABLED env idiom (server/worldmonitor/resilience/v1/_shared.ts).
 const IRAN_EVENTS_ENABLED = (process.env.IRAN_EVENTS_ENABLED ?? 'false').toLowerCase() === 'true';
 
+// Risk Sentinel scope (14/10/2026, src/config/scope.ts; thesis issues #90, #101):
+// checks of switched-off groups are not evaluated, so they no longer count as
+// criticals. This edge file must stay self-contained, so the list is inlined.
+const OUT_OF_SCOPE_HEALTH_CHECKS = new Set([
+  // finance
+  'etfFlows', 'cryptoQuotes', 'stablecoinMarkets', 'defiTokens',
+  'aiTokens', 'otherTokens', 'cryptoSectors', 'predictionMarkets',
+  'fearGreedIndex', 'breadthHistory', 'earningsCalendar', 'cotPositioning',
+  'hyperliquidFlow', 'aaiiSentiment', 'wsbTickers', 'socialVelocity',
+  'secCikMap', 'sec8kStream', 'chinaStockConnect', 'goldEtfFlows',
+  'gulfQuotes', 'marketImplications',
+  // techStartup
+  'techEvents', 'techReadiness', 'researchArxivHnTrending',
+  // consumerIndices
+  'bigmac', 'groceryBasket', 'consumerPricesOverview', 'consumerPricesCategories',
+  'consumerPricesMovers', 'consumerPricesSpread', 'consumerPricesFreshness', 'positiveGeoEvents',
+  'positiveEventsLive', 'progressData', 'renewableEnergy', 'giving',
+  // liveMedia
+  'webcams',
+  // military
+  'militaryFlights', 'militaryFlightsStale', 'militaryCii', 'militaryForecastInputs',
+  'militarySurges', 'militaryBases', 'usniFleet', 'usniFleetStale',
+  'crossStraitActivity', 'crossStraitActivityBootstrap', 'crossStraitActivityTaiwanMnd', 'crossStraitActivityJapanMod',
+  'intelHistoryIngestMilitaryCrossStrait', 'gpsjam', 'thermalEscalation', 'thermalEscalationBootstrap',
+  'defensePatents', 'pizzint', 'telegramFeed',
+  // acled
+  'acledIntel', 'intelHistoryIngestConflictAcled',
+]);
+function isOutOfScopeCheck(name) {
+  return OUT_OF_SCOPE_HEALTH_CHECKS.has(name) || name.startsWith('consumerPricesCoverage');
+}
+
 const BOOTSTRAP_KEYS = {
   earthquakes:       'seismology:earthquakes:v1',
   outages:           'infra:outages:v1',
@@ -2661,6 +2693,7 @@ export async function handleHealth(req, ctx, options = {}) {
   ];
   for (const [registry, opts] of sources) {
     for (const [name, redisKey] of Object.entries(registry)) {
+      if (isOutOfScopeCheck(name)) continue;
       totalChecks++;
       let entry = classifyKey(name, redisKey, opts, classifyCtx);
       if (name === 'chinaCoverage') {
