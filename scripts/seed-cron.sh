@@ -9,7 +9,7 @@
 #   ./scripts/seed-cron.sh signals  # gdelt-intel, cross-source, chokepoints, FX (hourly)
 #   ./scripts/seed-cron.sh slow     # sanctions + UCDP                    (every 6h)
 #   ./scripts/seed-cron.sh thesis   # thesis triggers: USGS quakes, GDACS/EONET, climate (hourly)
-#   ./scripts/seed-cron.sh context  # context panels of the thesis view: trade policy, shipping (every 6h)
+#   ./scripts/seed-cron.sh context  # context panels: trade policy, shipping, PortWatch transits (every 6h)
 #   ./scripts/seed-cron.sh full     # everything else                     (weekly)
 #
 # Rules that keep the box predictable:
@@ -72,10 +72,18 @@ case "$TIER" in
     # restrictions with an 8h TTL designed for a 6h cadence: left to the weekly
     # sweep, those panels were empty for most of the week.
     run supply-chain-trade 600
+    # IMF PortWatch chokepoint transits (supply_chain:portwatch:v1, TTL 12h,
+    # designed upstream for a 6h cadence). ais-relay derives the transit
+    # summaries and chokepoint flows from this key every 10 minutes, and the
+    # chokepoint status endpoint returns nothing without them: left to the
+    # weekly sweep, the Supply Chain "Chokepoints" tab was empty 6.5 days in 7.
+    # The exact file name keeps the filter from pulling in the heavy
+    # port-activity seeder.
+    run seed-portwatch.mjs 360
     ;;
   full)
     # Everything without a tier of its own: the weekly catch-all.
-    export SEED_SKIP="market-quotes,commodity,insights,forecasts,correlation,gdelt-intel,cross-source,chokepoint,ecb-fx,acled,sanctions,ucdp,earthquakes,natural-events,climate-anomalies,supply-chain-trade"
+    export SEED_SKIP="market-quotes,commodity,insights,forecasts,correlation,gdelt-intel,cross-source,chokepoint,ecb-fx,acled,sanctions,ucdp,earthquakes,natural-events,climate-anomalies,supply-chain-trade,seed-portwatch.mjs"
     run "" 240
     ;;
   *)
