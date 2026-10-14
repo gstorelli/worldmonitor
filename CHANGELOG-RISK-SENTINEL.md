@@ -8,6 +8,7 @@ Formato di ogni voce: numero della PR, cosa cambia per chi usa il portale, event
 
 ## 14 ottobre 2026
 
+- **#36**: il job informativo "data" dei test (suite ereditata, non bloccante) ha un limite di 20 minuti: senza limite restava appeso fino a 6 ore e, dopo una serie di merge, bloccava i runner e quindi il deploy.
 - **#35**: le normali climatiche 1991-2020 (Open-Meteo) si scaricano una zona alla volta, all'inizio del giro settimanale e con un tempo massimo proprio: prima venivano bloccate dai 429 di Open-Meteo, e senza di esse il pannello climate restava vuoto. *Server:* serve un lancio manuale una tantum per non aspettare domenica.
 - **#34**: il tooltip "Fonti dei dati" di Alert feed e OSINT dice che il workflow n8n 01 (notizie GDELT) non esiste nell'istanza, come risulta dal log di `n8n-sync`.
 - **#33**: questo changelog; autorizzazione permanente al merge per gli agenti, registrata in `AGENTS.md`.
