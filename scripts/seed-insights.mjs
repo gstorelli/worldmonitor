@@ -166,6 +166,50 @@ export function resolveInsightsFallbackStatus({ synthesisFailureCode, legacyStat
   return synthesisFailureCode ? 'degraded' : legacyStatus;
 }
 
+// Risk Sentinel (thesis issue #100): an editorial-gate rejection gets ONE more
+// synthesis attempt with a note naming the rule that failed (one extra paid
+// LLM call, approved by Giuseppe on 14/10/2026). Provider failures and a
+// missing corroborated cluster are not retried: a second call cannot fix them.
+const RETRYABLE_SYNTHESIS_FAILURES = new Set([
+  INSIGHTS_SYNTHESIS_FAILURE_CODES.PARSE,
+  INSIGHTS_SYNTHESIS_FAILURE_CODES.GATE,
+  INSIGHTS_SYNTHESIS_FAILURE_CODES.LEAD_EMPTY,
+  INSIGHTS_SYNTHESIS_FAILURE_CODES.LEAD_UNCITED,
+  INSIGHTS_SYNTHESIS_FAILURE_CODES.LEAD_PROPER_NOUN,
+  INSIGHTS_SYNTHESIS_FAILURE_CODES.LEAD_NUMERIC_FACT,
+  INSIGHTS_SYNTHESIS_FAILURE_CODES.LEAD_GROUNDING,
+]);
+// Room the retry must leave for the legacy single-headline call after it.
+const INSIGHTS_RETRY_MIN_BUDGET_MS = 20_000;
+const INSIGHTS_LEGACY_RESERVE_MS = 10_000;
+
+export function isRetryableSynthesisFailure(code) {
+  return RETRYABLE_SYNTHESIS_FAILURES.has(code);
+}
+
+/** Corrective note appended to the user prompt of the retry. */
+export function synthesisRetryNote(code) {
+  const C = INSIGHTS_SYNTHESIS_FAILURE_CODES;
+  if (code === C.LEAD_PROPER_NOUN) {
+    return 'Your previous answer was rejected: its opening sentence named a person, place or organisation that does not appear in the story lines. Name only actors written in the story lines above.';
+  }
+  if (code === C.LEAD_NUMERIC_FACT) {
+    return 'Your previous answer was rejected: its opening sentence stated a number that does not appear in the story lines. Use only figures written in the story lines above.';
+  }
+  return 'Your previous answer was rejected because it did not follow the required format or was not grounded in the story lines. Follow the format exactly and state only what the story lines above say.';
+}
+
+/**
+ * Keep the previous good payload instead of publishing a degraded one?
+ * Since #100 (option b) a degraded run that still has a usable single-headline
+ * brief is published, so the World Brief does not age for hours; the previous
+ * payload is kept only when this run has no brief at all.
+ */
+export function shouldPreserveLkg({ status, existingStatus, worldBrief }) {
+  if (status !== 'degraded' || existingStatus !== 'ok') return false;
+  return !(typeof worldBrief === 'string' && worldBrief.trim().length > 0);
+}
+
 /**
  * #5947: how many corroborated (brief-eligible) clusters the corpus held on
  * this run. Bounded and numeric so it is safe for seed-meta/health/logs, and
@@ -863,7 +907,7 @@ async function fetchInsights() {
   // SECOND callLLM. Stamp the run's LLM start so L2 gets only the remainder —
   // otherwise two full 60s budgets could outlast the 120s seed lock.
   const llmRunStartedAtMs = Date.now();
-  const synthesisResult = hasBriefCluster
+  const firstSynthesisResult = hasBriefCluster
     ? await callLLM(null, {
         systemPrompt: synthesisSystemPrompt(new Date().toISOString().split('T')[0]),
         userPrompt: synthesisUserPrompt(topStories),
@@ -873,11 +917,36 @@ async function fetchInsights() {
         accept: composeFromText,
       })
     : null;
-  const { composed, failureCode } = resolveInsightsSynthesis({
+  let synthesisResult = firstSynthesisResult;
+  let { composed, failureCode } = resolveInsightsSynthesis({
     synthesisResult,
     topStories,
     ...synthesisComposerOptions,
   });
+  const retryBudgetMs = INSIGHTS_LLM_CALL_BUDGET_MS - (Date.now() - llmRunStartedAtMs) - INSIGHTS_LEGACY_RESERVE_MS;
+  if (!composed && hasBriefCluster && isRetryableSynthesisFailure(failureCode) && retryBudgetMs >= INSIGHTS_RETRY_MIN_BUDGET_MS) {
+    console.warn(`  [brief_synthesis] rejected (${failureCode}) — retrying once with a corrective note`);
+    const retryResult = await callLLM(null, {
+      systemPrompt: synthesisSystemPrompt(new Date().toISOString().split('T')[0]),
+      userPrompt: `${synthesisUserPrompt(topStories)}\n\n${synthesisRetryNote(failureCode)}`,
+      maxTokens: 900,
+      accept: composeFromText,
+      callBudgetMs: retryBudgetMs,
+    });
+    const retried = resolveInsightsSynthesis({
+      synthesisResult: retryResult,
+      topStories,
+      ...synthesisComposerOptions,
+    });
+    if (retried.composed) {
+      synthesisResult = retryResult;
+      composed = retried.composed;
+      failureCode = null;
+      console.log('  [brief_synthesis] retry accepted');
+    } else {
+      failureCode = retried.failureCode || failureCode;
+    }
+  }
   synthesisFailureCode = failureCode;
 
   if (composed) {
@@ -1007,10 +1076,11 @@ async function fetchInsights() {
     chinaNewsCoverage,
   };
 
-  // LKG preservation: don't overwrite "ok" with "degraded"
+  // LKG preservation: don't overwrite "ok" with a degraded run that has no
+  // brief at all (a degraded single-headline brief is published, #100).
   if (status === 'degraded') {
     const existing = await readExistingInsights();
-    if (existing?.status === 'ok') {
+    if (shouldPreserveLkg({ status, existingStatus: existing?.status, worldBrief })) {
       console.log('  LKG preservation: existing payload is "ok", skipping degraded overwrite');
       return decorateInsightsRun(
         preserveChinaNewsCoverageInLkg(existing, chinaNewsCoverage),
