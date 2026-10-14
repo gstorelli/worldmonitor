@@ -272,6 +272,9 @@ const STANDALONE_KEYS = {
   // data layer only), so it is standalone rather than bootstrap-tiered.
   chinaStockConnect:  'market:china:stock-connect:v1',
   hkoWarnings:        'weather:hko-warnings:v1',
+  // Fork: seismic triggers of the thesis view, read by /api/thesis/triggers
+  // (not a bootstrap key: the trigger panels call that endpoint directly).
+  thesisTriggers:     'thesis:triggers:v1',
   humanitarianSummary: 'conflict:humanitarian:v1',
   // #4920 completeness measurement (daily GH Actions publishers) — ops
   // keys: health-monitored but NOT bootstrap-hydrated into page loads.
@@ -487,6 +490,7 @@ const SEED_META = {
   // (scripts/seed-cron.sh tiers thesis/intel), so the upstream 30-min floor
   // marked them STALE for half of every hour. 90 = one missed tick tolerated.
   earthquakes:      { key: 'seed-meta:seismology:earthquakes',  maxStaleMin: 90 },
+  thesisTriggers:   { key: 'seed-meta:thesis:triggers',         maxStaleMin: 90 }, // fork: hourly `thesis` cron tier
   wildfires:        { key: 'seed-meta:wildfire:fires',          maxStaleMin: 360 }, // FIRMS NRT resets at midnight UTC; new-day data takes 3-6h to accumulate
   wildfiresBootstrap: { key: 'seed-meta:wildfire:fires-bootstrap', maxStaleMin: 360 }, // Compact CDN payload is a distinct publish target; monitor it so canonical fallback cannot hide transform/write failures.
   outages:          { key: 'seed-meta:infra:outages',           maxStaleMin: 30 },

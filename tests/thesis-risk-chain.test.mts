@@ -12,7 +12,7 @@ import {
 } from '../src/services/thesis/risk-chain.ts';
 import { STRATEGIC_GOODS, THESIS_NODES, TRIGGER_WORKING_RULES } from '../src/config/thesis-model.ts';
 import { NODE_HAZARDS } from '../src/config/node-hazards.ts';
-import { emscQueryUrl, parseEmsc, parseUsgs, usgsQueryUrl } from '../api/thesis/_catalogue.js';
+import { emscQueryUrl, fetchSeismicTriggers, parseEmsc, parseUsgs, usgsQueryUrl } from '../api/thesis/_catalogue.js';
 
 const node = (id: string) => {
   const n = THESIS_NODES.find((x) => x.id === id);
@@ -135,5 +135,44 @@ describe('earthquake catalogue normalisation', () => {
     const now = Date.parse('2026-10-08T12:00:00Z');
     assert.match(emscQueryUrl(now, 30, 4.5), /seismicportal\.eu.*minmag=4\.5.*starttime=2026-09-08T12%3A00%3A00/);
     assert.match(usgsQueryUrl(now, 30, 4.5), /earthquake\.usgs\.gov.*minmagnitude=4\.5/);
+  });
+});
+
+describe('seismic trigger fetch (endpoint and seeder)', () => {
+  const now = Date.parse('2026-10-08T12:00:00Z');
+  const emscBody = { features: [{ geometry: { coordinates: [121.6, 23.8, -35] },
+    properties: { unid: 'x1', time: '2026-10-01T10:00:00.0Z', lat: 23.8, lon: 121.6, depth: 35, mag: 6.1, magtype: 'mw', flynn_region: 'TAIWAN' } }] };
+  const usgsBody = { features: [{ id: 'us1', geometry: { coordinates: [121.56, 23.82, 34.8] },
+    properties: { mag: 7.4, magType: 'mww', place: 'Hualien', time: 1712102292173 } }] };
+  const reply = (status: number, body: unknown) => ({ status, ok: status >= 200 && status < 300, json: async () => body });
+
+  it('uses EMSC when it answers', async () => {
+    const calls: string[] = [];
+    const out = await fetchSeismicTriggers({ nowMs: now, fetchFn: async (url: string) => { calls.push(url); return reply(200, emscBody); } });
+    assert.equal(out.source, 'EMSC');
+    assert.equal(out.quakes.length, 1);
+    assert.equal(calls.length, 1);
+    assert.match(calls[0]!, /seismicportal\.eu/);
+    assert.deepEqual({ w: out.windowDays, m: out.minMagnitude, s: out.status }, { w: 30, m: 4.5, s: { emsc: 'ok' } });
+  });
+
+  it('falls back to USGS when EMSC fails', async () => {
+    const out = await fetchSeismicTriggers({ nowMs: now, fetchFn: async (url: string) => (/seismicportal/.test(url) ? reply(503, null) : reply(200, usgsBody)) });
+    assert.equal(out.source, 'USGS');
+    assert.equal(out.quakes[0]?.source, 'USGS');
+    assert.deepEqual(out.status, { emsc: 'error: HTTP 503', usgs: 'ok' });
+  });
+
+  it('returns no source when both catalogues fail', async () => {
+    const out = await fetchSeismicTriggers({ nowMs: now, fetchFn: async () => { throw new Error('offline'); } });
+    assert.equal(out.source, null);
+    assert.deepEqual(out.quakes, []);
+    assert.deepEqual(out.status, { emsc: 'error: offline', usgs: 'error: offline' });
+  });
+
+  it('treats EMSC 204 (no events) as an empty answer, not a failure', async () => {
+    const out = await fetchSeismicTriggers({ nowMs: now, fetchFn: async () => reply(204, null) });
+    assert.equal(out.source, 'EMSC');
+    assert.deepEqual(out.quakes, []);
   });
 });
