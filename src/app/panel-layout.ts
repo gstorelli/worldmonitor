@@ -543,6 +543,11 @@ export class PanelLayoutManager implements AppModule {
       const panelKey = this.ctx.panels[key] && !this.ctx.newsPanels[key] ? `${key}-news` : key;
       if (this.ctx.panels[panelKey]) continue;
       if (!this.ctx.panelSettings[panelKey] && !this.ctx.panelSettings[key]) continue;
+      // Same gates as shouldCreatePanel (tier 3, admin policy, app allowlist):
+      // without them the news panels of switched-off scope groups (finance,
+      // tech, ai, layoffs; src/config/scope.ts) were still created from FEEDS,
+      // and the thesis view showed ten news panels outside its allowlist.
+      if (isPanelDisabled(panelKey) || isPolicyDisabled(panelKey) || !isPanelAllowedInApp(panelKey)) continue;
       const panelConfig = this.ctx.panelSettings[panelKey] ?? this.ctx.panelSettings[key] ?? ALL_PANELS[panelKey] ?? ALL_PANELS[key];
       const label = panelConfig?.name ?? key.charAt(0).toUpperCase() + key.slice(1);
       const panel = new NewsPanel(panelKey, label);
