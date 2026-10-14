@@ -8,6 +8,7 @@ Formato di ogni voce: numero della PR, cosa cambia per chi usa il portale, event
 
 ## 15 ottobre 2026
 
+- **#46** (#87 della tesi): OSINT, Research e Policy non scaricano più il codice della dashboard (mappa, pannelli, loader). JavaScript caricato da 7,8 a 3,7 MB; la vista tesi è invariata.
 - **#45** (#90, #102 della tesi): salute e carico.
   - Energia e gas ogni 6 ore nel livello `context`: stoccaggi GIE, JODI petrolio e gas, EIA, prezzi dell'energia, Ember, carenze di carburante, Hormuz, interruzioni nei porti.
   - Spenti due gruppi nuovi di perimetro (`src/config/scope.ts`): **macro** (BIS, BCE, FRED, FSI, curve dei rendimenti, cambi, BLS, calendario USA, macro della Cina) e **upstreamExtra** (gare d'appalto, Cina, resilienza, sanità, radiazioni, CO₂ e ghiacci, minacce cyber, interruzioni internet, aviazione, stato dei servizi, advisory, proteste, sfollati, sintesi umanitaria).
