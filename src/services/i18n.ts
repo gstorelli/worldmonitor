@@ -35,10 +35,24 @@ function normalizeLanguage(lng: string): SupportedLanguage {
   return 'en';
 }
 
+// Tajawal (Arabic body font, see [dir="rtl"] in main.css) is requested only
+// when an RTL language is active: index.html no longer blocks every first
+// paint on Google Fonts for a locale the portal almost never serves.
+const ARABIC_FONT_HREF = 'https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap';
+
+function ensureArabicFont(): void {
+  if (document.querySelector(`link[href="${ARABIC_FONT_HREF}"]`)) return;
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = ARABIC_FONT_HREF;
+  document.head.appendChild(link);
+}
+
 function applyDocumentDirection(lang: string): void {
   const base = lang.split('-')[0] || lang;
   document.documentElement.setAttribute('lang', base === 'zh' ? 'zh-CN' : base);
   if (RTL_LANGUAGES.has(base)) {
+    ensureArabicFont();
     document.documentElement.setAttribute('dir', 'rtl');
   } else {
     document.documentElement.removeAttribute('dir');

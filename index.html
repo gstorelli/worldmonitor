@@ -165,14 +165,10 @@
       [data-variant="happy"][data-theme="dark"] .skeleton-line{background:linear-gradient(90deg,rgba(139,175,122,.05) 25%,rgba(139,175,122,.10) 50%,rgba(139,175,122,.05) 75%);background-size:200% 100%;animation:skel-shimmer 1.5s infinite}
     </style>
 
-    <!-- Preconnect: map tiles + assets -->
-    <link rel="preconnect" href="https://maps.worldmonitor.app" crossorigin>
+    <!-- Map assets (basemap glyphs and sprites). No Google Fonts here: the
+         Arabic font is requested by src/services/i18n.ts only for RTL, and the
+         upstream Nunito (happy variant) never applies on this domain. -->
     <link rel="dns-prefetch" href="https://protomaps.github.io">
-
-    <!-- Google Fonts (Nunito for happy variant, Tajawal for Arabic) -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,300;0,400;0,600;0,700;1,400&family=Tajawal:wght@200;300;400;500;700;800;900&display=swap" rel="stylesheet">
   </head>
   <body>
     <h1 style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap">Risk Sentinel - AI Early-Warning for Customs Risk Mitigation</h1>
