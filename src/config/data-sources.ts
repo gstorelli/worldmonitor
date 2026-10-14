@@ -450,10 +450,11 @@ export const WORKSPACE_SOURCES: Record<string, DataSource[]> = {
   ],
   'policy.monitor': [
     {
-      what: 'Nuovi atti UE',
-      source: 'EUR-Lex, ricerca (workflow n8n 06 “Policy Monitor”)',
-      url: 'https://eur-lex.europa.eu/search.html',
-      code: 'n8n-workflows/06-policy-monitor.json',
+      what: 'Regolamenti, decisioni e direttive UE degli ultimi 30 giorni (titolo in italiano), filtrati per beni della tesi e misure commerciali',
+      source: 'Ufficio delle pubblicazioni dell\u2019UE, endpoint SPARQL (CELLAR), la base dati di EUR-Lex',
+      url: 'https://publications.europa.eu/webapi/rdf/sparql',
+      code: 'scripts/seed-policy-eu-acts.mjs; scripts/_policy-eu-acts.mjs',
+      note: 'Il collegamento a un bene è una parola chiave nel titolo. Il workflow n8n 06 (ricerca EUR-Lex) non trova nulla: EUR-Lex risponde alle richieste automatiche con una verifica anti-bot.',
     },
   ],
 };

@@ -275,6 +275,8 @@ const STANDALONE_KEYS = {
   // Fork: seismic triggers of the thesis view, read by /api/thesis/triggers
   // (not a bootstrap key: the trigger panels call that endpoint directly).
   thesisTriggers:     'thesis:triggers:v1',
+  // Fork: recent EU acts for the Policy workspace (scripts/seed-policy-eu-acts.mjs).
+  policyEuActs:       'policy:eu-acts:v1',
   humanitarianSummary: 'conflict:humanitarian:v1',
   // #4920 completeness measurement (daily GH Actions publishers) — ops
   // keys: health-monitored but NOT bootstrap-hydrated into page loads.
@@ -491,6 +493,7 @@ const SEED_META = {
   // marked them STALE for half of every hour. 90 = one missed tick tolerated.
   earthquakes:      { key: 'seed-meta:seismology:earthquakes',  maxStaleMin: 90 },
   thesisTriggers:   { key: 'seed-meta:thesis:triggers',         maxStaleMin: 90 }, // fork: hourly `thesis` cron tier
+  policyEuActs:     { key: 'seed-meta:policy:eu-acts',          maxStaleMin: 1080 }, // fork: `slow` tier every 6h
   wildfires:        { key: 'seed-meta:wildfire:fires',          maxStaleMin: 360 }, // FIRMS NRT resets at midnight UTC; new-day data takes 3-6h to accumulate
   wildfiresBootstrap: { key: 'seed-meta:wildfire:fires-bootstrap', maxStaleMin: 360 }, // Compact CDN payload is a distinct publish target; monitor it so canonical fallback cannot hide transform/write failures.
   outages:          { key: 'seed-meta:infra:outages',           maxStaleMin: 30 },
