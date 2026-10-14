@@ -32,6 +32,7 @@ import {
   isClimateAnomaly,
   type GoodRow,
   type NodeRow,
+  type OsintComtradeProduct,
   type OsintSignalsPayload,
   type PolicyEntryLike,
 } from './model';
@@ -86,7 +87,24 @@ function nodeRowHtml(row: NodeRow): string {
     </tr>`;
 }
 
-function goodRowHtml(row: GoodRow, policyHref: string): string {
+interface EuGoodsLike {
+  available?: boolean;
+  goods?: Record<string, { imports?: Record<string, { year: number; top: Array<{ code: string; share: number | null }> }> }>;
+}
+
+/** Italy's suppliers per good from Eurostat Comext (#91), in the Comtrade-shaped rows of the model. */
+function comextImportsForItaly(eu: EuGoodsLike | null): OsintComtradeProduct[] {
+  if (!eu?.available || !eu.goods) return [];
+  const out: OsintComtradeProduct[] = [];
+  for (const [hs4, g] of Object.entries(eu.goods)) {
+    const it = g.imports?.IT;
+    // Eurostat geo codes that differ from ISO 3166: Comext uses XS for Serbia.
+    if (it) out.push({ hs4, year: it.year, description: '', suppliers: it.top.map((t) => ({ iso2: t.code === 'XS' ? 'RS' : t.code, code: null, share: t.share })) });
+  }
+  return out;
+}
+
+function goodRowHtml(row: GoodRow, policyHref: string, importsSource: string): string {
   const prices = row.prices.length
     ? row.prices
         .map((p) => {
@@ -98,8 +116,8 @@ function goodRowHtml(row: GoodRow, policyHref: string): string {
         .join('<br>')
     : '<span class="rs-meta">nessuna quotazione disponibile</span>';
   const imports = row.imports
-    ? `${escapeHtml(importSentence(row.imports, displayNames))}<br><span class="rs-meta">Comtrade, anno ${row.imports.year ?? 'n.d.'}</span>`
-    : '<span class="rs-meta">codice non coperto dal seeder Comtrade</span>';
+    ? `${escapeHtml(importSentence(row.imports, displayNames))}<br><span class="rs-meta">${escapeHtml(importsSource)}, anno ${row.imports.year ?? 'n.d.'}</span>`
+    : '<span class="rs-meta">dato non disponibile</span>';
   const measures = row.measures.length
     ? `<a class="rs-link" href="${escapeHtml(policyHref)}">${row.measures.length} misur${row.measures.length === 1 ? 'a' : 'e'} nel registro ↗</a><br><span class="rs-meta">${row.measures.map((m) => escapeHtml(m.title.split(' — ')[0] ?? m.title)).join('; ')}</span>`
     : '<span class="rs-meta">nessuna nel registro</span>';
@@ -175,7 +193,7 @@ export function createOsintWorkspace(): AppWorkspace {
 
       const load = async (force: boolean) => {
         const errors: string[] = [];
-        const [snapshot, signals, policy] = await Promise.all([
+        const [snapshot, signals, policy, euGoods] = await Promise.all([
           getThesisSnapshot(force).catch((e: unknown) => {
             errors.push(`inneschi: ${e instanceof Error ? e.message : String(e)}`);
             return null;
@@ -188,6 +206,7 @@ export function createOsintWorkspace(): AppWorkspace {
             errors.push(`registro Policy: ${e instanceof Error ? e.message : String(e)}`);
             return null;
           }),
+          fetchJson<EuGoodsLike>('/api/trade/eu-goods').catch(() => null),
         ]);
         if (snapshot?.errors.length) errors.push(...snapshot.errors);
 
@@ -197,8 +216,11 @@ export function createOsintWorkspace(): AppWorkspace {
           ? nodeRows.map(nodeRowHtml).join('')
           : '<tr><td colspan="5" class="rs-empty">Inneschi non disponibili.</td></tr>';
 
-        const goodRows = buildGoodRows(STRATEGIC_GOODS, signals?.quotes ?? [], COMMODITIES, signals?.comtradeIT.products ?? [], policy?.entries ?? []);
-        goodsEl.innerHTML = goodRows.map((row) => goodRowHtml(row, policyHref)).join('');
+        // Eurostat Comext covers all 8 goods; UN Comtrade (4 goods) is the fallback.
+        const comext = comextImportsForItaly(euGoods);
+        const importsSource = comext.length ? 'Eurostat Comext' : 'UN Comtrade';
+        const goodRows = buildGoodRows(STRATEGIC_GOODS, signals?.quotes ?? [], COMMODITIES, comext.length ? comext : signals?.comtradeIT.products ?? [], policy?.entries ?? []);
+        goodsEl.innerHTML = goodRows.map((row) => goodRowHtml(row, policyHref, importsSource)).join('');
 
         const feed = buildFeed(chains);
         feedEl.innerHTML = feed.length

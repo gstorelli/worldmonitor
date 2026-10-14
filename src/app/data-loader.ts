@@ -121,6 +121,7 @@ import { enrichEventsWithExposure } from '@/services/population-exposure';
 import { debounce, getCircuitBreakerCooldownInfo } from '@/utils';
 import { getSecretState, isFeatureAvailable, isFeatureEnabled } from '@/services/runtime-config';
 import { isDesktopRuntime, toApiUrl } from '@/services/runtime';
+import { ACTIVE_APP } from '@/config/apps';
 import { getAiFlowSettings } from '@/services/ai-flow-settings';
 import { t, getCurrentLanguage } from '@/services/i18n';
 import { getHydratedData } from '@/services/bootstrap';
@@ -2658,6 +2659,15 @@ export class DataLoaderManager implements AppModule {
   async loadTradePolicy(): Promise<void> {
     const tradePanel = this.ctx.panels['trade-policy'] as TradePolicyPanel | undefined;
     if (!tradePanel) return;
+
+    // Risk Sentinel (#91): EU/Italy imports and EU duties on the 8 thesis goods.
+    // The thesis view shows only these; the US-centred WTO/Treasury tabs stay
+    // in the Full dashboard.
+    void fetch(toApiUrl('/api/trade/eu-goods'), { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => { if (data) tradePanel.updateEuGoods(data); })
+      .catch(() => {});
+    if (ACTIVE_APP.id === 'thesis') return;
 
     try {
       const [restrictions, tariffs, flows, barriers, revenue, comtrade] = await Promise.allSettled([

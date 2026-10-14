@@ -8,6 +8,7 @@ Formato di ogni voce: numero della PR, cosa cambia per chi usa il portale, event
 
 ## 14 ottobre 2026
 
+- **#42** (#91 della tesi): Trade Policy su UE e Italia per gli 8 beni. Scheda "Importazioni UE/IT" con importazioni e primi fornitori (Eurostat Comext DS-045409, 2025) e scheda "Dazi UE" con dazio MFN e preferenziale minimo per sottovoce HS6 (WTO, 2024). Nella vista tesi solo queste due; le schede USA restano nella Full dashboard. OSINT prende i fornitori dell'Italia da Comext (8 beni su 8). Nuovo seeder `seed-eu-trade` nel livello `context`.
 - **#41**: le previsioni (`seed-forecasts`, LLM DeepSeek dalle `FORECAST_LLM_*`) si calcolano solo nelle 24 ore dopo che qualcuno ha aperto il pannello Previsioni (`POST /api/forecast/viewed`); altrimenti il giro orario si ferma senza chiamare l'LLM. `FORECAST_ALWAYS_RUN=1` ripristina il comportamento precedente.
 - **#40**: Policy, nuova scheda iniziale "Beni × misure": per ognuno degli 8 beni, le misure del registro con lo stesso codice HS (verificate prima, con stato) e gli atti UE recenti che lo nominano.
 - **#39**: Policy, scheda "Atti UE recenti": regolamenti, decisioni e direttive degli ultimi 30 giorni che nominano uno degli 8 beni o una misura commerciale, dall'endpoint SPARQL dell'Ufficio delle pubblicazioni (nuovo seeder `seed-policy-eu-acts`, livello `slow`). Il workflow n8n 06 non trovava nulla, perché EUR-Lex blocca le richieste automatiche. *Server:* lancio una tantum facoltativo, altrimenti si riempie al giro `slow` successivo.

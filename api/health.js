@@ -277,6 +277,8 @@ const STANDALONE_KEYS = {
   thesisTriggers:     'thesis:triggers:v1',
   // Fork: recent EU acts for the Policy workspace (scripts/seed-policy-eu-acts.mjs).
   policyEuActs:       'policy:eu-acts:v1',
+  // Fork: EU/Italy imports (Comext) and EU duties (WTO) for the 8 thesis goods.
+  euTradeGoods:       'trade:eu-goods:v1',
   humanitarianSummary: 'conflict:humanitarian:v1',
   // #4920 completeness measurement (daily GH Actions publishers) — ops
   // keys: health-monitored but NOT bootstrap-hydrated into page loads.
@@ -494,6 +496,7 @@ const SEED_META = {
   earthquakes:      { key: 'seed-meta:seismology:earthquakes',  maxStaleMin: 90 },
   thesisTriggers:   { key: 'seed-meta:thesis:triggers',         maxStaleMin: 90 }, // fork: hourly `thesis` cron tier
   policyEuActs:     { key: 'seed-meta:policy:eu-acts',          maxStaleMin: 1080 }, // fork: `slow` tier every 6h
+  euTradeGoods:     { key: 'seed-meta:trade:eu-goods',          maxStaleMin: 1080 }, // fork: `context` tier every 6h
   wildfires:        { key: 'seed-meta:wildfire:fires',          maxStaleMin: 360 }, // FIRMS NRT resets at midnight UTC; new-day data takes 3-6h to accumulate
   wildfiresBootstrap: { key: 'seed-meta:wildfire:fires-bootstrap', maxStaleMin: 360 }, // Compact CDN payload is a distinct publish target; monitor it so canonical fallback cannot hide transform/write failures.
   outages:          { key: 'seed-meta:infra:outages',           maxStaleMin: 30 },
