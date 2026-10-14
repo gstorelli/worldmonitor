@@ -591,3 +591,11 @@
   color: var(--accent);
   text-decoration: underline;
 }
+
+.rs-gm-item {
+  padding: 3px 0;
+}
+
+.rs-gm-item + .rs-gm-item {
+  border-top: 1px dashed var(--border-subtle);
+}

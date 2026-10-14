@@ -15,6 +15,7 @@ import { mountSourceInfo, sourceInfoSlot } from '@/components/source-info';
 import { STRATEGIC_GOODS, localText } from '@/config/thesis-model';
 import { escapeHtml } from '@/utils/sanitize';
 import type { AppWorkspace } from '../types';
+import { buildGoodsMeasures, isVerifiedStatus, shortTitle } from './model';
 
 interface PolicyEntry {
   id: string;
@@ -122,8 +123,10 @@ export function createPolicyWorkspace(): AppWorkspace {
       const jurisdictions = [...new Set(entries.map((entry) => entry.jurisdiction).filter(Boolean))];
       const categories = [...new Set(entries.flatMap((entry) => entry.riskCategories ?? []))].sort();
 
-      let activeTab: 'registry' | 'monitor' = 'registry';
-      const tabClass = (tab: 'registry' | 'monitor'): string => `rs-tab${activeTab === tab ? ' active' : ''}`;
+      type PolicyTab = 'goods' | 'registry' | 'monitor';
+      let activeTab: PolicyTab = 'goods';
+      const tabClass = (tab: PolicyTab): string => `rs-tab${activeTab === tab ? ' active' : ''}`;
+      const goodsRows = buildGoodsMeasures(STRATEGIC_GOODS, entries, acts);
       let selectedId = entries[0]?.id ?? '';
       let jurisdiction = 'ALL';
       let category = 'ALL';
@@ -146,11 +149,43 @@ export function createPolicyWorkspace(): AppWorkspace {
           </div>
 
           <div class="rs-tabs" role="tablist">
+            <button class="${tabClass('goods')}" data-tab="goods" role="tab">Beni × misure</button>
             <button class="${tabClass('registry')}" data-tab="registry" role="tab">Registro normativo</button>
             <button class="${tabClass('monitor')}" data-tab="monitor" role="tab">Atti UE recenti</button>
           </div>
 
-          <div class="rs-tab-panel" data-panel="registry"><div class="rs-tab-sources">Fonti dei dati ${sourceInfoSlot('policy.registry')}</div>
+          <div class="rs-tab-panel" data-panel="goods"><div class="rs-tab-sources">Fonti dei dati ${sourceInfoSlot('policy.goods')}</div>
+            <p class="rs-meta">Per ogni bene strategico della tesi: le misure del registro con lo stesso codice HS (modulatori del modello) e gli atti UE degli ultimi 30 giorni che lo nominano nel titolo. Le voci "da verificare" non sono ancora controllate sul testo ufficiale.</p>
+            <div class="rs-osint-table-wrap"><table class="rs-osint-table">
+              <thead><tr><th>Bene</th><th>Misure nel registro</th><th>Atti UE recenti che lo nominano</th></tr></thead>
+              <tbody>${goodsRows
+                .map(
+                  (row) => `<tr>
+                <th scope="row">HS ${escapeHtml(row.good.hs)}<br><span class="rs-meta">${escapeHtml(localText(row.good.label, 'it'))}</span></th>
+                <td>${
+                  row.measures.length
+                    ? row.measures
+                        .map(
+                          (m) => `<div class="rs-gm-item">${m.url ? `<a class="rs-link" href="${escapeHtml(m.url)}" target="_blank" rel="noopener">${escapeHtml(shortTitle(m.title))} ↗</a>` : escapeHtml(shortTitle(m.title))}
+                  <span class="rs-chip ${isVerifiedStatus(m.status) ? 'rs-chip-ok' : 'rs-chip-wip'}">${escapeHtml(isVerifiedStatus(m.status) ? 'verificata' : 'da verificare')}</span><br><span class="rs-meta">${escapeHtml(m.topic ?? '')}</span></div>`,
+                        )
+                        .join('')
+                    : '<span class="rs-meta">nessuna misura nel registro</span>'
+                }</td>
+                <td>${
+                  row.acts.length
+                    ? row.acts
+                        .map((a) => `<div class="rs-gm-item"><span class="rs-meta">${escapeHtml(a.date)}</span> <a class="rs-link" href="${escapeHtml(a.url)}" target="_blank" rel="noopener">${escapeHtml(a.celex)} ↗</a><br><span class="rs-meta">${escapeHtml(a.title.slice(0, 140))}${a.title.length > 140 ? '…' : ''}</span></div>`)
+                        .join('')
+                    : `<span class="rs-meta">${payload.acts ? 'nessuno' : 'atti non ancora disponibili'}</span>`
+                }</td>
+              </tr>`,
+                )
+                .join('')}</tbody>
+            </table></div>
+          </div>
+
+          <div class="rs-tab-panel" data-panel="registry" hidden><div class="rs-tab-sources">Fonti dei dati ${sourceInfoSlot('policy.registry')}</div>
             <div class="rs-ws-controls">
               <input id="rsPolicyQuery" class="rs-input" type="search" placeholder="Cerca per titolo, riferimento, tema…">
               <select id="rsPolicyJurisdiction" class="rs-select">
@@ -308,7 +343,7 @@ export function createPolicyWorkspace(): AppWorkspace {
 
       root.querySelectorAll<HTMLElement>('.rs-tab').forEach((tab) => {
         tab.addEventListener('click', () => {
-          activeTab = (tab.dataset.tab as 'registry' | 'monitor') ?? 'registry';
+          activeTab = (tab.dataset.tab as PolicyTab) ?? 'goods';
           root.querySelectorAll<HTMLElement>('.rs-tab').forEach((candidate) => candidate.classList.toggle('active', candidate === tab));
           root.querySelectorAll<HTMLElement>('.rs-tab-panel').forEach((panel) => {
             panel.hidden = panel.dataset.panel !== activeTab;

@@ -448,6 +448,19 @@ export const WORKSPACE_SOURCES: Record<string, DataSource[]> = {
       code: 'data/policy-registry.json',
     },
   ],
+  'policy.goods': [
+    {
+      what: 'Colonna Misure: voci del registro normativo con lo stesso codice HS, con stato di verifica',
+      source: 'Registro normativo del portale (fonti primarie voce per voce)',
+      code: 'data/policy-registry.json; src/apps/policy/model.ts',
+    },
+    {
+      what: 'Colonna Atti UE recenti: atti degli ultimi 30 giorni che nominano il bene nel titolo',
+      source: 'Ufficio delle pubblicazioni dell\u2019UE, endpoint SPARQL (CELLAR)',
+      url: 'https://publications.europa.eu/webapi/rdf/sparql',
+      code: 'scripts/seed-policy-eu-acts.mjs',
+    },
+  ],
   'policy.monitor': [
     {
       what: 'Regolamenti, decisioni e direttive UE degli ultimi 30 giorni (titolo in italiano), filtrati per beni della tesi e misure commerciali',

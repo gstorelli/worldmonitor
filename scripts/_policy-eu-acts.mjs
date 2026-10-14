@@ -60,11 +60,19 @@ function matches(text, alternatives) {
   return new RegExp(`(?<![\\p{L}\\p{N}])(?:${alternatives})(?![\\p{L}\\p{N}])`, 'iu').test(text);
 }
 
+/**
+ * Approvals of active substances (biocides, plant protection products) name a
+ * metal (e.g. "rame granulato … biocidi", 24/9/2026) without being trade
+ * measures on the good: they never link to a good.
+ */
+export const NOT_A_GOOD_MEASURE = 'biocidi|biocida|fitosanitari|fitosanitario|sostanza attiva|sostanze attive';
+
 /** Goods and measure types named in an act title (keyword match, not analysis). */
 export function classifyAct(title) {
   const t = String(title ?? '');
+  const goodsAllowed = !matches(t, NOT_A_GOOD_MEASURE);
   return {
-    goods: Object.entries(GOOD_KEYWORDS).filter(([, kw]) => matches(t, kw)).map(([hs]) => hs),
+    goods: goodsAllowed ? Object.entries(GOOD_KEYWORDS).filter(([, kw]) => matches(t, kw)).map(([hs]) => hs) : [],
     measures: Object.entries(MEASURE_KEYWORDS).filter(([, kw]) => matches(t, kw)).map(([m]) => m),
   };
 }
