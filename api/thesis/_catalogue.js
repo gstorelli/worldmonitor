@@ -78,3 +78,61 @@ export function parseUsgs(json) {
   }
   return out;
 }
+
+// ---------------------------------------------------------------------------
+// Shared fetch for /api/thesis/triggers and scripts/seed-thesis-triggers.mjs:
+// EMSC first (European reference for real time), USGS only as fallback.
+
+export const TRIGGER_WINDOW_DAYS = 30;
+export const TRIGGER_MIN_MAG = 4.5;
+/** Redis key written hourly by seed-thesis-triggers (thesis cron tier). */
+export const TRIGGERS_REDIS_KEY = 'thesis:triggers:v1';
+export const TRIGGERS_UA = 'RiskSentinel/1.0 (+https://risksentinel.opencyber.org; PhD research, UniBA)';
+
+async function getCatalogueJson(fetchFn, url, timeoutMs) {
+  const res = await fetchFn(url, {
+    headers: { Accept: 'application/json', 'User-Agent': TRIGGERS_UA },
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+  if (res.status === 204) return { features: [] };
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+/**
+ * Fetch the seismic triggers of the last TRIGGER_WINDOW_DAYS days.
+ * Returns the endpoint payload; `source` is null when both catalogues failed.
+ */
+export async function fetchSeismicTriggers({
+  nowMs = Date.now(),
+  fetchFn = (...args) => globalThis.fetch(...args),
+  timeoutMs = 15_000,
+} = {}) {
+  const status = {};
+  let quakes = [];
+  let source = null;
+  try {
+    quakes = parseEmsc(await getCatalogueJson(fetchFn, emscQueryUrl(nowMs, TRIGGER_WINDOW_DAYS, TRIGGER_MIN_MAG), timeoutMs));
+    status.emsc = 'ok';
+    source = 'EMSC';
+  } catch (err) {
+    status.emsc = `error: ${err.message}`;
+  }
+  if (!source) {
+    try {
+      quakes = parseUsgs(await getCatalogueJson(fetchFn, usgsQueryUrl(nowMs, TRIGGER_WINDOW_DAYS, TRIGGER_MIN_MAG), timeoutMs));
+      status.usgs = 'ok';
+      source = 'USGS';
+    } catch (err) {
+      status.usgs = `error: ${err.message}`;
+    }
+  }
+  return {
+    generatedAt: new Date(nowMs).toISOString(),
+    windowDays: TRIGGER_WINDOW_DAYS,
+    minMagnitude: TRIGGER_MIN_MAG,
+    source,
+    status,
+    quakes,
+  };
+}

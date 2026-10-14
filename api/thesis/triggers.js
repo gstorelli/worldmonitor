@@ -2,26 +2,27 @@
 // last 30 days from the EMSC catalogue (European reference for real time),
 // with the USGS catalogue as fallback. Normalised, not scored; the client
 // matches them to the critical nodes (src/services/thesis/risk-chain.ts).
+//
+// Served from Redis (thesis:triggers:v1, written hourly by
+// scripts/seed-thesis-triggers.mjs in the `thesis` cron tier), so the first
+// visitor after a deploy no longer waits for EMSC (up to 15 s) and then USGS.
+// The live fetch is kept as fallback when the key is missing or too old.
 import { jsonResponse } from '../_json-response.js';
-import { emscQueryUrl, parseEmsc, parseUsgs, usgsQueryUrl } from './_catalogue.js';
+import { readJsonFromUpstashWithStatus } from '../_upstash-json.js';
+import { TRIGGERS_REDIS_KEY, TRIGGER_MIN_MAG, TRIGGER_WINDOW_DAYS, fetchSeismicTriggers } from './_catalogue.js';
 
 export const config = { runtime: 'edge' };
 
-const WINDOW_DAYS = 30;
-const MIN_MAG = 4.5;
 const TTL_MS = 10 * 60_000;
-const UA = 'RiskSentinel/1.0 (+https://risksentinel.opencyber.org; PhD research, UniBA)';
+// The seeder runs hourly: older than this means the cron missed two runs.
+const REDIS_MAX_AGE_MS = 3 * 60 * 60_000;
 
 let cache = null;
 
-async function getJson(url) {
-  const res = await globalThis.fetch(url, {
-    headers: { Accept: 'application/json', 'User-Agent': UA },
-    signal: AbortSignal.timeout(15_000),
-  });
-  if (res.status === 204) return { features: [] };
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
+function isUsable(payload, now) {
+  if (!payload || typeof payload !== 'object' || !Array.isArray(payload.quakes) || !payload.source) return false;
+  const at = Date.parse(payload.generatedAt || '');
+  return Number.isFinite(at) && now - at <= REDIS_MAX_AGE_MS;
 }
 
 export default async function handler() {
@@ -29,30 +30,20 @@ export default async function handler() {
   if (cache && now - cache.at < TTL_MS) {
     return jsonResponse(cache.payload, 200, { 'Cache-Control': 'public, max-age=300' });
   }
-  const status = {};
-  let quakes = [];
-  let source = null;
-  try {
-    quakes = parseEmsc(await getJson(emscQueryUrl(now, WINDOW_DAYS, MIN_MAG)));
-    status.emsc = 'ok';
-    source = 'EMSC';
-  } catch (err) {
-    status.emsc = `error: ${err.message}`;
+
+  const stored = await readJsonFromUpstashWithStatus(TRIGGERS_REDIS_KEY);
+  if (stored.status === 'hit' && isUsable(stored.value, now)) {
+    const payload = { ...stored.value, servedFrom: 'redis' };
+    cache = { at: now, payload };
+    return jsonResponse(payload, 200, { 'Cache-Control': 'public, max-age=300' });
   }
-  if (!source) {
-    try {
-      quakes = parseUsgs(await getJson(usgsQueryUrl(now, WINDOW_DAYS, MIN_MAG)));
-      status.usgs = 'ok';
-      source = 'USGS';
-    } catch (err) {
-      status.usgs = `error: ${err.message}`;
-    }
+
+  const live = await fetchSeismicTriggers({ nowMs: now });
+  if (!live.source) {
+    if (cache) return jsonResponse({ ...cache.payload, stale: true, status: live.status }, 200, { 'Cache-Control': 'no-store' });
+    return jsonResponse({ quakes: [], source: null, status: live.status, windowDays: TRIGGER_WINDOW_DAYS, minMagnitude: TRIGGER_MIN_MAG }, 502, { 'Cache-Control': 'no-store' });
   }
-  if (!source) {
-    if (cache) return jsonResponse({ ...cache.payload, stale: true, status }, 200, { 'Cache-Control': 'no-store' });
-    return jsonResponse({ quakes: [], source: null, status, windowDays: WINDOW_DAYS, minMagnitude: MIN_MAG }, 502, { 'Cache-Control': 'no-store' });
-  }
-  const payload = { generatedAt: new Date(now).toISOString(), windowDays: WINDOW_DAYS, minMagnitude: MIN_MAG, source, status, quakes };
+  const payload = { ...live, servedFrom: 'live' };
   cache = { at: now, payload };
   return jsonResponse(payload, 200, { 'Cache-Control': 'public, max-age=300' });
 }

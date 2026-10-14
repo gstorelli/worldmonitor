@@ -8,7 +8,7 @@
 #   ./scripts/seed-cron.sh intel    # insights -> forecasts -> correlation (hourly)
 #   ./scripts/seed-cron.sh signals  # gdelt-intel, cross-source, chokepoints, FX (hourly)
 #   ./scripts/seed-cron.sh slow     # sanctions + UCDP                    (every 6h)
-#   ./scripts/seed-cron.sh thesis   # thesis triggers: USGS quakes, GDACS/EONET, climate (hourly)
+#   ./scripts/seed-cron.sh thesis   # thesis triggers: EMSC/USGS quakes, GDACS/EONET, climate (hourly)
 #   ./scripts/seed-cron.sh context  # context panels: trade policy, shipping, PortWatch transits (every 6h)
 #   ./scripts/seed-cron.sh full     # everything else                     (weekly)
 #
@@ -63,6 +63,8 @@ case "$TIER" in
     # 18h, climate anomalies 9h — the weekly sweep alone leaves them expired
     # for most of the week. (Chokepoint transits come from ais-relay.)
     run earthquakes 180
+    # EMSC triggers (USGS fallback) served by /api/thesis/triggers from Redis.
+    run thesis-triggers 180
     run natural-events 240
     run climate-anomalies 300
     ;;
@@ -87,7 +89,7 @@ case "$TIER" in
     # 14/10/2026 (src/config/scope.ts): finance, tech/startup, consumer
     # indices, live media, military. They never run on this box.
     OUT_OF_SCOPE_SEEDERS="aaii-sentiment,crypto-quotes,crypto-sectors,etf-flows,stablecoin-markets,token-panels,prediction-markets,fear-greed,seed-cot.mjs,earnings-calendar,hyperliquid-flow,market-breadth,sec-8k-stream,sec-cik-map,china-stock-connect,china-corporate-disclosures,gold-etf-flows,gulf-quotes,bundle-market-backup,seed-research.mjs,bigmac,grocery-basket,consumer-prices,webcams,military-bases,military-cii,military-flights,military-maritime-news,iran-events,defense-patents,thermal-escalation,cross-strait-activity"
-    export SEED_SKIP="market-quotes,commodity,insights,forecasts,correlation,gdelt-intel,cross-source,chokepoint,ecb-fx,acled,sanctions,ucdp,earthquakes,natural-events,climate-anomalies,supply-chain-trade,seed-portwatch.mjs,${OUT_OF_SCOPE_SEEDERS}"
+    export SEED_SKIP="market-quotes,commodity,insights,forecasts,correlation,gdelt-intel,cross-source,chokepoint,ecb-fx,acled,sanctions,ucdp,earthquakes,thesis-triggers,natural-events,climate-anomalies,supply-chain-trade,seed-portwatch.mjs,${OUT_OF_SCOPE_SEEDERS}"
     run "" 240
     ;;
   *)
