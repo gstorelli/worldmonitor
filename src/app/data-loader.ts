@@ -527,9 +527,12 @@ export class DataLoaderManager implements AppModule {
         }
       } catch { /* non-fatal */ }
     }
-    // Intelligence signals: run for any variant that shows these panels
-    if (shouldLoadAny(['cii', 'strategic-risk', 'strategic-posture', 'climate', 'population-exposure', 'security-advisories', 'radiation-watch', 'displacement', 'ucdp-events', 'satellite-fires', 'oref-sirens'])) {
+    // Intelligence signals: run for any variant that shows these panels.
+    // The climate panel alone (thesis view) only needs its own anomalies.
+    if (shouldLoadAny(['cii', 'strategic-risk', 'strategic-posture', 'population-exposure', 'security-advisories', 'radiation-watch', 'displacement', 'ucdp-events', 'satellite-fires', 'oref-sirens'])) {
       tasks.push({ name: 'intelligence', task: runGuarded('intelligence', () => this.loadIntelligenceSignals()) });
+    } else if (shouldLoad('climate') || this.ctx.mapLayers.climate) {
+      tasks.push({ name: 'climate', task: runGuarded('climate', () => this.loadClimateAnomalies()) });
     }
 
     if (SITE_VARIANT === 'full' && (shouldLoad('satellite-fires') || this.ctx.mapLayers.natural)) {
@@ -665,9 +668,11 @@ export class DataLoaderManager implements AppModule {
         case 'radiationWatch':
           await this.loadRadiationWatch();
           break;
+        case 'climate':
+          await this.loadClimateAnomalies();
+          break;
         case 'ucdpEvents':
         case 'displacement':
-        case 'climate':
         case 'gpsJamming':
           await this.loadIntelligenceSignals();
           break;
@@ -1798,6 +1803,33 @@ export class DataLoaderManager implements AppModule {
     }
   }
 
+  /**
+   * Climate anomalies on their own: the thesis view shows the climate panel but
+   * none of the CII panels, so it must not pull the whole intelligence bundle
+   * (outages, protests, HAPI, UNHCR, advisories…). loadIntelligenceSignals
+   * still calls this, so the CII keeps its climate input.
+   */
+  async loadClimateAnomalies(): Promise<void> {
+    try {
+      const climateResult = await fetchClimateAnomalies();
+      if (!climateResult.ok) {
+        dataFreshness.recordError('climate', 'Climate anomalies unavailable (retaining prior climate state)');
+        return;
+      }
+      const anomalies = climateResult.anomalies;
+      this.callPanel('climate', 'setAnomalies', anomalies);
+      ingestClimateForCII(anomalies);
+      if (this.ctx.mapLayers.climate) {
+        this.ctx.map?.setClimateAnomalies(anomalies);
+      }
+      if (anomalies.length > 0) dataFreshness.recordUpdate('climate', anomalies.length);
+    } catch (error) {
+      console.error('[Intelligence] Climate anomalies fetch failed:', error);
+      this.callPanel('climate', 'showError');
+      dataFreshness.recordError('climate', String(error));
+    }
+  }
+
   async loadIntelligenceSignals(): Promise<void> {
     resetHotspotActivity();
     const _desktopLocked = isDesktopRuntime() && !getSecretState('WORLDMONITOR_API_KEY').present;
@@ -2011,26 +2043,7 @@ export class DataLoaderManager implements AppModule {
       }
     })());
 
-    tasks.push((async () => {
-      try {
-        const climateResult = await fetchClimateAnomalies();
-        if (!climateResult.ok) {
-          dataFreshness.recordError('climate', 'Climate anomalies unavailable (retaining prior climate state)');
-          return;
-        }
-        const anomalies = climateResult.anomalies;
-        this.callPanel('climate', 'setAnomalies', anomalies);
-        ingestClimateForCII(anomalies);
-        if (this.ctx.mapLayers.climate) {
-          this.ctx.map?.setClimateAnomalies(anomalies);
-        }
-        if (anomalies.length > 0) dataFreshness.recordUpdate('climate', anomalies.length);
-      } catch (error) {
-        console.error('[Intelligence] Climate anomalies fetch failed:', error);
-        this.callPanel('climate', 'showError');
-        dataFreshness.recordError('climate', String(error));
-      }
-    })());
+    tasks.push(this.loadClimateAnomalies());
 
     // Security advisories
     tasks.push(this.loadSecurityAdvisories());
