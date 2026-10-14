@@ -342,8 +342,12 @@ Pre-push (`.husky/pre-push`) runs state guards, then diff-scoped checks:
 - Yahoo Finance requests must be staggered (150ms delays).
 - Prefer minimal, targeted diffs; run `npm run typecheck` and the relevant
   `tsx --test` files before finishing.
-- **Merge authority is explicit**: never merge a PR or enable auto-merge unless
-  the user asked for that specific action in the current conversation.
+- **Merge authority**: Giuseppe granted agents standing authority to merge their
+  own PRs into `main` (14/10/2026), once typecheck and the touched tests match
+  `main`. Every merge redeploys production, so merge one PR at a time, add its
+  entry to `CHANGELOG-RISK-SENTINEL.md` (Italian, newest first), and check the
+  deploy and `/api/health` afterwards. Never enable auto-merge, never force-push
+  `main`.
 
 ## SENTINEL-ADM (moved out)
 
