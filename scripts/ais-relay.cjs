@@ -508,6 +508,30 @@ async function bootSeedDelayMs(label, metaKey, intervalMs) {
   return 0;
 }
 
+// Risk Sentinel scope (14/10/2026, src/config/scope.ts): relay loops of
+// switched-off groups never start. USNI and PizzINT are military, WsbTickers
+// and SocialVelocity are retail-finance Reddit signals, TechEvents is the
+// upstream tech variant, DodoPrices is the removed payments provider.
+// RS_RELAY_DISABLED_LOOPS (comma list, "none" to clear) overrides the default.
+const RS_DEFAULT_DISABLED_LOOPS = ['USNI', 'PizzINT', 'WsbTickers', 'SocialVelocity', 'TechEvents', 'DodoPrices'];
+// Each starter of a listed loop checks rsLoopDisabled(label) before calling
+// startBootSeedLoop (kept untouched: tests evaluate its source in isolation).
+const RS_DISABLED_LOOPS = new Set(
+  process.env.RS_RELAY_DISABLED_LOOPS === 'none' ? []
+    : process.env.RS_RELAY_DISABLED_LOOPS
+      ? process.env.RS_RELAY_DISABLED_LOOPS.split(',').map((s) => s.trim()).filter(Boolean)
+      : RS_DEFAULT_DISABLED_LOOPS,
+);
+function rsLoopDisabled(label) {
+  if (!RS_DISABLED_LOOPS.has(label)) return false;
+  console.log(`[${label}] Seed loop disabled (out of Risk Sentinel scope)`);
+  return true;
+}
+// Finance scope (crypto, stablecoins, tokens, ETF flows, Gulf quotes) is off
+// unless RS_FINANCE_SCOPE=on. Stocks, commodities and sectors keep seeding:
+// the commodities panel shares that loader.
+const RS_FINANCE_ON = process.env.RS_FINANCE_SCOPE === 'on';
+
 function startBootSeedLoop(label, metaKey, intervalMs, seedFn, onInitialError, onSeedError = onInitialError) {
   let intervalStarted = false;
   const startInterval = () => {
@@ -2537,6 +2561,7 @@ const GULF_SYMBOLS = [
 const GULF_SEED_TTL = 5400; // 90min — survives 1 missed cycle
 
 async function seedGulfQuotes() {
+  if (!RS_FINANCE_ON) return 0; // finance scope switched off (src/config/scope.ts)
   const quotes = [];
   for (const meta of GULF_SYMBOLS) {
     const yahoo = await fetchYahooChartDirect(meta.symbol);
@@ -2584,6 +2609,7 @@ function parseEtfChart(chart, ticker, issuer) {
 }
 
 async function seedEtfFlows() {
+  if (!RS_FINANCE_ON) return 0; // finance scope switched off (src/config/scope.ts)
   const etfs = [];
   for (const { ticker, issuer } of ETF_LIST) {
     try {
@@ -2732,6 +2758,7 @@ function coingeckoEndpoint() {
 }
 
 async function seedCryptoQuotes() {
+  if (!RS_FINANCE_ON) return 0; // finance scope switched off (src/config/scope.ts)
   let data;
   try {
     const { base, headers } = coingeckoEndpoint();
@@ -2803,6 +2830,7 @@ async function fetchStablecoinCoinPaprika() {
 }
 
 async function seedStablecoinMarkets() {
+  if (!RS_FINANCE_ON) return 0; // finance scope switched off (src/config/scope.ts)
   let data;
   try {
     const { base, headers } = coingeckoEndpoint();
@@ -2835,6 +2863,7 @@ const SECTORS_LIST = _sectorsCfg.sectors;
 const SECTORS_SEED_TTL = 7200; // 2h — 1h buffer over 5min cron cadence (was 1h = 55min buffer)
 
 async function seedCryptoSectors() {
+  if (!RS_FINANCE_ON) return 0; // finance scope switched off (src/config/scope.ts)
   const allIds = [...new Set(SECTORS_LIST.flatMap((s) => s.tokens))];
   let data;
   try {
@@ -2905,6 +2934,7 @@ async function fetchTokenPanelsCoinPaprika(allIds) {
 }
 
 async function seedTokenPanels() {
+  if (!RS_FINANCE_ON) return 0; // finance scope switched off (src/config/scope.ts)
   const allIds = [...new Set([..._defiCfg.ids, ..._aiCfg.ids, ..._otherCfg.ids])];
   let data;
   try {
@@ -2988,6 +3018,8 @@ async function seedAllMarketDataOnce() {
   if (!equitySkipped) q = await seedMarketQuotes();
   const c = await seedCommodityQuotes();
   const s = await seedSectorSummary();
+  // Gulf, ETF, crypto, stablecoin and token seeders return 0 at once while the
+  // finance scope is switched off (RS_FINANCE_ON, see top of the market block).
   const g = await seedGulfQuotes();
   const e = await seedEtfFlows();
   const cr = await seedCryptoQuotes();
@@ -5410,6 +5442,7 @@ async function startTechEventsSeedLoop() {
     console.log('[TechEvents] Disabled (no Upstash Redis)');
     return;
   }
+  if (rsLoopDisabled('TechEvents')) return;
   console.log(`[TechEvents] Seed loop starting (interval ${TECH_EVENTS_SEED_INTERVAL_MS / 1000 / 60 / 60}h)`);
   startBootSeedLoop('TechEvents', 'seed-meta:research:tech-events', TECH_EVENTS_SEED_INTERVAL_MS, seedTechEvents, (e) => console.warn('[TechEvents] Initial seed error:', e?.message || e), (e) => console.warn('[TechEvents] Seed error:', e?.message || e));
 }
@@ -5850,6 +5883,7 @@ async function startUsniFleetSeedLoop() {
     console.log('[USNI] Disabled (no Upstash Redis)');
     return;
   }
+  if (rsLoopDisabled('USNI')) return;
   console.log(`[USNI] Seed loop starting (interval ${USNI_SEED_INTERVAL_MS / 1000 / 60 / 60}h)`);
   startBootSeedLoop('USNI', 'seed-meta:military:usni-fleet', USNI_SEED_INTERVAL_MS, seedUsniFleet, e => console.warn('[USNI] Initial seed error:', e?.message || e), e => console.warn('[USNI] Seed error:', e?.message || e));
 }
@@ -6292,6 +6326,7 @@ async function startSocialVelocitySeedLoop() {
     console.log('[SocialVelocity] Disabled (no Upstash Redis)');
     return;
   }
+  if (rsLoopDisabled('SocialVelocity')) return;
   console.log(`[SocialVelocity] Seed loop starting (interval ${SOCIAL_VELOCITY_INTERVAL_MS / 1000 / 60}min)`);
   startBootSeedLoop('SocialVelocity', SOCIAL_VELOCITY_SEED_META_KEY, SOCIAL_VELOCITY_INTERVAL_MS, seedSocialVelocity, e => console.warn('[SocialVelocity] Initial seed error:', e?.message || e), e => console.warn('[SocialVelocity] Seed error:', e?.message || e));
 }
@@ -6481,6 +6516,7 @@ async function startWsbTickersSeedLoop() {
     console.log('[WsbTickers] Disabled (no Upstash Redis)');
     return;
   }
+  if (rsLoopDisabled('WsbTickers')) return;
   console.log(`[WsbTickers] Seed loop starting (interval ${WSB_TICKERS_INTERVAL_MS / 1000 / 60}min)`);
   startBootSeedLoop('WsbTickers', 'seed-meta:intelligence:wsb-tickers', WSB_TICKERS_INTERVAL_MS, seedWsbTickers, e => console.warn('[WsbTickers] Initial seed error:', e?.message || e), e => console.warn('[WsbTickers] Seed error:', e?.message || e));
 }
@@ -6750,6 +6786,7 @@ function startPizzintSeedLoop() {
     console.log('[PizzINT] Disabled (no Upstash Redis)');
     return;
   }
+  if (rsLoopDisabled('PizzINT')) return;
   console.log(`[PizzINT] Seed loop starting (interval ${PIZZINT_SEED_INTERVAL_MS / 1000 / 60}min)`);
   startBootSeedLoop('PizzINT', 'seed-meta:intelligence:pizzint', PIZZINT_SEED_INTERVAL_MS, seedPizzint, (e) => console.warn('[PizzINT] Initial seed error:', e?.message || e), (e) => console.warn('[PizzINT] Seed error:', e?.message || e));
 }
@@ -6889,6 +6926,7 @@ async function seedDodoPrices() {
 function startDodoPriceSeedLoop() {
   if (!UPSTASH_ENABLED) { console.log('[DodoPrices] Disabled (no Upstash Redis)'); return; }
   if (!DODO_PRICE_API_KEY) { console.log('[DodoPrices] Disabled (no DODO_API_KEY)'); return; }
+  if (rsLoopDisabled('DodoPrices')) return;
   console.log(`[DodoPrices] Seed loop starting (interval ${DODO_PRICE_SEED_INTERVAL_MS / 1000 / 60}min)`);
   startBootSeedLoop('DodoPrices', 'seed-meta:product-catalog', DODO_PRICE_SEED_INTERVAL_MS, seedDodoPrices, (e) => console.warn('[DodoPrices] Initial seed error:', e?.message || e), (e) => console.warn('[DodoPrices] Seed error:', e?.message || e));
 }

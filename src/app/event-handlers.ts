@@ -1,4 +1,5 @@
 import type { AppContext, AppModule } from '@/app/app-context';
+import { isScopeOff } from '@/config/scope';
 import type { AirlineIntelPanel } from '@/components/AirlineIntelPanel';
 import type { CustomWidgetPanel } from '@/components/CustomWidgetPanel';
 import { openWidgetChatModal } from '@/components/WidgetChatModal';
@@ -972,6 +973,7 @@ export class EventHandlerManager implements AppModule {
 
   setupPizzIntIndicator(): void {
     if (SITE_VARIANT !== 'full') return;
+    if (isScopeOff('military')) return; // military scope switched off (src/config/scope.ts)
 
     this.ctx.pizzintIndicator = new PizzIntIndicator();
     const headerLeft = this.ctx.container.querySelector('.header-left');

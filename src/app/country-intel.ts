@@ -25,6 +25,7 @@ import { getCachedScores, toCountryScore } from '@/services/cached-risk-scores';
 import { signalAggregator } from '@/services/signal-aggregator';
 import { dataFreshness } from '@/services/data-freshness';
 import { fetchCountryMarkets } from '@/services/prediction';
+import { isScopeOff } from '@/config/scope';
 import { collectStoryData } from '@/services/story-data';
 import { renderStoryToCanvas } from '@/services/story-renderer';
 import { openStoryModal } from '@/components/StoryModal';
@@ -216,7 +217,10 @@ export class CountryIntelManager implements AppModule {
     this.ctx.countryBriefPage.updateEconomicIndicators?.(this.buildEconomicIndicators(code, score, null));
 
     const marketClient = new MarketServiceClient(getRpcBaseUrl(), { fetch: (...args: Parameters<typeof globalThis.fetch>) => globalThis.fetch(...args) });
-    const stockPromise = marketClient.getCountryStockIndex({ countryCode: code })
+    // Stock index and prediction markets belong to the finance scope, switched
+    // off on 14/10/2026 (src/config/scope.ts): no request, empty card.
+    const noStock = { available: false as const, code: '', symbol: '', indexName: '', price: '0', weekChangePercent: '0', currency: '' };
+    const stockPromise = isScopeOff('finance') ? Promise.resolve(noStock) : marketClient.getCountryStockIndex({ countryCode: code })
       .then((resp) => ({
         available: resp.available,
         code: resp.code,
@@ -226,7 +230,7 @@ export class CountryIntelManager implements AppModule {
         weekChangePercent: String(resp.weekChangePercent),
         currency: resp.currency,
       }))
-      .catch(() => ({ available: false as const, code: '', symbol: '', indexName: '', price: '0', weekChangePercent: '0', currency: '' }));
+      .catch(() => noStock);
 
     let latestStock: CountryStockSnapshot | null = null;
     let latestImf: ImfCountryBundle | null = null;
@@ -246,7 +250,7 @@ export class CountryIntelManager implements AppModule {
       this.ctx.countryBriefPage.updateEconomicIndicators?.(this.buildEconomicIndicators(code, score, latestStock, bundle));
     }).catch(() => { /* non-fatal */ });
 
-    fetchCountryMarkets(country)
+    (isScopeOff('finance') ? Promise.resolve([]) : fetchCountryMarkets(country))
       .then((markets) => {
         if (this.ctx.countryBriefPage?.getCode() === code) this.ctx.countryBriefPage.updateMarkets(markets);
       })

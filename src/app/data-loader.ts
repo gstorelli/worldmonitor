@@ -116,6 +116,7 @@ import { fetchSecurityAdvisories } from '@/services/security-advisories';
 import { fetchThermalEscalations } from '@/services/thermal-escalation';
 import { fetchCrossSourceSignals } from '@/services/cross-source-signals';
 import { fetchTelegramFeed } from '@/services/telegram-intel';
+import { isScopeOff } from '@/config/scope';
 import { fetchOrefAlerts, startOrefPolling, stopOrefPolling, onOrefAlertsUpdate } from '@/services/oref-alerts';
 import { enrichEventsWithExposure } from '@/services/population-exposure';
 import { debounce, getCircuitBreakerCooldownInfo } from '@/utils';
@@ -1165,6 +1166,7 @@ export class DataLoaderManager implements AppModule {
   }
 
   async loadStockAnalysis(): Promise<void> {
+    if (isScopeOff('finance')) return; // switched off: src/config/scope.ts
     const panel = this.ctx.panels['stock-analysis'] as StockAnalysisPanel | undefined;
     if (!panel) return;
 
@@ -1205,6 +1207,7 @@ export class DataLoaderManager implements AppModule {
   }
 
   async loadStockBacktest(): Promise<void> {
+    if (isScopeOff('finance')) return; // switched off: src/config/scope.ts
     const panel = this.ctx.panels['stock-backtest'] as StockBacktestPanel | undefined;
     if (!panel) return;
 
@@ -1415,13 +1418,16 @@ export class DataLoaderManager implements AppModule {
       this.ctx.statusPanel?.updateApi('Finnhub', { status: 'error' });
     }
 
-    try {
-      const cryptoPanel = this.ctx.panels['crypto'] as CryptoPanel | undefined;
-      const crypto = await fetchCrypto();
-      cryptoPanel?.renderCrypto(crypto);
-      this.ctx.statusPanel?.updateApi('CoinGecko', { status: crypto.length > 0 ? 'ok' : 'error' });
-    } catch {
-      this.ctx.statusPanel?.updateApi('CoinGecko', { status: 'error' });
+    // Crypto quotes: finance scope switched off (src/config/scope.ts).
+    if (!isScopeOff('finance')) {
+      try {
+        const cryptoPanel = this.ctx.panels['crypto'] as CryptoPanel | undefined;
+        const crypto = await fetchCrypto();
+        cryptoPanel?.renderCrypto(crypto);
+        this.ctx.statusPanel?.updateApi('CoinGecko', { status: crypto.length > 0 ? 'ok' : 'error' });
+      } catch {
+        this.ctx.statusPanel?.updateApi('CoinGecko', { status: 'error' });
+      }
     }
 
     const cryptoHeatmapPanel = this.ctx.panels['crypto-heatmap'] as CryptoHeatmapPanel | undefined;
@@ -1452,6 +1458,7 @@ export class DataLoaderManager implements AppModule {
   }
 
   async loadDailyMarketBrief(force = false): Promise<void> {
+    if (isScopeOff('finance')) return; // switched off: src/config/scope.ts
     if (this.ctx.isDestroyed || this.ctx.inFlight.has('dailyMarketBrief')) return;
 
     this.dailyBriefGeneration++;
@@ -1608,6 +1615,7 @@ export class DataLoaderManager implements AppModule {
   }
 
   async loadMarketImplications(): Promise<void> {
+    if (isScopeOff('finance')) return; // switched off: src/config/scope.ts
     if (this.ctx.isDestroyed || this.ctx.inFlight.has('marketImplications')) return;
     this.ctx.inFlight.add('marketImplications');
     try {
@@ -1629,6 +1637,7 @@ export class DataLoaderManager implements AppModule {
   }
 
   async loadPredictions(): Promise<void> {
+    if (isScopeOff('finance')) return; // switched off: src/config/scope.ts
     try {
       const predictions = await fetchPredictions({ region: this.ctx.resolvedLocation });
       this.ctx.latestPredictions = predictions;
@@ -1887,6 +1896,7 @@ export class DataLoaderManager implements AppModule {
     })());
 
     tasks.push((async () => {
+      if (isScopeOff('military')) return; // military feeds switched off (src/config/scope.ts)
       try {
         if (isMilitaryVesselTrackingConfigured()) {
           initMilitaryVesselStream();
@@ -2030,8 +2040,8 @@ export class DataLoaderManager implements AppModule {
       tasks.push(this.loadTelegramIntel());
     }
 
-    // OREF sirens (premium-locked on desktop without API key)
-    if (!_desktopLocked) {
+    // OREF sirens (premium-locked on desktop without API key; military scope)
+    if (!_desktopLocked && !isScopeOff('military')) {
       tasks.push((async () => {
         try {
           const data = await fetchOrefAlerts();
@@ -2058,7 +2068,7 @@ export class DataLoaderManager implements AppModule {
     }
 
     // GPS/GNSS jamming (cloud-only — seeded by Wingbits API via fetch-gpsjam.mjs)
-    if (!isDesktopRuntime()) {
+    if (!isDesktopRuntime() && !isScopeOff('military')) {
       tasks.push((async () => {
         try {
           const data = await fetchGpsInterference();
@@ -2183,6 +2193,7 @@ export class DataLoaderManager implements AppModule {
   }
 
   async loadIranEvents(): Promise<void> {
+    if (isScopeOff('military')) return; // switched off: src/config/scope.ts
     try {
       const events = await fetchIranEvents();
       this.ctx.intelligenceCache.iranEvents = events;
@@ -2372,6 +2383,7 @@ export class DataLoaderManager implements AppModule {
   }
 
   async loadMilitary(): Promise<void> {
+    if (isScopeOff('military')) return; // switched off: src/config/scope.ts
     if (this.ctx.intelligenceCache.military) {
       const { flights, flightClusters, vessels, vesselClusters } = this.ctx.intelligenceCache.military;
       this.ctx.map?.setMilitaryFlights(flights, flightClusters);
@@ -2808,6 +2820,7 @@ export class DataLoaderManager implements AppModule {
   }
 
   async loadPizzInt(): Promise<void> {
+    if (isScopeOff('military')) return; // switched off: src/config/scope.ts
     try {
       const [status, tensions] = await Promise.all([
         fetchPizzIntStatus(),
@@ -3059,6 +3072,7 @@ export class DataLoaderManager implements AppModule {
   }
 
   async loadTelegramIntel(): Promise<void> {
+    if (isScopeOff('military')) return; // switched off: src/config/scope.ts
     if (isDesktopRuntime() && !getSecretState('WORLDMONITOR_API_KEY').present) return;
     try {
       const result = await fetchTelegramFeed();
@@ -3072,6 +3086,7 @@ export class DataLoaderManager implements AppModule {
   }
 
   async loadThermalEscalations(): Promise<void> {
+    if (isScopeOff('military')) return; // switched off: src/config/scope.ts
     try {
       const result = await fetchThermalEscalations();
       this.ctx.intelligenceCache.thermalEscalation = result;

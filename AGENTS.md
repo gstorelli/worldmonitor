@@ -134,6 +134,15 @@ npm run lint:safe-html    # OPT-IN ONLY: see "Pre-Push" (fork baseline fails thi
   download button/dropdown is gone. Do not re-add it without a real release channel.
 - **Panel tiers**: `src/config/panel-tiers.ts` DISABLED (tier 3) includes the upstream
   PRO finance surfaces (`stock-analysis`, `stock-backtest`, `wsb-ticker-scanner`).
+- **Scope switches (14/10/2026)**: `src/config/scope.ts` switches off whole inherited
+  groups: finance (crypto, stablecoins, tokens, predictions, stocks), tech/startup,
+  consumer indices, live media (webcams, live channels) and military (flights,
+  vessels, bases, USNI, sirens, strikes, GPS jamming, Telegram, PizzINT). A switched-off
+  group is tier 3, never fetched by the SPA (`isScopeOff` in the loaders), absent from the
+  map layer picker, out of the `full` seed sweep (`scripts/seed-cron.sh`), out of the
+  relay loops (`RS_RELAY_DISABLED_LOOPS`, `RS_FINANCE_SCOPE` in `scripts/ais-relay.cjs`)
+  and out of `/api/health` (`OUT_OF_SCOPE_HEALTH_CHECKS`). Keep the five lists aligned
+  when a group changes; do not switch a group back on to "fix" an empty panel.
 - **User auth (Phase 1)**: authentication is **enforced by default**
   (`docker-compose` uses `AUTH_REQUIRED:-true`; set `AUTH_REQUIRED=false` for the
   anonymous mode). The server requires an `rs_session` HttpOnly cookie on every
