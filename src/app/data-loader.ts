@@ -1271,7 +1271,12 @@ export class DataLoaderManager implements AppModule {
       let stocksResult: Awaited<ReturnType<typeof fetchMultipleStocks>>;
       const marketsPanel = this.ctx.panels['markets'] as MarketPanel | undefined;
 
-      if (customEntries.length === 0 && hydratedMarkets?.quotes?.length) {
+      if (isScopeOff('finance')) {
+        // Stock quotes only feed the markets panels, switched off with the
+        // finance group (src/config/scope.ts): the commodities panel does not
+        // need them.
+        stocksResult = { data: [] };
+      } else if (customEntries.length === 0 && hydratedMarkets?.quotes?.length) {
         const symbolMetaMap = new Map(effectiveSymbols.map((s) => [s.symbol, s]));
         const data = hydratedMarkets.quotes.map((q) => ({
           symbol: q.symbol,
@@ -1297,7 +1302,9 @@ export class DataLoaderManager implements AppModule {
 
       const finnhubConfigMsg = 'FINNHUB_API_KEY not configured — add in Settings';
 
-      if (stocksResult.rateLimited && stocksResult.data.length === 0) {
+      if (isScopeOff('finance')) {
+        // Finnhub is not called: nothing to report.
+      } else if (stocksResult.rateLimited && stocksResult.data.length === 0) {
         const rlMsg = 'Market data temporarily unavailable (rate limited) — retrying shortly';
         this.ctx.panels['commodities']?.showError(rlMsg);
       } else if (stocksResult.skipped) {
@@ -1310,6 +1317,7 @@ export class DataLoaderManager implements AppModule {
       }
 
       // Sector heatmap: always attempt loading regardless of market rate-limit status
+      // (finance scope only: the heatmap is switched off with it).
       const hydratedSectors = getHydratedData('sectors') as GetSectorSummaryResponse | undefined;
       const heatmapPanel = this.ctx.panels['heatmap'] as HeatmapPanel | undefined;
       const sectorNameMap = new Map(SECTORS.map((s) => [s.symbol, s.name]));
@@ -1320,7 +1328,9 @@ export class DataLoaderManager implements AppModule {
       });
       const toSectorBar = (s: { symbol?: string; name: string; change: number | null }) =>
         s.symbol && Number.isFinite(s.change) ? { symbol: s.symbol, name: s.name, change1d: s.change as number } : null;
-      if (hydratedSectors?.sectors?.length) {
+      if (isScopeOff('finance')) {
+        // switched off: src/config/scope.ts
+      } else if (hydratedSectors?.sectors?.length) {
         warmSectorCache(hydratedSectors);
         const items = hydratedSectors.sectors.map(toHeatmapItem);
         const sectorBars = items.map(toSectorBar).filter((s): s is NonNullable<typeof s> => s !== null);

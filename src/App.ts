@@ -237,8 +237,13 @@ export class App {
       tasks.push(wrapped);
     };
 
-    const shouldPrime = (id: string): boolean => forceAll || this.isPanelNearViewport(id);
-    const shouldPrimeAny = (ids: string[]): boolean => forceAll || this.isAnyPanelNearViewport(ids);
+    // Risk Sentinel: forceAll primes only panels that exist in the active app
+    // (same gate as DataLoaderManager.loadAllData). Without it the thesis view
+    // fetched FRED, BIS, government spending and oil analytics for panels it
+    // never creates.
+    const panelExists = (id: string): boolean => Boolean(this.state.panels[id]);
+    const shouldPrime = (id: string): boolean => (forceAll && panelExists(id)) || this.isPanelNearViewport(id);
+    const shouldPrimeAny = (ids: string[]): boolean => (forceAll && ids.some(panelExists)) || this.isAnyPanelNearViewport(ids);
 
     if (shouldPrime('service-status')) {
       const panel = this.state.panels['service-status'] as ServiceStatusPanel | undefined;
