@@ -20,7 +20,7 @@
  * independence-from-upstream work, not a reason to switch a group back on.
  */
 
-export type ScopeGroup = 'finance' | 'techStartup' | 'consumerIndices' | 'liveMedia' | 'military';
+export type ScopeGroup = 'finance' | 'techStartup' | 'consumerIndices' | 'liveMedia' | 'military' | 'macro' | 'upstreamExtra';
 
 export const OUT_OF_SCOPE: Record<ScopeGroup, boolean> = {
   /** Crypto, stablecoins, tokens, prediction markets, stock markets and analysis. */
@@ -33,6 +33,20 @@ export const OUT_OF_SCOPE: Record<ScopeGroup, boolean> = {
   liveMedia: true,
   /** Military flights/vessels/bases, USNI fleet, sirens, strikes, GPS jamming, Telegram OSINT. */
   military: true,
+  /**
+   * Macro and financial indicators (BIS, ECB rates, FRED, US/China macro, EU
+   * financial stress, FX). Decision of 15/10/2026: outside the thesis, and
+   * seeded only weekly they were empty most of the week.
+   */
+  macro: true,
+  /**
+   * Upstream domains outside the thesis and services without API keys:
+   * tenders, China coverage, resilience, health, radiation, CO2/ocean ice,
+   * cyber threats, internet outages, aviation, service statuses, security
+   * advisories, unrest, displacement, humanitarian summary (15/10/2026). The
+   * country-instability panels stay but lose these inputs.
+   */
+  upstreamExtra: true,
 };
 
 export function isScopeOff(group: ScopeGroup): boolean {
@@ -62,6 +76,11 @@ export const OUT_OF_SCOPE_PANELS: Record<ScopeGroup, readonly string[]> = {
     'military-correlation', 'oref-sirens', 'telegram-intel', 'thermal-escalation',
     'defense-patents',
   ],
+  macro: ['economic', 'macro-tiles', 'yield-curve', 'fsi', 'economic-calendar', 'national-debt', 'gulf-economies'],
+  upstreamExtra: [
+    'disease-outbreaks', 'radiation-watch', 'service-status', 'internet-disruptions', 'airline-intel',
+    'security-advisories', 'displacement', 'population-exposure',
+  ],
 };
 
 /** Map layers of each switched-off group (removed from the picker and forced off). */
@@ -71,6 +90,8 @@ export const OUT_OF_SCOPE_LAYER_KEYS: Record<ScopeGroup, readonly string[]> = {
   consumerIndices: [],
   liveMedia: ['webcams'],
   military: ['military', 'bases', 'iranAttacks', 'gpsJamming'],
+  macro: [],
+  upstreamExtra: ['outages', 'cyberThreats', 'flights', 'displacement', 'radiationWatch', 'protests', 'diseaseOutbreaks'],
 };
 
 function collect(map: Record<ScopeGroup, readonly string[]>): Set<string> {

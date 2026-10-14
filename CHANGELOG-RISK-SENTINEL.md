@@ -6,6 +6,13 @@ Ogni merge su `main` ripubblica la produzione (`risksentinel.opencyber.org`). Ch
 
 Formato di ogni voce: numero della PR, cosa cambia per chi usa il portale, eventuale azione sul server dopo il merge.
 
+## 15 ottobre 2026
+
+- **#45** (#90, #102 della tesi): salute e carico.
+  - Energia e gas ogni 6 ore nel livello `context`: stoccaggi GIE, JODI petrolio e gas, EIA, prezzi dell'energia, Ember, carenze di carburante, Hormuz, interruzioni nei porti.
+  - Spenti due gruppi nuovi di perimetro (`src/config/scope.ts`): **macro** (BIS, BCE, FRED, FSI, curve dei rendimenti, cambi, BLS, calendario USA, macro della Cina) e **upstreamExtra** (gare d'appalto, Cina, resilienza, sanità, radiazioni, CO₂ e ghiacci, minacce cyber, interruzioni internet, aviazione, stato dei servizi, advisory, proteste, sfollati, sintesi umanitaria).
+  - Questi gruppi escono da pannelli, livelli della mappa, cron, cicli del relay (Cyber, Spending, ServiceStatuses) e `/api/health`. I pannelli dell'instabilità dei paesi restano, ma senza questi dati.
+
 ## 14 ottobre 2026
 
 - **#44**: il proxy `redis-rest` accetta richieste fino a 16 MB invece di 1 MB. Con il limite precedente il seeder OFAC falliva a ogni giro scrivendo il suo indice di circa 2,1 MB, e la scheda USA delle sanzioni non si aggiornava.
