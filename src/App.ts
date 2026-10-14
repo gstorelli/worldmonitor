@@ -53,7 +53,7 @@ import { preloadCountryGeometry, getCountryNameByCode } from '@/services/country
 import { initI18n, t } from '@/services/i18n';
 
 import { computeDefaultDisabledSources, getLocaleBoostedSources, getTotalFeedCount } from '@/config/feeds';
-import { fetchBootstrapData, getBootstrapHydrationState, markBootstrapAsLive, type BootstrapHydrationState } from '@/services/bootstrap';
+import { awaitBootstrapData, getBootstrapHydrationState, markBootstrapAsLive, type BootstrapHydrationState } from '@/services/bootstrap';
 import { describeFreshness } from '@/services/persistent-cache';
 import { DesktopUpdater } from '@/app/desktop-updater';
 import { CountryIntelManager } from '@/app/country-intel';
@@ -847,7 +847,7 @@ export class App {
     }
 
     // Hydrate in-memory cache from bootstrap endpoint (before panels construct and fetch)
-    await fetchBootstrapData();
+    await awaitBootstrapData();
     this.bootstrapHydrationState = getBootstrapHydrationState();
 
     // Verify OAuth OTT and hydrate auth session BEFORE any UI subscribes to auth state

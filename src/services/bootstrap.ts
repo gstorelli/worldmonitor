@@ -219,3 +219,21 @@ export async function fetchBootstrapData(): Promise<void> {
     await runBootstrapAttempt(fastMs, slowMs);
   }
 }
+
+// Risk Sentinel (thesis issue #86): main.ts starts the bootstrap right after
+// login, in parallel with the panel policy/prefs reads and the App module
+// download, instead of waiting for App.init(); App.init() then reuses it.
+let earlyBootstrap: Promise<void> | null = null;
+
+/** Start the bootstrap fetch early (web only: the desktop sidecar may not be ready yet). */
+export function prefetchBootstrapData(): void {
+  if (earlyBootstrap || isDesktopRuntime()) return;
+  earlyBootstrap = fetchBootstrapData().catch(() => {});
+}
+
+/** App.init(): the early fetch when there is one, a fresh fetch otherwise. */
+export function awaitBootstrapData(): Promise<void> {
+  const early = earlyBootstrap;
+  earlyBootstrap = null;
+  return early ?? fetchBootstrapData();
+}
