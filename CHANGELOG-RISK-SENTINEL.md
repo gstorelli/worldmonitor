@@ -8,6 +8,7 @@ Formato di ogni voce: numero della PR, cosa cambia per chi usa il portale, event
 
 ## 14 ottobre 2026
 
+- **#35**: le normali climatiche 1991-2020 (Open-Meteo) si scaricano una zona alla volta, all'inizio del giro settimanale e con un tempo massimo proprio: prima venivano bloccate dai 429 di Open-Meteo, e senza di esse il pannello climate restava vuoto. *Server:* serve un lancio manuale una tantum per non aspettare domenica.
 - **#34**: il tooltip "Fonti dei dati" di Alert feed e OSINT dice che il workflow n8n 01 (notizie GDELT) non esiste nell'istanza, come risulta dal log di `n8n-sync`.
 - **#33**: questo changelog; autorizzazione permanente al merge per gli agenti, registrata in `AGENTS.md`.
 - **#32**: icona "Fonti dei dati" accanto al titolo di ogni pannello della vista tesi, sulla mappa e in ogni sezione di OSINT, Research e Policy. Il tooltip cita la fonte esatta, l'indirizzo chiamato dal codice e il file che la chiama. Registro in `src/config/data-sources.ts`, da aggiornare quando un pannello cambia fonte.
