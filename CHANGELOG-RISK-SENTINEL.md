@@ -8,6 +8,7 @@ Formato di ogni voce: numero della PR, cosa cambia per chi usa il portale, event
 
 ## 15 ottobre 2026
 
+- **#47** (#86 della tesi): il bootstrap della dashboard parte subito dopo il login, in parallelo a regole e preferenze, e `App.init` riusa la stessa richiesta. Si risparmia un giro di richieste (primo pannello da 1,24 a 0,95 s nella sonda). I limiti di 6 e 12 s restano: sul server il bootstrap risponde in 0,2-0,8 s.
 - **#46** (#87 della tesi): OSINT, Research e Policy non scaricano più il codice della dashboard (mappa, pannelli, loader). JavaScript caricato da 7,8 a 3,7 MB; la vista tesi è invariata.
 - **#45** (#90, #102 della tesi): salute e carico.
   - Energia e gas ogni 6 ore nel livello `context`: stoccaggi GIE, JODI petrolio e gas, EIA, prezzi dell'energia, Ember, carenze di carburante, Hormuz, interruzioni nei porti.
