@@ -463,3 +463,105 @@
   font-size: 12px;
   font-weight: 400;
 }
+
+/* OSINT workspace: signal layer of the thesis model (src/apps/osint/) */
+.rs-osint-section {
+  margin: 0 0 20px;
+}
+
+.rs-osint-section h2 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+
+.rs-osint-note {
+  margin: 0 0 8px;
+}
+
+.rs-osint-sub {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-dim);
+}
+
+.rs-osint-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.rs-osint-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.rs-osint-table th,
+.rs-osint-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-subtle);
+  text-align: left;
+  vertical-align: top;
+}
+
+.rs-osint-table thead th {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-dim);
+  background: var(--bg-secondary);
+  white-space: nowrap;
+}
+
+.rs-osint-table tbody th {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.rs-osint-state {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 11px;
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.rs-osint-state-monitor .rs-osint-state {
+  border-color: var(--yellow);
+  color: var(--yellow);
+}
+
+.rs-osint-state-assess .rs-osint-state {
+  border-color: var(--red);
+  color: var(--red);
+}
+
+.rs-up {
+  color: var(--green);
+}
+
+.rs-down {
+  color: var(--red);
+}
+
+.rs-osint-feed {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 12.5px;
+}
+
+.rs-osint-feed li {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.rs-osint-feed li.rs-osint-sig {
+  border-left: 3px solid var(--red);
+  padding-left: 8px;
+}
