@@ -10,6 +10,7 @@
  * unjustified; it still breaks ties after severity in the digest ordering.
  */
 
+import { mountSourceInfo, sourceInfoSlot } from '@/components/source-info';
 import { escapeHtml } from '@/utils/sanitize';
 import type { AppWorkspace } from '../types';
 
@@ -52,7 +53,7 @@ export function createOsintWorkspace(): AppWorkspace {
         <div class="rs-ws rs-ws-osint">
           <div class="rs-ws-toolbar">
             <div class="rs-ws-heading">
-              <h1>Open-Source Intelligence</h1>
+              <h1>Open-Source Intelligence ${sourceInfoSlot('osint')}</h1>
               <p>Segnali OSINT aggregati dalle pipeline n8n, ordinati per severità</p>
             </div>
             <div class="rs-ws-stats">
@@ -79,6 +80,7 @@ export function createOsintWorkspace(): AppWorkspace {
           <div class="rs-card-grid rs-card-grid-osint" id="rsOsintGrid"></div>
         </div>
       `;
+      mountSourceInfo(root);
 
       const gridEl = root.querySelector<HTMLElement>('#rsOsintGrid');
       const chipbar = root.querySelector<HTMLElement>('#rsOsintTopics');

@@ -1879,6 +1879,108 @@ body.panel-resize-active iframe {
   padding-left: 14px;
 }
 
+/* Risk Sentinel: "Fonti" icon (src/components/source-info.ts) */
+.rs-source-info {
+  position: relative;
+  display: inline-flex;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+
+
+.rs-source-btn {
+  width: 16px;
+  height: 16px;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.rs-source-btn:hover,
+.rs-source-btn:focus-visible {
+  color: var(--accent);
+  background: rgba(0, 200, 255, 0.1);
+}
+
+.rs-source-tooltip {
+  /* appended to <body> and placed by source-info.ts while open */
+  position: fixed;
+  top: 0;
+  left: 0;
+  background: var(--border-subtle);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  padding: 10px 12px;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.45;
+  color: var(--text);
+  text-transform: none;
+  letter-spacing: normal;
+  white-space: normal;
+  width: max-content;
+  min-width: 240px;
+  max-width: min(380px, 80vw);
+  max-height: 60vh;
+  overflow-y: auto;
+  z-index: 10000;
+  box-shadow: 0 4px 16px var(--shadow-color);
+}
+
+.rs-source-tooltip strong {
+  color: var(--accent);
+  display: block;
+  margin-bottom: 6px;
+}
+
+.rs-source-tooltip ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rs-source-tooltip li {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 5px 0;
+  border-top: 1px solid var(--border-strong);
+}
+
+.rs-source-tooltip li:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.rs-source-tooltip a {
+  color: var(--accent);
+  text-decoration: underline;
+  word-break: break-word;
+}
+
+.rs-source-what {
+  color: var(--text-dim);
+}
+
+.rs-source-host,
+.rs-source-code {
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  word-break: break-all;
+}
+
+.rs-source-note {
+  font-style: italic;
+}
+
 .panel-info-tooltip li {
   margin: 2px 0;
   color: var(--text-dim);

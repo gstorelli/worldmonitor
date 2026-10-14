@@ -448,3 +448,18 @@
     flex-wrap: wrap;
   }
 }
+
+/* "Fonti dei dati" row at the top of each workspace tab (src/components/source-info.ts) */
+.rs-tab-sources {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin: 0 0 8px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.rs-ws-heading h1 .rs-source-slot {
+  font-size: 12px;
+  font-weight: 400;
+}

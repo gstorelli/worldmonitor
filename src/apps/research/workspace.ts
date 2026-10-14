@@ -8,6 +8,7 @@
  * persisted per user through /api/prefs/research.
  */
 
+import { mountSourceInfo, sourceInfoSlot } from '@/components/source-info';
 import { escapeHtml } from '@/utils/sanitize';
 import type { AppWorkspace } from '../types';
 import { CALL_TOPICS, CALLS_UPDATED_AT, callsForThemes, daysUntil } from './calls';
@@ -497,7 +498,7 @@ export function createResearchWorkspace(): AppWorkspace {
             <button class="rs-tab" data-tab="notes" role="tab">Note</button>
           </div>
 
-          <div class="rs-tab-panel" data-panel="library">
+          <div class="rs-tab-panel" data-panel="library"><div class="rs-tab-sources">Fonti dei dati ${sourceInfoSlot('research.library')}</div>
             <div class="rs-ws-controls">
               <input id="rsResearchQuery" class="rs-input" type="search" placeholder="Cerca… (author: / year: / layer:innesco / verif:T / type:journal / status:reviewed / prio:high / tag:customs)">
               <span class="rs-meta" id="rsResearchResultCount"></span>
@@ -537,13 +538,14 @@ export function createResearchWorkspace(): AppWorkspace {
             <div class="ai-flow-toggle-desc" id="rsResearchStatus">${escapeHtml(statusMessage)}</div>
           </div>
 
-          <div class="rs-tab-panel" data-panel="coverage" hidden><div id="rsResearchCoverage"></div></div>
-          <div class="rs-tab-panel" data-panel="news" hidden><div id="rsResearchNews"></div></div>
-          <div class="rs-tab-panel" data-panel="calls" hidden><div id="rsResearchCalls"></div></div>
-          <div class="rs-tab-panel" data-panel="zotero" hidden><div id="rsResearchZotero"></div></div>
-          <div class="rs-tab-panel" data-panel="notes" hidden><div id="rsResearchNotes"></div></div>
+          <div class="rs-tab-panel" data-panel="coverage" hidden><div class="rs-tab-sources">Fonti dei dati ${sourceInfoSlot('research.coverage')}</div><div id="rsResearchCoverage"></div></div>
+          <div class="rs-tab-panel" data-panel="news" hidden><div class="rs-tab-sources">Fonti dei dati ${sourceInfoSlot('research.news')}</div><div id="rsResearchNews"></div></div>
+          <div class="rs-tab-panel" data-panel="calls" hidden><div class="rs-tab-sources">Fonti dei dati ${sourceInfoSlot('research.calls')}</div><div id="rsResearchCalls"></div></div>
+          <div class="rs-tab-panel" data-panel="zotero" hidden><div class="rs-tab-sources">Fonti dei dati ${sourceInfoSlot('research.zotero')}</div><div id="rsResearchZotero"></div></div>
+          <div class="rs-tab-panel" data-panel="notes" hidden><div class="rs-tab-sources">Fonti dei dati ${sourceInfoSlot('research.notes')}</div><div id="rsResearchNotes"></div></div>
         </div>
       `;
+      mountSourceInfo(root);
 
       // ── Events ────────────────────────────────────────────────────────────
       root.addEventListener('click', (event) => {

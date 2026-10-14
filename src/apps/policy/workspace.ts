@@ -5,6 +5,7 @@
  * registry (EUR-Lex / Gazzetta Ufficiale) plus the live n8n policy monitor.
  */
 
+import { mountSourceInfo, sourceInfoSlot } from '@/components/source-info';
 import { escapeHtml } from '@/utils/sanitize';
 import type { AppWorkspace } from '../types';
 
@@ -107,7 +108,7 @@ export function createPolicyWorkspace(): AppWorkspace {
             <button class="${tabClass('monitor')}" data-tab="monitor" role="tab">Monitor policy (n8n)</button>
           </div>
 
-          <div class="rs-tab-panel" data-panel="registry">
+          <div class="rs-tab-panel" data-panel="registry"><div class="rs-tab-sources">Fonti dei dati ${sourceInfoSlot('policy.registry')}</div>
             <div class="rs-ws-controls">
               <input id="rsPolicyQuery" class="rs-input" type="search" placeholder="Cerca per titolo, riferimento, tema…">
               <select id="rsPolicyJurisdiction" class="rs-select">
@@ -131,11 +132,12 @@ export function createPolicyWorkspace(): AppWorkspace {
             </div>
           </div>
 
-          <div class="rs-tab-panel" data-panel="monitor" hidden>
+          <div class="rs-tab-panel" data-panel="monitor" hidden><div class="rs-tab-sources">Fonti dei dati ${sourceInfoSlot('policy.monitor')}</div>
             <div class="rs-card-grid" id="rsPolicyMonitor"></div>
           </div>
         </div>
       `;
+      mountSourceInfo(root);
 
       const listEl = root.querySelector<HTMLElement>('#rsPolicyList');
       const detailEl = root.querySelector<HTMLElement>('#rsPolicyDetail');

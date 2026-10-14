@@ -1,5 +1,7 @@
 import type { AppContext, AppModule } from '@/app/app-context';
 import { isPanelDisabled } from '@/config/panel-tiers';
+import { getPanelSources } from '@/config/data-sources';
+import { createSourceInfo } from '@/components/source-info';
 import { isPolicyDisabled } from '@/services/panel-policy';
 import { schedulePanelPrefsPush } from '@/services/user-panel-prefs';
 import { ACTIVE_APP, APPS, isPanelAllowedInApp, switchAppHref } from '@/config/apps';
@@ -289,6 +291,10 @@ export class PanelLayoutManager implements AppModule {
     `;
 
     this.createPanels();
+
+    // "Fonti" icon on the map header (src/config/data-sources.ts).
+    const mapSourceInfo = createSourceInfo(getPanelSources('map'));
+    if (mapSourceInfo) document.querySelector('#mapSection .panel-header-left')?.appendChild(mapSourceInfo);
 
     if (this.ctx.isMobile) {
       this.setupMobileMapToggle();
