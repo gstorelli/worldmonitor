@@ -6,7 +6,7 @@ export const config = { runtime: 'edge' };
 const CACHE_TTL_SECONDS = 6 * 3600;
 const MAX_LIMIT = 25;
 // Bump when the query/providers change so stale cached bodies are not served.
-const CACHE_VERSION = 'v3';
+const CACHE_VERSION = 'v4';
 
 /** Rebuild a plain abstract from OpenAlex's inverted index. */
 function invertAbstract(index) {
@@ -108,8 +108,36 @@ async function cacheKey(value) {
 }
 
 /**
+ * Build the OpenAlex search URL. With OPENALEX_API_KEY the key travels as the
+ * `api_key` query parameter (the only form OpenAlex documents); without it the
+ * request runs on the anonymous daily budget. Pure + exported for tests.
+ *
+ * @param {{ query: string, from: string, to: string, limit: number, mailto: string, apiKey?: string }} params
+ */
+export function buildOpenAlexUrl({ query, from, to, limit, mailto, apiKey }) {
+  // title_and_abstract.search requires ALL terms (AND semantics) and the
+  // relevance score keeps the results on-topic.
+  let target = `https://api.openalex.org/works?filter=title_and_abstract.search:${encodeURIComponent(query)},from_publication_date:${from},to_publication_date:${to}&sort=relevance_score:desc&per-page=${limit}&mailto=${encodeURIComponent(mailto)}`;
+  if (apiKey) target += `&api_key=${encodeURIComponent(apiKey)}`;
+  return target;
+}
+
+/**
+ * Order of the providers. OpenAlex goes first only with an API key: the
+ * anonymous budget is small and the shared VPS IP was throttled (HTTP 429),
+ * while Crossref is always reachable. Pure + exported for tests.
+ *
+ * @param {string | undefined} apiKey
+ * @returns {Array<'openalex' | 'crossref'>}
+ */
+export function providerOrder(apiKey) {
+  return apiKey ? ['openalex', 'crossref'] : ['crossref', 'openalex'];
+}
+
+/**
  * GET /api/research/papers?q=<keywords>&days=180&limit=12
- * OpenAlex search for recent scholarly works (no API key), cached 6h.
+ * Search for recent scholarly works (OpenAlex with OPENALEX_API_KEY, Crossref
+ * otherwise or as fallback), cached 6h.
  *
  * WIP: this is the backend of the "Novità accademiche" tab. It returns titles
  * and metadata only; adding an item to Zotero goes through /api/zotero/items.
@@ -143,13 +171,10 @@ export default async function handler(request) {
   const mailto = process.env.CROSSREF_MAILTO || 'research@risksentinel.opencyber.org';
   const userAgent = `RiskSentinelResearch/1.0 (mailto:${mailto})`;
 
-  // Crossref is the primary source: it is reliably reachable from the VPS,
-  // while OpenAlex throttles shared datacenter IPs (HTTP 429). OpenAlex is the
-  // fallback when Crossref returns nothing.
-  let items = [];
-  let providerError = '';
+  const apiKey = (process.env.OPENALEX_API_KEY ?? '').trim();
   const today = new Date().toISOString().slice(0, 10);
-  try {
+
+  async function searchCrossref() {
     // Relevance-sorted (no sort/order override) and bounded to the window;
     // date-sorting would return newest-but-irrelevant works.
     const target = `https://api.crossref.org/works?query.bibliographic=${encodeURIComponent(query)}&filter=from-pub-date:${from},until-pub-date:${today}&rows=${limit}&select=DOI,title,author,issued,container-title,publisher,type,URL,abstract,is-referenced-by-count&mailto=${encodeURIComponent(mailto)}`;
@@ -157,42 +182,46 @@ export default async function handler(request) {
       headers: { Accept: 'application/json', 'User-Agent': userAgent },
       signal: AbortSignal.timeout(20_000),
     });
-    if (res.ok) {
-      const payload = await res.json();
-      items = Array.isArray(payload?.message?.items)
-        ? payload.message.items.map(normalizeCrossrefItem).filter((entry) => entry && entry.title)
-        : [];
-    } else {
-      providerError = `Crossref HTTP ${res.status}`;
-    }
-  } catch (error) {
-    providerError = error instanceof Error ? error.message : 'Crossref unreachable';
+    if (!res.ok) throw new Error(`Crossref HTTP ${res.status}`);
+    const payload = await res.json();
+    return Array.isArray(payload?.message?.items)
+      ? payload.message.items.map(normalizeCrossrefItem).filter((entry) => entry && entry.title)
+      : [];
   }
 
-  if (items.length === 0) {
+  async function searchOpenAlex() {
+    const target = buildOpenAlexUrl({ query, from, to: today, limit, mailto, apiKey });
+    const res = await fetch(target, {
+      headers: { Accept: 'application/json', 'User-Agent': userAgent },
+      signal: AbortSignal.timeout(20_000),
+    });
+    // Never echo the URL: it carries the API key.
+    if (!res.ok) throw new Error(`OpenAlex HTTP ${res.status}`);
+    const payload = await res.json();
+    return Array.isArray(payload?.results)
+      ? payload.results.map(normalizeOpenAlexWork).filter((entry) => entry && entry.title)
+      : [];
+  }
+
+  let items = [];
+  let provider = '';
+  const errors = [];
+  for (const name of providerOrder(apiKey)) {
     try {
-      // title_and_abstract.search requires ALL terms (AND semantics) and the
-      // relevance score keeps the results on-topic.
-      const target = `https://api.openalex.org/works?filter=title_and_abstract.search:${encodeURIComponent(query)},from_publication_date:${from},to_publication_date:${today}&sort=relevance_score:desc&per-page=${limit}&mailto=${encodeURIComponent(mailto)}`;
-      const res = await fetch(target, {
-        headers: { Accept: 'application/json', 'User-Agent': userAgent },
-        signal: AbortSignal.timeout(20_000),
-      });
-      if (res.ok) {
-        const payload = await res.json();
-        items = Array.isArray(payload?.results)
-          ? payload.results.map(normalizeOpenAlexWork).filter((entry) => entry && entry.title)
-          : [];
-        if (items.length > 0) providerError = '';
-      } else if (!providerError) {
-        providerError = `OpenAlex HTTP ${res.status}`;
-      }
+      items = name === 'openalex' ? await searchOpenAlex() : await searchCrossref();
     } catch (error) {
-      if (!providerError) providerError = error instanceof Error ? error.message : 'OpenAlex unreachable';
+      const message = error instanceof Error ? error.message : `${name} unreachable`;
+      errors.push(apiKey ? message.split(apiKey).join('***') : message);
+      items = [];
+    }
+    if (items.length > 0) {
+      provider = name;
+      break;
     }
   }
+  const providerError = errors.join('; ');
 
-  const body = items.length > 0 ? { query, from, items, fetchedAt: new Date().toISOString() } : { query, from, items: [], error: providerError || 'No results', fetchedAt: new Date().toISOString() };
+  const body = items.length > 0 ? { query, from, provider, items, fetchedAt: new Date().toISOString() } : { query, from, items: [], error: providerError || 'No results', fetchedAt: new Date().toISOString() };
   try {
     await redisSetJson(key, body, CACHE_TTL_SECONDS);
   } catch {
