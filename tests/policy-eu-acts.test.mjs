@@ -14,6 +14,13 @@ describe('EU acts classification (title keywords, word boundaries)', () => {
     assert.deepEqual(classifyAct('classificazione di talune merci nella nomenclatura combinata').measures, ['classificazione']);
   });
 
+  it('does not link biocide or plant-protection approvals to a good', () => {
+    assert.deepEqual(
+      classifyAct("che posticipa la data di scadenza dell'approvazione del rame granulato ai fini del suo uso nei biocidi del tipo di prodotto 8"),
+      { goods: [], measures: [] },
+    );
+  });
+
   it('does not match a keyword inside another word', () => {
     assert.deepEqual(classifyAct('sostituzione di un membro del consiglio di amministrazione della Fondazione'), { goods: [], measures: [] });
     assert.deepEqual(classifyAct('in materia di ramerie e grandine').goods, []);
