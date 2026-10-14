@@ -345,7 +345,45 @@ export function getPanelSources(panelId: string, feeds: Record<string, unknown> 
 // --- Standalone workspaces (OSINT, Research, Policy) -------------------------
 
 export const WORKSPACE_SOURCES: Record<string, DataSource[]> = {
-  osint: N8N_DIGEST,
+  'osint.nodes': [
+    { ...EMSC_TRIGGERS, what: 'Colonna Inneschi: terremoti entro il raggio di lavoro dal nodo' },
+    { ...GDACS, what: 'Colonna Inneschi: eventi naturali vicino al nodo' },
+    { ...EONET, what: 'Colonna Inneschi: eventi naturali vicino al nodo' },
+    { ...NHC, what: 'Colonna Inneschi: cicloni tropicali vicino al nodo' },
+    { ...PORTWATCH, what: 'Colonna Transiti: navi transitate oggi e variazione sulla settimana' },
+    {
+      what: 'Colonna Clima: anomalia di temperatura e precipitazione degli ultimi 7 giorni nella zona monitorata più vicina (entro il raggio di lavoro)',
+      source: 'Open-Meteo, Historical Weather API (workflow n8n 03, 15 zone)',
+      url: 'https://archive-api.open-meteo.com/v1/archive',
+      code: 'n8n-workflows/03-climate-anomalies-ingestion.json; api/osint/signals.js',
+    },
+    { ...THESIS_REGISTRY, what: 'Colonna Catena: regola del modello (nessun innesco → nessun rischio)' },
+  ],
+  'osint.goods': [
+    {
+      what: 'Colonna Prezzo: futures sul bene; i titoli e gli ETF quotati sono segnati come indicatori indiretti',
+      source: 'Yahoo Finance, API dei grafici; simboli e codici HS in shared/commodities.json',
+      url: 'https://query1.finance.yahoo.com/v8/finance/chart/',
+      code: 'scripts/seed-commodity-quotes.mjs; api/osint/signals.js',
+    },
+    {
+      what: 'Colonna Fornitori: quote dei primi tre paesi fornitori dell\u2019Italia per codice HS4',
+      source: 'UN Comtrade, dati bilaterali HS4 (importatore: Italia)',
+      url: 'https://comtradeapi.un.org/',
+      code: 'scripts/seed-comtrade-bilateral-hs4.mjs; api/osint/signals.js',
+    },
+    {
+      what: 'Colonna Misure: voci del registro Policy con lo stesso codice HS',
+      source: 'Registro normativo del portale (fonti primarie voce per voce)',
+      code: 'data/policy-registry.json',
+    },
+  ],
+  'osint.feed': [
+    { ...EMSC_TRIGGERS, what: 'Terremoti vicino ai nodi, dal più recente' },
+    { ...GDACS, what: 'Eventi naturali vicino ai nodi' },
+    { ...EONET, what: 'Eventi naturali vicino ai nodi' },
+    { ...NHC, what: 'Cicloni tropicali vicino ai nodi' },
+  ],
   'research.library': [
     {
       what: 'Bibliografia: metadati, strato del modello e livello di verifica',

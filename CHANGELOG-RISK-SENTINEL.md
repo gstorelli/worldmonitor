@@ -8,6 +8,7 @@ Formato di ogni voce: numero della PR, cosa cambia per chi usa il portale, event
 
 ## 14 ottobre 2026
 
+- **#38**: OSINT riscritto come strato "Segnali" del modello: tabella dei 12 nodi (inneschi entro 300 km, transiti, clima della zona vicina, stato della catena), tabella degli 8 beni (prezzi, primi fornitori dell'Italia da Comtrade, misure del registro Policy) e ultimi segnali sui nodi. Nuovo endpoint `/api/osint/signals`; il digest n8n per le notifiche non cambia.
 - **#37**: World Brief (#100 della tesi). Se la sintesi viene scartata da un controllo editoriale, si fa un secondo tentativo con una nota sulla regola violata (una chiamata LLM in più). Se fallisce anche quello, si pubblica la sintesi ridotta a un titolo invece di conservare la precedente. I controlli non cambiano.
 - **#36**: il job informativo "data" dei test (suite ereditata, non bloccante) ha un limite di 20 minuti: senza limite restava appeso fino a 6 ore e, dopo una serie di merge, bloccava i runner e quindi il deploy.
 - **#35**: le normali climatiche 1991-2020 (Open-Meteo) si scaricano una zona alla volta, all'inizio del giro settimanale e con un tempo massimo proprio: prima venivano bloccate dai 429 di Open-Meteo, e senza di esse il pannello climate restava vuoto. *Server:* serve un lancio manuale una tantum per non aspettare domenica.
