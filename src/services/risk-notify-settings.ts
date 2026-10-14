@@ -17,7 +17,6 @@ interface NotifyConfig {
 
 const TOPICS: Array<{ id: string; label: string }> = [
   { id: 'chokepoints', label: 'Chokepoint & rotte commerciali' },
-  { id: 'conflicts', label: 'Conflitti (ACLED)' },
   { id: 'commodities', label: 'Commodity & dogane' },
   { id: 'climate', label: 'Anomalie climatiche' },
   { id: 'seismic', label: 'Terremoti' },

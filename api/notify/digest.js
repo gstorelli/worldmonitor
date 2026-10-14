@@ -1,7 +1,7 @@
 /**
  * Risk Sentinel — intelligence digest endpoint (fork-native notifications).
  *
- * GET /api/notify/digest?topics=chokepoints,conflicts&limit=5
+ * GET /api/notify/digest?topics=chokepoints,commodities&limit=5
  *   → { digest: { sections: [{ topic, title, items: [{ title, summary,
  *        url, severity, score, source }] }], fetchedAt }
  *
