@@ -1498,20 +1498,6 @@ async function dispatch(requestUrl, req, routes, context) {
     }
   }
 
-  if (requestUrl.pathname === '/api/trigger-ingestion') {
-    try {
-      const { initSQLite } = await import('./database/sqlite.js');
-      initSQLite(context.dataDir);
-      
-      const { runIngestionPipeline } = await import('./services/ingestion/pipeline.js');
-      const result = await runIngestionPipeline();
-      return json(result);
-    } catch (e) {
-      context.logger.error('[api] trigger-ingestion error: ' + e.message);
-      return json({ error: e.message }, 500);
-    }
-  }
-
   if (requestUrl.pathname === '/api/local-env-update-batch') {
     if (req.method !== 'POST') return json({ error: 'POST required' }, 405);
     const body = await readBody(req);
