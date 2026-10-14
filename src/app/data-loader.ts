@@ -77,7 +77,6 @@ import {
   fetchCriticalMinerals,
   fetchSanctionsPressure,
   fetchRadiationWatch,
-  fetchCustomsEvents,
   fetchDigestSignals,
 } from '@/services';
 import { getMarketWatchlistEntries } from '@/services/market-watchlist';
@@ -3111,38 +3110,11 @@ export class DataLoaderManager implements AppModule {
 
   async loadCustomsEvents(): Promise<void> {
     try {
-      const events = await fetchCustomsEvents();
-      // The SQLite event table has no writer on the self-hosted deploy; fall back
-      // to the n8n notification digest so the panel still shows live signals.
-      const alerts = events.length > 0 ? events : await fetchDigestSignals();
+      // Alerts come from the n8n notification digest. They carry no position,
+      // so they leave the map hotspots layer alone (the removed SQLite route
+      // replaced it with its own, randomly placed, events).
+      const alerts = await fetchDigestSignals();
       this.callPanel('alert-feed', 'renderAlerts', alerts);
-      
-      const hotspots = events.map(e => {
-        let level: 'high' | 'elevated' | 'low' = 'low';
-        let escalationScore: 1 | 2 | 3 | 4 | 5 = 1;
-        if (e.severity === 'critical') {
-          level = 'high';
-          escalationScore = 5;
-        } else if (e.severity === 'high') {
-          level = 'high';
-          escalationScore = 4;
-        } else if (e.severity === 'medium') {
-          level = 'elevated';
-          escalationScore = 3;
-        } else {
-          escalationScore = 1;
-        }
-        return {
-          id: e.id,
-          name: e.title,
-          lat: e.lat,
-          lon: e.lon,
-          keywords: [e.severity],
-          level,
-          escalationScore
-        };
-      });
-      this.ctx.map?.setHotspots(hotspots);
     } catch (error) {
       console.error('[App] Customs events fetch failed:', error);
     }
