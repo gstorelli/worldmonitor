@@ -3,8 +3,32 @@ import { t } from '@/services/i18n';
 import type { CountrySanctionsPressure, ProgramSanctionsPressure, SanctionsEntry, SanctionsPressureResult } from '@/services/sanctions-pressure';
 import { escapeHtml } from '@/utils/sanitize';
 
+/** /api/sanctions/eu: EU consolidated list, counts only (thesis issue #92). */
+export interface EuSanctionsSummary {
+  available: boolean;
+  generationDate?: string | null;
+  recentDays?: number;
+  total?: number;
+  persons?: number;
+  enterprises?: number;
+  recent?: number;
+  lastDesignation?: string | null;
+  programmes?: Array<{ programme: string; total: number; recent: number; persons: number; enterprises: number }>;
+  enterpriseCountries?: Array<{ code: string; count: number }>;
+}
+
+let regionNames: Intl.DisplayNames | undefined;
+try {
+  regionNames = new Intl.DisplayNames(['it'], { type: 'region' });
+} catch {
+  regionNames = undefined;
+}
+
 export class SanctionsPressurePanel extends Panel {
   private data: SanctionsPressureResult | null = null;
+  private euData: EuSanctionsSummary | null = null;
+  /** EU first: the thesis is about EU customs (#92). */
+  private activeTab: 'eu' | 'us' = 'eu';
 
   constructor() {
     super({
@@ -16,6 +40,77 @@ export class SanctionsPressurePanel extends Panel {
       infoTooltip: t('components.sanctionsPressure.infoTooltip'),
     });
     this.showLoading(t('components.sanctionsPressure.loading'));
+    this.content.addEventListener('click', (e) => {
+      const tab = (e.target as HTMLElement).closest<HTMLElement>('.panel-tab[data-sanctions-tab]');
+      if (!tab) return;
+      this.activeTab = tab.dataset.sanctionsTab === 'us' ? 'us' : 'eu';
+      this.render();
+    });
+  }
+
+  public setEuData(data: EuSanctionsSummary): void {
+    this.euData = data;
+    this.render();
+  }
+
+  private tabsHtml(): string {
+    return `<div class="panel-tabs">
+      <button class="panel-tab ${this.activeTab === 'eu' ? 'active' : ''}" data-sanctions-tab="eu">UE</button>
+      <button class="panel-tab ${this.activeTab === 'us' ? 'active' : ''}" data-sanctions-tab="us">USA (OFAC)</button>
+    </div>`;
+  }
+
+  private renderEu(): void {
+    const d = this.euData;
+    if (!d?.available) {
+      this.setContent(`${this.tabsHtml()}<div class="economic-empty">Lista UE non ancora disponibile: si aggiorna ogni 6 ore.</div>`);
+      return;
+    }
+    const country = (code: string): string => {
+      try {
+        return regionNames?.of(code) ?? code;
+      } catch {
+        return code;
+      }
+    };
+    const last = d.lastDesignation ? new Date(d.lastDesignation).toLocaleDateString('it-IT', { month: 'long', year: 'numeric' }) : 'n.d.';
+    const programmes = (d.programmes ?? []).slice(0, 8).map((p) => `
+      <div class="sanctions-row">
+        <div class="sanctions-row-main">
+          <div class="sanctions-row-title">${escapeHtml(p.programme)}</div>
+          <div class="sanctions-row-meta">${p.total} soggetti · ${p.persons} persone · ${p.enterprises} enti</div>
+        </div>
+        <div class="sanctions-row-flags">${p.recent > 0 ? `<span class="sanctions-pill sanctions-pill-new">+${p.recent} in ${d.recentDays} gg</span>` : ''}</div>
+      </div>`).join('');
+    const countries = (d.enterpriseCountries ?? []).slice(0, 8).map((c) => `
+      <div class="sanctions-row">
+        <div class="sanctions-row-main">
+          <div class="sanctions-row-title">${escapeHtml(country(c.code))}</div>
+          <div class="sanctions-row-meta">${escapeHtml(c.code)} · ${c.count} enti</div>
+        </div>
+      </div>`).join('');
+    const file = d.generationDate ? new Date(d.generationDate).toLocaleDateString('it-IT') : 'n.d.';
+    this.setContent(`
+      ${this.tabsHtml()}
+      <div class="sanctions-panel-content">
+        <div class="sanctions-summary">
+          ${this.renderSummaryCard('Soggetti in lista', d.total ?? 0)}
+          ${this.renderSummaryCard('Enti', d.enterprises ?? 0)}
+          ${this.renderSummaryCard(`Nuovi in ${d.recentDays ?? 30} gg (ultimo: ${last})`, d.recent ?? 0, (d.recent ?? 0) > 0 ? 'highlight' : '')}
+        </div>
+        <div class="sanctions-sections">
+          <div class="sanctions-section">
+            <div class="sanctions-section-title">Regimi di sanzione (codice della lista UE)</div>
+            <div class="sanctions-list">${programmes}</div>
+          </div>
+          <div class="sanctions-section">
+            <div class="sanctions-section-title">Enti sanzionati per paese</div>
+            <div class="sanctions-list">${countries}</div>
+          </div>
+        </div>
+        <div class="economic-footer">${escapeHtml(`Lista consolidata UE delle sanzioni finanziarie (Commissione europea), file del ${file} · solo conteggi, nessun dato personale`)}</div>
+      </div>
+    `);
   }
 
   public setData(data: SanctionsPressureResult): void {
@@ -25,8 +120,12 @@ export class SanctionsPressurePanel extends Panel {
   }
 
   private render(): void {
+    if (this.activeTab === 'eu') {
+      this.renderEu();
+      return;
+    }
     if (!this.data || this.data.totalCount === 0) {
-      this.setContent(`<div class="economic-empty">${escapeHtml(t('components.sanctionsPressure.unavailable'))}</div>`);
+      this.setContent(`${this.tabsHtml()}<div class="economic-empty">${escapeHtml(t('components.sanctionsPressure.unavailable'))}</div>`);
       return;
     }
 
@@ -59,6 +158,7 @@ export class SanctionsPressurePanel extends Panel {
     ].filter(Boolean).join(' · ');
 
     this.setContent(`
+      ${this.tabsHtml()}
       <div class="sanctions-panel-content">
         ${summaryHtml}
         <div class="sanctions-sections">

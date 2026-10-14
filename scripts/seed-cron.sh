@@ -55,10 +55,13 @@ case "$TIER" in
     run ecb-fx 180
     ;;
   slow)
-    run sanctions 300
+    # Exact file name: the 'sanctions' substring would also match seed-eu-sanctions.
+    run seed-sanctions-pressure.mjs 300
     run ucdp 240
     # Recent EU acts for the Policy workspace (Publications Office SPARQL).
     run seed-policy-eu-acts.mjs 180
+    # EU consolidated sanctions list, aggregated (Sanctions pressure panel).
+    run seed-eu-sanctions.mjs 300
     ;;
   thesis)
     # Trigger layer of the thesis view. TTLs: earthquakes 6h, natural events
@@ -100,7 +103,7 @@ case "$TIER" in
     # 14/10/2026 (src/config/scope.ts): finance, tech/startup, consumer
     # indices, live media, military. They never run on this box.
     OUT_OF_SCOPE_SEEDERS="aaii-sentiment,crypto-quotes,crypto-sectors,etf-flows,stablecoin-markets,token-panels,prediction-markets,fear-greed,seed-cot.mjs,earnings-calendar,hyperliquid-flow,market-breadth,sec-8k-stream,sec-cik-map,china-stock-connect,china-corporate-disclosures,gold-etf-flows,gulf-quotes,bundle-market-backup,seed-research.mjs,bigmac,grocery-basket,consumer-prices,webcams,military-bases,military-cii,military-flights,military-maritime-news,iran-events,defense-patents,thermal-escalation,cross-strait-activity"
-    export SEED_SKIP="seed-climate-zone-normals.mjs,seed-policy-eu-acts.mjs,seed-eu-trade.mjs,market-quotes,commodity,insights,forecasts,correlation,gdelt-intel,cross-source,chokepoint,ecb-fx,acled,sanctions,ucdp,earthquakes,thesis-triggers,natural-events,climate-anomalies,supply-chain-trade,seed-portwatch.mjs,${OUT_OF_SCOPE_SEEDERS}"
+    export SEED_SKIP="seed-climate-zone-normals.mjs,seed-eu-sanctions.mjs,seed-policy-eu-acts.mjs,seed-eu-trade.mjs,market-quotes,commodity,insights,forecasts,correlation,gdelt-intel,cross-source,chokepoint,ecb-fx,acled,sanctions,ucdp,earthquakes,thesis-triggers,natural-events,climate-anomalies,supply-chain-trade,seed-portwatch.mjs,${OUT_OF_SCOPE_SEEDERS}"
     run "" 240
     ;;
   *)

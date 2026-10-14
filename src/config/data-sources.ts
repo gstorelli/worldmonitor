@@ -278,11 +278,17 @@ export const PANEL_SOURCES: Record<string, DataSource[]> = {
   ],
   'sanctions-pressure': [
     {
-      what: 'Designazioni e liste delle sanzioni',
+      what: 'Scheda UE: soggetti in lista per regime, enti per paese, nuove designazioni (solo conteggi, nessun dato personale)',
+      source: 'Commissione europea, Financial Sanctions Files: lista consolidata delle sanzioni finanziarie UE (XML)',
+      url: 'https://webgate.ec.europa.eu/fsd/fsf/public/files/xmlFullSanctionsList_1_1/content?token=dG9rZW4tMjAxNw',
+      code: 'scripts/seed-eu-sanctions.mjs; scripts/_eu-sanctions.mjs',
+      note: 'Licenza di riuso da verificare prima di citarla nella tesi.',
+    },
+    {
+      what: 'Scheda USA: designazioni e liste delle sanzioni',
       source: 'U.S. Treasury, OFAC Sanctions List Service: lista SDN e lista consolidata (non-SDN), formato avanzato XML',
       url: 'https://sanctionslistservice.ofac.treas.gov/api/PublicationPreview/exports/sdn_advanced.xml',
       code: 'scripts/seed-sanctions-pressure.mjs',
-      note: 'Solo sanzioni USA: le misure UE mancano (issue #92).',
     },
   ],
   'gdelt-intel': [

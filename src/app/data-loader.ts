@@ -3071,6 +3071,11 @@ export class DataLoaderManager implements AppModule {
   }
 
   async loadSanctionsPressure(): Promise<void> {
+    // Risk Sentinel (#92): EU consolidated list, aggregated, next to OFAC.
+    void fetch(toApiUrl('/api/sanctions/eu'), { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => { if (data) this.callPanel('sanctions-pressure', 'setEuData', data); })
+      .catch(() => {});
     try {
       const result = await fetchSanctionsPressure();
       this.callPanel('sanctions-pressure', 'setData', result);
