@@ -503,6 +503,18 @@ describe('validateNoHallucinatedProperNouns — May 19 regression + class', () =
     assert.ok(flat.includes('eu'));
   });
 
+  it('hyphenated compound of two grounded names → ok (fork, 14/10/2026)', () => {
+    const headline = 'Russia launches drone strikes on Ukraine energy grid';
+    assert.equal(validateNoHallucinatedProperNouns('The Russia-Ukraine war escalates.', headline).ok, true);
+  });
+
+  it('hyphenated compound with one invented side → still flagged', () => {
+    const headline = 'Russia launches drone strikes on Ukraine energy grid';
+    const r = validateNoHallucinatedProperNouns('The Russia-Belarus axis widens.', headline);
+    assert.equal(r.ok, false);
+    assert.deepEqual(r.hallucinated, ['russia-belarus']);
+  });
+
   it('no proper nouns either side → ok', () => {
     const r = validateNoHallucinatedProperNouns("the situation continues to evolve", "no proper nouns here");
     assert.equal(r.ok, true);

@@ -451,7 +451,10 @@ const SEED_META = {
   // Always-on loop publishes every few seconds. Five minutes tolerates deploy
   // churn while still detecting a stopped worker well before leases age out.
   companyMonitoringWorker: { key: 'seed-meta:company-monitoring:worker', maxStaleMin: 5, workerControl: true },
-  earthquakes:      { key: 'seed-meta:seismology:earthquakes',  maxStaleMin: 30 },
+  // Fork: earthquakes and newsInsights run from the VPS crontab every hour
+  // (scripts/seed-cron.sh tiers thesis/intel), so the upstream 30-min floor
+  // marked them STALE for half of every hour. 90 = one missed tick tolerated.
+  earthquakes:      { key: 'seed-meta:seismology:earthquakes',  maxStaleMin: 90 },
   wildfires:        { key: 'seed-meta:wildfire:fires',          maxStaleMin: 360 }, // FIRMS NRT resets at midnight UTC; new-day data takes 3-6h to accumulate
   wildfiresBootstrap: { key: 'seed-meta:wildfire:fires-bootstrap', maxStaleMin: 360 }, // Compact CDN payload is a distinct publish target; monitor it so canonical fallback cannot hide transform/write failures.
   outages:          { key: 'seed-meta:infra:outages',           maxStaleMin: 30 },
@@ -482,7 +485,7 @@ const SEED_META = {
   },
   newsInsights:     {
     key: 'seed-meta:news:insights',
-    maxStaleMin: 30,
+    maxStaleMin: 90, // fork: hourly cron, see the earthquakes entry
     // `fetchedAt` is deliberately held at the served LKG timestamp when a
     // synthesis is rejected. This separate bounded contract warns before the
     // generic 30-minute seed-age gate when repeated attempts keep failing.

@@ -1086,7 +1086,7 @@ if (_isDirectRun) {
 
     declareRecords,
     schemaVersion: 1,
-    maxStaleMin: 30,
+    maxStaleMin: 90, // fork: hourly VPS cron (api/health.js)
     // The source-status projection is not user-facing digest content. It is
     // retained separately so the China audit can distinguish an unavailable
     // source from a globally outranked one without changing the public payload.

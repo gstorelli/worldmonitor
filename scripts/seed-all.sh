@@ -55,6 +55,9 @@ if [ ! -d scripts/node_modules ]; then
     node:24-alpine npm ci --ignore-scripts --no-audit --no-fund
 fi
 
+# Each run leaves its full log in /tmp and the hourly cron tiers would pile up
+# thousands of them: keep a week (SEED_LOG_KEEP_DAYS) for diagnosis.
+find /tmp -maxdepth 1 -name 'seed-all.*.log' -mtime +"${SEED_LOG_KEEP_DAYS:-7}" -delete 2>/dev/null || true
 LOG="$(mktemp /tmp/seed-all.XXXXXX.log)"
 echo "seed sweep starting (timeout ${TIMEOUT_SECONDS}s/seeder, log: ${LOG})"
 if [ -n "${FILTER}" ]; then
