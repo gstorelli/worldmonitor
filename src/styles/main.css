@@ -23540,3 +23540,39 @@ body.map-width-resizing {
 .ecp-source-link:hover {
   text-decoration: underline;
 }
+
+/* Trade Policy: EU/Italy tabs on the 8 thesis goods (TradePolicyPanel, #91) */
+.trade-eu-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11.5px;
+  line-height: 1.4;
+}
+
+.trade-eu-table th,
+.trade-eu-table td {
+  padding: 5px 6px;
+  border-bottom: 1px solid var(--border-subtle);
+  text-align: left;
+  vertical-align: top;
+}
+
+.trade-eu-table thead th {
+  color: var(--text-dim);
+  font-weight: 600;
+  font-size: 10.5px;
+}
+
+.trade-eu-table tbody th {
+  font-weight: 600;
+  min-width: 92px;
+}
+
+.trade-eu-table td > div + div {
+  margin-top: 3px;
+}
+
+.trade-muted {
+  color: var(--text-dim);
+  font-weight: 400;
+}

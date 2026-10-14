@@ -239,26 +239,38 @@ export const PANEL_SOURCES: Record<string, DataSource[]> = {
   ],
   'trade-policy': [
     {
-      what: 'Schede Restrizioni, Dazi, Flussi, Barriere',
+      what: 'Scheda Importazioni UE/IT: importazioni di Italia e UE per bene, primi fornitori e quote',
+      source: 'Eurostat Comext, dataset DS-045409 (valore in euro, annuale)',
+      url: 'https://ec.europa.eu/eurostat/api/comext/dissemination/statistics/1.0/data/DS-045409',
+      code: 'scripts/seed-eu-trade.mjs; scripts/_eu-trade.mjs',
+    },
+    {
+      what: 'Scheda Dazi UE: dazio MFN medio e preferenziale minimo per sottovoce HS6',
+      source: 'WTO Timeseries API, UE (918): indicatori HS_A_0010 e HS_P_0070',
+      url: 'https://api.wto.org/timeseries/v1',
+      code: 'scripts/seed-eu-trade.mjs; scripts/_eu-trade.mjs',
+    },
+    {
+      what: 'Full dashboard, schede Restrizioni, Dazi, Flussi, Barriere',
       source: 'WTO Timeseries API: indicatori TP_A_0010, TP_A_0160, TP_A_0430, ITS_MTV_AX, ITS_MTV_AM',
       url: 'https://api.wto.org/timeseries/v1',
       code: 'scripts/seed-supply-chain-trade.mjs',
-      note: 'La scheda Dazi è fissa sulla coppia USA (840) – Cina (156): issue #91.',
+      note: 'Solo nella Full dashboard; la scheda Dazi è fissa sulla coppia USA (840) – Cina (156).',
     },
     {
-      what: 'Scheda Entrate: entrate doganali degli USA',
+      what: 'Full dashboard, scheda Entrate: entrate doganali degli USA',
       source: 'U.S. Treasury, Monthly Treasury Statement, Table 9',
       url: 'https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v1/accounting/mts/mts_table_9',
       code: 'scripts/seed-supply-chain-trade.mjs',
     },
     {
-      what: 'Dazio effettivo degli USA',
+      what: 'Full dashboard: dazio effettivo degli USA',
       source: 'FRED: serie B235RC1Q027SBEA e A255RC1Q027SBEA (BEA)',
       url: 'https://fred.stlouisfed.org/series/B235RC1Q027SBEA',
       code: 'scripts/seed-supply-chain-trade.mjs',
     },
     {
-      what: 'Scheda Comtrade: flussi commerciali per paese',
+      what: 'Full dashboard, scheda Comtrade: flussi commerciali per paese',
       source: 'UN Comtrade, API pubblica',
       url: 'https://comtradeapi.un.org/public/v1',
       code: 'scripts/seed-trade-flows.mjs',
@@ -367,10 +379,10 @@ export const WORKSPACE_SOURCES: Record<string, DataSource[]> = {
       code: 'scripts/seed-commodity-quotes.mjs; api/osint/signals.js',
     },
     {
-      what: 'Colonna Fornitori: quote dei primi tre paesi fornitori dell\u2019Italia per codice HS4',
-      source: 'UN Comtrade, dati bilaterali HS4 (importatore: Italia)',
-      url: 'https://comtradeapi.un.org/',
-      code: 'scripts/seed-comtrade-bilateral-hs4.mjs; api/osint/signals.js',
+      what: 'Colonna Fornitori: quote dei primi tre paesi fornitori dell\u2019Italia per bene',
+      source: 'Eurostat Comext, dataset DS-045409 (riserva: UN Comtrade, dati bilaterali HS4)',
+      url: 'https://ec.europa.eu/eurostat/api/comext/dissemination/statistics/1.0/data/DS-045409',
+      code: 'scripts/seed-eu-trade.mjs; api/trade/eu-goods.js (riserva: api/osint/signals.js)',
     },
     {
       what: 'Colonna Misure: voci del registro Policy con lo stesso codice HS',
