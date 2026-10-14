@@ -789,6 +789,8 @@ if (urlParams.get('settings') === '1') {
     // Risk Sentinel user auth gate: no-op unless the server has AUTH_REQUIRED=true.
     const { ensureAuthenticated, installLogoutControl } = await import('./services/user-auth');
     if (!(await ensureAuthenticated())) return;
+    // #86: the dashboard bootstrap starts now, alongside policy/prefs and the App download.
+    if (!standalone) void import('./services/bootstrap').then((m) => m.prefetchBootstrapData());
     // Independent reads (global panel policy, per-user prefs): fetch them in
     // parallel instead of paying two sequential round trips before the app boots.
     const [{ loadPanelPolicy }, { hydratePanelPrefs }] = await Promise.all([
