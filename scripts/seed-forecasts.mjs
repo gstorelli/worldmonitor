@@ -5,6 +5,7 @@
 import crypto from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { loadEnvFile, runSeed, CHROME_UA, withRetry, parseRetryAfterMs, getResponseHeader, isRetryableHttpStatus } from './_seed-utils.mjs';
+import { FORECAST_VIEWED_KEY, shouldRunForecasts } from './_forecast-viewer-gate.mjs';
 import { compactForecastDashboardPayload } from './_forecast-dashboard.mjs';
 import { unwrapEnvelope } from './_seed-envelope-source.mjs';
 import { allBootstrapMarkets } from './_prediction-classify.mjs';
@@ -17502,6 +17503,20 @@ export const FORECAST_EXTRA_KEYS = [
 
 if (_isDirectRun) {
   const refreshRequest = await readForecastRefreshRequest();
+  // Risk Sentinel: no LLM calls when nobody looks at the forecasts.
+  let viewed = null;
+  try {
+    const { url, token } = getRedisCredentials();
+    viewed = await redisGet(url, token, FORECAST_VIEWED_KEY);
+  } catch (err) {
+    console.warn(`  [Gate] viewer key read failed: ${err.message}`);
+  }
+  const gate = shouldRunForecasts({ viewed, refreshRequest, alwaysRun: process.env.FORECAST_ALWAYS_RUN === '1' });
+  if (!gate.run) {
+    console.log(`  [Gate] skipped: ${gate.reason} (no LLM calls)`);
+    process.exit(0);
+  }
+  console.log(`  [Gate] running: ${gate.reason}`);
   const triggerContext = buildForecastTriggerContext(refreshRequest);
   console.log(`  [Trigger] source=${triggerContext.triggerSource}${triggerContext.triggerRequest?.requester ? ` requester=${triggerContext.triggerRequest.requester}` : ''}`);
 
