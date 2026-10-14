@@ -76,7 +76,15 @@ export async function summarizeArticle(
   const isPremium = premiumIdentity.isPremium;
   const { provider, mode = 'brief', geoContext = '', variant = 'full', lang = 'en' } = req;
   const systemAppend = isPremium && typeof req.systemAppend === 'string' ? req.systemAppend : '';
-  const requiresPremium = mode !== 'translate';
+  // Self-hosted de-clouded mode (ALLOW_ANONYMOUS_API, the compose default):
+  // there is no Pro tier, so the upstream premium gate only ever answered
+  // "Pro subscription required" and every news-cluster summary failed. The
+  // gateway and entitlement checks already skip their premium gates in this
+  // mode; this handler had its own in-body gate that the de-clouding missed.
+  // Access is still bounded by the session login (AUTH_REQUIRED) and the
+  // per-cache-key dedup below. systemAppend stays premium-only.
+  const anonymousSelfHosted = process.env.ALLOW_ANONYMOUS_API === 'true';
+  const requiresPremium = mode !== 'translate' && !anonymousSelfHosted;
 
   const MAX_HEADLINES = 10;
   const MAX_HEADLINE_LEN = 500;
