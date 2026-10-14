@@ -2,10 +2,17 @@
  * Policy — regulatory monitor and compliance analysis workspace.
  *
  * A standalone application (not a dashboard variant): curated open normative
- * registry (EUR-Lex / Gazzetta Ufficiale) plus the live n8n policy monitor.
+ * registry (EUR-Lex / Gazzetta Ufficiale) plus recent EU acts.
+ *
+ * 14/10/2026: the "monitor" tab read the n8n workflow 06, which scraped the
+ * EUR-Lex search page; EUR-Lex answers automated requests with a bot challenge
+ * (HTTP 202, empty body), so it never found anything. Recent acts now come
+ * from the Publications Office SPARQL endpoint (scripts/seed-policy-eu-acts.mjs),
+ * tied to the strategic goods by title keywords.
  */
 
 import { mountSourceInfo, sourceInfoSlot } from '@/components/source-info';
+import { STRATEGIC_GOODS, localText } from '@/config/thesis-model';
 import { escapeHtml } from '@/utils/sanitize';
 import type { AppWorkspace } from '../types';
 
@@ -31,10 +38,44 @@ interface PolicyEntry {
   thesisKey?: string | null;
 }
 
+export interface EuAct {
+  celex: string;
+  date: string;
+  title: string;
+  url: string;
+  goods: string[];
+  measures: string[];
+}
+
 interface PolicyPayload {
   entries: PolicyEntry[];
   monitor: Record<string, unknown>[];
+  acts?: { since: string | null; windowDays: number | null; scanned: number | null; items: EuAct[] } | null;
   fetchedAt: string;
+}
+
+export const MEASURE_LABELS: Record<string, string> = {
+  antidumping: 'antidumping',
+  compensativo: 'dazio compensativo',
+  dazi: 'dazi e contingenti',
+  classificazione: 'classificazione NC',
+  sanzioni: 'misure restrittive',
+};
+
+const GOOD_LABELS: Record<string, string> = Object.fromEntries(STRATEGIC_GOODS.map((g) => [g.hs, localText(g.label, 'it')]));
+
+export function goodChip(hs: string): string {
+  return `HS ${hs}${GOOD_LABELS[hs] ? ` ${GOOD_LABELS[hs].toLowerCase()}` : ''}`;
+}
+
+function actRow(act: EuAct): string {
+  return `<li class="rs-act">
+    <span class="rs-meta">${escapeHtml(act.date)} · ${escapeHtml(act.celex)}</span>
+    <a class="rs-act-title" href="${escapeHtml(act.url)}" target="_blank" rel="noopener">${escapeHtml(act.title)}</a>
+    <span class="rs-list-tags">${act.goods.map((hs) => `<span class="rs-chip">${escapeHtml(goodChip(hs))}</span>`).join('')}${act.measures
+      .map((m) => `<span class="rs-chip rs-chip-dim">${escapeHtml(MEASURE_LABELS[m] ?? m)}</span>`)
+      .join('')}</span>
+  </li>`;
 }
 
 const JURISDICTION_LABELS: Record<string, string> = { eu: 'Unione Europea', it: 'Italia', wto: 'OMC (WTO)' };
@@ -77,6 +118,7 @@ export function createPolicyWorkspace(): AppWorkspace {
 
       const entries = Array.isArray(payload.entries) ? payload.entries : [];
       const monitor = Array.isArray(payload.monitor) ? payload.monitor : [];
+      const acts = Array.isArray(payload.acts?.items) ? payload.acts.items : [];
       const jurisdictions = [...new Set(entries.map((entry) => entry.jurisdiction).filter(Boolean))];
       const categories = [...new Set(entries.flatMap((entry) => entry.riskCategories ?? []))].sort();
 
@@ -98,14 +140,14 @@ export function createPolicyWorkspace(): AppWorkspace {
             <div class="rs-ws-stats">
               <div class="rs-stat"><span class="rs-stat-value">${entries.length}</span><span class="rs-stat-label">norme</span></div>
               <div class="rs-stat"><span class="rs-stat-value">${entries.filter(isVerified).length}</span><span class="rs-stat-label">verificate</span></div>
-              <div class="rs-stat"><span class="rs-stat-value">${monitor.length}</span><span class="rs-stat-label">monitor</span></div>
+              <div class="rs-stat"><span class="rs-stat-value">${acts.length}</span><span class="rs-stat-label">atti UE recenti</span></div>
               <div class="rs-stat"><span class="rs-stat-value">${jurisdictions.length}</span><span class="rs-stat-label">giurisdizioni</span></div>
             </div>
           </div>
 
           <div class="rs-tabs" role="tablist">
             <button class="${tabClass('registry')}" data-tab="registry" role="tab">Registro normativo</button>
-            <button class="${tabClass('monitor')}" data-tab="monitor" role="tab">Monitor policy (n8n)</button>
+            <button class="${tabClass('monitor')}" data-tab="monitor" role="tab">Atti UE recenti</button>
           </div>
 
           <div class="rs-tab-panel" data-panel="registry"><div class="rs-tab-sources">Fonti dei dati ${sourceInfoSlot('policy.registry')}</div>
@@ -133,6 +175,21 @@ export function createPolicyWorkspace(): AppWorkspace {
           </div>
 
           <div class="rs-tab-panel" data-panel="monitor" hidden><div class="rs-tab-sources">Fonti dei dati ${sourceInfoSlot('policy.monitor')}</div>
+            <p class="rs-meta">Regolamenti, decisioni e direttive degli ultimi ${payload.acts?.windowDays ?? 30} giorni che nominano uno degli 8 beni della tesi o una misura di difesa commerciale, tariffaria o di classificazione${
+              payload.acts?.scanned ? ` (${acts.length} su ${payload.acts.scanned} atti esaminati)` : ''
+            }. Il collegamento a un bene è una parola chiave nel titolo, non un'analisi del testo.</p>
+            <div class="rs-ws-controls">
+              <select id="rsActsGood" class="rs-select">
+                <option value="ALL">Tutti i beni</option>
+                <option value="ANY">Solo atti che nominano un bene della tesi</option>
+                ${STRATEGIC_GOODS.map((g) => `<option value="${escapeHtml(g.hs)}">${escapeHtml(goodChip(g.hs))}</option>`).join('')}
+              </select>
+              <select id="rsActsMeasure" class="rs-select">
+                <option value="ALL">Tutti i tipi di misura</option>
+                ${Object.entries(MEASURE_LABELS).map(([k, v]) => `<option value="${escapeHtml(k)}">${escapeHtml(v)}</option>`).join('')}
+              </select>
+            </div>
+            <ul class="rs-acts" id="rsPolicyActs"></ul>
             <div class="rs-card-grid" id="rsPolicyMonitor"></div>
           </div>
         </div>
@@ -142,7 +199,29 @@ export function createPolicyWorkspace(): AppWorkspace {
       const listEl = root.querySelector<HTMLElement>('#rsPolicyList');
       const detailEl = root.querySelector<HTMLElement>('#rsPolicyDetail');
       const monitorEl = root.querySelector<HTMLElement>('#rsPolicyMonitor');
-      if (!listEl || !detailEl || !monitorEl) return;
+      const actsEl = root.querySelector<HTMLElement>('#rsPolicyActs');
+      if (!listEl || !detailEl || !monitorEl || !actsEl) return;
+      let actsGood = 'ALL';
+      let actsMeasure = 'ALL';
+      const renderActs = () => {
+        const shown = acts.filter((a) => {
+          if (actsGood === 'ANY' && !a.goods.length) return false;
+          if (actsGood !== 'ALL' && actsGood !== 'ANY' && !a.goods.includes(actsGood)) return false;
+          if (actsMeasure !== 'ALL' && !a.measures.includes(actsMeasure)) return false;
+          return true;
+        });
+        actsEl.innerHTML = shown.length
+          ? shown.map(actRow).join('')
+          : `<li class="rs-empty">${payload.acts ? 'Nessun atto con i filtri correnti.' : 'Atti UE non ancora disponibili: si aggiornano ogni 6 ore.'}</li>`;
+      };
+      root.querySelector<HTMLSelectElement>('#rsActsGood')?.addEventListener('change', (event) => {
+        actsGood = (event.target as HTMLSelectElement).value;
+        renderActs();
+      });
+      root.querySelector<HTMLSelectElement>('#rsActsMeasure')?.addEventListener('change', (event) => {
+        actsMeasure = (event.target as HTMLSelectElement).value;
+        renderActs();
+      });
 
       const filtered = () =>
         entries.filter((entry) => {
@@ -237,9 +316,9 @@ export function createPolicyWorkspace(): AppWorkspace {
         });
       });
 
-      monitorEl.innerHTML = monitor.length
-        ? monitor.map(monitorCard).join('')
-        : '<div class="rs-empty">Nessun aggiornamento dal monitor n8n. La pipeline 06-policy-monitor popola `policy:monitor:v1`.</div>';
+      // Legacy n8n workflow 06 items, shown only if it ever pushes something.
+      monitorEl.innerHTML = monitor.length ? `<h3>Dal workflow n8n 06</h3>${monitor.map(monitorCard).join('')}` : '';
+      renderActs();
 
       renderList();
       renderDetail();
