@@ -5,6 +5,11 @@ export interface CustomsEvent {
   title: string;
   description: string;
   explainability?: string;
+  /** Pipeline that produced the signal (n8n topic or source name). */
+  source?: string;
+  /** Severity label as given by the source (not a model risk score). */
+  sourceSeverity?: string;
+  url?: string;
   score: number;
   lat: number;
   lon: number;
@@ -49,7 +54,8 @@ export async function fetchDigestSignals(limit = 12): Promise<CustomsEvent[]> {
     return sections
       .flatMap(section =>
         (section.items ?? []).map((item, index) => {
-          const severity = String(item.severity ?? 'moderate').toLowerCase();
+          // Open-Meteo sends proto enum names (ANOMALY_SEVERITY_NORMAL).
+          const severity = String(item.severity ?? 'moderate').toLowerCase().replace(/^anomaly_severity_/, '');
           const rawScore = Number(item.score ?? 0);
           const score = rawScore > 0 ? Math.min(rawScore, 1) : (SEVERITY_SCORES[severity] ?? 0.5);
           const level: CustomsEvent['severity'] =
@@ -62,6 +68,9 @@ export async function fetchDigestSignals(limit = 12): Promise<CustomsEvent[]> {
             title: String(item.title ?? 'Signal'),
             description: String(item.summary ?? ''),
             explainability: `Fonte: ${item.source ?? section.topic ?? 'n8n'} · severità ${severity}${item.url ? ` · ${item.url}` : ''}`,
+            source: String(item.source ?? section.title ?? section.topic ?? 'n8n'),
+            sourceSeverity: severity,
+            url: typeof item.url === 'string' && /^https?:\/\//.test(item.url) ? item.url : undefined,
             score,
             lat: 0,
             lon: 0,

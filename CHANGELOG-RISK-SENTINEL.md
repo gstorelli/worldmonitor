@@ -8,6 +8,7 @@ Formato di ogni voce: numero della PR, cosa cambia per chi usa il portale, event
 
 ## 15 ottobre 2026
 
+- **#51**: Alert feed: al posto di «Risk %» e «✨ AI Reasoning» ogni scheda mostra la fonte e la severità dichiarata dalla fonte, più un pulsante «Dettagli» (descrizione, fonte, link). Il «Risk %» non era un punteggio: il campo `score` del digest vale 0 e la percentuale veniva da una tabella fissa (alta = 85%). Corretto anche un inserimento di testo non escapato. Sanzioni: il numero nel titolo segue la scheda aperta (UE o OFAC).
 - **#50**: OSINT organizzato in tre schede (Nodi critici, Beni strategici, Ultimi segnali) con il numero di righe; la scheda aperta viene ricordata dal browser. Le app OSINT, Research e Policy scorrono in verticale: il CSS della dashboard bloccava lo scorrimento della pagina.
 - **#49**: il bootstrap non scarica più i dati dei gruppi spenti (borsa, macro, tech, indici di consumo, extra upstream): la SPA li elenca in `omit=` e il server li salta. Il tempo di risposta cresceva con la dimensione (circa 3,5 ms per KB, 2-4 s per livello); i dati omessi erano circa un terzo del totale.
 - **#48**: aggiunto `src/apps/boot.ts`, rimasto fuori dal commit della #46. Senza il file i deploy della #46 e della #47 fallivano in compilazione e la produzione era rimasta alla #45.
