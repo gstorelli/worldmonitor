@@ -954,7 +954,7 @@ export class EventHandlerManager implements AppModule {
     const icon = btn.querySelector('.mobile-menu-item-icon');
     const label = btn.querySelector('.mobile-menu-item-label');
     if (icon) icon.textContent = isDark ? '☀️' : '🌙';
-    if (label) label.textContent = isDark ? 'Light Mode' : 'Dark Mode';
+    if (label) label.textContent = isDark ? 'Tema chiaro' : 'Tema scuro';
   }
 
   startHeaderClock(): void {
