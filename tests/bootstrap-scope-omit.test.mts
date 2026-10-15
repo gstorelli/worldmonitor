@@ -19,7 +19,17 @@ describe('bootstrap keys of switched-off scope groups', () => {
 
   it('is what the SPA asks the server to omit', async () => {
     const { bootstrapTierPath } = await import('../src/services/bootstrap.ts');
-    const omit = new URL(bootstrapTierPath('slow'), 'http://x').searchParams.get('omit')?.split(',') ?? [];
+    const omit = new URL(bootstrapTierPath('slow', []), 'http://x').searchParams.get('omit')?.split(',') ?? [];
     assert.deepEqual(omit, [...OUT_OF_SCOPE_BOOTSTRAP]);
+  });
+
+  it('adds the keys the thesis app never reads', async () => {
+    const { bootstrapTierPath } = await import('../src/services/bootstrap.ts');
+    const { THESIS_APP } = await import('../src/config/apps.ts');
+    const known = new Set(Object.keys(BOOTSTRAP_CACHE_KEYS));
+    for (const key of THESIS_APP.bootstrapOmit ?? []) assert.ok(known.has(key), `${key} is not a bootstrap key`);
+    const omit = new URL(bootstrapTierPath('slow', THESIS_APP.bootstrapOmit), 'http://x').searchParams.get('omit')?.split(',') ?? [];
+    for (const key of ['pipelinesGas', 'storageFacilities', ...OUT_OF_SCOPE_BOOTSTRAP]) assert.ok(omit.includes(key), key);
+    assert.ok(!omit.includes('naturalEvents'), 'natural events feed the thesis map preset');
   });
 });
