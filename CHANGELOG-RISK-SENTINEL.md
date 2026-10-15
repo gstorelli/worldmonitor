@@ -8,6 +8,7 @@ Formato di ogni voce: numero della PR, cosa cambia per chi usa il portale, event
 
 ## 15 ottobre 2026
 
+- **#58**: Impostazioni ripulite. Tolte le schede API Keys e MCP Clients (funzioni a pagamento dell'upstream, senza backend qui), il modello IA locale del browser con la «memoria dei titoli», l'invito all'app desktop, il gruppo Media (flussi video spenti) e il link al Discord di WorldMonitor. Lingue: solo italiano e inglese. Nella vista tesi non c'è più la scheda Fonti (i feed di notizie servono solo alla dashboard completa). Il token admin delle notifiche si vede solo da amministratore. Etichette in italiano («Segnali e allerte», «Sanzioni e designazioni», categorie dei pannelli, «Impulso sugli eventi»).
 - **#57**: la «Full dashboard» non compare più nell'intestazione: la apre un link nella scheda Admin delle Impostazioni (solo amministratori) e resta raggiungibile con `?app=customs`. Descrizioni delle app in italiano.
 - **#56**: bibliografia di Research rigenerata dalla tesi: sei fonti di dati nuove (Open-Meteo, NASA EONET, NOAA NHC, WTO Timeseries, lista UE delle sanzioni finanziarie, CELLAR), 91 voci in tutto.
 - **#55**: GDACS risponde 404 quando un tipo di evento non ha eventi correnti (vulcani, 15/10): il seeder lo legge come lista vuota, non come errore. Primo giro dopo la #54: 26 eventi invece di 21.
