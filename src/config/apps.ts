@@ -38,6 +38,11 @@ export interface AppDefinition {
    * only from the Admin tab of the settings.
    */
   hiddenFromSwitcher?: boolean;
+  /**
+   * Map layers offered in the picker (on top of the scope switches). Absent:
+   * every layer of the variant. Stored toggles outside the list are forced off.
+   */
+  mapLayers?: readonly string[];
 }
 
 /**
@@ -77,6 +82,15 @@ export const THESIS_APP: AppDefinition = {
     'trade-policy',
   ],
   mapLayerPreset: ['criticalNodes', 'natural', 'waterways', 'tradeRoutes'],
+  // 15/10/2026: only the layers that serve a layer of the model (nodes and
+  // routes, natural triggers, climate, conflict events as signal/modulator,
+  // infrastructure of the nodes, vessel traffic, sanctions). Inherited layers
+  // such as nuclear sites, gamma irradiators, spaceports, military bases, the
+  // static conflict-zone polygons (no declared source) stay in the full dashboard.
+  mapLayers: [
+    'criticalNodes', 'waterways', 'tradeRoutes', 'natural', 'fires', 'weather', 'climate',
+    'ucdpEvents', 'cables', 'pipelines', 'ais', 'sanctions', 'dayNight',
+  ],
   // 15/10/2026: ~640 KB of the slow tier. Pipelines and storage feed panels
   // that are not in this app; the pipelines map layer falls back to its static
   // geometry when switched on. Climate news and energy-crisis policies feed

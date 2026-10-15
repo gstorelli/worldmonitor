@@ -2,6 +2,7 @@ import type { MapLayers } from '@/types';
 // boundary-ignore: isDesktopRuntime is a pure env probe with no service dependencies
 import { isDesktopRuntime } from '@/services/runtime';
 import { OUT_OF_SCOPE_LAYERS } from './scope';
+import { ACTIVE_APP } from './apps';
 
 export type MapRenderer = 'flat' | 'globe';
 export type MapVariant = 'full' | 'tech' | 'finance' | 'happy' | 'commodity' | 'energy';
@@ -157,9 +158,11 @@ const I18N_PREFIX = 'components.deckgl.layers.';
 // Risk Sentinel: layers of switched-off scope groups (src/config/scope.ts) are
 // dropped from every variant, so they leave the picker and stored toggles are
 // forced off by sanitizeLayersForVariant.
+// The active app can narrow the list further (AppDefinition.mapLayers).
 function variantLayerKeys(variant: MapVariant): Array<keyof MapLayers> {
   const keys = VARIANT_LAYER_ORDER[variant] ?? VARIANT_LAYER_ORDER.full;
-  return keys.filter(k => !OUT_OF_SCOPE_LAYERS.has(k));
+  const appLayers = ACTIVE_APP.mapLayers ? new Set<string>(ACTIVE_APP.mapLayers) : null;
+  return keys.filter(k => !OUT_OF_SCOPE_LAYERS.has(k) && (!appLayers || appLayers.has(k)));
 }
 
 export function getLayersForVariant(variant: MapVariant, renderer: MapRenderer): LayerDefinition[] {
