@@ -498,6 +498,11 @@ export default async function handler(req, ctx) {
       ? Object.fromEntries(Object.entries(BOOTSTRAP_CACHE_KEYS).filter(([k]) => requested.includes(k)))
       : BOOTSTRAP_CACHE_KEYS;
   }
+  // Risk Sentinel: the SPA omits the keys of switched-off scope groups
+  // (src/config/scope.ts). Response time grows with payload size, and those
+  // keys were about a third of it.
+  const omit = new Set(url.searchParams.get('omit')?.split(',').filter(Boolean) ?? []);
+  if (omit.size) registry = Object.fromEntries(Object.entries(registry).filter(([k]) => !omit.has(k)));
 
   const keys = Object.values(registry);
   const names = Object.keys(registry);

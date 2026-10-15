@@ -1,5 +1,6 @@
 import { getPersistentCache, setPersistentCache } from '@/services/persistent-cache';
 import { isDesktopRuntime, toApiUrl } from '@/services/runtime';
+import { OUT_OF_SCOPE_BOOTSTRAP } from '@/config/scope';
 
 const hydrationCache = new Map<string, unknown>();
 const BOOTSTRAP_CACHE_PREFIX = 'bootstrap:tier:';
@@ -93,6 +94,12 @@ function combineHydrationSources(states: BootstrapTierHydrationState[]): Bootstr
   return 'mixed';
 }
 
+/** Tier URL without the keys of switched-off scope groups (src/config/scope.ts). */
+export function bootstrapTierPath(tier: 'fast' | 'slow'): string {
+  const omit = OUT_OF_SCOPE_BOOTSTRAP.length ? `&omit=${OUT_OF_SCOPE_BOOTSTRAP.join(',')}` : '';
+  return `/api/bootstrap?tier=${tier}${omit}`;
+}
+
 async function fetchTier(tier: 'fast' | 'slow', signal: AbortSignal): Promise<BootstrapTierHydrationState> {
   if (typeof navigator !== 'undefined' && navigator.onLine === false) {
     const cached = await readCachedTier(tier, true); // age gate skipped: any snapshot beats blank offline
@@ -107,7 +114,7 @@ async function fetchTier(tier: 'fast' | 'slow', signal: AbortSignal): Promise<Bo
   let missingKeys: string[] = [];
 
   try {
-    const resp = await fetch(toApiUrl(`/api/bootstrap?tier=${tier}`), { signal });
+    const resp = await fetch(toApiUrl(bootstrapTierPath(tier)), { signal });
     if (resp.ok) {
       const payload = (await resp.json()) as {
         data?: Record<string, unknown>;
