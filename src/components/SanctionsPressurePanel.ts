@@ -115,11 +115,13 @@ export class SanctionsPressurePanel extends Panel {
 
   public setData(data: SanctionsPressureResult): void {
     this.data = data;
-    this.setCount(data.totalCount);
     this.render();
   }
 
   private render(): void {
+    // The header count follows the active tab (EU list or OFAC), never mixes them.
+    const count = this.activeTab === 'eu' ? (this.euData?.available ? this.euData.total : undefined) : this.data?.totalCount;
+    if (typeof count === 'number') this.setCount(count);
     if (this.activeTab === 'eu') {
       this.renderEu();
       return;
