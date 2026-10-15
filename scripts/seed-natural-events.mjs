@@ -148,15 +148,30 @@ function parseGdacsTcFields(props) {
   return fields;
 }
 
-async function fetchGdacs(fetchFn = globalThis.fetch) {
-  const res = await fetchFn(GDACS_API, {
-    headers: { Accept: 'application/json', 'User-Agent': CHROME_UA },
-    signal: AbortSignal.timeout(15_000),
-  });
-  if (!res.ok) throw new Error(`GDACS ${res.status}`);
+// Since (at least) 14/10/2026 the GDACS MAP endpoint answers HTTP 400
+// "Eventtype is required." without `eventtype`, and accepts one type per
+// request: the seeder had silently published EONET/NHC events only.
+export function gdacsUrl(eventType) {
+  return `${GDACS_API}?eventtype=${encodeURIComponent(eventType)}`;
+}
 
-  const data = await res.json();
-  const features = data.features || [];
+export async function fetchGdacs(fetchFn = globalThis.fetch) {
+  const types = Object.keys(GDACS_TO_CATEGORY);
+  const results = await Promise.allSettled(types.map(async (type) => {
+    const res = await fetchFn(gdacsUrl(type), {
+      headers: { Accept: 'application/json', 'User-Agent': CHROME_UA },
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!res.ok) throw new Error(`GDACS ${type} ${res.status}`);
+    const data = await res.json();
+    return data.features || [];
+  }));
+  const failed = results
+    .map((r, i) => (r.status === 'rejected' ? `${types[i]}: ${r.reason?.message ?? r.reason}` : null))
+    .filter(Boolean);
+  if (failed.length === types.length) throw new Error(`GDACS all types failed (${failed.join('; ')})`);
+  if (failed.length) console.log(`[GDACS] partial: ${failed.join('; ')}`);
+  const features = results.flatMap((r) => (r.status === 'fulfilled' ? r.value : []));
   const seen = new Set();
   const events = [];
 
