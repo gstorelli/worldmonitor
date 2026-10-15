@@ -1,4 +1,5 @@
 import { escapeHtml } from '@/utils/sanitize';
+import { getAuthState as getForkAuthState } from '@/services/user-auth';
 
 export interface RiskNotifyResult {
   html: string;
@@ -151,9 +152,9 @@ export function renderRiskNotifySettings(): RiskNotifyResult {
             <option value="regulatory"${enrichment === 'regulatory' ? ' selected' : ''}>Regolatorio (segnali + normativa)</option>
           </select>
 
-          <div class="ai-flow-section-label" style="margin-top:10px">Token admin</div>
+          ${getForkAuthState().user?.role === 'admin' ? `<div class="ai-flow-section-label" style="margin-top:10px">Token admin</div>
           <input type="password" id="rkAdminToken" class="unified-settings-input" style="font-size:12px;width:100%" placeholder="N8N_INGEST_SECRET" value="${escapeHtml(adminToken)}" autocomplete="off">
-          <div class="ai-flow-toggle-desc" style="margin-top:4px">Salvato solo in questo browser. Serve a modificare chat ID / destinatario email già configurati: senza token il server rifiuta le modifiche ai canali esistenti (401).</div>
+          <div class="ai-flow-toggle-desc" style="margin-top:4px">Salvato solo in questo browser. Serve a modificare chat ID / destinatario email già configurati: senza token il server rifiuta le modifiche ai canali esistenti (401).</div>` : ''}
 
           <div class="ai-flow-section-label" style="margin-top:10px">Stato</div>
           <div class="ai-flow-toggle-desc" id="rkStatus">Salvataggio automatico attivo.</div>`;

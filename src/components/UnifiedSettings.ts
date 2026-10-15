@@ -1,7 +1,7 @@
 import '@/styles/settings-window.css';
 import { FEEDS, INTEL_SOURCES, SOURCE_REGION_MAP } from '@/config/feeds';
 import { PANEL_CATEGORY_MAP, ALL_PANELS, VARIANT_DEFAULTS, getEffectivePanelConfig } from '@/config/panels';
-import { isPanelAllowedInApp, switchAppHref } from '@/config/apps';
+import { ACTIVE_APP, isPanelAllowedInApp, switchAppHref } from '@/config/apps';
 
 import { SITE_VARIANT } from '@/config/variant';
 import { t } from '@/services/i18n';
@@ -298,6 +298,11 @@ export class UnifiedSettings {
       isSignedIn,
     });
     const showNotificationsTab = !this.config.isDesktopApp;
+    // Risk Sentinel (15/10/2026): the news-feed list only serves the inherited
+    // news panels, which live in the full dashboard; API Keys and MCP Clients
+    // are upstream paid features with no backend in the self-hosted fork
+    // (thesis issue #116).
+    const showSourcesTab = ACTIVE_APP.id !== 'thesis';
     const notifs = showNotificationsTab
       ? (isSignedIn ? renderNotificationsSettings({ isSignedIn }) : renderRiskNotifySettings())
       : null;
@@ -311,10 +316,8 @@ export class UnifiedSettings {
         <div class="unified-settings-tabs" role="tablist" aria-label="Settings">
           <button class="${tabClass('settings')}" data-tab="settings" role="tab" aria-selected="${this.activeTab === 'settings'}" id="us-tab-settings" aria-controls="us-tab-panel-settings">${t('header.tabSettings')}</button>
           <button class="${tabClass('panels')}" data-tab="panels" role="tab" aria-selected="${this.activeTab === 'panels'}" id="us-tab-panels" aria-controls="us-tab-panel-panels">${t('header.tabPanels')}</button>
-          <button class="${tabClass('sources')}" data-tab="sources" role="tab" aria-selected="${this.activeTab === 'sources'}" id="us-tab-sources" aria-controls="us-tab-panel-sources">${t('header.tabSources')}</button>
+          ${showSourcesTab ? `<button class="${tabClass('sources')}" data-tab="sources" role="tab" aria-selected="${this.activeTab === 'sources'}" id="us-tab-sources" aria-controls="us-tab-panel-sources">${t('header.tabSources')}</button>` : ''}
           ${showNotificationsTab ? `<button class="${tabClass('notifications')}" data-tab="notifications" role="tab" aria-selected="${this.activeTab === 'notifications'}" id="us-tab-notifications" aria-controls="us-tab-panel-notifications">${t('header.tabNotifications')}</button>` : ''}
-          <button class="${tabClass('api-keys')}" data-tab="api-keys" role="tab" aria-selected="${this.activeTab === 'api-keys'}" id="us-tab-api-keys" aria-controls="us-tab-panel-api-keys">API Keys</button>
-          ${hasFeature('mcpAccess') ? `<button class="${tabClass('mcp-clients')}" data-tab="mcp-clients" role="tab" aria-selected="${this.activeTab === 'mcp-clients'}" id="us-tab-mcp-clients" aria-controls="us-tab-panel-mcp-clients">MCP Clients</button>` : ''}
           ${isAdmin ? `<button class="${tabClass('admin')}" data-tab="admin" role="tab" aria-selected="${this.activeTab === 'admin'}" id="us-tab-admin" aria-controls="us-tab-panel-admin">Admin</button>` : ''}
         </div>
         <div class="unified-settings-tab-panel${this.activeTab === 'settings' ? ' active' : ''}" data-panel-id="settings" id="us-tab-panel-settings" role="tabpanel" aria-labelledby="us-tab-settings">
