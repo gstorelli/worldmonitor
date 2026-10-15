@@ -32,6 +32,12 @@ export interface AppDefinition {
    * SPA asks /api/bootstrap to omit them, like the switched-off scope groups.
    */
   bootstrapOmit?: readonly string[];
+  /**
+   * Not listed in the header app switcher (still reachable by `?app=<id>`).
+   * Decision of 15/10/2026: the full dashboard is an advanced tool, linked
+   * only from the Admin tab of the settings.
+   */
+  hiddenFromSwitcher?: boolean;
 }
 
 /**
@@ -42,7 +48,7 @@ export interface AppDefinition {
 export const THESIS_APP: AppDefinition = {
   id: 'thesis',
   label: 'Risk Sentinel',
-  description: 'Six-layer model: triggers at critical nodes to customs risk (PhD thesis view)',
+  description: 'Modello a sei strati: dagli inneschi sui nodi critici al rischio doganale (vista della tesi)',
   allowedPanels: [
     'map',
     'risk-chain',
@@ -81,7 +87,8 @@ export const THESIS_APP: AppDefinition = {
 export const CUSTOMS_APP: AppDefinition = {
   id: 'customs',
   label: 'Full dashboard',
-  description: 'Every panel inherited from WorldMonitor (context and signals)',
+  description: 'Tutti i pannelli ereditati (contesto e segnali): strumento avanzato',
+  hiddenFromSwitcher: true,
   allowedPanels: null,
   // Moved to their dedicated apps: the Zotero/document-analysis workspace
   // (research) and the policy/compliance workspace (policy).
@@ -97,7 +104,7 @@ export const CUSTOMS_APP: AppDefinition = {
 export const OSINT_APP: AppDefinition = {
   id: 'osint',
   label: 'OSINT',
-  description: 'Open-source intelligence workspace',
+  description: 'Segnali OSINT sui nodi critici e sui beni strategici',
   allowedPanels: [
     'map',
     'live-news',
@@ -182,7 +189,7 @@ export const OSINT_APP: AppDefinition = {
 export const RESEARCH_APP: AppDefinition = {
   id: 'research',
   label: 'Research',
-  description: 'Zotero library and document analysis workspace',
+  description: 'Bibliografia della tesi, novità accademiche, Zotero',
   allowedPanels: [
     'map',
     'source-validation',
@@ -201,7 +208,7 @@ export const RESEARCH_APP: AppDefinition = {
 export const POLICY_APP: AppDefinition = {
   id: 'policy',
   label: 'Policy',
-  description: 'Policy, regulatory and compliance analysis',
+  description: 'Registro normativo, misure sui beni, atti UE recenti',
   allowedPanels: [
     'map',
     'policy-analysis',
@@ -237,6 +244,11 @@ export const POLICY_APP: AppDefinition = {
 
 export const APPS: AppDefinition[] = [THESIS_APP, CUSTOMS_APP, OSINT_APP, RESEARCH_APP, POLICY_APP];
 export const DEFAULT_APP_ID = THESIS_APP.id;
+
+/** Apps listed in the header switcher: hidden apps appear only while open. */
+export function switcherApps(activeId: string = ACTIVE_APP.id): AppDefinition[] {
+  return APPS.filter((app) => !app.hiddenFromSwitcher || app.id === activeId);
+}
 const APP_STORAGE_KEY = 'rs-active-app';
 const APP_QUERY_PARAM = 'app';
 

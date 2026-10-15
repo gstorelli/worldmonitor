@@ -1,7 +1,7 @@
 import '@/styles/settings-window.css';
 import { FEEDS, INTEL_SOURCES, SOURCE_REGION_MAP } from '@/config/feeds';
 import { PANEL_CATEGORY_MAP, ALL_PANELS, VARIANT_DEFAULTS, getEffectivePanelConfig } from '@/config/panels';
-import { isPanelAllowedInApp } from '@/config/apps';
+import { isPanelAllowedInApp, switchAppHref } from '@/config/apps';
 
 import { SITE_VARIANT } from '@/config/variant';
 import { t } from '@/services/i18n';
@@ -363,6 +363,11 @@ export class UnifiedSettings {
         ` : ''}
         ${isAdmin ? `
         <div class="unified-settings-tab-panel${this.activeTab === 'admin' ? ' active' : ''}" data-panel-id="admin" id="us-tab-panel-admin" role="tabpanel" aria-labelledby="us-tab-admin">
+          <div class="us-admin-advanced" style="margin-bottom:16px">
+            <div class="ai-flow-section-label">Strumenti avanzati</div>
+            <a class="rs-link" href="${switchAppHref('customs')}">Dashboard completa ↗</a>
+            <div class="ai-flow-toggle-desc">Tutti i pannelli ereditati, fuori dal modello della tesi. Non compare nell'intestazione.</div>
+          </div>
           <div id="usAdminPolicy"></div>
           <div id="usAdminUsers" style="margin-top:16px"></div>
         </div>
