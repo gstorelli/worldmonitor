@@ -36,7 +36,7 @@ export class AlertFeedPanel extends Panel {
   constructor() {
     super({
       id: 'alert-feed',
-      title: 'Global Risk Alerts',
+      title: 'Segnali e allerte',
       className: 'panel-narrow',
       closable: true,
       infoTooltip: 'Segnali delle pipeline n8n (notizie GDELT, anomalie climatiche Open-Meteo, materie prime, monitor normativo): titolo e severità dichiarata dalla fonte. Non è un punteggio di rischio del modello della tesi.',
