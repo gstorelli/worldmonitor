@@ -101,7 +101,10 @@ export class RiskChainPanel extends Panel {
     if (!c.transit?.dataAvailable) return `<span class="thesis-muted">${escapeHtml(t('components.thesis.chain.noTransit'))}</span>`;
     const wow = c.transit.wowChangePct;
     const cls = wow < 0 ? 'thesis-down' : 'thesis-up';
-    return `${c.transit.todayTotal} ${escapeHtml(t('components.thesis.chain.transits'))} <span class="${cls}">${wow > 0 ? '+' : ''}${wow.toFixed(0)}%</span>`;
+    // Weekly change from IMF PortWatch. The relay's "today" count comes from the
+    // live AIS stream, whose coverage of the straits is partial (0 at Suez on
+    // 15/10/2026), so it is not shown as a transit count.
+    return `${escapeHtml(t('components.thesis.chain.transits'))} <span class="${cls}">${wow > 0 ? '+' : ''}${wow.toFixed(0)}%</span>`;
   }
 
   private goodsCell(c: NodeChain): string {

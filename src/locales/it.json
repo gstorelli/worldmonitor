@@ -1620,7 +1620,7 @@
         "noTriggerDetail": "Nessun innesco misurato entro {{radius}} km nella finestra di osservazione.",
         "productionStatus": "area produttiva",
         "noTransit": "PortWatch n.d.",
-        "transits": "transiti",
+        "transits": "transiti sett.",
         "goodsTbd": "flussi da stimare",
         "goodsTbdDetail": "Beni strategici in transito nello stretto: da stimare con Eurostat Comext e IMF PortWatch (Capitolo 3).",
         "customsTbd": "La vulnerabilità doganale (capacità degli uffici, obsolescenza dei profili, incentivo alla mis-declaration) richiede dati ADM: pilota in shadow-mode presso l'Ufficio delle Dogane di Bari, Anno 3. Gli indicatori pubblici (spostamento delle origini, valori unitari, divario speculare) si costruiscono nell'Anno 2.",

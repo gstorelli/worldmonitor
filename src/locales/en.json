@@ -1789,7 +1789,7 @@
         "noTriggerDetail": "No measured trigger within {{radius}} km in the observation window.",
         "productionStatus": "production area",
         "noTransit": "PortWatch n/a",
-        "transits": "transits",
+        "transits": "transits w/w",
         "goodsTbd": "flows to estimate",
         "goodsTbdDetail": "Strategic goods transiting this strait: to be estimated from Eurostat Comext and IMF PortWatch (Chapter 3).",
         "customsTbd": "Customs vulnerability (office capacity, profile obsolescence, mis-declaration incentive) needs ADM data: shadow-mode pilot at the Bari customs office, Year 3. Public indicators (origin shifts, unit values, mirror gaps) are built in Year 2.",
