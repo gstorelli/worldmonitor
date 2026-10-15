@@ -8,6 +8,7 @@ Formato di ogni voce: numero della PR, cosa cambia per chi usa il portale, event
 
 ## 15 ottobre 2026
 
+- **#50**: OSINT organizzato in tre schede (Nodi critici, Beni strategici, Ultimi segnali) con il numero di righe; la scheda aperta viene ricordata dal browser. Le app OSINT, Research e Policy scorrono in verticale: il CSS della dashboard bloccava lo scorrimento della pagina.
 - **#49**: il bootstrap non scarica più i dati dei gruppi spenti (borsa, macro, tech, indici di consumo, extra upstream): la SPA li elenca in `omit=` e il server li salta. Il tempo di risposta cresceva con la dimensione (circa 3,5 ms per KB, 2-4 s per livello); i dati omessi erano circa un terzo del totale.
 - **#48**: aggiunto `src/apps/boot.ts`, rimasto fuori dal commit della #46. Senza il file i deploy della #46 e della #47 fallivano in compilazione e la produzione era rimasta alla #45.
 - **#47** (#86 della tesi): il bootstrap della dashboard parte subito dopo il login, in parallelo a regole e preferenze, e `App.init` riusa la stessa richiesta. Si risparmia un giro di richieste (primo pannello da 1,24 a 0,95 s nella sonda). I limiti di 6 e 12 s restano: sul server il bootstrap risponde in 0,2-0,8 s.

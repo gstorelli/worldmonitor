@@ -136,6 +136,47 @@ async function fetchJson<T>(url: string): Promise<T> {
   return (await res.json()) as T;
 }
 
+type OsintTab = 'nodes' | 'goods' | 'feed';
+const OSINT_TABS: readonly OsintTab[] = ['nodes', 'goods', 'feed'];
+const TAB_STORAGE_KEY = 'rs-osint-tab';
+
+function readStoredTab(): OsintTab {
+  try {
+    const v = localStorage.getItem(TAB_STORAGE_KEY);
+    return OSINT_TABS.includes(v as OsintTab) ? (v as OsintTab) : 'nodes';
+  } catch {
+    return 'nodes';
+  }
+}
+
+/** Tab switching; the last tab is remembered per browser (a convenience only). */
+function bindTabs(root: HTMLElement): void {
+  const show = (tab: OsintTab) => {
+    root.querySelectorAll<HTMLElement>('.rs-tab').forEach((t) => {
+      const active = t.dataset.tab === tab;
+      t.classList.toggle('active', active);
+      t.setAttribute('aria-selected', String(active));
+    });
+    root.querySelectorAll<HTMLElement>('.rs-tab-panel').forEach((panel) => {
+      panel.hidden = panel.dataset.panel !== tab;
+    });
+    try {
+      localStorage.setItem(TAB_STORAGE_KEY, tab);
+    } catch {
+      // storage unavailable: the tab is simply not remembered
+    }
+  };
+  root.querySelectorAll<HTMLElement>('.rs-tab').forEach((t) => {
+    t.addEventListener('click', () => show((t.dataset.tab as OsintTab) ?? 'nodes'));
+  });
+  show(readStoredTab());
+}
+
+function setCount(root: HTMLElement, selector: string, n: number): void {
+  const el = root.querySelector<HTMLElement>(selector);
+  if (el) el.textContent = String(n);
+}
+
 export function createOsintWorkspace(): AppWorkspace {
   return {
     async mount(root: HTMLElement): Promise<void> {
@@ -154,32 +195,40 @@ export function createOsintWorkspace(): AppWorkspace {
             <button class="rs-button" id="rsOsintRefresh">Aggiorna</button>
           </div>
 
-          <section class="rs-osint-section">
-            <h2>Nodi critici <span class="rs-osint-sub">inneschi entro ${TRIGGER_WORKING_RULES.radiusKm} km negli ultimi ${TRIGGER_WORKING_RULES.windowDays} giorni, transiti, clima</span> ${sourceInfoSlot('osint.nodes')}</h2>
+          <div class="rs-tabs" role="tablist">
+            <button class="rs-tab" data-tab="nodes" role="tab">Nodi critici <span class="rs-chip-count" id="rsOsintNodesCount"></span></button>
+            <button class="rs-tab" data-tab="goods" role="tab">Beni strategici <span class="rs-chip-count" id="rsOsintGoodsCount"></span></button>
+            <button class="rs-tab" data-tab="feed" role="tab">Ultimi segnali <span class="rs-chip-count" id="rsOsintFeedCount"></span></button>
+          </div>
+
+          <div class="rs-tab-panel" data-panel="nodes">
+            <div class="rs-tab-sources">Fonti dei dati ${sourceInfoSlot('osint.nodes')}</div>
+            <p class="rs-meta rs-osint-note">Inneschi entro ${TRIGGER_WORKING_RULES.radiusKm} km negli ultimi ${TRIGGER_WORKING_RULES.windowDays} giorni, transiti delle navi, clima della zona più vicina.</p>
             <div class="rs-osint-table-wrap"><table class="rs-osint-table">
               <thead><tr><th>Nodo</th><th>Inneschi</th><th>Transiti oggi</th><th>Clima (ultimi 7 giorni)</th><th>Catena</th></tr></thead>
               <tbody id="rsOsintNodes"><tr><td colspan="5" class="rs-loading">Caricamento…</td></tr></tbody>
             </table></div>
-          </section>
+          </div>
 
-          <section class="rs-osint-section">
-            <h2>Beni strategici <span class="rs-osint-sub">prezzi, fornitori dell'Italia, misure in vigore</span> ${sourceInfoSlot('osint.goods')}</h2>
-            <p class="rs-meta rs-osint-note">I prezzi sono nell'unità di quotazione del contratto (per esempio il grano in centesimi di dollaro per bushel): come segnale conta la variazione. "Indiretto" indica un titolo o un ETF quotato, non il prezzo del bene.</p>
+          <div class="rs-tab-panel" data-panel="goods" hidden>
+            <div class="rs-tab-sources">Fonti dei dati ${sourceInfoSlot('osint.goods')}</div>
+            <p class="rs-meta rs-osint-note">Prezzi, fornitori dell'Italia, misure in vigore. I prezzi sono nell'unità di quotazione del contratto (per esempio il grano in centesimi di dollaro per bushel): come segnale conta la variazione. "Indiretto" indica un titolo o un ETF quotato, non il prezzo del bene.</p>
             <div class="rs-osint-table-wrap"><table class="rs-osint-table">
               <thead><tr><th>Bene</th><th>Prezzo (variazione sulla chiusura precedente)</th><th>Principali fornitori dell'Italia</th><th>Misure (registro Policy)</th></tr></thead>
               <tbody id="rsOsintGoods"><tr><td colspan="4" class="rs-loading">Caricamento…</td></tr></tbody>
             </table></div>
-          </section>
+          </div>
 
-          <section class="rs-osint-section">
-            <h2>Ultimi segnali sui nodi ${sourceInfoSlot('osint.feed')}</h2>
+          <div class="rs-tab-panel" data-panel="feed" hidden>
+            <div class="rs-tab-sources">Fonti dei dati ${sourceInfoSlot('osint.feed')}</div>
             <ul class="rs-osint-feed" id="rsOsintFeed"><li class="rs-loading">Caricamento…</li></ul>
-          </section>
+          </div>
 
           <p class="rs-meta" id="rsOsintErrors"></p>
         </div>
       `;
       mountSourceInfo(root);
+      bindTabs(root);
 
       const nodesEl = root.querySelector<HTMLElement>('#rsOsintNodes');
       const goodsEl = root.querySelector<HTMLElement>('#rsOsintGoods');
@@ -233,6 +282,9 @@ export function createOsintWorkspace(): AppWorkspace {
               .join('')
           : '<li class="rs-empty">Nessun innesco misurato vicino ai nodi nel periodo.</li>';
 
+        setCount(root, '#rsOsintNodesCount', nodeRows.length);
+        setCount(root, '#rsOsintGoodsCount', goodRows.length);
+        setCount(root, '#rsOsintFeedCount', feed.length);
         if (nodesHitEl) nodesHitEl.textContent = String(nodeRows.filter((r) => r.triggers.count > 0).length);
         if (significantEl) significantEl.textContent = String(nodeRows.reduce((n, r) => n + r.triggers.significant, 0));
         if (updatedEl) updatedEl.textContent = new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
