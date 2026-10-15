@@ -368,7 +368,7 @@ export const WORKSPACE_SOURCES: Record<string, DataSource[]> = {
     { ...GDACS, what: 'Colonna Inneschi: eventi naturali vicino al nodo' },
     { ...EONET, what: 'Colonna Inneschi: eventi naturali vicino al nodo' },
     { ...NHC, what: 'Colonna Inneschi: cicloni tropicali vicino al nodo' },
-    { ...PORTWATCH, what: 'Colonna Transiti: navi transitate oggi e variazione sulla settimana' },
+    { ...PORTWATCH, what: 'Colonna Transiti: variazione dei transiti rispetto alla settimana precedente' },
     {
       what: 'Colonna Clima: anomalia di temperatura e precipitazione degli ultimi 7 giorni nella zona monitorata più vicina (entro il raggio di lavoro)',
       source: 'Open-Meteo, Historical Weather API (workflow n8n 03, 15 zone)',

@@ -68,7 +68,7 @@ function nodeRowHtml(row: NodeRow): string {
   const transit = row.node.kind !== 'strait'
     ? '<span class="rs-meta">non applicabile</span>'
     : row.transit?.dataAvailable
-      ? `${row.transit.todayTotal} navi · ${fmtSigned(row.transit.wowChangePct, '%', 0)} sulla settimana`
+      ? `${fmtSigned(row.transit.wowChangePct, '%', 0)} sulla settimana precedente <span class="rs-meta">(PortWatch)</span>`
       : '<span class="rs-meta">dato non disponibile</span>';
   const c = row.climate;
   const climate = c
@@ -203,9 +203,9 @@ export function createOsintWorkspace(): AppWorkspace {
 
           <div class="rs-tab-panel" data-panel="nodes">
             <div class="rs-tab-sources">Fonti dei dati ${sourceInfoSlot('osint.nodes')}</div>
-            <p class="rs-meta rs-osint-note">Inneschi entro ${TRIGGER_WORKING_RULES.radiusKm} km negli ultimi ${TRIGGER_WORKING_RULES.windowDays} giorni, transiti delle navi, clima della zona più vicina.</p>
+            <p class="rs-meta rs-osint-note">Inneschi entro ${TRIGGER_WORKING_RULES.radiusKm} km negli ultimi ${TRIGGER_WORKING_RULES.windowDays} giorni, variazione dei transiti di navi rispetto alla settimana precedente (IMF PortWatch), clima della zona più vicina.</p>
             <div class="rs-osint-table-wrap"><table class="rs-osint-table">
-              <thead><tr><th>Nodo</th><th>Inneschi</th><th>Transiti oggi</th><th>Clima (ultimi 7 giorni)</th><th>Catena</th></tr></thead>
+              <thead><tr><th>Nodo</th><th>Inneschi</th><th>Transiti</th><th>Clima (ultimi 7 giorni)</th><th>Catena</th></tr></thead>
               <tbody id="rsOsintNodes"><tr><td colspan="5" class="rs-loading">Caricamento…</td></tr></tbody>
             </table></div>
           </div>

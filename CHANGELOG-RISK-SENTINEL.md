@@ -8,6 +8,7 @@ Formato di ogni voce: numero della PR, cosa cambia per chi usa il portale, event
 
 ## 15 ottobre 2026
 
+- **#53**: OSINT e Catena del rischio mostrano per gli stretti solo la variazione dei transiti sulla settimana precedente (IMF PortWatch). Il numero di «navi oggi» veniva dal flusso AIS in tempo reale del relay, con copertura parziale degli stretti (0 a Suez il 15/10), e non era un conteggio dei transiti.
 - **#52**: la vista tesi non scarica più nel bootstrap i dati che nessun suo pannello usa: registri di oleodotti, gasdotti e depositi, notizie sul clima, politiche sulla crisi energetica (circa 640 KB del livello lento). Se si accende il layer delle pipeline, la mappa usa la geometria statica. La dashboard completa (`?app=customs`) è invariata.
 - **#51**: Alert feed: al posto di «Risk %» e «✨ AI Reasoning» ogni scheda mostra la fonte e la severità dichiarata dalla fonte, più un pulsante «Dettagli» (descrizione, fonte, link). Il «Risk %» non era un punteggio: il campo `score` del digest vale 0 e la percentuale veniva da una tabella fissa (alta = 85%). Corretto anche un inserimento di testo non escapato. Sanzioni: il numero nel titolo segue la scheda aperta (UE o OFAC).
 - **#50**: OSINT organizzato in tre schede (Nodi critici, Beni strategici, Ultimi segnali) con il numero di righe; la scheda aperta viene ricordata dal browser. Le app OSINT, Research e Policy scorrono in verticale: il CSS della dashboard bloccava lo scorrimento della pagina.
