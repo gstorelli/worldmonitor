@@ -104,3 +104,36 @@ function collect(map: Record<ScopeGroup, readonly string[]>): Set<string> {
 
 export const OUT_OF_SCOPE_PANEL_IDS: ReadonlySet<string> = collect(OUT_OF_SCOPE_PANELS);
 export const OUT_OF_SCOPE_LAYERS: ReadonlySet<string> = collect(OUT_OF_SCOPE_LAYER_KEYS);
+
+/**
+ * Bootstrap keys read only by switched-off groups. The SPA asks /api/bootstrap
+ * to omit them (`omit=`): the response time grows with the payload, and on
+ * 15/10/2026 these keys were about a third of it (stock quotes alone 275 KB).
+ * Keep only keys with no consumer outside the group (`ecbFxRates` stays: it
+ * feeds the Commodities FX tab).
+ */
+export const OUT_OF_SCOPE_BOOTSTRAP_KEYS: Record<ScopeGroup, readonly string[]> = {
+  finance: [
+    'marketQuotes', 'sectors', 'etfFlows', 'cryptoQuotes', 'cryptoSectors', 'defiTokens', 'aiTokens',
+    'otherTokens', 'stablecoinMarkets', 'predictions', 'fearGreedIndex', 'hyperliquidFlow',
+    'marketImplications', 'wsbTickers', 'aaiiSentiment', 'breadthHistory', 'gulfQuotes', 'macroSignals',
+  ],
+  techStartup: ['techEvents', 'techReadiness'],
+  consumerIndices: [
+    'consumerPricesOverview', 'consumerPricesCategories', 'consumerPricesMovers', 'consumerPricesSpread',
+    'groceryBasket', 'bigmac', 'giving', 'progressData', 'positiveGeoEvents',
+  ],
+  liveMedia: [],
+  military: ['pizzint', 'thermalEscalation'],
+  macro: [
+    'bisPolicy', 'bisExchange', 'bisCredit', 'nationalDebt', 'chinaMacro', 'chinaReleaseCalendar',
+    'euFsi', 'economicStress', 'spending',
+  ],
+  upstreamExtra: [
+    'outages', 'serviceStatuses', 'ddosAttacks', 'trafficAnomalies', 'flightDelays',
+    'chinaCorporateDisclosures', 'crossStraitActivity', 'co2Monitoring', 'oceanIce', 'radiationWatch',
+    'unrestEvents', 'securityAdvisories', 'diseaseOutbreaks',
+  ],
+};
+
+export const OUT_OF_SCOPE_BOOTSTRAP: readonly string[] = [...collect(OUT_OF_SCOPE_BOOTSTRAP_KEYS)].sort();
