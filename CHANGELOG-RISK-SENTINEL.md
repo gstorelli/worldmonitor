@@ -8,6 +8,7 @@ Formato di ogni voce: numero della PR, cosa cambia per chi usa il portale, event
 
 ## 15 ottobre 2026
 
+- **#59**: nella vista tesi il selettore dei livelli della mappa offre solo i livelli del modello (nodi critici, stretti, rotte, eventi naturali, incendi, meteo, clima, conflitti UCDP, cavi, condotte, traffico navale, sanzioni, giorno/notte). Siti nucleari, irradiatori, spazioporti, basi, zone di conflitto statiche e gli altri livelli ereditati restano nella dashboard completa.
 - **#58**: Impostazioni ripulite. Tolte le schede API Keys e MCP Clients (funzioni a pagamento dell'upstream, senza backend qui), il modello IA locale del browser con la «memoria dei titoli», l'invito all'app desktop, il gruppo Media (flussi video spenti) e il link al Discord di WorldMonitor. Lingue: solo italiano e inglese. Nella vista tesi non c'è più la scheda Fonti (i feed di notizie servono solo alla dashboard completa). Il token admin delle notifiche si vede solo da amministratore. Etichette in italiano («Segnali e allerte», «Sanzioni e designazioni», categorie dei pannelli, «Impulso sugli eventi»).
 - **#57**: la «Full dashboard» non compare più nell'intestazione: la apre un link nella scheda Admin delle Impostazioni (solo amministratori) e resta raggiungibile con `?app=customs`. Descrizioni delle app in italiano.
 - **#56**: bibliografia di Research rigenerata dalla tesi: sei fonti di dati nuove (Open-Meteo, NASA EONET, NOAA NHC, WTO Timeseries, lista UE delle sanzioni finanziarie, CELLAR), 91 voci in tutto.
