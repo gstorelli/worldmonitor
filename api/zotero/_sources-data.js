@@ -1561,5 +1561,116 @@ export default [
     "verification": "API",
     "summary": "",
     "limitation": ""
+  },
+  {
+    "ref": 87,
+    "key": "open_meteo_2026",
+    "authors": "Open-Meteo",
+    "year": 2026,
+    "title": "Historical Weather API",
+    "type": "institutional",
+    "venue": "",
+    "doi": null,
+    "url": "",
+    "layers": [
+      "trigger"
+    ],
+    "verified": true,
+    "verification": "P",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 88,
+    "key": "eonet_2026",
+    "authors": "NASA Earth Observatory",
+    "year": 2026,
+    "title": "Earth Observatory Natural Event Tracker (EONET), API version 3",
+    "type": "institutional",
+    "venue": "",
+    "doi": null,
+    "url": "",
+    "layers": [
+      "trigger"
+    ],
+    "verified": true,
+    "verification": "P",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 89,
+    "key": "nhc_gis_2026",
+    "authors": "NOAA National Hurricane Center",
+    "year": 2026,
+    "title": "GIS data and products",
+    "type": "institutional",
+    "venue": "",
+    "doi": null,
+    "url": "",
+    "layers": [
+      "trigger"
+    ],
+    "verified": true,
+    "verification": "P",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 90,
+    "key": "wto_timeseries_2026",
+    "authors": "World Trade Organization",
+    "year": 2026,
+    "title": "WTO Timeseries API: tariff indicators by product",
+    "type": "institutional",
+    "venue": "",
+    "doi": null,
+    "url": "",
+    "layers": [
+      "supply",
+      "modulator"
+    ],
+    "verified": true,
+    "verification": "P",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 91,
+    "key": "eu_fsf_2026",
+    "authors": "European Commission, D.-G. f. F. S.; Union, C. M.",
+    "year": 2026,
+    "title": "Consolidated list of persons, groups and entities subject to EU financial sanctions",
+    "type": "institutional",
+    "venue": "data.europa.eu",
+    "doi": null,
+    "url": "",
+    "layers": [
+      "supply",
+      "modulator"
+    ],
+    "verified": true,
+    "verification": "P",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 92,
+    "key": "op_cellar_sparql_2026",
+    "authors": "Publications Office of the European Union",
+    "year": 2026,
+    "title": "CELLAR SPARQL endpoint (metadata of EU legal acts)",
+    "type": "institutional",
+    "venue": "",
+    "doi": null,
+    "url": "",
+    "layers": [
+      "supply",
+      "modulator"
+    ],
+    "verified": true,
+    "verification": "P",
+    "summary": "",
+    "limitation": ""
   }
 ];
