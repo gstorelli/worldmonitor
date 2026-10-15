@@ -27,6 +27,11 @@ export interface AppDefinition {
    * is switched off once); the user can change them afterwards.
    */
   mapLayerPreset?: string[];
+  /**
+   * Bootstrap keys this app never reads (no panel of the app uses them): the
+   * SPA asks /api/bootstrap to omit them, like the switched-off scope groups.
+   */
+  bootstrapOmit?: readonly string[];
 }
 
 /**
@@ -66,6 +71,11 @@ export const THESIS_APP: AppDefinition = {
     'trade-policy',
   ],
   mapLayerPreset: ['criticalNodes', 'natural', 'waterways', 'tradeRoutes'],
+  // 15/10/2026: ~640 KB of the slow tier. Pipelines and storage feed panels
+  // that are not in this app; the pipelines map layer falls back to its static
+  // geometry when switched on. Climate news and energy-crisis policies feed
+  // panels of the full dashboard only.
+  bootstrapOmit: ['pipelinesGas', 'pipelinesOil', 'storageFacilities', 'climateNews', 'energyCrisisPolicies'],
 };
 
 export const CUSTOMS_APP: AppDefinition = {

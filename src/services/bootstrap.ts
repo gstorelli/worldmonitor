@@ -1,6 +1,7 @@
 import { getPersistentCache, setPersistentCache } from '@/services/persistent-cache';
 import { isDesktopRuntime, toApiUrl } from '@/services/runtime';
 import { OUT_OF_SCOPE_BOOTSTRAP } from '@/config/scope';
+import { ACTIVE_APP } from '@/config/apps';
 
 const hydrationCache = new Map<string, unknown>();
 const BOOTSTRAP_CACHE_PREFIX = 'bootstrap:tier:';
@@ -94,9 +95,13 @@ function combineHydrationSources(states: BootstrapTierHydrationState[]): Bootstr
   return 'mixed';
 }
 
-/** Tier URL without the keys of switched-off scope groups (src/config/scope.ts). */
-export function bootstrapTierPath(tier: 'fast' | 'slow'): string {
-  const omit = OUT_OF_SCOPE_BOOTSTRAP.length ? `&omit=${OUT_OF_SCOPE_BOOTSTRAP.join(',')}` : '';
+/**
+ * Tier URL without the keys of switched-off scope groups (src/config/scope.ts)
+ * and the keys the active app never reads (`bootstrapOmit` in src/config/apps.ts).
+ */
+export function bootstrapTierPath(tier: 'fast' | 'slow', appOmit: readonly string[] = ACTIVE_APP.bootstrapOmit ?? []): string {
+  const keys = [...new Set([...OUT_OF_SCOPE_BOOTSTRAP, ...appOmit])].sort();
+  const omit = keys.length ? `&omit=${keys.join(',')}` : '';
   return `/api/bootstrap?tier=${tier}${omit}`;
 }
 
