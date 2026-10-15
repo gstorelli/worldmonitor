@@ -28,6 +28,16 @@ describe('GDACS fetch', () => {
     assert.deepEqual(events.map((e) => [e.id, e.category]).sort(), [['gdacs-FL-3', 'floods'], ['gdacs-VO-1', 'volcanoes']]);
   });
 
+  it('reads a 404 as no current events of that type', async () => {
+    const fetchFn = async (url) => {
+      const type = new URL(url).searchParams.get('eventtype');
+      if (type === 'VO') return new Response('{"status":404}', { status: 404 });
+      return new Response(JSON.stringify({ features: type === 'FL' ? [feature('FL', 3, 'Red')] : [] }), { status: 200 });
+    };
+    const events = await fetchGdacs(fetchFn);
+    assert.deepEqual(events.map((e) => e.id), ['gdacs-FL-3']);
+  });
+
   it('fails only when every type fails', async () => {
     const fetchFn = async () => new Response('{"message":"Eventtype is required."}', { status: 400 });
     await assert.rejects(fetchGdacs(fetchFn), /all types failed/);

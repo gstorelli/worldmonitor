@@ -8,6 +8,7 @@ Formato di ogni voce: numero della PR, cosa cambia per chi usa il portale, event
 
 ## 15 ottobre 2026
 
+- **#55**: GDACS risponde 404 quando un tipo di evento non ha eventi correnti (vulcani, 15/10): il seeder lo legge come lista vuota, non come errore. Primo giro dopo la #54: 26 eventi invece di 21.
 - **#54**: GDACS torna a funzionare. Dall'ultima modifica dell'API (in tutti i log disponibili, dal 14/10 mattina) l'endpoint `MAP` rispondeva 400 senza il parametro `eventtype`, e il seeder pubblicava lo stesso «OK» con i soli eventi EONET e NOAA: la vista tesi non riceveva eruzioni, alluvioni, siccità e incendi da GDACS. Ora c'è una richiesta per tipo di evento.
 - **#53**: OSINT e Catena del rischio mostrano per gli stretti solo la variazione dei transiti sulla settimana precedente (IMF PortWatch). Il numero di «navi oggi» veniva dal flusso AIS in tempo reale del relay, con copertura parziale degli stretti (0 a Suez il 15/10), e non era un conteggio dei transiti.
 - **#52**: la vista tesi non scarica più nel bootstrap i dati che nessun suo pannello usa: registri di oleodotti, gasdotti e depositi, notizie sul clima, politiche sulla crisi energetica (circa 640 KB del livello lento). Se si accende il layer delle pipeline, la mappa usa la geometria statica. La dashboard completa (`?app=customs`) è invariata.

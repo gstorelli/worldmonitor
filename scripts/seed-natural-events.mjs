@@ -162,6 +162,12 @@ export async function fetchGdacs(fetchFn = globalThis.fetch) {
       headers: { Accept: 'application/json', 'User-Agent': CHROME_UA },
       signal: AbortSignal.timeout(15_000),
     });
+    // GDACS answers 404 when a type has no current event (seen for VO on
+    // 15/10/2026): an empty list, not a failure.
+    if (res.status === 404) {
+      console.log(`[GDACS] ${type}: no current events (404)`);
+      return [];
+    }
     if (!res.ok) throw new Error(`GDACS ${type} ${res.status}`);
     const data = await res.json();
     return data.features || [];
