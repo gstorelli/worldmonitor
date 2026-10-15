@@ -290,6 +290,8 @@ const STANDALONE_KEYS = {
   // data layer only), so it is standalone rather than bootstrap-tiered.
   chinaStockConnect:  'market:china:stock-connect:v1',
   hkoWarnings:        'weather:hko-warnings:v1',
+  // Fork: GDACS answered on the last natural-events run (thesis issue #146).
+  gdacsStatus:        'natural:gdacs-status:v1',
   // Fork: seismic triggers of the thesis view, read by /api/thesis/triggers
   // (not a bootstrap key: the trigger panels call that endpoint directly).
   thesisTriggers:     'thesis:triggers:v1',
@@ -535,6 +537,7 @@ const SEED_META = {
   gulfQuotes:       { key: 'seed-meta:market:gulf-quotes',      maxStaleMin: 30 },
   stablecoinMarkets:{ key: 'seed-meta:market:stablecoins',      maxStaleMin: 60 },
   naturalEvents:    { key: 'seed-meta:natural:events',          maxStaleMin: 540 }, // 3h Railway climate bundle; 3x cadence preserves a full missed run.
+  gdacsStatus:      { key: 'seed-meta:natural:gdacs-status',    maxStaleMin: 180 }, // fork: hourly natural-events run; stale = GDACS failing for 3h (#146)
   hkoWarnings:      { key: 'seed-meta:weather:hko-warnings',    maxStaleMin: 540 }, // successful HKO responses publish a snapshot even when no tropical-cyclone warning is active.
   flightDelays:     { key: 'seed-meta:aviation:faa',            maxStaleMin: 90 }, // CACHE_TTL=7200s; matches notamClosures from same cron
   notamClosures:    { key: 'seed-meta:aviation:notam',          maxStaleMin: 240 }, // 2h interval; 240min = 2x interval

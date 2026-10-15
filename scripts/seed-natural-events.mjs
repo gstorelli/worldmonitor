@@ -17,6 +17,10 @@ const NHC_BASE = 'https://mapservices.weather.noaa.gov/tropical/rest/services/tr
 const CANONICAL_KEY = 'natural:events:v1';
 const WESTERN_PACIFIC_CYCLONES_KEY = 'natural:western-pacific-cyclones:v1';
 const HKO_WARNINGS_KEY = 'weather:hko-warnings:v1';
+// Risk Sentinel: written only when GDACS answered, so its seed-meta goes stale
+// (and /api/health says so) when GDACS fails. Thesis issue #146: from at least
+// 14/10/2026 GDACS answered 400 and the seeder still reported OK.
+export const GDACS_STATUS_KEY = 'natural:gdacs-status:v1';
 const CACHE_TTL = 64800; // 18h — 6x the 3h Railway bundle cadence; preserves last-good through health grace.
 
 const DAYS = 30;
@@ -506,6 +510,12 @@ export async function fetchNaturalEvents({
   if (merged.length === 0) return null;
   return {
     events: merged,
+    gdacsStatus: {
+      ok: gdacsResult.status === 'fulfilled',
+      checkedAt: now,
+      events: gdacsEvents.length,
+      error: gdacsResult.status === 'rejected' ? String(gdacsResult.reason?.message ?? gdacsResult.reason) : null,
+    },
     westernPacific,
     hkoWarnings: {
       evaluatedAt: westernPacific.evaluatedAt,
@@ -531,6 +541,16 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     ttlSeconds: CACHE_TTL,
     sourceVersion: 'eonet+gdacs+nhc+hko-v2',
     extraKeys: [
+      {
+        key: GDACS_STATUS_KEY,
+        ttl: CACHE_TTL,
+        transform: (data) => data.gdacsStatus,
+        declareRecords: (status) => (status?.ok ? 1 : 0),
+        metaKey: 'seed-meta:natural:gdacs-status',
+        metaTtlSeconds: CACHE_TTL,
+        metaCritical: true,
+        skipWhenEmpty: true,
+      },
       {
         key: WESTERN_PACIFIC_CYCLONES_KEY,
         ttl: CACHE_TTL,
