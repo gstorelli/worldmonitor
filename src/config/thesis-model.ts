@@ -26,17 +26,38 @@ export interface SourcedFact {
 }
 
 /**
- * Working thresholds of the trigger layer. They match the choices used for the
- * hazard statistics of Chapter 1 (radius 300 km, Mw >= 6 as "significant") and
- * are NOT validated parameters.
+ * Working rules of the trigger layer (thesis, Chapter 3, Section 3.6.8 — a
+ * PROPOSAL pending the supervisors, NOT validated parameters).
+ *
+ * An earthquake within the screening radius is a significant trigger for a node
+ * when the intensity expected at the node reference point — from magnitude,
+ * depth and distance through the intensity prediction equation of Allen, Wald
+ * and Worden (2012), hypocentral form — reaches the threshold of the node.
+ * Chip fabs stop at lower shaking than canals or bulk ports (Hualien 2024),
+ * hence a lower provisional threshold. The thresholds are calibrated in Year 2.
+ *
+ * `significantMw` is the Chapter 1 rule (Mw >= 6 within 300 km), kept only as
+ * the label of the magnitude filter of the trigger monitor.
  */
 export const TRIGGER_WORKING_RULES = {
+  /** Screening distance; also the distance limit of the intensity equation. */
   radiusKm: NODE_HAZARD_RADIUS_KM,
   significantMw: 6,
+  /** Modified Mercalli intensity expected at the node that makes a quake significant. */
+  intensityThreshold: { default: 6, chips: 5 },
+  /** Depth assumed when the catalogue gives none (km). */
+  defaultDepthKm: 15,
   /** Live catalogue window (days) requested from /api/thesis/triggers. */
   windowDays: 30,
   minMagnitude: 4.5,
 } as const;
+
+export type TriggerRules = typeof TRIGGER_WORKING_RULES;
+
+/** Intensity threshold of a node: lower for semiconductor fabs (HS 8542). */
+export function nodeIntensityThreshold(node: { goods?: readonly string[] }, rules: TriggerRules = TRIGGER_WORKING_RULES): number {
+  return node.goods?.includes('8542') ? rules.intensityThreshold.chips : rules.intensityThreshold.default;
+}
 
 export interface ThesisNode extends NodeHazard {
   /** Id in the supply-chain chokepoint registry (IMF PortWatch transits). */
