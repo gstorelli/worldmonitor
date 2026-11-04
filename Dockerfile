@@ -8,7 +8,7 @@
 # =============================================================================
 
 # ── Stage 1: Builder ─────────────────────────────────────────────────────────
-FROM node:24-alpine@sha256:a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a95432d679c54fbfd AS builder
+FROM node:24-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53 AS builder
 
 WORKDIR /app
 
@@ -30,7 +30,7 @@ RUN node docker/build-handlers.mjs
 RUN npx tsc && npx vite build
 
 # ── Stage 2: Runtime dependencies ───────────────────────────────────────────
-FROM node:24-alpine@sha256:a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a95432d679c54fbfd AS runtime-deps
+FROM node:24-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53 AS runtime-deps
 
 WORKDIR /app
 
@@ -49,7 +49,7 @@ RUN apk add --no-cache python3 make g++ && \
     apk del python3 make g++
 
 # ── Stage 3: Runtime ─────────────────────────────────────────────────────────
-FROM node:24-alpine@sha256:a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a95432d679c54fbfd AS final
+FROM node:24-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53 AS final
 
 # nginx + supervisord
 RUN apk add --no-cache nginx supervisor gettext && \
