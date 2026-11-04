@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 
 import { loadEnvFile, CHROME_UA, runSeed } from './_seed-utils.mjs';
+import { TRIGGERS_UA } from './_thesis-catalogue.mjs';
 import {
   buildWesternPacificCycloneSnapshot,
   fetchHkoWarnings,
@@ -162,8 +163,10 @@ export function gdacsUrl(eventType) {
 export async function fetchGdacs(fetchFn = globalThis.fetch) {
   const types = Object.keys(GDACS_TO_CATEGORY);
   const results = await Promise.allSettled(types.map(async (type) => {
+    // Since early November 2026 GDACS answers a browser User-Agent with a
+    // JavaScript challenge page (F5); an honest client name gets the JSON API.
     const res = await fetchFn(gdacsUrl(type), {
-      headers: { Accept: 'application/json', 'User-Agent': CHROME_UA },
+      headers: { Accept: 'application/json', 'User-Agent': TRIGGERS_UA },
       signal: AbortSignal.timeout(15_000),
     });
     // GDACS answers 404 when a type has no current event (seen for VO on

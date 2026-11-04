@@ -38,6 +38,16 @@ describe('GDACS fetch', () => {
     assert.deepEqual(events.map((e) => e.id), ['gdacs-FL-3']);
   });
 
+  it('identifies itself as Risk Sentinel, not as a browser', async () => {
+    const agents = [];
+    const fetchFn = async (_url, init) => {
+      agents.push(init?.headers?.['User-Agent']);
+      return new Response(JSON.stringify({ features: [] }), { status: 200 });
+    };
+    await fetchGdacs(fetchFn);
+    assert.ok(agents.length > 0 && agents.every((ua) => /^RiskSentinel\//.test(ua)), agents.join(' | '));
+  });
+
   it('fails only when every type fails', async () => {
     const fetchFn = async () => new Response('{"message":"Eventtype is required."}', { status: 400 });
     await assert.rejects(fetchGdacs(fetchFn), /all types failed/);

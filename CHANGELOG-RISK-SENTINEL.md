@@ -8,6 +8,7 @@ Formato di ogni voce: numero della PR, cosa cambia per chi usa il portale, event
 
 ## 4 novembre 2026
 
+- **#63**: GDACS di nuovo raggiungibile. Da inizio novembre GDACS risponde a un User-Agent da browser con una pagina di verifica JavaScript; il seeder ora si presenta come `RiskSentinel/1.0` (come il seeder dei terremoti) e riceve di nuovo il JSON. Il controllo `gdacsStatus` della #60 aveva segnalato il guasto.
 - **#62**: immagine di base `node:24-alpine` aggiornata (correzioni di sicurezza, tra cui brotli) in `Dockerfile`, `Dockerfile.relay` e `docker/Dockerfile.redis-rest`. Le prime due erano state cambiate direttamente sul server il 27/10, fuori da Git, e avrebbero bloccato il deploy successivo; la terza era rimasta indietro.
 
 ## 15 ottobre 2026
