@@ -6,6 +6,10 @@ Ogni merge su `main` ripubblica la produzione (`risksentinel.opencyber.org`). Ch
 
 Formato di ogni voce: numero della PR, cosa cambia per chi usa il portale, eventuale azione sul server dopo il merge.
 
+## 4 novembre 2026
+
+- **#62**: immagine di base `node:24-alpine` aggiornata (correzioni di sicurezza, tra cui brotli) in `Dockerfile`, `Dockerfile.relay` e `docker/Dockerfile.redis-rest`. Le prime due erano state cambiate direttamente sul server il 27/10, fuori da Git, e avrebbero bloccato il deploy successivo; la terza era rimasta indietro.
+
 ## 15 ottobre 2026
 
 - **#61**: via i riferimenti visibili all'upstream: link Blog, Docs e Status a worldmonitor.app nel menu mobile, numero di versione dell'upstream nell'intestazione, titolo e nome del sito «World Monitor» (scheda del browser, metadati), contatto di sicurezza (`.well-known/security.txt` indicava l'email dello sviluppatore dell'upstream). «Light/Dark Mode» → «Tema chiaro/scuro». Le pagine di scoperta per agenti restano: sono legate alla build e ai test dell'upstream (#116 della tesi).
