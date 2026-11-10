@@ -6,6 +6,10 @@ Ogni merge su `main` ripubblica la produzione (`risksentinel.opencyber.org`). Ch
 
 Formato di ogni voce: numero della PR, cosa cambia per chi usa il portale, eventuale azione sul server dopo il merge.
 
+## 10 novembre 2026
+
+- **#12**: la vista tesi decide se un terremoto è un innesco significativo dall’intensità attesa sul nodo (equazione di Allen, Wald e Worden 2012, forma ipocentrale), non più da «Mw ≥ 6 entro 300 km». Soglie provvisorie: grado VI in generale, V per le aree dei chip (Hsinchu, Tainan); convenzione senza arrotondamento (Ī ≥ soglia). Approvato da Giuseppe il 10/11 come proposta concordata con la tutor; calibrazione nell’Anno 2.
+
 ## 4 novembre 2026
 
 - **#63**: GDACS di nuovo raggiungibile. Da inizio novembre GDACS risponde a un User-Agent da browser con una pagina di verifica JavaScript; il seeder ora si presenta come `RiskSentinel/1.0` (come il seeder dei terremoti) e riceve di nuovo il JSON. Il controllo `gdacsStatus` della #60 aveva segnalato il guasto.
