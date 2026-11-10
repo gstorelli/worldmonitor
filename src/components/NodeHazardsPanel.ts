@@ -40,8 +40,15 @@ export class NodeHazardsPanel extends Panel {
     return `${kind} · ${t('components.nodeHazards.plateShort', { km: String(node.plateBoundaryKm) })}`;
   }
 
+  /** Return period as shown in Table 3.4: '>1.000' above 1,000 years, 'a' for weak estimates. */
+  private returnPeriod(n: NodeHazard): string {
+    const years = n.returnPeriodI6Years > 1000 ? '>1.000' : String(Math.round(n.returnPeriodI6Years));
+    return n.lowEvidenceI6 ? `${years}<sup>a</sup>` : years;
+  }
+
   private renderContent(): void {
-    const sorted = [...NODE_HAZARDS].sort((a, b) => b.m6 - a.m6 || b.eruptions - a.eruptions);
+    // Most hazardous first: shortest return period of intensity VI (Chapter 3).
+    const sorted = [...NODE_HAZARDS].sort((a, b) => a.returnPeriodI6Years - b.returnPeriodI6Years);
 
     const rows = sorted
       .map((n) => {
@@ -49,11 +56,12 @@ export class NodeHazardsPanel extends Panel {
         const badgeClass = n.kind === 'strait' ? 'severity-normal' : 'severity-moderate';
         const strongRow = n.m7 > 0 || n.eruptions > 0 ? ' climate-extreme-row' : '';
         return `<tr class="climate-row${strongRow}" data-lat="${n.lat}" data-lon="${n.lon}" title="${escapeHtml(
-          t('components.nodeHazards.rowTooltip', { mw: n.mwMax.toFixed(1), date: n.mwMaxDate }),
+          t('components.nodeHazards.rowTooltip', { mw: n.mwMax.toFixed(1), date: n.mwMaxDate, m7: String(n.m7) }),
         )}">
         <td class="climate-zone">${escapeHtml(name)}<br><span class="climate-badge ${badgeClass}">${escapeHtml(this.kindLabel(n))}</span></td>
+        <td class="climate-num">${this.returnPeriod(n)}</td>
+        <td class="climate-num">${n.gemPgaG.toFixed(2)}</td>
         <td class="climate-num">${n.m6}</td>
-        <td class="climate-num">${n.m7}</td>
         <td class="climate-num">${n.eruptions}</td>
       </tr>`;
       })
@@ -65,8 +73,9 @@ export class NodeHazardsPanel extends Panel {
           <thead>
             <tr>
               <th>${t('components.nodeHazards.node')}</th>
+              <th title="${escapeHtml(t('components.nodeHazards.returnI6Tooltip'))}">${t('components.nodeHazards.returnI6')}</th>
+              <th title="${escapeHtml(t('components.nodeHazards.gemPgaTooltip'))}">${t('components.nodeHazards.gemPga')}</th>
               <th>${t('components.nodeHazards.m6')}</th>
-              <th>${t('components.nodeHazards.m7')}</th>
               <th>${t('components.nodeHazards.eruptions')}</th>
             </tr>
           </thead>
