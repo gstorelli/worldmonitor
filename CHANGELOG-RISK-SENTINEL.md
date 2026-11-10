@@ -8,6 +8,7 @@ Formato di ogni voce: numero della PR, cosa cambia per chi usa il portale, event
 
 ## 10 novembre 2026
 
+- **#11**: entrano in `research/hazard-stats/` gli script della caratterizzazione del pericolo dei nodi (completezza del catalogo, declustering, zone dall’intensità attesa, attribuzione geologica, figure e tabelle del Cap. 3). Solo codice di ricerca: nessun effetto sul portale.
 - **#12**: la vista tesi decide se un terremoto è un innesco significativo dall’intensità attesa sul nodo (equazione di Allen, Wald e Worden 2012, forma ipocentrale), non più da «Mw ≥ 6 entro 300 km». Soglie provvisorie: grado VI in generale, V per le aree dei chip (Hsinchu, Tainan); convenzione senza arrotondamento (Ī ≥ soglia). Approvato da Giuseppe il 10/11 come proposta concordata con la tutor; calibrazione nell’Anno 2.
 
 ## 4 novembre 2026
