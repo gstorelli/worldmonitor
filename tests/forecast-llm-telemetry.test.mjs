@@ -14,7 +14,7 @@ import {
   __setForecastLlmTransportForTests,
 } from '../scripts/seed-forecasts.mjs';
 
-const ENV_KEYS = ['USAGE_TELEMETRY', 'AXIOM_API_TOKEN', 'GROQ_API_KEY', 'OPENROUTER_API_KEY'];
+const ENV_KEYS = ['USAGE_TELEMETRY', 'AXIOM_API_TOKEN', 'LLM_API_KEY', 'LLM_API_URL', 'OPENROUTER_API_KEY'];
 const originalEnv = Object.fromEntries(ENV_KEYS.map((k) => [k, process.env[k]]));
 const realFetch = global.fetch;
 
@@ -30,7 +30,8 @@ afterEach(() => {
 function baseEnv() {
   process.env.USAGE_TELEMETRY = '1';
   process.env.AXIOM_API_TOKEN = 'axiom-test-token';
-  process.env.GROQ_API_KEY = 'groq-test';
+  process.env.LLM_API_KEY = 'generic-test';
+  process.env.LLM_API_URL = 'https://llm.example.test/v1/chat/completions';
   process.env.OPENROUTER_API_KEY = 'or-test';
 }
 
@@ -117,7 +118,7 @@ test('provider fallback chains keep incrementing the index', async () => {
   const captured = captureAxiom();
   __setForecastLlmTransportForTests({
     fetch: async (url) => {
-      if (String(url).includes('api.groq.com')) return llmResponse({ error: 'down' }, 503);
+      if (String(url).includes('llm.example.test')) return llmResponse({ error: 'down' }, 503);
       return llmResponse({
         choices: [{ message: { content: 'a forecast narrative that is long enough' } }],
         model: 'google/gemini-2.5-flash',
@@ -126,18 +127,18 @@ test('provider fallback chains keep incrementing the index', async () => {
   });
 
   const result = await callForecastLLM('system', 'user prompt', {
-    stage: 'scenario', providerOrder: ['groq', 'openrouter'], retryDelayMs: 0,
+    stage: 'scenario', providerOrder: ['generic', 'openrouter'], retryDelayMs: 0,
   });
 
   assert.ok(result?.text);
-  assert.ok(captured.length >= 2, 'groq attempts + openrouter success must all be recorded');
+  assert.ok(captured.length >= 2, 'generic attempts + openrouter success must all be recorded');
   const last = captured[captured.length - 1];
   assert.equal(last.provider, 'openrouter');
   assert.equal(last.ok, true);
   for (const [i, ev] of captured.entries()) {
     assert.equal(ev.fallback_index, i, 'indexes must be strictly sequential across retries and providers');
     if (i < captured.length - 1) {
-      assert.equal(ev.provider, 'groq');
+      assert.equal(ev.provider, 'generic');
       assert.equal(ev.ok, false);
     }
   }

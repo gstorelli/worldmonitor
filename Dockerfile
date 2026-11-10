@@ -8,7 +8,7 @@
 # =============================================================================
 
 # ── Stage 1: Builder ─────────────────────────────────────────────────────────
-FROM node:24-alpine@sha256:a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a95432d679c54fbfd AS builder
+FROM node:24-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53 AS builder
 
 WORKDIR /app
 
@@ -30,7 +30,7 @@ RUN node docker/build-handlers.mjs
 RUN npx tsc && npx vite build
 
 # ── Stage 2: Runtime dependencies ───────────────────────────────────────────
-FROM node:24-alpine@sha256:a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a95432d679c54fbfd AS runtime-deps
+FROM node:24-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53 AS runtime-deps
 
 WORKDIR /app
 
@@ -49,7 +49,7 @@ RUN apk add --no-cache python3 make g++ && \
     apk del python3 make g++
 
 # ── Stage 3: Runtime ─────────────────────────────────────────────────────────
-FROM node:24-alpine@sha256:a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a95432d679c54fbfd AS final
+FROM node:24-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53 AS final
 
 # nginx + supervisord
 RUN apk add --no-cache nginx supervisor gettext && \
@@ -86,7 +86,8 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 COPY docker/nginx.conf /etc/nginx/nginx.conf.template
 COPY docker/supervisord.conf /etc/supervisor/conf.d/worldmonitor.conf
 COPY docker/entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
+COPY docker/api-watchdog.sh /app/api-watchdog.sh
+RUN chmod +x /app/entrypoint.sh /app/api-watchdog.sh
 
 # Ensure writable dirs for non-root
 RUN chown -R appuser:appgroup /app /tmp/nginx-client-body /tmp/nginx-proxy \
@@ -103,7 +104,8 @@ EXPOSE 8080
 # through nginx's /api/ proxy verifies BOTH nginx and the node sidecar are up,
 # unlike a static "/" probe which only proves nginx is serving. Keep this off
 # /api/health so the public compact data-health contract still reaches api/health.js.
+# ?deep=1 also reports 503 when the outbound-fetch limiter is stuck (12/10/2026 outage).
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-  CMD wget -qO- http://127.0.0.1:8080/api/sidecar-health >/dev/null 2>&1 || exit 1
+  CMD wget -qO- 'http://127.0.0.1:8080/api/sidecar-health?deep=1' >/dev/null 2>&1 || exit 1
 
 CMD ["/app/entrypoint.sh"]

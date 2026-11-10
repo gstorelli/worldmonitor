@@ -1,7 +1,7 @@
 /**
  * Summarization Service with Fallback Chain
  * Server-side Redis caching handles cross-user deduplication
- * Fallback: Ollama -> Groq -> OpenRouter -> Browser T5
+ * Fallback: Ollama -> OpenRouter -> Browser T5
  *
  * Uses NewsServiceClient.summarizeArticle() RPC instead of legacy
  * per-provider fetch endpoints.
@@ -18,7 +18,7 @@ import { NewsServiceClient, type SummarizeArticleResponse } from '@/generated/cl
 import { createCircuitBreaker } from '@/utils';
 import { buildSummaryCacheKey } from '@/utils/summary-cache-key';
 
-export type SummarizationProvider = 'ollama' | 'groq' | 'openrouter' | 'browser' | 'cache';
+export type SummarizationProvider = 'ollama' | 'openrouter' | 'browser' | 'cache';
 
 export interface SummarizationResult {
   summary: string;
@@ -30,7 +30,7 @@ export interface SummarizationResult {
 export type ProgressCallback = (step: number, total: number, message: string) => void;
 
 export interface SummarizeOptions {
-  skipCloudProviders?: boolean;  // true = skip Ollama/Groq/OpenRouter, go straight to browser T5
+  skipCloudProviders?: boolean;  // true = skip Ollama/OpenRouter, go straight to browser T5
   skipBrowserFallback?: boolean; // true = skip browser T5 fallback
   /**
    * Optional article bodies paired 1:1 with `headlines`. When supplied and
@@ -65,7 +65,6 @@ interface ApiProviderDef {
 
 const API_PROVIDERS: ApiProviderDef[] = [
   { featureId: 'aiOllama',      provider: 'ollama',     label: 'Ollama' },
-  { featureId: 'aiGroq',        provider: 'groq',       label: 'Groq AI' },
   { featureId: 'aiOpenRouter',  provider: 'openrouter', label: 'OpenRouter' },
 ];
 
@@ -186,7 +185,7 @@ async function runApiChain(
 }
 
 /**
- * Generate a summary using the fallback chain: Ollama -> Groq -> OpenRouter -> Browser T5
+ * Generate a summary using the fallback chain: Ollama -> OpenRouter -> Browser T5
  * Server-side Redis caching is handled by the SummarizeArticle RPC handler.
  *
  * @param geoContext Optional geographic signal context to include in the prompt
@@ -262,8 +261,8 @@ async function generateSummaryInternal(
         onProgress?.(1, totalSteps, 'Running local AI model (beta)...');
         const browserResult = await tryBrowserT5(headlines, 'summarization-beta', bodies);
         if (browserResult) {
-          const groqProvider = API_PROVIDERS.find(p => p.provider === 'groq');
-          if (groqProvider && !options?.skipCloudProviders) tryApiProvider(groqProvider, headlines, geoContext, undefined, bodies).catch(() => {});
+          const cloudProvider = API_PROVIDERS.find(p => p.provider === 'openrouter');
+          if (cloudProvider && !options?.skipCloudProviders) tryApiProvider(cloudProvider, headlines, geoContext, undefined, bodies).catch(() => {});
 
           return browserResult;
         }

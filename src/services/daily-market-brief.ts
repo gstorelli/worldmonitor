@@ -79,6 +79,9 @@ export interface BuildDailyMarketBriefOptions {
   ) => Promise<SummarizationResult | null>;
 }
 
+// Optional chaining: under Node (tests, server bundles) import.meta.env is undefined.
+const MARKET_LLM_ENABLED = import.meta.env?.VITE_MARKET_LLM_ENABLED === '1';
+
 async function getDefaultSummarizer(): Promise<NonNullable<BuildDailyMarketBriefOptions['summarize']>> {
   const { generateSummary } = await import('./summarization');
   return generateSummary;
@@ -423,7 +426,10 @@ export async function buildDailyMarketBrief(options: BuildDailyMarketBriefOption
   let model = '';
   let fallback = true;
 
-  if (summaryHeadlines.length >= 1) {
+  // Fork (13/10/2026): the AI summary of this inherited panel is off unless the
+  // build sets VITE_MARKET_LLM_ENABLED=1; the rules-based summary above stays.
+  // An explicitly injected summarizer (tests) still runs.
+  if (summaryHeadlines.length >= 1 && (options.summarize || MARKET_LLM_ENABLED)) {
     try {
       const summaryProvider = options.summarize || await getDefaultSummarizer();
       const generated = await summaryProvider(

@@ -49,6 +49,17 @@ afterEach(() => {
 });
 
 describe("summarizeArticle handler premium mode gate", () => {
+  test("self-hosted anonymous mode (ALLOW_ANONYMOUS_API) skips the Pro gate", async () => {
+    process.env.ALLOW_ANONYMOUS_API = "true";
+    delete process.env.OPENROUTER_API_KEY;
+    const result = await summarizeArticle(makeContext(), { ...request("brief"), provider: "openrouter" });
+
+    // Past the gate the handler reaches the provider credential check instead.
+    expect(result.error).not.toBe("Pro subscription required");
+    expect(result.statusDetail).not.toBe("Pro subscription required");
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
   test("anonymous article summaries are rejected before provider fetch", async () => {
     const result = await summarizeArticle(makeContext(), request("brief"));
 

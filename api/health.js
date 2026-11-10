@@ -125,6 +125,56 @@ const HEALTH_VERDICT_RELEASE_LOCK_SCRIPT = [
 // *_ENABLED env idiom (server/worldmonitor/resilience/v1/_shared.ts).
 const IRAN_EVENTS_ENABLED = (process.env.IRAN_EVENTS_ENABLED ?? 'false').toLowerCase() === 'true';
 
+// Risk Sentinel scope (14/10/2026, src/config/scope.ts; thesis issues #90, #101):
+// checks of switched-off groups are not evaluated, so they no longer count as
+// criticals. This edge file must stay self-contained, so the list is inlined.
+const OUT_OF_SCOPE_HEALTH_CHECKS = new Set([
+  // finance
+  'etfFlows', 'cryptoQuotes', 'stablecoinMarkets', 'defiTokens',
+  'aiTokens', 'otherTokens', 'cryptoSectors', 'predictionMarkets',
+  'fearGreedIndex', 'breadthHistory', 'earningsCalendar', 'cotPositioning',
+  'hyperliquidFlow', 'aaiiSentiment', 'wsbTickers', 'socialVelocity',
+  'secCikMap', 'sec8kStream', 'chinaStockConnect', 'goldEtfFlows',
+  'gulfQuotes', 'marketImplications',
+  // techStartup
+  'techEvents', 'techReadiness', 'researchArxivHnTrending',
+  // consumerIndices
+  'bigmac', 'groceryBasket', 'consumerPricesOverview', 'consumerPricesCategories',
+  'consumerPricesMovers', 'consumerPricesSpread', 'consumerPricesFreshness', 'positiveGeoEvents',
+  'positiveEventsLive', 'progressData', 'renewableEnergy', 'giving',
+  // liveMedia
+  'webcams',
+  // military
+  'militaryFlights', 'militaryFlightsStale', 'militaryCii', 'militaryForecastInputs',
+  'militarySurges', 'militaryBases', 'usniFleet', 'usniFleetStale',
+  'crossStraitActivity', 'crossStraitActivityBootstrap', 'crossStraitActivityTaiwanMnd', 'crossStraitActivityJapanMod',
+  'intelHistoryIngestMilitaryCrossStrait', 'gpsjam', 'thermalEscalation', 'thermalEscalationBootstrap',
+  'defensePatents', 'pizzint', 'telegramFeed',
+  // acled
+  'acledIntel', 'intelHistoryIngestConflictAcled',
+  // macro (15/10/2026): BIS, ECB rates, FRED, US/China macro, EU financial stress
+  'bisCredit', 'bisDsr', 'bisExchange', 'bisPolicy', 'bisPropertyCommercial', 'bisPropertyResidential',
+  'blsSeries', 'cbrRates', 'chinaMacro', 'chinaPolicyEvents', 'chinaReleaseCalendar',
+  'ecbEstr', 'ecbEuribor1y', 'ecbEuribor3m', 'ecbEuribor6m', 'econCalendar', 'economicStress',
+  'euFsi', 'euYieldCurve', 'eurostatCountryData', 'fxYoy', 'fredBatch', 'fredRatesSeeder', 'macroSignals',
+  'forecastFredCpiaucsl', 'forecastFredDcoilwtico', 'forecastFredDgs10', 'forecastFredGdp', 'forecastFredM2sl',
+  'forecastFredT10y2y', 'forecastFredUnrate', 'forecastFredVixcls', 'forecastFredWalcl',
+  // upstreamExtra (15/10/2026): upstream domains outside the thesis and services without API keys
+  'chinaCorporateDisclosures', 'chinaCoverage', 'chinaDecisionSignals', 'climateAirQuality', 'healthAirQuality',
+  'co2Monitoring', 'oceanIce', 'companyMonitoringWorker', 'cyberThreats', 'cyberThreatsRpc', 'ddosAttacks',
+  'trafficAnomalies', 'outages', 'digestNotifications', 'diseaseOutbreaks', 'vpdTrackerHistorical',
+  'vpdTrackerRealtime', 'displacement', 'displacementPrev', 'electricityPrices', 'fatfListing', 'flightDelays',
+  'intlDelays', 'notamClosures', 'globalTendersCanadaBuys', 'globalTendersContractsFinder', 'globalTendersGets',
+  'globalTendersSam', 'globalTendersTed', 'globalTendersWorldBank', 'humanitarianSummary', 'newsFeedHealth',
+  'newsRecallBenchmark', 'productCatalog', 'radiationWatch', 'recoveryImportHhi', 'recoveryReexportShare',
+  'regionalSnapshots', 'regulatoryActions', 'resilienceIntervals', 'resilienceRanking', 'securityAdvisories',
+  'serviceStatuses', 'simulationOutcomeLatest', 'simulationPackageLatest', 'unrestEvents', 'energyIntelligence',
+  'intelHistoryIngestEnergyIntelligence',
+]);
+function isOutOfScopeCheck(name) {
+  return OUT_OF_SCOPE_HEALTH_CHECKS.has(name) || name.startsWith('consumerPricesCoverage');
+}
+
 const BOOTSTRAP_KEYS = {
   earthquakes:       'seismology:earthquakes:v1',
   outages:           'infra:outages:v1',
@@ -240,6 +290,17 @@ const STANDALONE_KEYS = {
   // data layer only), so it is standalone rather than bootstrap-tiered.
   chinaStockConnect:  'market:china:stock-connect:v1',
   hkoWarnings:        'weather:hko-warnings:v1',
+  // Fork: GDACS answered on the last natural-events run (thesis issue #146).
+  gdacsStatus:        'natural:gdacs-status:v1',
+  // Fork: seismic triggers of the thesis view, read by /api/thesis/triggers
+  // (not a bootstrap key: the trigger panels call that endpoint directly).
+  thesisTriggers:     'thesis:triggers:v1',
+  // Fork: recent EU acts for the Policy workspace (scripts/seed-policy-eu-acts.mjs).
+  policyEuActs:       'policy:eu-acts:v1',
+  // Fork: EU/Italy imports (Comext) and EU duties (WTO) for the 8 thesis goods.
+  euTradeGoods:       'trade:eu-goods:v1',
+  // Fork: EU consolidated sanctions list, aggregated (scripts/seed-eu-sanctions.mjs).
+  euSanctions:        'sanctions:eu:v1',
   humanitarianSummary: 'conflict:humanitarian:v1',
   // #4920 completeness measurement (daily GH Actions publishers) — ops
   // keys: health-monitored but NOT bootstrap-hydrated into page loads.
@@ -451,7 +512,14 @@ const SEED_META = {
   // Always-on loop publishes every few seconds. Five minutes tolerates deploy
   // churn while still detecting a stopped worker well before leases age out.
   companyMonitoringWorker: { key: 'seed-meta:company-monitoring:worker', maxStaleMin: 5, workerControl: true },
-  earthquakes:      { key: 'seed-meta:seismology:earthquakes',  maxStaleMin: 30 },
+  // Fork: earthquakes and newsInsights run from the VPS crontab every hour
+  // (scripts/seed-cron.sh tiers thesis/intel), so the upstream 30-min floor
+  // marked them STALE for half of every hour. 90 = one missed tick tolerated.
+  earthquakes:      { key: 'seed-meta:seismology:earthquakes',  maxStaleMin: 90 },
+  thesisTriggers:   { key: 'seed-meta:thesis:triggers',         maxStaleMin: 90 }, // fork: hourly `thesis` cron tier
+  policyEuActs:     { key: 'seed-meta:policy:eu-acts',          maxStaleMin: 1080 }, // fork: `slow` tier every 6h
+  euTradeGoods:     { key: 'seed-meta:trade:eu-goods',          maxStaleMin: 1080 }, // fork: `context` tier every 6h
+  euSanctions:      { key: 'seed-meta:sanctions:eu',            maxStaleMin: 1080 }, // fork: `slow` tier every 6h
   wildfires:        { key: 'seed-meta:wildfire:fires',          maxStaleMin: 360 }, // FIRMS NRT resets at midnight UTC; new-day data takes 3-6h to accumulate
   wildfiresBootstrap: { key: 'seed-meta:wildfire:fires-bootstrap', maxStaleMin: 360 }, // Compact CDN payload is a distinct publish target; monitor it so canonical fallback cannot hide transform/write failures.
   outages:          { key: 'seed-meta:infra:outages',           maxStaleMin: 30 },
@@ -469,6 +537,7 @@ const SEED_META = {
   gulfQuotes:       { key: 'seed-meta:market:gulf-quotes',      maxStaleMin: 30 },
   stablecoinMarkets:{ key: 'seed-meta:market:stablecoins',      maxStaleMin: 60 },
   naturalEvents:    { key: 'seed-meta:natural:events',          maxStaleMin: 540 }, // 3h Railway climate bundle; 3x cadence preserves a full missed run.
+  gdacsStatus:      { key: 'seed-meta:natural:gdacs-status',    maxStaleMin: 180 }, // fork: hourly natural-events run; stale = GDACS failing for 3h (#146)
   hkoWarnings:      { key: 'seed-meta:weather:hko-warnings',    maxStaleMin: 540 }, // successful HKO responses publish a snapshot even when no tropical-cyclone warning is active.
   flightDelays:     { key: 'seed-meta:aviation:faa',            maxStaleMin: 90 }, // CACHE_TTL=7200s; matches notamClosures from same cron
   notamClosures:    { key: 'seed-meta:aviation:notam',          maxStaleMin: 240 }, // 2h interval; 240min = 2x interval
@@ -482,7 +551,7 @@ const SEED_META = {
   },
   newsInsights:     {
     key: 'seed-meta:news:insights',
-    maxStaleMin: 30,
+    maxStaleMin: 90, // fork: hourly cron, see the earthquakes entry
     // `fetchedAt` is deliberately held at the served LKG timestamp when a
     // synthesis is rejected. This separate bounded contract warns before the
     // generic 30-minute seed-age gate when repeated attempts keep failing.
@@ -2658,6 +2727,7 @@ export async function handleHealth(req, ctx, options = {}) {
   ];
   for (const [registry, opts] of sources) {
     for (const [name, redisKey] of Object.entries(registry)) {
+      if (isOutOfScopeCheck(name)) continue;
       totalChecks++;
       let entry = classifyKey(name, redisKey, opts, classifyCtx);
       if (name === 'chinaCoverage') {

@@ -6,7 +6,8 @@ import { callLlmDefault, __setNarrativeTransportForTests } from '../scripts/regi
 const PROMPT = { systemPrompt: 'system', userPrompt: 'user' };
 
 const originalEnv = {
-  GROQ_API_KEY: process.env.GROQ_API_KEY,
+  LLM_API_KEY: process.env.LLM_API_KEY,
+  LLM_API_URL: process.env.LLM_API_URL,
   OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
 };
 
@@ -29,7 +30,8 @@ function okResponse(model, content) {
 
 describe('narrative callLlmDefault retry/budget', () => {
   it('honors a 429 Retry-After on the same provider before falling through', async () => {
-    process.env.GROQ_API_KEY = 'groq-test-key';
+    process.env.LLM_API_KEY = 'generic-test-key';
+    process.env.LLM_API_URL = 'https://llm.example.test/v1/chat/completions';
     process.env.OPENROUTER_API_KEY = 'openrouter-test-key';
     const originalSetTimeout = globalThis.setTimeout;
     const waits = [];
@@ -60,7 +62,8 @@ describe('narrative callLlmDefault retry/budget', () => {
   });
 
   it('caps an oversized Retry-After hint before retrying', async () => {
-    process.env.GROQ_API_KEY = 'groq-test-key';
+    process.env.LLM_API_KEY = 'generic-test-key';
+    process.env.LLM_API_URL = 'https://llm.example.test/v1/chat/completions';
     process.env.OPENROUTER_API_KEY = 'openrouter-test-key';
     const originalSetTimeout = globalThis.setTimeout;
     const waits = [];
@@ -91,7 +94,8 @@ describe('narrative callLlmDefault retry/budget', () => {
   // second is fail-fast. Drive the stop via withRetry wait overshoot:
   //   usable 12s, hint 3s, retryDelayMs 8s → waits 8s then 16s → usable <= 0.
   it('stops at the call budget without falling through to the next provider', async () => {
-    process.env.GROQ_API_KEY = 'groq-test-key';
+    process.env.LLM_API_KEY = 'generic-test-key';
+    process.env.LLM_API_URL = 'https://llm.example.test/v1/chat/completions';
     process.env.OPENROUTER_API_KEY = 'openrouter-test-key';
     const originalDateNow = Date.now;
     const originalSetTimeout = globalThis.setTimeout;
@@ -105,7 +109,7 @@ describe('narrative callLlmDefault retry/budget', () => {
       __setNarrativeTransportForTests({
         fetch: async (url) => {
           calls += 1;
-          assert.ok(String(url).includes('openrouter.ai'), 'budget stop must not fall through to groq');
+          assert.ok(String(url).includes('openrouter.ai'), 'budget stop must not fall through to generic');
           return { ok: false, status: 429, headers: { get: (n) => (n.toLowerCase() === 'retry-after' ? '3' : null) } };
         },
       });
@@ -122,14 +126,15 @@ describe('narrative callLlmDefault retry/budget', () => {
   });
 
   it('falls through to the next provider after a non-retryable 402', async () => {
-    process.env.GROQ_API_KEY = 'groq-test-key';
+    process.env.LLM_API_KEY = 'generic-test-key';
+    process.env.LLM_API_URL = 'https://llm.example.test/v1/chat/completions';
     process.env.OPENROUTER_API_KEY = 'openrouter-test-key';
     const providers = [];
 
     __setNarrativeTransportForTests({
       fetch: async (url) => {
         const href = String(url);
-        providers.push(href.includes('api.groq.com') ? 'groq' : 'openrouter');
+        providers.push(href.includes('llm.example.test') ? 'generic' : 'openrouter');
         if (href.includes('openrouter.ai')) return { ok: false, status: 402, headers: { get: () => null } };
         return okResponse('llama-3.3-70b-versatile', '{"situation":"ok"}');
       },
@@ -137,8 +142,8 @@ describe('narrative callLlmDefault retry/budget', () => {
 
     const result = await callLlmDefault(PROMPT, { retryDelayMs: 0 });
 
-    assert.deepEqual(providers, ['openrouter', 'groq']);
-    assert.equal(result?.provider, 'groq');
+    assert.deepEqual(providers, ['openrouter', 'generic']);
+    assert.equal(result?.provider, 'generic');
   });
 });
 
@@ -148,7 +153,8 @@ describe('narrative callLlmDefault retry/budget', () => {
 // coverage — only the seed-insights twin was tested.
 describe('narrative callLlmDefault does not sleep on an unreachable Retry-After (#6110)', () => {
   it('fails a provider over immediately when its hint outruns the run budget', async () => {
-    process.env.GROQ_API_KEY = 'groq-test-key';
+    process.env.LLM_API_KEY = 'generic-test-key';
+    process.env.LLM_API_URL = 'https://llm.example.test/v1/chat/completions';
     process.env.OPENROUTER_API_KEY = 'openrouter-test-key';
     const originalSetTimeout = globalThis.setTimeout;
     const waits = [];
@@ -159,9 +165,9 @@ describe('narrative callLlmDefault does not sleep on an unreachable Retry-After 
       __setNarrativeTransportForTests({
         fetch: async (url) => {
           const href = String(url);
-          providers.push(href.includes('api.groq.com') ? 'groq' : 'openrouter');
+          providers.push(href.includes('llm.example.test') ? 'generic' : 'openrouter');
           if (href.includes('openrouter.ai')) {
-            // The groq daily-quota shape: ~20 minutes out.
+            // A daily-quota 429 shape: ~20 minutes out.
             return { ok: false, status: 429, headers: { get: (n) => (n.toLowerCase() === 'retry-after' ? '1213' : null) } };
           }
           return okResponse('llama-3.3-70b-versatile', '{"situation":"ok"}');
@@ -171,8 +177,8 @@ describe('narrative callLlmDefault does not sleep on an unreachable Retry-After 
       const result = await callLlmDefault(PROMPT, { retryDelayMs: 0 });
 
       assert.deepEqual(waits, [], 'a hint 20 minutes out must not be slept on at all');
-      assert.deepEqual(providers, ['openrouter', 'groq'], 'the budget saved must be spent on the next provider');
-      assert.equal(result?.provider, 'groq');
+      assert.deepEqual(providers, ['openrouter', 'generic'], 'the budget saved must be spent on the next provider');
+      assert.equal(result?.provider, 'generic');
     } finally {
       globalThis.setTimeout = originalSetTimeout;
     }
@@ -181,7 +187,8 @@ describe('narrative callLlmDefault does not sleep on an unreachable Retry-After 
   it('fails over with no sleep when the hint exactly equals usable budget', async () => {
     // callBudgetMs 7000 − 5s guard = 2000ms usable. Equality must fail-fast so
     // the next provider still gets a real attempt (same composition as insights).
-    process.env.GROQ_API_KEY = 'groq-test-key';
+    process.env.LLM_API_KEY = 'generic-test-key';
+    process.env.LLM_API_URL = 'https://llm.example.test/v1/chat/completions';
     process.env.OPENROUTER_API_KEY = 'openrouter-test-key';
     const originalSetTimeout = globalThis.setTimeout;
     const originalDateNow = Date.now;
@@ -195,7 +202,7 @@ describe('narrative callLlmDefault does not sleep on an unreachable Retry-After 
       __setNarrativeTransportForTests({
         fetch: async (url) => {
           const href = String(url);
-          providers.push(href.includes('api.groq.com') ? 'groq' : 'openrouter');
+          providers.push(href.includes('llm.example.test') ? 'generic' : 'openrouter');
           if (href.includes('openrouter.ai')) {
             return { ok: false, status: 429, headers: { get: (n) => (n.toLowerCase() === 'retry-after' ? '2' : null) } };
           }
@@ -206,8 +213,8 @@ describe('narrative callLlmDefault does not sleep on an unreachable Retry-After 
       const result = await callLlmDefault(PROMPT, { retryDelayMs: 0, callBudgetMs: 7_000 });
 
       assert.deepEqual(waits, [], 'equality must fail-fast, not sleep the full remainder');
-      assert.deepEqual(providers, ['openrouter', 'groq'], 'saved budget must reach the next provider');
-      assert.equal(result?.provider, 'groq');
+      assert.deepEqual(providers, ['openrouter', 'generic'], 'saved budget must reach the next provider');
+      assert.equal(result?.provider, 'generic');
     } finally {
       globalThis.setTimeout = originalSetTimeout;
       Date.now = originalDateNow;

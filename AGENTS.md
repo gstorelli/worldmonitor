@@ -105,11 +105,23 @@ npm run lint:safe-html    # OPT-IN ONLY: see "Pre-Push" (fork baseline fails thi
 
 ## Runtime Knobs (fork defaults)
 
-- **LLM chain**: `ollama → openrouter → groq → generic` (`server/_shared/llm.ts`).
-  OpenRouter is tried first with `deepseek/deepseek-v4-flash`; **Groq is optional**
-  (free fallback). A 429 usually means the OpenRouter free-tier quota, not a config
-  error; add a Groq key to absorb it. `LLM_TOOL_PROVIDER`/`LLM_REASONING_PROVIDER`
-  override the per-profile default provider.
+- **LLM chain**: `ollama → openrouter → generic` (`server/_shared/llm.ts`).
+  OpenRouter is the production provider. **Groq was removed from the fork on
+  13/10/2026** (no account): do not re-add it to any chain.
+- **LLM models** (since 13/10/2026): chosen in ONE place, `scripts/_llm-models.mjs`.
+  Fast tier `LLM_FAST_MODEL` (default `anthropic/claude-haiku-5.5`: classification,
+  extraction, short summaries, forecasts); quality tier `LLM_QUALITY_MODEL` (default
+  `mistralai/mistral-large-4-0`: World Brief, digest prose, country/regional briefs,
+  second resolution judge, reasoning profile unless `LLM_REASONING_MODEL` is set).
+  All uses are text-only. `OPENROUTER_BASE_URL=https://eu.openrouter.ai/api/v1`
+  keeps inference in the EU (Business/Enterprise plans). Do not hardcode a model id
+  or the OpenRouter URL in a runtime file: `tests/llm-models-parity.test.mjs` fails.
+  The CommonJS chain, the relay and `api/customs/classify.js` keep copies of the
+  defaults, checked by the same test. Inherited market LLM features (stock analysis,
+  market implications, daily-brief AI summary) are off unless
+  `LLM_INHERITED_MARKET_FEATURES=true` / `VITE_MARKET_LLM_ENABLED=1`.
+  `LLM_TOOL_PROVIDER`/`LLM_REASONING_PROVIDER` override the per-profile default
+  provider (both default to `openrouter`).
 - **Notify auth**: anonymous `GET /api/notify/config` is redacted; changing a stored
   delivery credential (`chatId`/`to`/`botToken`/`smtpUrl`) requires the
   `N8N_INGEST_SECRET` bearer. The settings UI keeps that token in `localStorage`
@@ -122,6 +134,20 @@ npm run lint:safe-html    # OPT-IN ONLY: see "Pre-Push" (fork baseline fails thi
   download button/dropdown is gone. Do not re-add it without a real release channel.
 - **Panel tiers**: `src/config/panel-tiers.ts` DISABLED (tier 3) includes the upstream
   PRO finance surfaces (`stock-analysis`, `stock-backtest`, `wsb-ticker-scanner`).
+- **Scope switches (14/10/2026)**: `src/config/scope.ts` switches off whole inherited
+  groups: finance (crypto, stablecoins, tokens, predictions, stocks), tech/startup,
+  consumer indices, live media (webcams, live channels) and military (flights,
+  vessels, bases, USNI, sirens, strikes, GPS jamming, Telegram, PizzINT); since
+  15/10/2026 also macro (BIS, ECB rates, FRED, FSI, US/China macro, FX) and
+  upstreamExtra (tenders, China coverage, resilience, health, radiation, CO2/ocean
+  ice, cyber, internet outages, aviation, service status, advisories, unrest,
+  displacement, humanitarian). Energy and gas seeders run in the `context` tier.
+  A switched-off
+  group is tier 3, never fetched by the SPA (`isScopeOff` in the loaders), absent from the
+  map layer picker, out of the `full` seed sweep (`scripts/seed-cron.sh`), out of the
+  relay loops (`RS_RELAY_DISABLED_LOOPS`, `RS_FINANCE_SCOPE` in `scripts/ais-relay.cjs`)
+  and out of `/api/health` (`OUT_OF_SCOPE_HEALTH_CHECKS`). Keep the five lists aligned
+  when a group changes; do not switch a group back on to "fix" an empty panel.
 - **User auth (Phase 1)**: authentication is **enforced by default**
   (`docker-compose` uses `AUTH_REQUIRED:-true`; set `AUTH_REQUIRED=false` for the
   anonymous mode). The server requires an `rs_session` HttpOnly cookie on every
@@ -164,8 +190,17 @@ npm run lint:safe-html    # OPT-IN ONLY: see "Pre-Push" (fork baseline fails thi
   `panelLayout.init()` — the dashboard (map, panels, data loader) never initialises for
   them. Add new panels/features inside the app workspace, not as dashboard panels.
   Research owns its academic layer as pure modules with tests:
-  `src/apps/research/{citations,coverage,filters}.ts` (APA/BibTeX/RIS/CSV, 8D coverage
-  matrix and field-qualified search) — extend those instead of the workspace DOM code.
+  `src/apps/research/{citations,coverage,filters,layers}.ts` (APA/BibTeX/RIS/CSV,
+  coverage by thesis-model layer × verification level, field-qualified search with
+  `layer:`/`verif:`) — extend those instead of the workspace DOM code. The bibliography
+  (`data/zotero-sources.json` + `api/zotero/_sources-data.js`) is GENERATED from the
+  private thesis repo by `scripts/build-research-bibliography.mjs` (metadata, layer and
+  verification level only; verification notes never enter this public repo).
+- **Seeder logs on the VPS**: `scripts/seed-cron.sh` tiers (quotes 20', intel/signals/
+  thesis hourly, context/slow 6h, full weekly) write one-line RUN/OK summaries to the
+  crontab logs; each seeder's full output goes to `/tmp/seed-all.*.log`. Exit 0 ("OK")
+  does not mean the seeder published: read the full log (e.g. `news:insights` exits 0
+  when its synthesis is rejected and the last good payload is preserved).
 
 ## Runtime Architecture
 
@@ -312,8 +347,12 @@ Pre-push (`.husky/pre-push`) runs state guards, then diff-scoped checks:
 - Yahoo Finance requests must be staggered (150ms delays).
 - Prefer minimal, targeted diffs; run `npm run typecheck` and the relevant
   `tsx --test` files before finishing.
-- **Merge authority is explicit**: never merge a PR or enable auto-merge unless
-  the user asked for that specific action in the current conversation.
+- **Merge authority**: Giuseppe granted agents standing authority to merge their
+  own PRs into `main` (14/10/2026), once typecheck and the touched tests match
+  `main`. Every merge redeploys production, so merge one PR at a time, add its
+  entry to `CHANGELOG-RISK-SENTINEL.md` (Italian, newest first), and check the
+  deploy and `/api/health` afterwards. Never enable auto-merge, never force-push
+  `main`.
 
 ## SENTINEL-ADM (moved out)
 

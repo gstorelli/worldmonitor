@@ -61,7 +61,9 @@ const DEFAULTS: AiFlowSettings = {
 
 export function getAiFlowSettings(): AiFlowSettings {
   return {
-    browserModel: readBool(STORAGE_KEY_BROWSER_MODEL, DEFAULTS.browserModel),
+    // Risk Sentinel (15/10/2026): the in-browser model has no toggle any more;
+    // a value stored before then must not keep loading the ML worker.
+    browserModel: false,
     cloudLlm: readBool(STORAGE_KEY_CLOUD_LLM, DEFAULTS.cloudLlm),
     mapNewsFlash: readBool(STORAGE_KEY_MAP_NEWS_FLASH, DEFAULTS.mapNewsFlash),
     headlineMemory: readBool(STORAGE_KEY_HEADLINE_MEMORY, DEFAULTS.headlineMemory),
@@ -88,8 +90,7 @@ export function isHeadlineMemoryEnabled(): boolean {
   const headline = readBool(STORAGE_KEY_HEADLINE_MEMORY, DEFAULTS.headlineMemory);
   if (!headline) return false;
   if (isDesktopRuntime()) return true;
-  const browser = readBool(STORAGE_KEY_BROWSER_MODEL, DEFAULTS.browserModel);
-  return browser;
+  return false; // no in-browser model on the web (see getAiFlowSettings)
 }
 
 export function setAiFlowSetting(key: keyof AiFlowSettings, value: boolean): void {

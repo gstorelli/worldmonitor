@@ -179,11 +179,10 @@ export function assignRefs(parsed: ParsedSource[], existing: ResearchSource[]): 
     venue: entry.venue,
     doi: entry.doi,
     url: entry.url,
-    themeArea: '',
+    layers: [],
     summary: '',
     limitation: '',
-    contribution: '',
-    dimensions: [],
     verified: false,
+    verification: null,
   }));
 }

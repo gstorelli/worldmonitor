@@ -25,7 +25,7 @@ public/crawlable-corpus.json
 #   - docker-compose.override.yml holds WORLDMONITOR_VALID_KEYS and the
 #     upstream provider keys; SELF_HOSTING.md already states it is gitignored.
 #   - secrets/ is the Docker-secrets layout documented in docker-compose.yml,
-#     which instructs `echo "gsk_abc123" > secrets/groq_api_key.txt`.
+#     which instructs `echo "sk-or-..." > secrets/openrouter_api_key.txt`.
 docker-compose.override.yml
 secrets/
 .playwright-mcp/
@@ -33,7 +33,9 @@ secrets/
 .vercel
 api/\[domain\]/v1/\[rpc\].js
 api/\[\[...path\]\].js
-.claude/
+.claude/*
+# Shared project settings for Claude Code (attribution off) are tracked.
+!.claude/settings.json
 .cursor/
 .env.vercel-backup
 .env.vercel-export

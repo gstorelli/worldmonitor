@@ -14,6 +14,8 @@
  * unless it is explicitly listed as tier 3 here).
  */
 
+import { OUT_OF_SCOPE_PANEL_IDS } from './scope';
+
 export type PanelTier = 1 | 2 | 3;
 
 export const PANEL_TIERS: Record<string, PanelTier> = {
@@ -27,8 +29,6 @@ export const PANEL_TIERS: Record<string, PanelTier> = {
   'strategic-risk': 1,
   'strategic-posture': 1,
   'gdelt-intel': 1,
-  'events': 1,
-  'heatmap': 1,
   'monitors': 1,
   'sanctions-pressure': 1,
   'ucdp-events': 1,
@@ -68,6 +68,8 @@ export const TIER_META: Record<PanelTier, { label: string; className: string }> 
 };
 
 export function getPanelTier(panelId: string): PanelTier {
+  // Switched-off scope groups (src/config/scope.ts) win over any listing here.
+  if (OUT_OF_SCOPE_PANEL_IDS.has(panelId)) return 3;
   return PANEL_TIERS[panelId] ?? 2;
 }
 

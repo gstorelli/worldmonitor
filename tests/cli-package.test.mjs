@@ -96,11 +96,14 @@ describe('worldmonitor CLI run() with a mocked transport', () => {
   });
 });
 
-describe('llms.txt advertises the CLI', () => {
+// Risk Sentinel fork (13/10/2026): public/llms.txt describes this deployment and
+// does not advertise the upstream CLI; it must still credit the upstream project.
+describe('llms.txt describes the fork', () => {
   const llms = readFileSync(join(ROOT, 'public/llms.txt'), 'utf-8');
 
-  it('references the npm package so the discovery entry is not dropped', () => {
-    assert.match(llms, /worldmonitor/);
-    assert.match(llms, /npm|npx/i, 'llms.txt should mention how to install/run the CLI');
+  it('names Risk Sentinel and credits the upstream World Monitor repository', () => {
+    assert.match(llms, /^# Risk Sentinel/);
+    assert.match(llms, /github\.com\/koala73\/worldmonitor/);
+    assert.doesNotMatch(llms, /npx worldmonitor/);
   });
 });

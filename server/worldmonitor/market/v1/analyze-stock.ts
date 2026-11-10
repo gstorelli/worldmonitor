@@ -9,6 +9,7 @@ import type {
   StockAnalysisHeadline,
 } from '../../../../src/generated/server/worldmonitor/market/v1/service_server';
 import { callLlm } from '../../../_shared/llm';
+import { isInheritedMarketLlmEnabled } from '../../../../scripts/_llm-models.mjs';
 import { cachedFetchJson, getCachedJson } from '../../../_shared/redis';
 import { CHROME_UA, yahooGate } from '../../../_shared/constants';
 import { UPSTREAM_TIMEOUT_MS, sanitizeSymbol } from './_shared';
@@ -1519,6 +1520,10 @@ async function buildAiOverlay(
     ratingSignal,
   );
   const hasFundamentals = Object.values(fundamentals).some((v) => typeof v === 'number');
+  // Fork (13/10/2026): stock analysis is an inherited feature that does not serve
+  // the thesis; without LLM_INHERITED_MARKET_FEATURES=true it uses the
+  // rules-based overlays, exactly as when no LLM provider answers.
+  if (!isInheritedMarketLlmEnabled()) return { legacy: legacyFallback, rating: ratingFallback };
   const llm = await callLlm({
     messages: [
       {

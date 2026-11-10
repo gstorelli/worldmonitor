@@ -25,7 +25,7 @@ export default async function handler(req) {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405 });
   }
 
-  const apiKey = process.env.GROQ_API_KEY || process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY;
+  const apiKey = process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY;
   if (!apiKey) {
     return new Response(JSON.stringify({ error: 'LLM Key not configured' }), { status: 401 });
   }
@@ -67,13 +67,19 @@ export default async function handler(req) {
     // Prepare LLM Call
     const userPrompt = `Classify this event:\nSource: ${source}\nTitle: ${title}\nDescription: ${description || 'N/A'}`;
     
-    let apiUrl = 'https://api.openai.com/v1/chat/completions';
-    let model = 'gpt-3.5-turbo';
-    
-    if (process.env.GROQ_API_KEY) {
-      apiUrl = 'https://api.groq.com/openai/v1/chat/completions';
-      model = 'llama3-8b-8192';
-    }
+    // OpenRouter is the fork's provider. Before 13/10/2026 an OpenRouter-only
+    // deployment sent its key to api.openai.com (the URL was chosen only by
+    // the presence of a Groq key), so every call failed.
+    // Edge functions are self-contained, so the fast-tier default and the base
+    // URL are copied from scripts/_llm-models.mjs (tests/llm-models-parity).
+    const useOpenRouter = Boolean(process.env.OPENROUTER_API_KEY);
+    const openRouterBase = (process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1').replace(/\/+$/, '');
+    const apiUrl = useOpenRouter
+      ? `${openRouterBase}/chat/completions`
+      : 'https://api.openai.com/v1/chat/completions';
+    const model = useOpenRouter
+      ? (process.env.LLM_FAST_MODEL || 'anthropic/claude-haiku-5.5')
+      : 'gpt-3.5-turbo';
 
     const llmResp = await fetch(apiUrl, {
       method: 'POST',

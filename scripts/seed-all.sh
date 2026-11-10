@@ -55,6 +55,9 @@ if [ ! -d scripts/node_modules ]; then
     node:24-alpine npm ci --ignore-scripts --no-audit --no-fund
 fi
 
+# Each run leaves its full log in /tmp and the hourly cron tiers would pile up
+# thousands of them: keep a week (SEED_LOG_KEEP_DAYS) for diagnosis.
+find /tmp -maxdepth 1 -name 'seed-all.*.log' -mtime +"${SEED_LOG_KEEP_DAYS:-7}" -delete 2>/dev/null || true
 LOG="$(mktemp /tmp/seed-all.XXXXXX.log)"
 echo "seed sweep starting (timeout ${TIMEOUT_SECONDS}s/seeder, log: ${LOG})"
 if [ -n "${FILTER}" ]; then
@@ -87,7 +90,10 @@ for f in scripts/seed-*.mjs; do
   echo "RUN  ${name}"
   seedlog="$(mktemp /tmp/seed-one.XXXXXX.log)"
   echo "### ${name} ($(date -u +%FT%TZ))" >> "${LOG}"
-  if docker run --rm --network "${NET}" \
+  # Memory cap per seeder container (SEED_MEMORY_LIMIT, default 1g): a runaway
+  # seeder is OOM-killed inside its own container instead of starving the API
+  # on the same VPS.
+  if docker run --rm --network "${NET}" --memory "${SEED_MEMORY_LIMIT:-1g}" \
     --env-file "${REPO_PATH}/.env" \
     -e UPSTASH_REDIS_REST_URL=http://redis-rest:80 \
     -e UPSTASH_REDIS_REST_TOKEN="${RT}" \

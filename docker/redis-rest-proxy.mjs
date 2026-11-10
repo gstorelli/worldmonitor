@@ -79,7 +79,11 @@ async function runCommand(args) {
   return client.sendCommand([cmd, ...cmdArgs.map(String)]);
 }
 
-const MAX_BODY_BYTES = 1024 * 1024; // 1 MB
+// Risk Sentinel: 16 MB. The upstream 1 MB cap mirrored the hosted Upstash
+// limit, but this proxy is ours, on the internal network and token-protected.
+// At 1 MB it reset the connection on seed-sanctions-pressure's ~2.1 MB entity
+// index (ECONNRESET on every run), so OFAC sanctions were never published.
+const MAX_BODY_BYTES = 16 * 1024 * 1024;
 
 async function readBody(req) {
   const chunks = [];

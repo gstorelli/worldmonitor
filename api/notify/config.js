@@ -27,7 +27,7 @@
  *     email:    { enabled: boolean, connected?: boolean, smtpUrl: string, from: string, to: string }
  *   },
  *   frequency: 'realtime' | 'hourly' | 'daily' | 'weekly',
- *   topics: string[],        // chokepoints, commodities, conflicts, climate, seismic, policy
+ *   topics: string[],        // chokepoints, commodities, climate, seismic, policy
  *   enrichment: 'fact' | 'analysis' | 'regulatory'
  * }
  */

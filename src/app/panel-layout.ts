@@ -1,8 +1,10 @@
 import type { AppContext, AppModule } from '@/app/app-context';
 import { isPanelDisabled } from '@/config/panel-tiers';
+import { getPanelSources } from '@/config/data-sources';
+import { createSourceInfo } from '@/components/source-info';
 import { isPolicyDisabled } from '@/services/panel-policy';
 import { schedulePanelPrefsPush } from '@/services/user-panel-prefs';
-import { ACTIVE_APP, APPS, isPanelAllowedInApp, switchAppHref } from '@/config/apps';
+import { ACTIVE_APP, isPanelAllowedInApp, switchAppHref, switcherApps } from '@/config/apps';
 
 import { replayPendingCalls, clearAllPendingCalls } from '@/app/pending-panel-data';
 import type { RelatedAsset } from '@/types';
@@ -153,7 +155,7 @@ export class PanelLayoutManager implements AppModule {
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
           </button>
 
-          <span class="logo">SENTINEL</span><span class="logo-mobile">Risk Sentinel</span><span class="version">v${__APP_VERSION__}</span>${BETA_MODE ? '<span class="beta-badge">BETA</span>' : ''}
+          <span class="logo">SENTINEL</span><span class="logo-mobile">Risk Sentinel</span>${BETA_MODE ? '<span class="beta-badge">BETA</span>' : ''}
           <a href="https://github.com/gstorelli/worldmonitor" target="_blank" rel="noopener" class="github-link" title="${t('header.viewOnGitHub')}">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
           </a>
@@ -181,7 +183,7 @@ export class PanelLayoutManager implements AppModule {
           </button>
         </div>
         <div class="header-right">
-          ${APPS.length > 1 ? `<div class="rs-app-switcher">${APPS.map(app => `<a class="rs-app-link${app.id === ACTIVE_APP.id ? ' active' : ''}" href="${switchAppHref(app.id)}" title="${app.description}">${app.label}</a>`).join('')}</div>` : ''}
+          ${switcherApps().length > 1 ? `<div class="rs-app-switcher">${switcherApps().map(app => `<a class="rs-app-link${app.id === ACTIVE_APP.id ? ' active' : ''}" href="${switchAppHref(app.id)}" title="${app.description}">${app.label}</a>`).join('')}</div>` : ''}
           <button class="search-btn" id="searchBtn"><kbd>⌘K</kbd> ${t('header.search')}</button>
           ${this.ctx.isDesktopApp ? '' : `<button class="copy-link-btn" id="copyLinkBtn">${t('header.copyLink')}</button>`}
           ${this.ctx.isDesktopApp ? '' : `<button class="fullscreen-btn" id="fullscreenBtn" title="${t('header.fullscreen')}">⛶</button>`}
@@ -212,16 +214,12 @@ export class PanelLayoutManager implements AppModule {
         </button>
         <button class="mobile-menu-item" id="mobileMenuTheme">
           <span class="mobile-menu-item-icon">${getCurrentTheme() === 'dark' ? '☀️' : '🌙'}</span>
-          <span class="mobile-menu-item-label">${getCurrentTheme() === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
+          <span class="mobile-menu-item-label">${getCurrentTheme() === 'dark' ? 'Tema chiaro' : 'Tema scuro'}</span>
         </button>
         <div class="mobile-menu-divider"></div>
         <div class="mobile-menu-footer-links">
           <a href="https://github.com/gstorelli/worldmonitor" target="_blank" rel="noopener">GitHub</a>
-          <a href="${this.ctx.isDesktopApp ? 'https://worldmonitor.app/blog/' : 'https://www.worldmonitor.app/blog/'}" target="_blank" rel="noopener">Blog</a>
-          <a href="${this.ctx.isDesktopApp ? 'https://worldmonitor.app/docs' : 'https://www.worldmonitor.app/docs'}" target="_blank" rel="noopener">Docs</a>
-          <a href="https://status.worldmonitor.app/" target="_blank" rel="noopener">Status</a>
         </div>
-        <div class="mobile-menu-version">v${__APP_VERSION__}</div>
       </nav>
       <div class="region-sheet-backdrop" id="regionSheetBackdrop"></div>
       <div class="region-bottom-sheet" id="regionBottomSheet">
@@ -289,6 +287,10 @@ export class PanelLayoutManager implements AppModule {
     `;
 
     this.createPanels();
+
+    // "Fonti" icon on the map header (src/config/data-sources.ts).
+    const mapSourceInfo = createSourceInfo(getPanelSources('map'));
+    if (mapSourceInfo) document.querySelector('#mapSection .panel-header-left')?.appendChild(mapSourceInfo);
 
     if (this.ctx.isMobile) {
       this.setupMobileMapToggle();
@@ -543,6 +545,11 @@ export class PanelLayoutManager implements AppModule {
       const panelKey = this.ctx.panels[key] && !this.ctx.newsPanels[key] ? `${key}-news` : key;
       if (this.ctx.panels[panelKey]) continue;
       if (!this.ctx.panelSettings[panelKey] && !this.ctx.panelSettings[key]) continue;
+      // Same gates as shouldCreatePanel (tier 3, admin policy, app allowlist):
+      // without them the news panels of switched-off scope groups (finance,
+      // tech, ai, layoffs; src/config/scope.ts) were still created from FEEDS,
+      // and the thesis view showed ten news panels outside its allowlist.
+      if (isPanelDisabled(panelKey) || isPolicyDisabled(panelKey) || !isPanelAllowedInApp(panelKey)) continue;
       const panelConfig = this.ctx.panelSettings[panelKey] ?? this.ctx.panelSettings[key] ?? ALL_PANELS[panelKey] ?? ALL_PANELS[key];
       const label = panelConfig?.name ?? key.charAt(0).toUpperCase() + key.slice(1);
       const panel = new NewsPanel(panelKey, label);

@@ -26,7 +26,7 @@ globalThis.fetch = async (_url, opts) => {
 };
 
 const { normalizeCrossrefWork } = await import(pathToFileURL(resolve(root, 'api/research/doi.js')).href);
-const { normalizeOpenAlexWork, normalizeCrossrefItem } = await import(pathToFileURL(resolve(root, 'api/research/papers.js')).href);
+const { normalizeOpenAlexWork, normalizeCrossrefItem, buildOpenAlexUrl, providerOrder, default: papersHandler } = await import(pathToFileURL(resolve(root, 'api/research/papers.js')).href);
 const { buildCreators, buildZoteroItem } = await import(pathToFileURL(resolve(root, 'api/zotero/items.js')).href);
 const { default: researchHandler } = await import(pathToFileURL(resolve(root, 'api/prefs/research.js')).href);
 const users = await import(pathToFileURL(resolve(root, 'api/_users.js')).href);
@@ -164,5 +164,50 @@ describe('api/prefs/research', () => {
     assert.equal(body.research.notes['1'], 'nota');
     assert.equal(body.research.reading['1'].state, 'reviewed');
     assert.equal(body.research.imported.length, 1);
+  });
+});
+
+describe('research papers: OpenAlex API key', () => {
+  it('adds api_key only when a key is configured', () => {
+    const base = { query: 'volcanic ash shipping', from: '2026-01-01', to: '2026-10-14', limit: 5, mailto: 'a@b.c' };
+    assert.ok(!buildOpenAlexUrl(base).includes('api_key='));
+    const withKey = buildOpenAlexUrl({ ...base, apiKey: 'k&y' });
+    assert.ok(withKey.endsWith('&api_key=k%26y'));
+    assert.ok(withKey.includes('title_and_abstract.search:volcanic%20ash%20shipping'));
+  });
+
+  it('searches OpenAlex first only with a key', () => {
+    assert.deepEqual(providerOrder('secret'), ['openalex', 'crossref']);
+    assert.deepEqual(providerOrder(''), ['crossref', 'openalex']);
+    assert.deepEqual(providerOrder(undefined), ['crossref', 'openalex']);
+  });
+
+  it('falls back to Crossref and never leaks the key in the error', async () => {
+    const saved = { fetch: globalThis.fetch, key: process.env.OPENALEX_API_KEY };
+    const calls = [];
+    process.env.OPENALEX_API_KEY = 'super-secret-key';
+    globalThis.fetch = async (url) => {
+      const target = String(url);
+      calls.push(target);
+      if (target.startsWith('https://api.openalex.org/')) return new Response('quota', { status: 429 });
+      if (target.startsWith('https://api.crossref.org/')) {
+        return new Response(JSON.stringify({ message: { items: [{ DOI: '10.1/x', title: ['Ash and ports'], issued: { 'date-parts': [[2026]] } }] } }), { status: 200 });
+      }
+      throw new Error('cache unavailable'); // Redis REST in this test env
+    };
+    try {
+      const res = await papersHandler(new Request('https://x.test/api/research/papers?q=ash%20ports%20test'));
+      const body = await res.json();
+      const providerCalls = calls.filter((c) => c.includes('openalex.org') || c.includes('crossref.org'));
+      assert.ok(providerCalls[0].includes('api.openalex.org') && providerCalls[0].includes('api_key=super-secret-key'));
+      assert.ok(providerCalls[1].includes('api.crossref.org'));
+      assert.equal(body.provider, 'crossref');
+      assert.equal(body.items[0].title, 'Ash and ports');
+      assert.ok(!JSON.stringify(body).includes('super-secret-key'));
+    } finally {
+      globalThis.fetch = saved.fetch;
+      if (saved.key === undefined) delete process.env.OPENALEX_API_KEY;
+      else process.env.OPENALEX_API_KEY = saved.key;
+    }
   });
 });

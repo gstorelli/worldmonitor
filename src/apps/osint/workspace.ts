@@ -1,183 +1,301 @@
 /**
- * OSINT — open-source intelligence workspace.
+ * OSINT — the signal layer of the thesis model.
  *
- * A standalone application (not a dashboard variant): topic-scoped signals from
- * the n8n intelligence digest, ranked by severity/score, with a source link per
- * signal. Shares only the header/footer shell.
+ * A standalone application (not a dashboard variant). Until 14/10/2026 it
+ * listed the raw n8n digest (bare tickers, duplicate topics, "normal" climate
+ * zones), which said nothing about the thesis. It now answers one question:
+ * what is happening around the critical nodes and to the strategic goods?
+ *
+ *  - Nodes: measured triggers within the working radius (the same snapshot as
+ *    the Risk Chain panel: EMSC, GDACS/EONET/NHC), vessel transits (IMF
+ *    PortWatch) and the nearest monitored climate zone (Open-Meteo, n8n 03).
+ *  - Goods: prices (Yahoo Finance; listed shares are flagged as indirect
+ *    indicators), Italy's main suppliers (UN Comtrade) and the measures of the
+ *    Policy registry for the same HS code.
+ *  - Latest signals: trigger events near the nodes, newest first.
+ *
+ * Signals anticipate and corroborate; they never measure the hazard.
  */
 
+import { mountSourceInfo, sourceInfoSlot } from '@/components/source-info';
+import { switchAppHref } from '@/config/apps';
+import { COMMODITIES } from '@/config/markets';
+import { STRATEGIC_GOODS, TRIGGER_WORKING_RULES, localText } from '@/config/thesis-model';
+import { getThesisSnapshot } from '@/services/thesis/snapshot';
 import { escapeHtml } from '@/utils/sanitize';
 import type { AppWorkspace } from '../types';
+import {
+  buildFeed,
+  buildGoodRows,
+  buildNodeRows,
+  importSentence,
+  isClimateAnomaly,
+  type GoodRow,
+  type NodeRow,
+  type OsintComtradeProduct,
+  type OsintSignalsPayload,
+  type PolicyEntryLike,
+} from './model';
 
-interface DigestItem {
-  title: string;
-  summary: string;
-  url: string;
-  severity: string;
-  score: number;
-  source: string;
+const STATE_LABELS: Record<string, string> = {
+  none: 'nessun innesco',
+  monitor: 'da monitorare',
+  assess: 'da valutare',
+};
+
+let displayNames: Intl.DisplayNames | undefined;
+try {
+  displayNames = new Intl.DisplayNames(['it'], { type: 'region' });
+} catch {
+  displayNames = undefined;
 }
 
-interface DigestSection {
-  topic: string;
-  title: string;
-  items: DigestItem[];
+function fmtDate(ms: number): string {
+  return new Date(ms).toLocaleString('it-IT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 }
 
-interface DigestPayload {
-  digest?: { sections?: DigestSection[] };
-  fetchedAt?: string;
+function fmtSigned(n: number | null, unit: string, digits = 1): string {
+  if (n === null) return 'n.d.';
+  const abs = Math.abs(n).toLocaleString('it-IT', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+  return `${n > 0 ? '+' : n < 0 ? '−' : ''}${abs}${unit}`;
 }
 
-const SEVERITY_ORDER: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
+function nodeRowHtml(row: NodeRow): string {
+  const t = row.triggers;
+  const triggers = t.count
+    ? `${t.count} event${t.count === 1 ? 'o' : 'i'}${t.significant ? `, <strong>${t.significant} significativ${t.significant === 1 ? 'o' : 'i'}</strong>` : ''}${t.maxMagnitude !== null ? ` · M max ${t.maxMagnitude.toFixed(1)}` : ''}`
+    : '<span class="rs-meta">nessuno</span>';
+  const transit = row.node.kind !== 'strait'
+    ? '<span class="rs-meta">non applicabile</span>'
+    : row.transit?.dataAvailable
+      ? `${fmtSigned(row.transit.wowChangePct, '%', 0)} sulla settimana precedente <span class="rs-meta">(PortWatch)</span>`
+      : '<span class="rs-meta">dato non disponibile</span>';
+  const c = row.climate;
+  const climate = c
+    ? `${isClimateAnomaly(c.zone) ? '<strong>anomalia</strong>' : 'nella norma'} · ΔT ${fmtSigned(c.zone.tempDelta, ' °C')} · Δ pioggia ${fmtSigned(c.zone.precipDelta, ' mm/g')}<br><span class="rs-meta">${escapeHtml(c.zone.zone)}, ${Math.round(c.distanceKm)} km</span>`
+    : '<span class="rs-meta">nessuna zona monitorata vicina</span>';
+  const latest = t.latest
+    ? `${escapeHtml(fmtDate(t.latest.time))}${t.latest.url ? ` · <a class="rs-link" href="${escapeHtml(t.latest.url)}" target="_blank" rel="noopener">${escapeHtml(t.latest.source)} ↗</a>` : ` · ${escapeHtml(t.latest.source)}`}`
+    : '';
+  return `
+    <tr class="rs-osint-state-${escapeHtml(row.state)}">
+      <th scope="row">${escapeHtml(row.node.name)}<br><span class="rs-meta">${row.node.kind === 'strait' ? 'stretto' : 'area produttiva'}</span></th>
+      <td>${triggers}${latest ? `<br><span class="rs-meta">ultimo: ${latest}</span>` : ''}</td>
+      <td>${transit}</td>
+      <td>${climate}</td>
+      <td><span class="rs-osint-state">${escapeHtml(STATE_LABELS[row.state] ?? row.state)}</span></td>
+    </tr>`;
+}
 
-function severityRank(item: DigestItem): number {
-  return SEVERITY_ORDER[item.severity?.toLowerCase()] ?? 0;
+interface EuGoodsLike {
+  available?: boolean;
+  goods?: Record<string, { imports?: Record<string, { year: number; top: Array<{ code: string; share: number | null }> }> }>;
+}
+
+/** Italy's suppliers per good from Eurostat Comext (#91), in the Comtrade-shaped rows of the model. */
+function comextImportsForItaly(eu: EuGoodsLike | null): OsintComtradeProduct[] {
+  if (!eu?.available || !eu.goods) return [];
+  const out: OsintComtradeProduct[] = [];
+  for (const [hs4, g] of Object.entries(eu.goods)) {
+    const it = g.imports?.IT;
+    // Eurostat geo codes that differ from ISO 3166: Comext uses XS for Serbia.
+    if (it) out.push({ hs4, year: it.year, description: '', suppliers: it.top.map((t) => ({ iso2: t.code === 'XS' ? 'RS' : t.code, code: null, share: t.share })) });
+  }
+  return out;
+}
+
+function goodRowHtml(row: GoodRow, policyHref: string, importsSource: string): string {
+  const prices = row.prices.length
+    ? row.prices
+        .map((p) => {
+          const change = p.change !== null ? `<span class="${p.change >= 0 ? 'rs-up' : 'rs-down'}">${fmtSigned(p.change, '%', 2)}</span>` : 'n.d.';
+          const price = p.price !== null ? p.price.toLocaleString('it-IT', { maximumFractionDigits: 2 }) : 'n.d.';
+          const kind = p.kind === 'proxy' ? ' <span class="rs-chip rs-chip-dim" title="Titolo o ETF quotato, non il prezzo del bene">indiretto</span>' : '';
+          return `${escapeHtml(p.name)} (${escapeHtml(p.symbol)}): ${price} · ${change}${kind}`;
+        })
+        .join('<br>')
+    : '<span class="rs-meta">nessuna quotazione disponibile</span>';
+  const imports = row.imports
+    ? `${escapeHtml(importSentence(row.imports, displayNames))}<br><span class="rs-meta">${escapeHtml(importsSource)}, anno ${row.imports.year ?? 'n.d.'}</span>`
+    : '<span class="rs-meta">dato non disponibile</span>';
+  const measures = row.measures.length
+    ? `<a class="rs-link" href="${escapeHtml(policyHref)}">${row.measures.length} misur${row.measures.length === 1 ? 'a' : 'e'} nel registro ↗</a><br><span class="rs-meta">${row.measures.map((m) => escapeHtml(m.title.split(' — ')[0] ?? m.title)).join('; ')}</span>`
+    : '<span class="rs-meta">nessuna nel registro</span>';
+  return `
+    <tr>
+      <th scope="row">HS ${escapeHtml(row.good.hs)}<br><span class="rs-meta">${escapeHtml(localText(row.good.label, 'it'))}</span></th>
+      <td>${prices}</td>
+      <td>${imports}</td>
+      <td>${measures}</td>
+    </tr>`;
+}
+
+async function fetchJson<T>(url: string): Promise<T> {
+  const res = await fetch(url, { credentials: 'same-origin', headers: { Accept: 'application/json' } });
+  if (!res.ok) throw new Error(`${url}: HTTP ${res.status}`);
+  return (await res.json()) as T;
+}
+
+type OsintTab = 'nodes' | 'goods' | 'feed';
+const OSINT_TABS: readonly OsintTab[] = ['nodes', 'goods', 'feed'];
+const TAB_STORAGE_KEY = 'rs-osint-tab';
+
+function readStoredTab(): OsintTab {
+  try {
+    const v = localStorage.getItem(TAB_STORAGE_KEY);
+    return OSINT_TABS.includes(v as OsintTab) ? (v as OsintTab) : 'nodes';
+  } catch {
+    return 'nodes';
+  }
+}
+
+/** Tab switching; the last tab is remembered per browser (a convenience only). */
+function bindTabs(root: HTMLElement): void {
+  const show = (tab: OsintTab) => {
+    root.querySelectorAll<HTMLElement>('.rs-tab').forEach((t) => {
+      const active = t.dataset.tab === tab;
+      t.classList.toggle('active', active);
+      t.setAttribute('aria-selected', String(active));
+    });
+    root.querySelectorAll<HTMLElement>('.rs-tab-panel').forEach((panel) => {
+      panel.hidden = panel.dataset.panel !== tab;
+    });
+    try {
+      localStorage.setItem(TAB_STORAGE_KEY, tab);
+    } catch {
+      // storage unavailable: the tab is simply not remembered
+    }
+  };
+  root.querySelectorAll<HTMLElement>('.rs-tab').forEach((t) => {
+    t.addEventListener('click', () => show((t.dataset.tab as OsintTab) ?? 'nodes'));
+  });
+  show(readStoredTab());
+}
+
+function setCount(root: HTMLElement, selector: string, n: number): void {
+  const el = root.querySelector<HTMLElement>(selector);
+  if (el) el.textContent = String(n);
 }
 
 export function createOsintWorkspace(): AppWorkspace {
   return {
     async mount(root: HTMLElement): Promise<void> {
-      let sections: DigestSection[] = [];
-      let activeTopic = 'ALL';
-      let activeSeverity = 'ALL';
-      let query = '';
-      let fetchedAt = '';
-
       root.innerHTML = `
         <div class="rs-ws rs-ws-osint">
           <div class="rs-ws-toolbar">
             <div class="rs-ws-heading">
-              <h1>Open-Source Intelligence</h1>
-              <p>Segnali OSINT aggregati dalle pipeline n8n, ordinati per severità</p>
+              <h1>Segnali OSINT</h1>
+              <p>Cosa sta succedendo intorno ai nodi critici e ai beni strategici della tesi. I segnali anticipano o confermano un impatto; non misurano il pericolo.</p>
             </div>
             <div class="rs-ws-stats">
-              <div class="rs-stat"><span class="rs-stat-value" id="rsOsintCount">0</span><span class="rs-stat-label">segnali</span></div>
-              <div class="rs-stat"><span class="rs-stat-value" id="rsOsintTopicCount">0</span><span class="rs-stat-label">topic</span></div>
+              <div class="rs-stat"><span class="rs-stat-value" id="rsOsintNodesHit">–</span><span class="rs-stat-label">nodi con inneschi</span></div>
+              <div class="rs-stat"><span class="rs-stat-value" id="rsOsintSignificant">–</span><span class="rs-stat-label">significativi</span></div>
               <div class="rs-stat"><span class="rs-stat-value" id="rsOsintUpdated">–</span><span class="rs-stat-label">aggiornato</span></div>
             </div>
             <button class="rs-button" id="rsOsintRefresh">Aggiorna</button>
           </div>
 
-          <div class="rs-chipbar" id="rsOsintTopics"></div>
-
-          <div class="rs-ws-controls">
-            <input id="rsOsintQuery" class="rs-input" type="search" placeholder="Cerca nei segnali…">
-            <select id="rsOsintSeverity" class="rs-select">
-              <option value="ALL">Tutte le severità</option>
-              <option value="critical">Critical</option>
-              <option value="high">High</option>
-              <option value="medium">Medium</option>
-              <option value="low">Low</option>
-            </select>
+          <div class="rs-tabs" role="tablist">
+            <button class="rs-tab" data-tab="nodes" role="tab">Nodi critici <span class="rs-chip-count" id="rsOsintNodesCount"></span></button>
+            <button class="rs-tab" data-tab="goods" role="tab">Beni strategici <span class="rs-chip-count" id="rsOsintGoodsCount"></span></button>
+            <button class="rs-tab" data-tab="feed" role="tab">Ultimi segnali <span class="rs-chip-count" id="rsOsintFeedCount"></span></button>
           </div>
 
-          <div class="rs-card-grid rs-card-grid-osint" id="rsOsintGrid"></div>
+          <div class="rs-tab-panel" data-panel="nodes">
+            <div class="rs-tab-sources">Fonti dei dati ${sourceInfoSlot('osint.nodes')}</div>
+            <p class="rs-meta rs-osint-note">Inneschi entro ${TRIGGER_WORKING_RULES.radiusKm} km negli ultimi ${TRIGGER_WORKING_RULES.windowDays} giorni, variazione dei transiti di navi rispetto alla settimana precedente (IMF PortWatch), clima della zona più vicina.</p>
+            <div class="rs-osint-table-wrap"><table class="rs-osint-table">
+              <thead><tr><th>Nodo</th><th>Inneschi</th><th>Transiti</th><th>Clima (ultimi 7 giorni)</th><th>Catena</th></tr></thead>
+              <tbody id="rsOsintNodes"><tr><td colspan="5" class="rs-loading">Caricamento…</td></tr></tbody>
+            </table></div>
+          </div>
+
+          <div class="rs-tab-panel" data-panel="goods" hidden>
+            <div class="rs-tab-sources">Fonti dei dati ${sourceInfoSlot('osint.goods')}</div>
+            <p class="rs-meta rs-osint-note">Prezzi, fornitori dell'Italia, misure in vigore. I prezzi sono nell'unità di quotazione del contratto (per esempio il grano in centesimi di dollaro per bushel): come segnale conta la variazione. "Indiretto" indica un titolo o un ETF quotato, non il prezzo del bene.</p>
+            <div class="rs-osint-table-wrap"><table class="rs-osint-table">
+              <thead><tr><th>Bene</th><th>Prezzo (variazione sulla chiusura precedente)</th><th>Principali fornitori dell'Italia</th><th>Misure (registro Policy)</th></tr></thead>
+              <tbody id="rsOsintGoods"><tr><td colspan="4" class="rs-loading">Caricamento…</td></tr></tbody>
+            </table></div>
+          </div>
+
+          <div class="rs-tab-panel" data-panel="feed" hidden>
+            <div class="rs-tab-sources">Fonti dei dati ${sourceInfoSlot('osint.feed')}</div>
+            <ul class="rs-osint-feed" id="rsOsintFeed"><li class="rs-loading">Caricamento…</li></ul>
+          </div>
+
+          <p class="rs-meta" id="rsOsintErrors"></p>
         </div>
       `;
+      mountSourceInfo(root);
+      bindTabs(root);
 
-      const gridEl = root.querySelector<HTMLElement>('#rsOsintGrid');
-      const chipbar = root.querySelector<HTMLElement>('#rsOsintTopics');
-      const countEl = root.querySelector<HTMLElement>('#rsOsintCount');
-      const topicsEl = root.querySelector<HTMLElement>('#rsOsintTopicCount');
+      const nodesEl = root.querySelector<HTMLElement>('#rsOsintNodes');
+      const goodsEl = root.querySelector<HTMLElement>('#rsOsintGoods');
+      const feedEl = root.querySelector<HTMLElement>('#rsOsintFeed');
+      const errorsEl = root.querySelector<HTMLElement>('#rsOsintErrors');
+      const nodesHitEl = root.querySelector<HTMLElement>('#rsOsintNodesHit');
+      const significantEl = root.querySelector<HTMLElement>('#rsOsintSignificant');
       const updatedEl = root.querySelector<HTMLElement>('#rsOsintUpdated');
-      if (!gridEl || !chipbar || !countEl || !topicsEl || !updatedEl) return;
+      if (!nodesEl || !goodsEl || !feedEl) return;
+      const policyHref = switchAppHref('policy');
 
-      const allItems = () => sections.flatMap((section) => section.items);
-      const visibleItems = () => {
-        const items = activeTopic === 'ALL' ? allItems() : sections.find((section) => section.topic === activeTopic)?.items ?? [];
-        return items
-          .filter((item) => activeSeverity === 'ALL' || item.severity?.toLowerCase() === activeSeverity)
-          .filter((item) => {
-            if (!query) return true;
-            const haystack = `${item.title} ${item.summary} ${item.source}`.toLowerCase();
-            return haystack.includes(query);
-          })
-          .sort((a, b) => severityRank(b) - severityRank(a) || (b.score ?? 0) - (a.score ?? 0));
-      };
+      const load = async (force: boolean) => {
+        const errors: string[] = [];
+        const [snapshot, signals, policy, euGoods] = await Promise.all([
+          getThesisSnapshot(force).catch((e: unknown) => {
+            errors.push(`inneschi: ${e instanceof Error ? e.message : String(e)}`);
+            return null;
+          }),
+          fetchJson<OsintSignalsPayload>('/api/osint/signals').catch((e: unknown) => {
+            errors.push(`segnali: ${e instanceof Error ? e.message : String(e)}`);
+            return null;
+          }),
+          fetchJson<{ entries?: PolicyEntryLike[] }>('/api/policy/registry').catch((e: unknown) => {
+            errors.push(`registro Policy: ${e instanceof Error ? e.message : String(e)}`);
+            return null;
+          }),
+          fetchJson<EuGoodsLike>('/api/trade/eu-goods').catch(() => null),
+        ]);
+        if (snapshot?.errors.length) errors.push(...snapshot.errors);
 
-      const renderChips = () => {
-        const chips = [
-          `<button class="rs-chip-btn${activeTopic === 'ALL' ? ' active' : ''}" data-topic="ALL">Tutti</button>`,
-          ...sections.map(
-            (section) =>
-              `<button class="rs-chip-btn${activeTopic === section.topic ? ' active' : ''}" data-topic="${escapeHtml(section.topic)}">${escapeHtml(
-                section.title,
-              )} <span class="rs-chip-count">${section.items.length}</span></button>`,
-          ),
-        ];
-        chipbar.innerHTML = chips.join('');
-      };
+        const chains = snapshot?.chains ?? [];
+        const nodeRows = buildNodeRows(chains, signals?.climate ?? [], TRIGGER_WORKING_RULES.radiusKm);
+        nodesEl.innerHTML = nodeRows.length
+          ? nodeRows.map(nodeRowHtml).join('')
+          : '<tr><td colspan="5" class="rs-empty">Inneschi non disponibili.</td></tr>';
 
-      const render = () => {
-        const items = visibleItems();
-        gridEl.innerHTML = items.length
-          ? items
+        // Eurostat Comext covers all 8 goods; UN Comtrade (4 goods) is the fallback.
+        const comext = comextImportsForItaly(euGoods);
+        const importsSource = comext.length ? 'Eurostat Comext' : 'UN Comtrade';
+        const goodRows = buildGoodRows(STRATEGIC_GOODS, signals?.quotes ?? [], COMMODITIES, comext.length ? comext : signals?.comtradeIT.products ?? [], policy?.entries ?? []);
+        goodsEl.innerHTML = goodRows.map((row) => goodRowHtml(row, policyHref, importsSource)).join('');
+
+        const feed = buildFeed(chains);
+        feedEl.innerHTML = feed.length
+          ? feed
               .map(
-                (item) => `
-            <article class="rs-card rs-card-osint rs-sev-${escapeHtml((item.severity || 'low').toLowerCase())}">
-              <div class="rs-card-head">
-                <span class="rs-sev">${escapeHtml(item.severity || 'low')}</span>
-                ${typeof item.score === 'number' ? `<span class="rs-score">score ${Math.round(item.score)}</span>` : ''}
-              </div>
-              <h3>${escapeHtml(item.title)}</h3>
-              ${item.summary ? `<p>${escapeHtml(item.summary)}</p>` : ''}
-              <div class="rs-card-foot">
-                <span class="rs-meta">${escapeHtml(item.source || '')}</span>
-                ${item.url ? `<a class="rs-link" href="${escapeHtml(item.url)}" target="_blank" rel="noopener">Fonte ↗</a>` : ''}
-              </div>
-            </article>`,
+                (f) => `<li class="${f.significant ? 'rs-osint-sig' : ''}"><span class="rs-meta">${escapeHtml(fmtDate(f.time))}</span> <strong>${escapeHtml(f.nodeName)}</strong> — ${escapeHtml(f.text)} ${
+                  f.url ? `<a class="rs-link" href="${escapeHtml(f.url)}" target="_blank" rel="noopener">${escapeHtml(f.source)} ↗</a>` : `<span class="rs-meta">${escapeHtml(f.source)}</span>`
+                }</li>`,
               )
               .join('')
-          : '<div class="rs-empty">Nessun segnale con i filtri correnti.</div>';
-        if (countEl) countEl.textContent = String(items.length);
-        if (topicsEl) topicsEl.textContent = String(sections.length);
-        if (updatedEl) updatedEl.textContent = fetchedAt ? new Date(fetchedAt).toLocaleTimeString() : '–';
+          : '<li class="rs-empty">Nessun innesco misurato vicino ai nodi nel periodo.</li>';
+
+        setCount(root, '#rsOsintNodesCount', nodeRows.length);
+        setCount(root, '#rsOsintGoodsCount', goodRows.length);
+        setCount(root, '#rsOsintFeedCount', feed.length);
+        if (nodesHitEl) nodesHitEl.textContent = String(nodeRows.filter((r) => r.triggers.count > 0).length);
+        if (significantEl) significantEl.textContent = String(nodeRows.reduce((n, r) => n + r.triggers.significant, 0));
+        if (updatedEl) updatedEl.textContent = new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+        if (errorsEl) errorsEl.textContent = errors.length ? `Dati parziali: ${errors.join('; ')}` : '';
       };
 
-      const load = async (showLoading: boolean) => {
-        if (showLoading) gridEl.innerHTML = '<div class="rs-loading">Aggiornamento segnali…</div>';
-        try {
-          const res = await fetch('/api/notify/digest?limit=12', {
-            credentials: 'same-origin',
-            headers: { Accept: 'application/json' },
-          });
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          const payload = (await res.json()) as DigestPayload;
-          sections = Array.isArray(payload.digest?.sections) ? payload.digest.sections : [];
-          fetchedAt = payload.fetchedAt ?? new Date().toISOString();
-          if (activeTopic !== 'ALL' && !sections.some((section) => section.topic === activeTopic)) activeTopic = 'ALL';
-        } catch (error) {
-          sections = [];
-          gridEl.innerHTML = `<div class="rs-empty">Impossibile caricare i segnali: ${escapeHtml(
-            error instanceof Error ? error.message : String(error),
-          )}</div>`;
-          return;
-        }
-        renderChips();
-        render();
-      };
-
-      chipbar.addEventListener('click', (event) => {
-        const button = (event.target as HTMLElement).closest<HTMLElement>('[data-topic]');
-        if (!button) return;
-        activeTopic = button.dataset.topic as string;
-        renderChips();
-        render();
-      });
-      root.querySelector<HTMLInputElement>('#rsOsintQuery')?.addEventListener('input', (event) => {
-        query = (event.target as HTMLInputElement).value.trim().toLowerCase();
-        render();
-      });
-      root.querySelector<HTMLSelectElement>('#rsOsintSeverity')?.addEventListener('change', (event) => {
-        activeSeverity = (event.target as HTMLSelectElement).value.toLowerCase();
-        render();
-      });
       root.querySelector<HTMLButtonElement>('#rsOsintRefresh')?.addEventListener('click', () => {
         void load(true);
       });
 
-      await load(true);
+      await load(false);
     },
   };
 }

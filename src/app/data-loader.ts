@@ -77,7 +77,6 @@ import {
   fetchCriticalMinerals,
   fetchSanctionsPressure,
   fetchRadiationWatch,
-  fetchCustomsEvents,
   fetchDigestSignals,
 } from '@/services';
 import { getMarketWatchlistEntries } from '@/services/market-watchlist';
@@ -116,11 +115,13 @@ import { fetchSecurityAdvisories } from '@/services/security-advisories';
 import { fetchThermalEscalations } from '@/services/thermal-escalation';
 import { fetchCrossSourceSignals } from '@/services/cross-source-signals';
 import { fetchTelegramFeed } from '@/services/telegram-intel';
+import { isScopeOff } from '@/config/scope';
 import { fetchOrefAlerts, startOrefPolling, stopOrefPolling, onOrefAlertsUpdate } from '@/services/oref-alerts';
 import { enrichEventsWithExposure } from '@/services/population-exposure';
 import { debounce, getCircuitBreakerCooldownInfo } from '@/utils';
 import { getSecretState, isFeatureAvailable, isFeatureEnabled } from '@/services/runtime-config';
 import { isDesktopRuntime, toApiUrl } from '@/services/runtime';
+import { ACTIVE_APP } from '@/config/apps';
 import { getAiFlowSettings } from '@/services/ai-flow-settings';
 import { t, getCurrentLanguage } from '@/services/i18n';
 import { getHydratedData } from '@/services/bootstrap';
@@ -405,8 +406,14 @@ export class DataLoaderManager implements AppModule {
       }
     };
 
-    const shouldLoad = (id: string): boolean => forceAll || this.isPanelNearViewport(id);
-    const shouldLoadAny = (ids: string[]): boolean => forceAll || this.isAnyPanelNearViewport(ids);
+    // Risk Sentinel: the boot pass (forceAll) loads only panels that exist in
+    // the active app. Apps such as the thesis view create a dozen panels; without
+    // this gate the first load fired ~70 endpoints for panels that were never
+    // created (markets, FRED, BIS, predictions, forecasts, ...), delaying the
+    // panels that are on screen and loading the self-hosted API for nothing.
+    const panelExists = (id: string): boolean => Boolean(this.ctx.panels[id]);
+    const shouldLoad = (id: string): boolean => (forceAll && panelExists(id)) || this.isPanelNearViewport(id);
+    const shouldLoadAny = (ids: string[]): boolean => (forceAll && ids.some(panelExists)) || this.isAnyPanelNearViewport(ids);
 
     const tasks: Array<{ name: string; task: Promise<void> }> = [
       { name: 'news', task: runGuarded('news', () => this.loadNews()) },
@@ -520,9 +527,12 @@ export class DataLoaderManager implements AppModule {
         }
       } catch { /* non-fatal */ }
     }
-    // Intelligence signals: run for any variant that shows these panels
-    if (shouldLoadAny(['cii', 'strategic-risk', 'strategic-posture', 'climate', 'population-exposure', 'security-advisories', 'radiation-watch', 'displacement', 'ucdp-events', 'satellite-fires', 'oref-sirens'])) {
+    // Intelligence signals: run for any variant that shows these panels.
+    // The climate panel alone (thesis view) only needs its own anomalies.
+    if (shouldLoadAny(['cii', 'strategic-risk', 'strategic-posture', 'population-exposure', 'security-advisories', 'radiation-watch', 'displacement', 'ucdp-events', 'satellite-fires', 'oref-sirens'])) {
       tasks.push({ name: 'intelligence', task: runGuarded('intelligence', () => this.loadIntelligenceSignals()) });
+    } else if (shouldLoad('climate') || this.ctx.mapLayers.climate) {
+      tasks.push({ name: 'climate', task: runGuarded('climate', () => this.loadClimateAnomalies()) });
     }
 
     if (SITE_VARIANT === 'full' && (shouldLoad('satellite-fires') || this.ctx.mapLayers.natural)) {
@@ -558,28 +568,24 @@ export class DataLoaderManager implements AppModule {
       tasks.push({ name: 'crossSourceSignals', task: runGuarded('crossSourceSignals', () => this.loadCrossSourceSignals()) });
     }
 
-    // Stagger startup: run tasks in small batches to avoid hammering upstreams
-    const BATCH_SIZE = 4;
-    const BATCH_DELAY_MS = 300;
-    for (let i = 0; i < tasks.length; i += BATCH_SIZE) {
-      const batch = tasks.slice(i, i + BATCH_SIZE);
-      const results = await Promise.allSettled(batch.map(t => t.task));
-      results.forEach((result, idx) => {
-        if (result.status === 'rejected') {
-          console.error(`[App] ${batch[idx]?.name} load failed:`, result.reason);
-        }
-      });
-      if (i + BATCH_SIZE < tasks.length) {
-        await new Promise(r => setTimeout(r, BATCH_DELAY_MS));
+    // Every task above is already running (runGuarded starts on creation), so
+    // the former 4-task batches with a 300 ms pause did not stagger the requests:
+    // they only delayed the end of the initial load by ~0.3 s per batch.
+    // Throttling of constrained upstreams belongs in their loader/service
+    // (see tests/load-all-data-scheduling.test.mts).
+    const results = await Promise.allSettled(tasks.map(t => t.task));
+    results.forEach((result, idx) => {
+      if (result.status === 'rejected') {
+        console.error(`[App] ${tasks[idx]?.name} load failed:`, result.reason);
       }
-    }
+    });
 
     this.updateSearchIndex();
 
-    await Promise.allSettled([
-      this.loadDailyMarketBrief(),
-      this.loadMarketImplications(),
-    ]);
+    const marketFollowUps: Promise<void>[] = [];
+    if (shouldLoad('daily-market-brief')) marketFollowUps.push(this.loadDailyMarketBrief());
+    if (shouldLoad('market-implications')) marketFollowUps.push(this.loadMarketImplications());
+    await Promise.allSettled(marketFollowUps);
 
     const bootstrapTemporal = consumeServerAnomalies();
     if (bootstrapTemporal.anomalies.length > 0 || bootstrapTemporal.trackedTypes.length > 0) {
@@ -662,9 +668,11 @@ export class DataLoaderManager implements AppModule {
         case 'radiationWatch':
           await this.loadRadiationWatch();
           break;
+        case 'climate':
+          await this.loadClimateAnomalies();
+          break;
         case 'ucdpEvents':
         case 'displacement':
-        case 'climate':
         case 'gpsJamming':
           await this.loadIntelligenceSignals();
           break;
@@ -1163,6 +1171,7 @@ export class DataLoaderManager implements AppModule {
   }
 
   async loadStockAnalysis(): Promise<void> {
+    if (isScopeOff('finance')) return; // switched off: src/config/scope.ts
     const panel = this.ctx.panels['stock-analysis'] as StockAnalysisPanel | undefined;
     if (!panel) return;
 
@@ -1203,6 +1212,7 @@ export class DataLoaderManager implements AppModule {
   }
 
   async loadStockBacktest(): Promise<void> {
+    if (isScopeOff('finance')) return; // switched off: src/config/scope.ts
     const panel = this.ctx.panels['stock-backtest'] as StockBacktestPanel | undefined;
     if (!panel) return;
 
@@ -1261,7 +1271,12 @@ export class DataLoaderManager implements AppModule {
       let stocksResult: Awaited<ReturnType<typeof fetchMultipleStocks>>;
       const marketsPanel = this.ctx.panels['markets'] as MarketPanel | undefined;
 
-      if (customEntries.length === 0 && hydratedMarkets?.quotes?.length) {
+      if (isScopeOff('finance')) {
+        // Stock quotes only feed the markets panels, switched off with the
+        // finance group (src/config/scope.ts): the commodities panel does not
+        // need them.
+        stocksResult = { data: [] };
+      } else if (customEntries.length === 0 && hydratedMarkets?.quotes?.length) {
         const symbolMetaMap = new Map(effectiveSymbols.map((s) => [s.symbol, s]));
         const data = hydratedMarkets.quotes.map((q) => ({
           symbol: q.symbol,
@@ -1287,7 +1302,9 @@ export class DataLoaderManager implements AppModule {
 
       const finnhubConfigMsg = 'FINNHUB_API_KEY not configured — add in Settings';
 
-      if (stocksResult.rateLimited && stocksResult.data.length === 0) {
+      if (isScopeOff('finance')) {
+        // Finnhub is not called: nothing to report.
+      } else if (stocksResult.rateLimited && stocksResult.data.length === 0) {
         const rlMsg = 'Market data temporarily unavailable (rate limited) — retrying shortly';
         this.ctx.panels['commodities']?.showError(rlMsg);
       } else if (stocksResult.skipped) {
@@ -1300,6 +1317,7 @@ export class DataLoaderManager implements AppModule {
       }
 
       // Sector heatmap: always attempt loading regardless of market rate-limit status
+      // (finance scope only: the heatmap is switched off with it).
       const hydratedSectors = getHydratedData('sectors') as GetSectorSummaryResponse | undefined;
       const heatmapPanel = this.ctx.panels['heatmap'] as HeatmapPanel | undefined;
       const sectorNameMap = new Map(SECTORS.map((s) => [s.symbol, s.name]));
@@ -1310,7 +1328,9 @@ export class DataLoaderManager implements AppModule {
       });
       const toSectorBar = (s: { symbol?: string; name: string; change: number | null }) =>
         s.symbol && Number.isFinite(s.change) ? { symbol: s.symbol, name: s.name, change1d: s.change as number } : null;
-      if (hydratedSectors?.sectors?.length) {
+      if (isScopeOff('finance')) {
+        // switched off: src/config/scope.ts
+      } else if (hydratedSectors?.sectors?.length) {
         warmSectorCache(hydratedSectors);
         const items = hydratedSectors.sectors.map(toHeatmapItem);
         const sectorBars = items.map(toSectorBar).filter((s): s is NonNullable<typeof s> => s !== null);
@@ -1413,13 +1433,16 @@ export class DataLoaderManager implements AppModule {
       this.ctx.statusPanel?.updateApi('Finnhub', { status: 'error' });
     }
 
-    try {
-      const cryptoPanel = this.ctx.panels['crypto'] as CryptoPanel | undefined;
-      const crypto = await fetchCrypto();
-      cryptoPanel?.renderCrypto(crypto);
-      this.ctx.statusPanel?.updateApi('CoinGecko', { status: crypto.length > 0 ? 'ok' : 'error' });
-    } catch {
-      this.ctx.statusPanel?.updateApi('CoinGecko', { status: 'error' });
+    // Crypto quotes: finance scope switched off (src/config/scope.ts).
+    if (!isScopeOff('finance')) {
+      try {
+        const cryptoPanel = this.ctx.panels['crypto'] as CryptoPanel | undefined;
+        const crypto = await fetchCrypto();
+        cryptoPanel?.renderCrypto(crypto);
+        this.ctx.statusPanel?.updateApi('CoinGecko', { status: crypto.length > 0 ? 'ok' : 'error' });
+      } catch {
+        this.ctx.statusPanel?.updateApi('CoinGecko', { status: 'error' });
+      }
     }
 
     const cryptoHeatmapPanel = this.ctx.panels['crypto-heatmap'] as CryptoHeatmapPanel | undefined;
@@ -1450,6 +1473,7 @@ export class DataLoaderManager implements AppModule {
   }
 
   async loadDailyMarketBrief(force = false): Promise<void> {
+    if (isScopeOff('finance')) return; // switched off: src/config/scope.ts
     if (this.ctx.isDestroyed || this.ctx.inFlight.has('dailyMarketBrief')) return;
 
     this.dailyBriefGeneration++;
@@ -1606,6 +1630,7 @@ export class DataLoaderManager implements AppModule {
   }
 
   async loadMarketImplications(): Promise<void> {
+    if (isScopeOff('finance')) return; // switched off: src/config/scope.ts
     if (this.ctx.isDestroyed || this.ctx.inFlight.has('marketImplications')) return;
     this.ctx.inFlight.add('marketImplications');
     try {
@@ -1627,6 +1652,7 @@ export class DataLoaderManager implements AppModule {
   }
 
   async loadPredictions(): Promise<void> {
+    if (isScopeOff('finance')) return; // switched off: src/config/scope.ts
     try {
       const predictions = await fetchPredictions({ region: this.ctx.resolvedLocation });
       this.ctx.latestPredictions = predictions;
@@ -1646,7 +1672,15 @@ export class DataLoaderManager implements AppModule {
     }
   }
 
+  private forecastViewSignalled = false;
+
   async loadForecasts(): Promise<void> {
+    // Risk Sentinel: tell the server someone is looking at the forecasts, so
+    // the hourly seeder computes them for the next 24 h (once per page load).
+    if (!this.forecastViewSignalled) {
+      this.forecastViewSignalled = true;
+      void fetch(toApiUrl('/api/forecast/viewed'), { method: 'POST', credentials: 'same-origin' }).catch(() => {});
+    }
     try {
       const hydrated = getHydratedData('forecasts') as { predictions?: import('@/generated/client/worldmonitor/forecast/v1/service_client').Forecast[] } | undefined;
       if (hydrated?.predictions?.length) {
@@ -1787,12 +1821,43 @@ export class DataLoaderManager implements AppModule {
     }
   }
 
+  /**
+   * Climate anomalies on their own: the thesis view shows the climate panel but
+   * none of the CII panels, so it must not pull the whole intelligence bundle
+   * (outages, protests, HAPI, UNHCR, advisories…). loadIntelligenceSignals
+   * still calls this, so the CII keeps its climate input.
+   */
+  async loadClimateAnomalies(): Promise<void> {
+    try {
+      const climateResult = await fetchClimateAnomalies();
+      if (!climateResult.ok) {
+        dataFreshness.recordError('climate', 'Climate anomalies unavailable (retaining prior climate state)');
+        return;
+      }
+      const anomalies = climateResult.anomalies;
+      this.callPanel('climate', 'setAnomalies', anomalies);
+      ingestClimateForCII(anomalies);
+      if (this.ctx.mapLayers.climate) {
+        this.ctx.map?.setClimateAnomalies(anomalies);
+      }
+      if (anomalies.length > 0) dataFreshness.recordUpdate('climate', anomalies.length);
+    } catch (error) {
+      console.error('[Intelligence] Climate anomalies fetch failed:', error);
+      this.callPanel('climate', 'showError');
+      dataFreshness.recordError('climate', String(error));
+    }
+  }
+
   async loadIntelligenceSignals(): Promise<void> {
     resetHotspotActivity();
     const _desktopLocked = isDesktopRuntime() && !getSecretState('WORLDMONITOR_API_KEY').present;
     const tasks: Promise<void>[] = [];
 
-    tasks.push((async () => {
+    // Risk Sentinel scope (15/10/2026): outages, protests, HAPI, UNHCR and
+    // security advisories belong to the switched-off upstreamExtra group.
+    const extraOff = isScopeOff('upstreamExtra');
+
+    if (!extraOff) tasks.push((async () => {
       try {
         const outages = await fetchInternetOutages();
         this.ctx.intelligenceCache.outages = outages;
@@ -1820,6 +1885,7 @@ export class DataLoaderManager implements AppModule {
     })());
 
     const protestsTask = (async (): Promise<SocialUnrestEvent[]> => {
+      if (extraOff) return [];
       try {
         const protestData = await fetchProtestEvents();
         this.ctx.intelligenceCache.protests = protestData;
@@ -1873,7 +1939,7 @@ export class DataLoaderManager implements AppModule {
       }
     })());
 
-    tasks.push((async () => {
+    if (!extraOff) tasks.push((async () => {
       try {
         const summaries = await fetchHapiSummary();
         ingestHapiForCII(summaries);
@@ -1885,6 +1951,7 @@ export class DataLoaderManager implements AppModule {
     })());
 
     tasks.push((async () => {
+      if (isScopeOff('military')) return; // military feeds switched off (src/config/scope.ts)
       try {
         if (isMilitaryVesselTrackingConfigured()) {
           initMilitaryVesselStream();
@@ -1978,7 +2045,7 @@ export class DataLoaderManager implements AppModule {
       }
     })());
 
-    tasks.push((async () => {
+    if (!extraOff) tasks.push((async () => {
       try {
         const unhcrResult = await fetchUnhcrPopulation();
         if (!unhcrResult.ok) {
@@ -1999,37 +2066,18 @@ export class DataLoaderManager implements AppModule {
       }
     })());
 
-    tasks.push((async () => {
-      try {
-        const climateResult = await fetchClimateAnomalies();
-        if (!climateResult.ok) {
-          dataFreshness.recordError('climate', 'Climate anomalies unavailable (retaining prior climate state)');
-          return;
-        }
-        const anomalies = climateResult.anomalies;
-        this.callPanel('climate', 'setAnomalies', anomalies);
-        ingestClimateForCII(anomalies);
-        if (this.ctx.mapLayers.climate) {
-          this.ctx.map?.setClimateAnomalies(anomalies);
-        }
-        if (anomalies.length > 0) dataFreshness.recordUpdate('climate', anomalies.length);
-      } catch (error) {
-        console.error('[Intelligence] Climate anomalies fetch failed:', error);
-        this.callPanel('climate', 'showError');
-        dataFreshness.recordError('climate', String(error));
-      }
-    })());
+    tasks.push(this.loadClimateAnomalies());
 
     // Security advisories
-    tasks.push(this.loadSecurityAdvisories());
+    if (!extraOff) tasks.push(this.loadSecurityAdvisories());
 
     // Telegram Intel (premium-locked on desktop without API key)
     if (!_desktopLocked) {
       tasks.push(this.loadTelegramIntel());
     }
 
-    // OREF sirens (premium-locked on desktop without API key)
-    if (!_desktopLocked) {
+    // OREF sirens (premium-locked on desktop without API key; military scope)
+    if (!_desktopLocked && !isScopeOff('military')) {
       tasks.push((async () => {
         try {
           const data = await fetchOrefAlerts();
@@ -2056,7 +2104,7 @@ export class DataLoaderManager implements AppModule {
     }
 
     // GPS/GNSS jamming (cloud-only — seeded by Wingbits API via fetch-gpsjam.mjs)
-    if (!isDesktopRuntime()) {
+    if (!isDesktopRuntime() && !isScopeOff('military')) {
       tasks.push((async () => {
         try {
           const data = await fetchGpsInterference();
@@ -2181,6 +2229,7 @@ export class DataLoaderManager implements AppModule {
   }
 
   async loadIranEvents(): Promise<void> {
+    if (isScopeOff('military')) return; // switched off: src/config/scope.ts
     try {
       const events = await fetchIranEvents();
       this.ctx.intelligenceCache.iranEvents = events;
@@ -2370,6 +2419,7 @@ export class DataLoaderManager implements AppModule {
   }
 
   async loadMilitary(): Promise<void> {
+    if (isScopeOff('military')) return; // switched off: src/config/scope.ts
     if (this.ctx.intelligenceCache.military) {
       const { flights, flightClusters, vessels, vesselClusters } = this.ctx.intelligenceCache.military;
       this.ctx.map?.setMilitaryFlights(flights, flightClusters);
@@ -2615,6 +2665,15 @@ export class DataLoaderManager implements AppModule {
     const tradePanel = this.ctx.panels['trade-policy'] as TradePolicyPanel | undefined;
     if (!tradePanel) return;
 
+    // Risk Sentinel (#91): EU/Italy imports and EU duties on the 8 thesis goods.
+    // The thesis view shows only these; the US-centred WTO/Treasury tabs stay
+    // in the Full dashboard.
+    void fetch(toApiUrl('/api/trade/eu-goods'), { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => { if (data) tradePanel.updateEuGoods(data); })
+      .catch(() => {});
+    if (ACTIVE_APP.id === 'thesis') return;
+
     try {
       const [restrictions, tariffs, flows, barriers, revenue, comtrade] = await Promise.allSettled([
         fetchTradeRestrictions([], 50),
@@ -2806,6 +2865,7 @@ export class DataLoaderManager implements AppModule {
   }
 
   async loadPizzInt(): Promise<void> {
+    if (isScopeOff('military')) return; // switched off: src/config/scope.ts
     try {
       const [status, tensions] = await Promise.all([
         fetchPizzIntStatus(),
@@ -3016,6 +3076,11 @@ export class DataLoaderManager implements AppModule {
   }
 
   async loadSanctionsPressure(): Promise<void> {
+    // Risk Sentinel (#92): EU consolidated list, aggregated, next to OFAC.
+    void fetch(toApiUrl('/api/sanctions/eu'), { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => { if (data) this.callPanel('sanctions-pressure', 'setEuData', data); })
+      .catch(() => {});
     try {
       const result = await fetchSanctionsPressure();
       this.callPanel('sanctions-pressure', 'setData', result);
@@ -3057,6 +3122,7 @@ export class DataLoaderManager implements AppModule {
   }
 
   async loadTelegramIntel(): Promise<void> {
+    if (isScopeOff('military')) return; // switched off: src/config/scope.ts
     if (isDesktopRuntime() && !getSecretState('WORLDMONITOR_API_KEY').present) return;
     try {
       const result = await fetchTelegramFeed();
@@ -3070,6 +3136,7 @@ export class DataLoaderManager implements AppModule {
   }
 
   async loadThermalEscalations(): Promise<void> {
+    if (isScopeOff('military')) return; // switched off: src/config/scope.ts
     try {
       const result = await fetchThermalEscalations();
       this.ctx.intelligenceCache.thermalEscalation = result;
@@ -3094,38 +3161,11 @@ export class DataLoaderManager implements AppModule {
 
   async loadCustomsEvents(): Promise<void> {
     try {
-      const events = await fetchCustomsEvents();
-      // The SQLite event table has no writer on the self-hosted deploy; fall back
-      // to the n8n notification digest so the panel still shows live signals.
-      const alerts = events.length > 0 ? events : await fetchDigestSignals();
+      // Alerts come from the n8n notification digest. They carry no position,
+      // so they leave the map hotspots layer alone (the removed SQLite route
+      // replaced it with its own, randomly placed, events).
+      const alerts = await fetchDigestSignals();
       this.callPanel('alert-feed', 'renderAlerts', alerts);
-      
-      const hotspots = events.map(e => {
-        let level: 'high' | 'elevated' | 'low' = 'low';
-        let escalationScore: 1 | 2 | 3 | 4 | 5 = 1;
-        if (e.severity === 'critical') {
-          level = 'high';
-          escalationScore = 5;
-        } else if (e.severity === 'high') {
-          level = 'high';
-          escalationScore = 4;
-        } else if (e.severity === 'medium') {
-          level = 'elevated';
-          escalationScore = 3;
-        } else {
-          escalationScore = 1;
-        }
-        return {
-          id: e.id,
-          name: e.title,
-          lat: e.lat,
-          lon: e.lon,
-          keywords: [e.severity],
-          level,
-          escalationScore
-        };
-      });
-      this.ctx.map?.setHotspots(hotspots);
     } catch (error) {
       console.error('[App] Customs events fetch failed:', error);
     }

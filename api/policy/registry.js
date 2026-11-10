@@ -11,9 +11,13 @@
  */
 
 import { getPublicCorsHeaders } from '../_cors.js';
+import { unwrapEnvelope } from '../_seed-envelope.js';
 import registryEntries from './_registry-data.js';
 
 const MONITOR_KEY = 'policy:monitor:v1';
+// Recent EU acts for the thesis goods / trade defence, written every 6h by
+// scripts/seed-policy-eu-acts.mjs (Publications Office SPARQL).
+const EU_ACTS_KEY = 'policy:eu-acts:v1';
 
 async function redisGet(url, token, key) {
   const resp = await fetch(url, {
@@ -43,6 +47,7 @@ export default async function handler(request) {
   const entries = Array.isArray(registryEntries) ? registryEntries : [];
 
   let monitor = [];
+  let acts = null;
   const restUrl = process.env.UPSTASH_REDIS_REST_URL || '';
   const restToken = process.env.UPSTASH_REDIS_REST_TOKEN || '';
   if (restUrl && restToken) {
@@ -50,10 +55,14 @@ export default async function handler(request) {
     if (cached && typeof cached === 'object') {
       monitor = Array.isArray(cached.items) ? cached.items : [];
     }
+    const euActs = unwrapEnvelope(await redisGet(restUrl, restToken, EU_ACTS_KEY).catch(() => null)).data;
+    if (euActs && typeof euActs === 'object' && Array.isArray(euActs.acts)) {
+      acts = { since: euActs.since ?? null, windowDays: euActs.windowDays ?? null, scanned: euActs.scanned ?? null, items: euActs.acts };
+    }
   }
 
   return new Response(
-    JSON.stringify({ entries, monitor, fetchedAt: new Date().toISOString() }),
+    JSON.stringify({ entries, monitor, acts, fetchedAt: new Date().toISOString() }),
     { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
   );
 }

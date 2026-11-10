@@ -12,8 +12,15 @@ export const CLIMATE_ZONE_NORMALS_KEY = 'climate:zone-normals:v1';
 const NORMALS_TTL = 95 * 24 * 60 * 60; // 95 days = >3x a 31-day monthly interval
 const NORMALS_START = '1991-01-01';
 const NORMALS_END = '2020-12-31';
-const NORMALS_BATCH_SIZE = 2;
-const NORMALS_BATCH_DELAY_MS = 3_000;
+// Risk Sentinel: 30 years of daily data per zone is a heavy Open-Meteo request.
+// On the VPS (shared IP, weekly sweep) two zones every 3 s drew HTTP 429 on
+// almost every batch and the run hit its 240 s deadline (log of 11/10/2026),
+// so the normals were never written and the hourly anomaly seeder failed.
+// One zone at a time, well spaced, with a deadline sized for 25 zones; the
+// cron runs it on its own in the weekly tier (scripts/seed-cron.sh).
+const NORMALS_BATCH_SIZE = 1;
+const NORMALS_BATCH_DELAY_MS = Number(process.env.CLIMATE_NORMALS_DELAY_MS) || 20_000;
+const NORMALS_FETCH_DEADLINE_MS = 45 * 60_000;
 
 function round(value, decimals = 2) {
   const scale = 10 ** decimals;
@@ -105,7 +112,7 @@ export async function fetchClimateZoneNormals() {
         daily: ['temperature_2m_mean', 'precipitation_sum'],
         timeoutMs: 30_000,
         maxRetries: 4,
-        retryBaseMs: 5_000,
+        retryBaseMs: 30_000,
         label: `normals batch (${batch.map((zone) => zone.name).join(', ')})`,
       });
       const batchNormals = buildZoneNormalsFromBatch(batch, payloads);
@@ -156,6 +163,8 @@ if (isMain) {
     declareRecords,
     schemaVersion: 1,
     maxStaleMin: 89280, // matches api/health.js SEED_META (monthly cron on 1st; 62d window)
+    lockTtlMs: NORMALS_FETCH_DEADLINE_MS,
+    fetchPhaseTimeoutMs: NORMALS_FETCH_DEADLINE_MS,
   }).catch((err) => {
     const cause = err.cause ? ` (cause: ${err.cause.message || err.cause.code || err.cause})` : '';
     console.error('FATAL:', (err.message || err) + cause);

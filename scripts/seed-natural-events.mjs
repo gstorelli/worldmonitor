@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 
 import { loadEnvFile, CHROME_UA, runSeed } from './_seed-utils.mjs';
+import { TRIGGERS_UA } from './_thesis-catalogue.mjs';
 import {
   buildWesternPacificCycloneSnapshot,
   fetchHkoWarnings,
@@ -17,6 +18,10 @@ const NHC_BASE = 'https://mapservices.weather.noaa.gov/tropical/rest/services/tr
 const CANONICAL_KEY = 'natural:events:v1';
 const WESTERN_PACIFIC_CYCLONES_KEY = 'natural:western-pacific-cyclones:v1';
 const HKO_WARNINGS_KEY = 'weather:hko-warnings:v1';
+// Risk Sentinel: written only when GDACS answered, so its seed-meta goes stale
+// (and /api/health says so) when GDACS fails. Thesis issue #146: from at least
+// 14/10/2026 GDACS answered 400 and the seeder still reported OK.
+export const GDACS_STATUS_KEY = 'natural:gdacs-status:v1';
 const CACHE_TTL = 64800; // 18h — 6x the 3h Railway bundle cadence; preserves last-good through health grace.
 
 const DAYS = 30;
@@ -148,15 +153,38 @@ function parseGdacsTcFields(props) {
   return fields;
 }
 
-async function fetchGdacs(fetchFn = globalThis.fetch) {
-  const res = await fetchFn(GDACS_API, {
-    headers: { Accept: 'application/json', 'User-Agent': CHROME_UA },
-    signal: AbortSignal.timeout(15_000),
-  });
-  if (!res.ok) throw new Error(`GDACS ${res.status}`);
+// Since (at least) 14/10/2026 the GDACS MAP endpoint answers HTTP 400
+// "Eventtype is required." without `eventtype`, and accepts one type per
+// request: the seeder had silently published EONET/NHC events only.
+export function gdacsUrl(eventType) {
+  return `${GDACS_API}?eventtype=${encodeURIComponent(eventType)}`;
+}
 
-  const data = await res.json();
-  const features = data.features || [];
+export async function fetchGdacs(fetchFn = globalThis.fetch) {
+  const types = Object.keys(GDACS_TO_CATEGORY);
+  const results = await Promise.allSettled(types.map(async (type) => {
+    // Since early November 2026 GDACS answers a browser User-Agent with a
+    // JavaScript challenge page (F5); an honest client name gets the JSON API.
+    const res = await fetchFn(gdacsUrl(type), {
+      headers: { Accept: 'application/json', 'User-Agent': TRIGGERS_UA },
+      signal: AbortSignal.timeout(15_000),
+    });
+    // GDACS answers 404 when a type has no current event (seen for VO on
+    // 15/10/2026): an empty list, not a failure.
+    if (res.status === 404) {
+      console.log(`[GDACS] ${type}: no current events (404)`);
+      return [];
+    }
+    if (!res.ok) throw new Error(`GDACS ${type} ${res.status}`);
+    const data = await res.json();
+    return data.features || [];
+  }));
+  const failed = results
+    .map((r, i) => (r.status === 'rejected' ? `${types[i]}: ${r.reason?.message ?? r.reason}` : null))
+    .filter(Boolean);
+  if (failed.length === types.length) throw new Error(`GDACS all types failed (${failed.join('; ')})`);
+  if (failed.length) console.log(`[GDACS] partial: ${failed.join('; ')}`);
+  const features = results.flatMap((r) => (r.status === 'fulfilled' ? r.value : []));
   const seen = new Set();
   const events = [];
 
@@ -485,6 +513,12 @@ export async function fetchNaturalEvents({
   if (merged.length === 0) return null;
   return {
     events: merged,
+    gdacsStatus: {
+      ok: gdacsResult.status === 'fulfilled',
+      checkedAt: now,
+      events: gdacsEvents.length,
+      error: gdacsResult.status === 'rejected' ? String(gdacsResult.reason?.message ?? gdacsResult.reason) : null,
+    },
     westernPacific,
     hkoWarnings: {
       evaluatedAt: westernPacific.evaluatedAt,
@@ -510,6 +544,16 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     ttlSeconds: CACHE_TTL,
     sourceVersion: 'eonet+gdacs+nhc+hko-v2',
     extraKeys: [
+      {
+        key: GDACS_STATUS_KEY,
+        ttl: CACHE_TTL,
+        transform: (data) => data.gdacsStatus,
+        declareRecords: (status) => (status?.ok ? 1 : 0),
+        metaKey: 'seed-meta:natural:gdacs-status',
+        metaTtlSeconds: CACHE_TTL,
+        metaCritical: true,
+        skipWhenEmpty: true,
+      },
       {
         key: WESTERN_PACIFIC_CYCLONES_KEY,
         ttl: CACHE_TTL,

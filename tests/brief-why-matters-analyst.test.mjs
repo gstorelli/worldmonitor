@@ -36,7 +36,6 @@ const HANDLER_ENV_KEYS = [
   'BRIEF_WHY_MATTERS_SHADOW',
   'OLLAMA_API_URL',
   'OLLAMA_API_KEY',
-  'GROQ_API_KEY',
   'OPENROUTER_API_KEY',
   'LLM_API_URL',
   'LLM_API_KEY',
@@ -56,11 +55,14 @@ async function invokeHandlerWithCachedEnvelope(
   process.env.UPSTASH_REDIS_REST_TOKEN = 'test-redis-token';
   process.env.BRIEF_WHY_MATTERS_PRIMARY = primary;
   process.env.BRIEF_WHY_MATTERS_SHADOW = '0';
-  for (const key of ['OLLAMA_API_URL', 'OLLAMA_API_KEY', 'GROQ_API_KEY', 'OPENROUTER_API_KEY', 'LLM_API_URL', 'LLM_API_KEY']) {
+  for (const key of ['OLLAMA_API_URL', 'OLLAMA_API_KEY', 'OPENROUTER_API_KEY', 'LLM_API_URL', 'LLM_API_KEY']) {
     delete process.env[key];
   }
   if (providerCompletion) process.env.OPENROUTER_API_KEY = 'or-test-key';
-  if (fallbackProviderCompletion) process.env.GROQ_API_KEY = 'groq-test-key';
+  if (fallbackProviderCompletion) {
+    process.env.LLM_API_URL = 'https://generic.example.test/v1/chat/completions';
+    process.env.LLM_API_KEY = 'generic-test-key';
+  }
   globalThis.fetch = async (input, init) => {
     const url = String(input);
     const method = init?.method || 'GET';
@@ -81,7 +83,7 @@ async function invokeHandlerWithCachedEnvelope(
         headers: { 'Content-Type': 'application/json' },
       });
     }
-    if (url === 'https://api.groq.com/openai/v1/chat/completions' && fallbackProviderCompletion) {
+    if (url === 'https://generic.example.test/v1/chat/completions' && fallbackProviderCompletion) {
       return new Response(JSON.stringify(fallbackProviderCompletion), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
@@ -338,7 +340,7 @@ describe('brief-why-matters Edge cache acceptance', () => {
           .map(({ url }) => url),
         [
           'https://openrouter.ai/api/v1/chat/completions',
-          'https://api.groq.com/openai/v1/chat/completions',
+          'https://generic.example.test/v1/chat/completions',
         ],
         `${primary} must retry the fallback provider in-request`,
       );

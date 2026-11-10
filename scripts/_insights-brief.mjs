@@ -140,8 +140,8 @@ export function synthesisUserPrompt(stories) {
 }
 
 /**
- * Tolerant parser for the synthesis JSON. Strips code fences (groq and
- * Gemini both wrap), extracts the outermost object, validates shape.
+ * Tolerant parser for the synthesis JSON. Strips code fences (several
+ * models wrap), extracts the outermost object, validates shape.
  * Returns { lead, lines: [{ n, text }] } or null — callers fall back to
  * the single-headline path on null (the brief always ships).
  */

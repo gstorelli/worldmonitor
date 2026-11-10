@@ -144,15 +144,17 @@ describe('resolveScenarioLlmResult validation retry', () => {
   });
 
   it('tries a fallback provider after the primary validates to zero narratives', async () => {
-    const oldGroqKey = process.env.GROQ_API_KEY;
+    const oldGenericKey = process.env.LLM_API_KEY;
+    const oldGenericUrl = process.env.LLM_API_URL;
     const oldOpenRouterKey = process.env.OPENROUTER_API_KEY;
-    process.env.GROQ_API_KEY = 'groq-key';
+    process.env.LLM_API_KEY = 'generic-key';
+    process.env.LLM_API_URL = 'https://llm.example.test/v1/chat/completions';
     process.env.OPENROUTER_API_KEY = 'openrouter-key';
     const providers = [];
     try {
       __setForecastLlmTransportForTests({
         fetch: async (url) => {
-          const provider = url.includes('groq.com') ? 'groq' : 'openrouter';
+          const provider = url.includes('llm.example.test') ? 'generic' : 'openrouter';
           providers.push(provider);
           return {
             ok: true,
@@ -160,7 +162,7 @@ describe('resolveScenarioLlmResult validation retry', () => {
               model: `${provider}-model`,
               choices: [{
                 message: {
-                  content: provider === 'groq'
+                  content: provider === 'generic'
                     ? 'The provider returned a semantically empty JSON payload: []'
                     : validCasePayload,
                 },
@@ -169,12 +171,13 @@ describe('resolveScenarioLlmResult validation retry', () => {
           };
         },
       });
-      const out = await resolveScenarioLlmResult(predictions, { providerOrder: ['groq', 'openrouter'], retryDelayMs: 1 });
-      assert.deepEqual(providers, ['groq', 'openrouter']);
+      const out = await resolveScenarioLlmResult(predictions, { providerOrder: ['generic', 'openrouter'], retryDelayMs: 1 });
+      assert.deepEqual(providers, ['generic', 'openrouter']);
       assert.equal(out.result.provider, 'openrouter');
       assert.equal(out.validCases.length, 1);
     } finally {
-      if (oldGroqKey === undefined) delete process.env.GROQ_API_KEY; else process.env.GROQ_API_KEY = oldGroqKey;
+      if (oldGenericKey === undefined) delete process.env.LLM_API_KEY; else process.env.LLM_API_KEY = oldGenericKey;
+      if (oldGenericUrl === undefined) delete process.env.LLM_API_URL; else process.env.LLM_API_URL = oldGenericUrl;
       if (oldOpenRouterKey === undefined) delete process.env.OPENROUTER_API_KEY; else process.env.OPENROUTER_API_KEY = oldOpenRouterKey;
     }
   });

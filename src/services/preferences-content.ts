@@ -1,4 +1,5 @@
 import { LANGUAGES, getCurrentLanguage, changeLanguage, t } from '@/services/i18n';
+import { isScopeOff } from '@/config/scope';
 import { getAiFlowSettings, setAiFlowSetting, getStreamQuality, setStreamQuality, STREAM_QUALITY_OPTIONS } from '@/services/ai-flow-settings';
 import { getMapProvider, setMapProvider, MAP_PROVIDER_OPTIONS, MAP_THEME_OPTIONS, getMapTheme, setMapTheme, type MapProvider } from '@/config/basemap';
 const getLiveStreamsAlwaysOn = () => false; const setLiveStreamsAlwaysOn = (_v: any) => {};
@@ -27,8 +28,6 @@ import {
   getActiveFrameworkForPanel,
   type AnalysisPanelId,
 } from '@/services/analysis-framework-store';
-
-const DESKTOP_RELEASES_URL = 'https://github.com/koala73/worldmonitor/releases';
 
 export interface PreferencesHost {
   isDesktopApp: boolean;
@@ -222,30 +221,11 @@ export function renderPreferences(host: PreferencesHost): PreferencesResult {
 
   if (!host.isDesktopApp) {
     html += toggleRowHtml('us-cloud', t('components.insights.aiFlowCloudLabel'), t('components.insights.aiFlowCloudDesc'), settings.cloudLlm);
-    html += toggleRowHtml('us-browser', t('components.insights.aiFlowBrowserLabel'), t('components.insights.aiFlowBrowserDesc'), settings.browserModel);
-    html += `<div class="ai-flow-toggle-warn" style="display:${settings.browserModel ? 'block' : 'none'}">${t('components.insights.aiFlowBrowserWarn')}</div>`;
-    html += `
-      <div class="ai-flow-cta">
-        <div class="ai-flow-cta-title">${t('components.insights.aiFlowOllamaCta')}</div>
-        <div class="ai-flow-cta-desc">${t('components.insights.aiFlowOllamaCtaDesc')}</div>
-        <a href="${DESKTOP_RELEASES_URL}" target="_blank" rel="noopener noreferrer" class="ai-flow-cta-link">${t('components.insights.aiFlowDownloadDesktop')}</a>
-      </div>
-    `;
   }
 
-  // Headline Memory requires Browser Local Model (it loads an embeddings
-  // model in the ML worker). Disable the toggle when the parent is off so
-  // the user sees the dependency rather than wondering why their Headline
-  // Memory toggle "did nothing."
-  const headlineDisabled = !host.isDesktopApp && !settings.browserModel;
-  html += toggleRowHtml(
-    'us-headline-memory',
-    t('components.insights.headlineMemoryLabel'),
-    t('components.insights.headlineMemoryDesc'),
-    settings.headlineMemory,
-    headlineDisabled,
-  );
-
+  // Risk Sentinel (15/10/2026): no in-browser model (its ML worker and the
+  // headline memory that depends on it are not used by the thesis views) and
+  // no desktop/Ollama call to action (the fork has no desktop distribution).
   html += `</div></details>`;
 
   // ── Analysis Frameworks group ──
@@ -319,33 +299,35 @@ export function renderPreferences(host: PreferencesHost): PreferencesResult {
 
   html += `</div></details>`;
 
-  // ── Media group ──
-  html += `<details class="wm-pref-group">`;
-  html += `<summary>${t('preferences.media')}</summary>`;
-  html += `<div class="wm-pref-group-content">`;
+  // ── Media group (live streams; off with the liveMedia scope group) ──
+  if (!isScopeOff('liveMedia')) {
+    html += `<details class="wm-pref-group">`;
+    html += `<summary>${t('preferences.media')}</summary>`;
+    html += `<div class="wm-pref-group-content">`;
 
-  const currentQuality = getStreamQuality();
-  html += `<div class="ai-flow-toggle-row">
-    <div class="ai-flow-toggle-label-wrap">
-      <div class="ai-flow-toggle-label">${t('components.insights.streamQualityLabel')}</div>
-      <div class="ai-flow-toggle-desc">${t('components.insights.streamQualityDesc')}</div>
-    </div>
-  </div>`;
-  html += `<select class="unified-settings-select" id="us-stream-quality">`;
-  for (const opt of STREAM_QUALITY_OPTIONS) {
-    const selected = opt.value === currentQuality ? ' selected' : '';
-    html += `<option value="${opt.value}"${selected}>${escapeHtml(opt.label)}</option>`;
+    const currentQuality = getStreamQuality();
+    html += `<div class="ai-flow-toggle-row">
+      <div class="ai-flow-toggle-label-wrap">
+        <div class="ai-flow-toggle-label">${t('components.insights.streamQualityLabel')}</div>
+        <div class="ai-flow-toggle-desc">${t('components.insights.streamQualityDesc')}</div>
+      </div>
+    </div>`;
+    html += `<select class="unified-settings-select" id="us-stream-quality">`;
+    for (const opt of STREAM_QUALITY_OPTIONS) {
+      const selected = opt.value === currentQuality ? ' selected' : '';
+      html += `<option value="${opt.value}"${selected}>${escapeHtml(opt.label)}</option>`;
+    }
+    html += `</select>`;
+
+    html += toggleRowHtml(
+      'us-live-streams-always-on',
+      t('components.insights.streamAlwaysOnLabel'),
+      t('components.insights.streamAlwaysOnDesc'),
+      getLiveStreamsAlwaysOn(),
+    );
+
+    html += `</div></details>`;
   }
-  html += `</select>`;
-
-  html += toggleRowHtml(
-    'us-live-streams-always-on',
-    t('components.insights.streamAlwaysOnLabel'),
-    t('components.insights.streamAlwaysOnDesc'),
-    getLiveStreamsAlwaysOn(),
-  );
-
-  html += `</div></details>`;
 
   // ── Panels group ──
   html += `<details class="wm-pref-group">`;
@@ -388,10 +370,6 @@ export function renderPreferences(host: PreferencesHost): PreferencesResult {
     </div>
     <div class="us-data-mgmt-toast" id="usDataMgmtToast"></div>
   `;
-  html += `<a href="https://discord.gg/re63kWKxaz" target="_blank" rel="noopener noreferrer" class="us-discussion-link">
-    <span class="us-discussion-dot"></span>
-    <span>${t('components.community.joinDiscussion')}</span>
-  </a>`;
   html += `</div></details>`;
 
   // AI status footer (web-only)

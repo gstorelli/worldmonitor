@@ -54,6 +54,7 @@ import { buildLlmCallEvent, emitLlmEvents, flushPendingLlmEvents } from './lib/l
 // line above. PR #3836 review caught this. See skill
 // railway-deploy-gotchas/reference/nixpacks-root-dir-scripts-cross-dir-import-escape.
 import { validateNoHallucinatedProperNouns } from './shared/brief-llm-core.js';
+import { getOpenRouterChatUrl, getLlmQualityModel } from './_llm-models.mjs';
 
 // Hallucination validator rollout mode (PR-2 of brief-content-quality
 // regressions). `shadow` = log violations to Sentry but ship the LLM
@@ -105,7 +106,6 @@ const CACHE_TTL = 10800; // 3h — 6x the 30 min cron interval. Shorter = key ex
                          // is gated at brief-selection time (see pickBriefCluster + briefSystemPrompt
                          // in _insights-brief.mjs), not by aging out fast.
 const MAX_HEADLINE_LEN = 500;
-const GROQ_MODEL = 'llama-3.3-70b-versatile';
 const INSIGHTS_SOURCE_VERSION = 'digest-clustering-v2-importance-diversity';
 const INSIGHTS_MAX_CONSECUTIVE_FAILURES = 100;
 const INSIGHTS_RUN_OUTCOMES = Object.freeze({
@@ -164,6 +164,50 @@ export function validateInsightsPayload(data) {
 
 export function resolveInsightsFallbackStatus({ synthesisFailureCode, legacyStatus }) {
   return synthesisFailureCode ? 'degraded' : legacyStatus;
+}
+
+// Risk Sentinel (thesis issue #100): an editorial-gate rejection gets ONE more
+// synthesis attempt with a note naming the rule that failed (one extra paid
+// LLM call, approved by Giuseppe on 14/10/2026). Provider failures and a
+// missing corroborated cluster are not retried: a second call cannot fix them.
+const RETRYABLE_SYNTHESIS_FAILURES = new Set([
+  INSIGHTS_SYNTHESIS_FAILURE_CODES.PARSE,
+  INSIGHTS_SYNTHESIS_FAILURE_CODES.GATE,
+  INSIGHTS_SYNTHESIS_FAILURE_CODES.LEAD_EMPTY,
+  INSIGHTS_SYNTHESIS_FAILURE_CODES.LEAD_UNCITED,
+  INSIGHTS_SYNTHESIS_FAILURE_CODES.LEAD_PROPER_NOUN,
+  INSIGHTS_SYNTHESIS_FAILURE_CODES.LEAD_NUMERIC_FACT,
+  INSIGHTS_SYNTHESIS_FAILURE_CODES.LEAD_GROUNDING,
+]);
+// Room the retry must leave for the legacy single-headline call after it.
+const INSIGHTS_RETRY_MIN_BUDGET_MS = 20_000;
+const INSIGHTS_LEGACY_RESERVE_MS = 10_000;
+
+export function isRetryableSynthesisFailure(code) {
+  return RETRYABLE_SYNTHESIS_FAILURES.has(code);
+}
+
+/** Corrective note appended to the user prompt of the retry. */
+export function synthesisRetryNote(code) {
+  const C = INSIGHTS_SYNTHESIS_FAILURE_CODES;
+  if (code === C.LEAD_PROPER_NOUN) {
+    return 'Your previous answer was rejected: its opening sentence named a person, place or organisation that does not appear in the story lines. Name only actors written in the story lines above.';
+  }
+  if (code === C.LEAD_NUMERIC_FACT) {
+    return 'Your previous answer was rejected: its opening sentence stated a number that does not appear in the story lines. Use only figures written in the story lines above.';
+  }
+  return 'Your previous answer was rejected because it did not follow the required format or was not grounded in the story lines. Follow the format exactly and state only what the story lines above say.';
+}
+
+/**
+ * Keep the previous good payload instead of publishing a degraded one?
+ * Since #100 (option b) a degraded run that still has a usable single-headline
+ * brief is published, so the World Brief does not age for hours; the previous
+ * payload is kept only when this run has no brief at all.
+ */
+export function shouldPreserveLkg({ status, existingStatus, worldBrief }) {
+  if (status !== 'degraded' || existingStatus !== 'ok') return false;
+  return !(typeof worldBrief === 'string' && worldBrief.trim().length > 0);
 }
 
 /**
@@ -382,8 +426,8 @@ async function readExistingInsights() {
 }
 
 // Provider config — mirrors server/_shared/llm.ts getProviderCredentials()
-// Order: ollama → openrouter → groq (canonical chain since #4944: DeepSeek
-// V4 Flash primary with reasoning disabled, groq 70B free-tier fallback)
+// Order: ollama → openrouter (DeepSeek V4 Flash, reasoning disabled). The fork
+// removed Groq on 13/10/2026: the project has no Groq account.
 const LLM_PROVIDERS = [
   {
     name: 'ollama',
@@ -402,18 +446,22 @@ const LLM_PROVIDERS = [
   {
     name: 'openrouter',
     envKey: 'OPENROUTER_API_KEY',
-    apiUrl: 'https://openrouter.ai/api/v1/chat/completions',
-    model: 'deepseek/deepseek-v4-flash',
-    headers: (key) => ({ 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://worldmonitor.app', 'X-Title': 'World Monitor', 'User-Agent': CHROME_UA }),
+    get apiUrl() { return getOpenRouterChatUrl(); },
+    // Fork: quality-tier model from scripts/_llm-models.mjs (13/10/2026).
+    get model() { return getLlmQualityModel(); },
+    headers: (key) => ({ 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://risksentinel.opencyber.org', 'X-Title': 'Risk Sentinel', 'User-Agent': CHROME_UA }),
     extraBody: { reasoning: { enabled: false } },
-    timeout: 20_000,
+    timeout: 30_000, // fork: quality-tier prose, not yet measured on the VPS
   },
   {
-    name: 'groq',
-    envKey: 'GROQ_API_KEY',
-    apiUrl: 'https://api.groq.com/openai/v1/chat/completions',
-    model: GROQ_MODEL,
-    headers: (key) => ({ 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json', 'User-Agent': CHROME_UA }),
+    // Fork: optional OpenAI-compatible fallback (LLM_API_URL + LLM_API_KEY,
+    // model LLM_MODEL) in the slot Groq held upstream; unset by default, so
+    // production runs on OpenRouter alone. Groq was removed on 13/10/2026.
+    name: 'generic',
+    envKey: 'LLM_API_KEY',
+    get apiUrl() { return process.env.LLM_API_URL || ''; },
+    get model() { return process.env.LLM_MODEL || 'gpt-3.5-turbo'; },
+    headers: (key) => ({ Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', 'User-Agent': CHROME_UA }),
     timeout: 15_000,
   },
 ];
@@ -517,8 +565,8 @@ async function callLLM(headline, options = {}) {
         });
         if (!response.ok) {
           // #6110: `usableBudgetMs()` is a real remaining wall clock, so pass it
-          // as `remainingBudgetMs` — a hint longer than that (groq's daily-quota
-          // 429 asks for ~20 minutes) makes the error nonRetryable and we fall
+          // as `remainingBudgetMs` — a hint longer than that (a provider's daily-quota
+          // 429 can ask for ~20 minutes) makes the error nonRetryable and we fall
           // through to the next provider immediately, instead of clamping the
           // hint to the ceiling and sleeping it away twice.
           throw httpRetryError(response, {
@@ -859,7 +907,7 @@ async function fetchInsights() {
   // SECOND callLLM. Stamp the run's LLM start so L2 gets only the remainder —
   // otherwise two full 60s budgets could outlast the 120s seed lock.
   const llmRunStartedAtMs = Date.now();
-  const synthesisResult = hasBriefCluster
+  const firstSynthesisResult = hasBriefCluster
     ? await callLLM(null, {
         systemPrompt: synthesisSystemPrompt(new Date().toISOString().split('T')[0]),
         userPrompt: synthesisUserPrompt(topStories),
@@ -869,11 +917,36 @@ async function fetchInsights() {
         accept: composeFromText,
       })
     : null;
-  const { composed, failureCode } = resolveInsightsSynthesis({
+  let synthesisResult = firstSynthesisResult;
+  let { composed, failureCode } = resolveInsightsSynthesis({
     synthesisResult,
     topStories,
     ...synthesisComposerOptions,
   });
+  const retryBudgetMs = INSIGHTS_LLM_CALL_BUDGET_MS - (Date.now() - llmRunStartedAtMs) - INSIGHTS_LEGACY_RESERVE_MS;
+  if (!composed && hasBriefCluster && isRetryableSynthesisFailure(failureCode) && retryBudgetMs >= INSIGHTS_RETRY_MIN_BUDGET_MS) {
+    console.warn(`  [brief_synthesis] rejected (${failureCode}) — retrying once with a corrective note`);
+    const retryResult = await callLLM(null, {
+      systemPrompt: synthesisSystemPrompt(new Date().toISOString().split('T')[0]),
+      userPrompt: `${synthesisUserPrompt(topStories)}\n\n${synthesisRetryNote(failureCode)}`,
+      maxTokens: 900,
+      accept: composeFromText,
+      callBudgetMs: retryBudgetMs,
+    });
+    const retried = resolveInsightsSynthesis({
+      synthesisResult: retryResult,
+      topStories,
+      ...synthesisComposerOptions,
+    });
+    if (retried.composed) {
+      synthesisResult = retryResult;
+      composed = retried.composed;
+      failureCode = null;
+      console.log('  [brief_synthesis] retry accepted');
+    } else {
+      failureCode = retried.failureCode || failureCode;
+    }
+  }
   synthesisFailureCode = failureCode;
 
   if (composed) {
@@ -1003,10 +1076,11 @@ async function fetchInsights() {
     chinaNewsCoverage,
   };
 
-  // LKG preservation: don't overwrite "ok" with "degraded"
+  // LKG preservation: don't overwrite "ok" with a degraded run that has no
+  // brief at all (a degraded single-headline brief is published, #100).
   if (status === 'degraded') {
     const existing = await readExistingInsights();
-    if (existing?.status === 'ok') {
+    if (shouldPreserveLkg({ status, existingStatus: existing?.status, worldBrief })) {
       console.log('  LKG preservation: existing payload is "ok", skipping degraded overwrite');
       return decorateInsightsRun(
         preserveChinaNewsCoverageInLkg(existing, chinaNewsCoverage),
@@ -1082,7 +1156,7 @@ if (_isDirectRun) {
 
     declareRecords,
     schemaVersion: 1,
-    maxStaleMin: 30,
+    maxStaleMin: 90, // fork: hourly VPS cron (api/health.js)
     // The source-status projection is not user-facing digest content. It is
     // retained separately so the China audit can distinguish an unavailable
     // source from a globally outranked one without changing the public payload.

@@ -12,7 +12,9 @@ import enTranslation from '../locales/en.json';
 // the moment they pick another language explicitly, that choice persists here.
 const EXPLICIT_LOCALE_KEY = 'wm-locale-explicit';
 
-const SUPPORTED_LANGUAGES = ['en', 'bg', 'cs', 'fr', 'de', 'el', 'es', 'it', 'pl', 'pt', 'nl', 'sv', 'ru', 'ar', 'zh', 'ja', 'ko', 'ro', 'tr', 'th', 'vi'] as const;
+// Risk Sentinel (15/10/2026): only Italian and English carry the thesis texts;
+// the other upstream locales stay in src/locales/ but are not offered.
+const SUPPORTED_LANGUAGES = ['en', 'it'] as const;
 type SupportedLanguage = typeof SUPPORTED_LANGUAGES[number];
 type TranslationDictionary = Record<string, unknown>;
 
@@ -35,10 +37,24 @@ function normalizeLanguage(lng: string): SupportedLanguage {
   return 'en';
 }
 
+// Tajawal (Arabic body font, see [dir="rtl"] in main.css) is requested only
+// when an RTL language is active: index.html no longer blocks every first
+// paint on Google Fonts for a locale the portal almost never serves.
+const ARABIC_FONT_HREF = 'https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap';
+
+function ensureArabicFont(): void {
+  if (document.querySelector(`link[href="${ARABIC_FONT_HREF}"]`)) return;
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = ARABIC_FONT_HREF;
+  document.head.appendChild(link);
+}
+
 function applyDocumentDirection(lang: string): void {
   const base = lang.split('-')[0] || lang;
   document.documentElement.setAttribute('lang', base === 'zh' ? 'zh-CN' : base);
   if (RTL_LANGUAGES.has(base)) {
+    ensureArabicFont();
     document.documentElement.setAttribute('dir', 'rtl');
   } else {
     document.documentElement.removeAttribute('dir');
@@ -168,25 +184,6 @@ export function getLocale(): string {
 }
 
 export const LANGUAGES = [
-  { code: 'en', label: 'English', flag: '🇬🇧' },
-  { code: 'bg', label: 'Български', flag: '🇧🇬' },
-  { code: 'ar', label: 'العربية', flag: '🇸🇦' },
-  { code: 'cs', label: 'Čeština', flag: '🇨🇿' },
-  { code: 'zh', label: '中文', flag: '🇨🇳' },
-  { code: 'fr', label: 'Français', flag: '🇫🇷' },
-  { code: 'de', label: 'Deutsch', flag: '🇩🇪' },
-  { code: 'el', label: 'Ελληνικά', flag: '🇬🇷' },
-  { code: 'es', label: 'Español', flag: '🇪🇸' },
   { code: 'it', label: 'Italiano', flag: '🇮🇹' },
-  { code: 'pl', label: 'Polski', flag: '🇵🇱' },
-  { code: 'pt', label: 'Português', flag: '🇵🇹' },
-  { code: 'nl', label: 'Nederlands', flag: '🇳🇱' },
-  { code: 'sv', label: 'Svenska', flag: '🇸🇪' },
-  { code: 'ru', label: 'Русский', flag: '🇷🇺' },
-  { code: 'ja', label: '日本語', flag: '🇯🇵' },
-  { code: 'ko', label: '한국어', flag: '🇰🇷' },
-  { code: 'ro', label: 'Română', flag: '🇷🇴' },
-  { code: 'th', label: 'ไทย', flag: '🇹🇭' },
-  { code: 'tr', label: 'Türkçe', flag: '🇹🇷' },
-  { code: 'vi', label: 'Tiếng Việt', flag: '🇻🇳' },
+  { code: 'en', label: 'English', flag: '🇬🇧' },
 ];
