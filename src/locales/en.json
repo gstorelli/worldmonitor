@@ -1803,7 +1803,10 @@
         "all": "All",
         "significant": "Significant",
         "none": "No measured trigger within {{radius}} km of a critical node.",
-        "footer": "Source: {{quake}} ({{days}} days, {{count}} earthquakes M≥4.5 worldwide) + {{natural}} GDACS/EONET events. Radius {{radius}} km (working hypothesis)."
+        "footer": "Source: {{quake}} ({{days}} days, {{count}} earthquakes M≥4.5 worldwide) + {{natural}} GDACS/EONET events. Radius {{radius}} km (working hypothesis).",
+        "sequences": "Sequences",
+        "sequenceOf": "Sequence of {{count}} events",
+        "sequencesTooltip": "One row per sequence: aftershocks and foreshocks grouped with the Gardner-Knopoff windows, as in Chapter 3. Provisional, pending the supervisor."
       },
       "goods": {
         "infoTooltip": "<strong>Strategic goods</strong><br>Detailed HS codes, EU criticality (CRMA or Commission method), supply-vulnerability evidence and modulators in force. ✓ = verified with source; ◌ = still to be done.",
@@ -1823,7 +1826,11 @@
       "eruptions": "Erupt.",
       "plateShort": "plate {{km}} km",
       "kindStrait": "Chokepoint",
-      "goods": {"copper": "Copper", "nickel": "Nickel", "chips": "Chips"},
+      "goods": {
+        "copper": "Copper",
+        "nickel": "Nickel",
+        "chips": "Chips"
+      },
       "nodes": {
         "suez": "Suez",
         "bab-el-mandeb": "Bab el-Mandeb",
@@ -1838,9 +1845,13 @@
         "hsinchu": "Hsinchu (Taiwan)",
         "tainan": "Tainan (Taiwan)"
       },
-      "rowTooltip": "Strongest event: Mw {{mw}} on {{date}}",
-      "footnote": "Events within {{radius}} km of each node. Earthquakes: ISC-GEM v12.1, {{period}}, aftershocks included. Eruptions: Smithsonian GVP, since 1922. Plate boundaries: Bird (2003). Taiwan Strait, Hsinchu and Tainan overlap: do not sum them. The radius is a working hypothesis.",
-      "infoTooltip": "<strong>Hazard at the critical nodes</strong> Seismic and volcanic hazard around the chokepoints and production areas of the thesis model.<ul><li>Mw≥6 / Mw≥7: earthquakes 1922-2021 (ISC-GEM)</li><li>Eruptions: confirmed eruptions since 1922 (GVP)</li><li>Plate: distance to the nearest plate boundary</li></ul>Static research data, not a live feed. Click a row to centre the map."
+      "rowTooltip": "Strongest event: Mw {{mw}} on {{date}} · Mw≥7: {{m7}}",
+      "footnote": "Return period of intensity VI: Chapter 3, continuous convention (Allen et al. 2012); a = fewer than one expected exceedance. PGA: GEM v2026.1. Mw≥6 counts: ISC-GEM v12.1, {{period}}, within {{radius}} km, aftershocks included. Eruptions: Smithsonian GVP, since 1922. Plate boundaries: Bird (2003). Taiwan Strait, Hsinchu and Tainan overlap: do not sum them.",
+      "infoTooltip": "<strong>Hazard at the critical nodes</strong> Seismic and volcanic hazard around the chokepoints and production areas of the thesis model.<ul><li>T(I≥VI): return period, in years, of an expected intensity of at least VI (Chapter 3)</li><li>GEM PGA: probabilistic hazard from the GEM map v2026.1, an independent method</li><li>Mw≥6: earthquakes 1922-2021 within 300 km (ISC-GEM)</li><li>Eruptions: confirmed eruptions since 1922 (GVP)</li><li>Plate: distance to the nearest plate boundary</li></ul>Static research data, not a live feed. Most exposed first. Click a row to centre the map.",
+      "returnI6": "T(I≥VI)",
+      "returnI6Tooltip": "Return period, in years, of an expected intensity of at least VI at the node (Chapter 3, Table 3.4; declustered sequences). a = weak estimate: fewer than one expected exceedance, order of magnitude only.",
+      "gemPga": "GEM PGA",
+      "gemPgaTooltip": "Peak ground acceleration (g) with a 10% probability of exceedance in 50 years on rock: GEM Global Seismic Hazard Map v2026.1 (Johnson et al. 2026, CC BY-NC-SA 4.0), grid point nearest to the node."
     },
     "populationExposure": {
       "noData": "No exposure data available",

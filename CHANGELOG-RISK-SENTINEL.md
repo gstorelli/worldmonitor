@@ -8,6 +8,7 @@ Formato di ogni voce: numero della PR, cosa cambia per chi usa il portale, event
 
 ## 11 novembre 2026
 
+- **#72**: «Pericoli dei nodi» mostra i risultati del Cap. 3: periodo di ritorno di un'intensità attesa almeno VI (con la nota *a* per le stime deboli, come nella Tab. 3.4) e PGA della mappa GEM v2026.1; i nodi sono ordinati dal più esposto. Nel Monitor inneschi un terzo filtro, «Sequenze», raggruppa repliche e scosse precedenti con le finestre di Gardner-Knopoff (una riga per sequenza; provvisorio, in attesa della tutor, #144 della tesi). Il filtro «Significativi» non porta più l'etichetta superata «Mw ≥ 6».
 - **#71**: motore della catena per l'Anno 2 (`src/services/thesis/engine.ts`): i sei strati diventano grandezze calcolabili (legame nodo-bene, pericolo dall'intensità attesa, vulnerabilità di fornitura da Comext, incentivo doganale) e si calcolano le tre formulazioni del protocollo (riferimento uniforme, F1 con soglia sul pericolo, F2 moltiplicativa), con le informazioni disponibili a ogni istante. Le repliche si raggruppano in sequenze (Gardner-Knopoff). Parametri in `research/replay/protocol.yaml` (proposta, non congelata) e dimostrazione su Hualien 2024 (`research/replay/hualien-demo.mts`). Non cambia ancora nulla nel portale.
 
 ## 10 novembre 2026

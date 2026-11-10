@@ -1634,7 +1634,10 @@
         "all": "Tutti",
         "significant": "Significativi",
         "none": "Nessun innesco misurato entro {{radius}} km da un nodo critico.",
-        "footer": "Fonte: {{quake}} ({{days}} giorni, {{count}} terremoti M≥4,5 nel mondo) + {{natural}} eventi GDACS/EONET. Raggio {{radius}} km (ipotesi di lavoro)."
+        "footer": "Fonte: {{quake}} ({{days}} giorni, {{count}} terremoti M≥4,5 nel mondo) + {{natural}} eventi GDACS/EONET. Raggio {{radius}} km (ipotesi di lavoro).",
+        "sequences": "Sequenze",
+        "sequenceOf": "Sequenza di {{count}} eventi",
+        "sequencesTooltip": "Una riga per sequenza: repliche e scosse precedenti raggruppate con le finestre di Gardner-Knopoff, come nel Cap. 3. Provvisorio, in attesa del parere della tutor."
       },
       "goods": {
         "infoTooltip": "<strong>Beni strategici</strong><br>Codici HS di dettaglio, criticità UE (CRMA o metodo della Commissione), evidenze di vulnerabilità di fornitura e modulatori in vigore. ✓ = verificato con fonte; ◌ = ancora da fare.",
@@ -1654,7 +1657,11 @@
       "eruptions": "Eruz.",
       "plateShort": "placca {{km}} km",
       "kindStrait": "Stretto",
-      "goods": {"copper": "Rame", "nickel": "Nichel", "chips": "Chip"},
+      "goods": {
+        "copper": "Rame",
+        "nickel": "Nichel",
+        "chips": "Chip"
+      },
       "nodes": {
         "suez": "Suez",
         "bab-el-mandeb": "Bab el-Mandeb",
@@ -1669,9 +1676,13 @@
         "hsinchu": "Hsinchu (Taiwan)",
         "tainan": "Tainan (Taiwan)"
       },
-      "rowTooltip": "Evento più forte: Mw {{mw}} del {{date}}",
-      "footnote": "Eventi entro {{radius}} km da ciascun nodo. Terremoti: ISC-GEM v12.1, {{period}}, repliche incluse. Eruzioni: Smithsonian GVP, dal 1922. Limiti di placca: Bird (2003). Stretto di Taiwan, Hsinchu e Tainan si sovrappongono: non vanno sommati. Il raggio è un'ipotesi di lavoro.",
-      "infoTooltip": "<strong>Pericoli dei nodi critici</strong> Pericolo sismico e vulcanico attorno agli stretti e alle aree produttive del modello della tesi.<ul><li>Mw≥6 / Mw≥7: terremoti 1922-2021 (ISC-GEM)</li><li>Eruzioni: eruzioni confermate dal 1922 (GVP)</li><li>Placca: distanza dal limite di placca più vicino</li></ul>Dati di ricerca statici, non un feed in tempo reale. Clicca una riga per centrare la mappa."
+      "rowTooltip": "Evento più forte: Mw {{mw}} del {{date}} · Mw≥7: {{m7}}",
+      "footnote": "Periodo di ritorno dell'intensità VI: Cap. 3, convenzione continua (Allen et al. 2012); a = meno di un superamento atteso. PGA: GEM v2026.1. Conteggi Mw≥6: ISC-GEM v12.1, {{period}}, entro {{radius}} km, repliche incluse. Eruzioni: Smithsonian GVP, dal 1922. Limiti di placca: Bird (2003). Stretto di Taiwan, Hsinchu e Tainan si sovrappongono: non vanno sommati.",
+      "infoTooltip": "<strong>Pericoli dei nodi critici</strong> Pericolo sismico e vulcanico attorno agli stretti e alle aree produttive del modello della tesi.<ul><li>T(I≥VI): periodo di ritorno, in anni, di un'intensità attesa almeno VI (Cap. 3)</li><li>PGA GEM: pericolosità probabilistica della mappa GEM v2026.1, metodo indipendente</li><li>Mw≥6: terremoti 1922-2021 entro 300 km (ISC-GEM)</li><li>Eruzioni: eruzioni confermate dal 1922 (GVP)</li><li>Placca: distanza dal limite di placca più vicino</li></ul>Dati di ricerca statici, non un feed in tempo reale. Ordinati dal più esposto. Clicca una riga per centrare la mappa.",
+      "returnI6": "T(I≥VI)",
+      "returnI6Tooltip": "Periodo di ritorno, in anni, di un'intensità attesa almeno VI sul nodo (Cap. 3, Tab. 3.4; sequenze dopo il declustering). a = stima debole: meno di un superamento atteso, solo ordine di grandezza.",
+      "gemPga": "PGA GEM",
+      "gemPgaTooltip": "Accelerazione di picco al suolo (g) con il 10% di probabilità di superamento in 50 anni su roccia: GEM Global Seismic Hazard Map v2026.1 (Johnson et al. 2026, CC BY-NC-SA 4.0), punto di griglia più vicino al nodo."
     },
     "populationExposure": {
       "noData": "Nessun dato di esposizione disponibile",

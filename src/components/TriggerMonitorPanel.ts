@@ -4,6 +4,7 @@ import { t } from '@/services/i18n';
 import { TRIGGER_WORKING_RULES } from '@/config/thesis-model';
 import { getThesisSnapshot, onThesisSnapshot, type ThesisSnapshot } from '@/services/thesis/snapshot';
 import type { NodeTriggerMatch } from '@/services/thesis/risk-chain';
+import { sequencesGardnerKnopoff } from '@/services/thesis/engine';
 import { ago, eventIntensity, kindIcon, nodeName, sourceLink } from './thesis-ui';
 
 const REFRESH_MS = 10 * 60_000;
@@ -11,7 +12,12 @@ const REFRESH_MS = 10 * 60_000;
 interface Row {
   match: NodeTriggerMatch;
   nodes: Array<{ id: string; km: number }>;
+  /** Events in the sequence (sequence view only). */
+  sequenceSize?: number;
+  anySignificant?: boolean;
 }
+
+type Filter = 'all' | 'sig' | 'seq';
 
 /**
  * Trigger layer: measured events (EMSC/USGS earthquakes, GDACS volcanoes,
@@ -19,7 +25,7 @@ interface Row {
  */
 export class TriggerMonitorPanel extends Panel {
   private snapshot: ThesisSnapshot | null = null;
-  private onlySignificant = false;
+  private filter: Filter = 'all';
   private timer: ReturnType<typeof setInterval> | null = null;
   private unsubscribe: (() => void) | null = null;
   private onEventClick?: (lat: number, lon: number) => void;
@@ -44,7 +50,7 @@ export class TriggerMonitorPanel extends Panel {
       if (target.closest('a')) return;
       const filter = target.closest<HTMLElement>('[data-filter]');
       if (filter) {
-        this.onlySignificant = filter.dataset.filter === 'sig';
+        this.filter = (filter.dataset.filter as Filter) ?? 'all';
         this.render();
         return;
       }
@@ -73,9 +79,35 @@ export class TriggerMonitorPanel extends Panel {
         byEvent.set(m.event.id, row);
       }
     }
-    return [...byEvent.values()]
-      .filter((r) => !this.onlySignificant || r.match.significant)
+    const all = [...byEvent.values()];
+    if (this.filter === 'seq') return this.sequenceRows(all);
+    return all
+      .filter((r) => this.filter !== 'sig' || r.match.significant)
       .sort((a, b) => b.match.event.time - a.match.event.time);
+  }
+
+  /**
+   * One row per sequence (Gardner-Knopoff windows, as in Chapter 3; provisional
+   * for the live monitor, #144): the mainshock, the nodes reached by any member
+   * and whether any member is significant for a node.
+   */
+  private sequenceRows(rows: Row[]): Row[] {
+    const byId = new Map(rows.map((r) => [r.match.event.id, r]));
+    const out: Row[] = [];
+    for (const seq of sequencesGardnerKnopoff(rows.map((r) => r.match.event))) {
+      const members = seq.members.map((e) => byId.get(e.id)).filter((r): r is Row => !!r);
+      const main = byId.get(seq.mainshock.id) ?? members[0];
+      if (!main) continue;
+      const nodes = new Map<string, number>();
+      for (const m of members) for (const n of m.nodes) nodes.set(n.id, Math.min(n.km, nodes.get(n.id) ?? Infinity));
+      out.push({
+        match: main.match,
+        nodes: [...nodes].map(([id, km]) => ({ id, km })),
+        sequenceSize: members.length,
+        anySignificant: members.some((m) => m.match.significant),
+      });
+    }
+    return out.sort((a, b) => b.match.event.time - a.match.event.time);
   }
 
   private render(): void {
@@ -85,15 +117,19 @@ export class TriggerMonitorPanel extends Panel {
     this.setCount(rows.length);
     const body = rows.length
       ? rows
-          .map(({ match, nodes }) => {
+          .map(({ match, nodes, sequenceSize, anySignificant }) => {
             const e = match.event;
+            const significant = anySignificant ?? match.significant;
+            const seqNote = sequenceSize
+              ? `<br><span class="thesis-muted">${escapeHtml(t('components.thesis.triggers.sequenceOf', { count: String(sequenceSize) }))}</span>`
+              : '';
             const where = nodes
               .sort((a, b) => a.km - b.km)
               .map((n) => `${escapeHtml(nodeName(n.id))} <span class="thesis-muted">${Math.round(n.km)} km</span>`)
               .join(', ');
-            return `<tr class="thesis-row${match.significant ? ' thesis-row-assess' : ''}" data-lat="${e.lat}" data-lon="${e.lon}">
+            return `<tr class="thesis-row${significant ? ' thesis-row-assess' : ''}" data-lat="${e.lat}" data-lon="${e.lon}">
               <td>${kindIcon(e.kind)} <b>${eventIntensity(e)}</b>${typeof e.depthKm === 'number' ? `<br><span class="thesis-muted">${Math.round(e.depthKm)} km ${escapeHtml(t('components.thesis.depth'))}</span>` : ''}</td>
-              <td>${where}<br><span class="thesis-muted">${escapeHtml(e.title)}</span></td>
+              <td>${where}<br><span class="thesis-muted">${escapeHtml(e.title)}</span>${seqNote}</td>
               <td class="thesis-nowrap">${ago(e.time)}<br><span class="thesis-muted">${sourceLink(e.source, e.url)}</span></td>
             </tr>`;
           })
@@ -102,8 +138,9 @@ export class TriggerMonitorPanel extends Panel {
     this.setContent(`
       <div class="thesis-panel">
         <div class="thesis-filters">
-          <button type="button" class="thesis-filter${this.onlySignificant ? '' : ' active'}" data-filter="all">${escapeHtml(t('components.thesis.triggers.all'))}</button>
-          <button type="button" class="thesis-filter${this.onlySignificant ? ' active' : ''}" data-filter="sig">${escapeHtml(t('components.thesis.triggers.significant', { mw: String(TRIGGER_WORKING_RULES.significantMw) }))}</button>
+          <button type="button" class="thesis-filter${this.filter === 'all' ? ' active' : ''}" data-filter="all">${escapeHtml(t('components.thesis.triggers.all'))}</button>
+          <button type="button" class="thesis-filter${this.filter === 'sig' ? ' active' : ''}" data-filter="sig">${escapeHtml(t('components.thesis.triggers.significant'))}</button>
+          <button type="button" class="thesis-filter${this.filter === 'seq' ? ' active' : ''}" data-filter="seq" title="${escapeHtml(t('components.thesis.triggers.sequencesTooltip'))}">${escapeHtml(t('components.thesis.triggers.sequences'))}</button>
         </div>
         <table class="thesis-table">
           <thead><tr>
