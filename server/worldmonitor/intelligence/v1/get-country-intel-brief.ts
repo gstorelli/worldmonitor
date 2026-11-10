@@ -7,7 +7,7 @@ import type {
 
 import { cachedFetchJson, getCachedJson } from '../../../_shared/redis';
 import { UPSTREAM_TIMEOUT_MS, TIER1_COUNTRIES, sha256Hex } from './_shared';
-import { callLlm } from '../../../_shared/llm';
+import { callLlmQuality } from '../../../_shared/llm';
 import { verifyCitationIndexes, checkLeadGrounding } from '../../../../shared/brief-llm-core.js';
 import { isCallerPremium } from '../../../_shared/premium-check';
 import { sanitizeForPrompt } from '../../../_shared/llm-sanitize.js';
@@ -226,7 +226,8 @@ Rules:
         userPromptParts.push(`Context snapshot:\n${promptContext}`);
       }
 
-      const llmResult = await callLlm({
+      // Fork: a country brief is narrative synthesis, so it uses the quality tier.
+      const llmResult = await callLlmQuality({
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPromptParts.join('\n\n') },

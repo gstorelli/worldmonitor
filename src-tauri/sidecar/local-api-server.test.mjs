@@ -946,12 +946,12 @@ test('treats Cloudflare challenge 403 as soft-pass during secret validation', as
 
   try {
     const response = await postJsonViaHttp(`http://127.0.0.1:${port}/api/local-validate-secret`, {
-      key: 'GROQ_API_KEY',
+      key: 'OPENROUTER_API_KEY',
       value: 'dummy-key',
     });
     assert.equal(response.status, 200);
     assert.equal(response.json?.valid, true);
-    assert.equal(response.json?.message, 'Groq key stored (Cloudflare blocked verification)');
+    assert.equal(response.json?.message, 'OpenRouter key stored (Cloudflare blocked verification)');
   } finally {
     restoreHttps();
     await app.close();
@@ -979,12 +979,12 @@ test('does not soft-pass provider auth 403 JSON responses even with cf-ray heade
 
   try {
     const response = await postJsonViaHttp(`http://127.0.0.1:${port}/api/local-validate-secret`, {
-      key: 'GROQ_API_KEY',
+      key: 'OPENROUTER_API_KEY',
       value: 'invalid-key',
     });
     assert.equal(response.status, 422);
     assert.equal(response.json?.valid, false);
-    assert.equal(response.json?.message, 'Groq rejected this key');
+    assert.equal(response.json?.message, 'OpenRouter rejected this key');
   } finally {
     restoreHttps();
     await app.close();

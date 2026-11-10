@@ -1,0 +1,95 @@
+# Changelog di Risk Sentinel
+
+Cambiamenti del fork `gstorelli/worldmonitor` (Risk Sentinel), una voce per pull request unita, dalla più recente. Il file `CHANGELOG.md` è quello dell'upstream WorldMonitor e non descrive questo fork.
+
+Ogni merge su `main` ripubblica la produzione (`risksentinel.opencyber.org`). Chi unisce una PR aggiunge qui la sua voce, nella stessa PR o subito dopo. Le motivazioni di ricerca sono in `docs/DECISIONI.md` del repository della tesi.
+
+Formato di ogni voce: numero della PR, cosa cambia per chi usa il portale, eventuale azione sul server dopo il merge.
+
+## 10 novembre 2026
+
+- **#12**: la vista tesi decide se un terremoto è un innesco significativo dall’intensità attesa sul nodo (equazione di Allen, Wald e Worden 2012, forma ipocentrale), non più da «Mw ≥ 6 entro 300 km». Soglie provvisorie: grado VI in generale, V per le aree dei chip (Hsinchu, Tainan); convenzione senza arrotondamento (Ī ≥ soglia). Approvato da Giuseppe il 10/11 come proposta concordata con la tutor; calibrazione nell’Anno 2.
+
+## 4 novembre 2026
+
+- **#63**: GDACS di nuovo raggiungibile. Da inizio novembre GDACS risponde a un User-Agent da browser con una pagina di verifica JavaScript; il seeder ora si presenta come `RiskSentinel/1.0` (come il seeder dei terremoti) e riceve di nuovo il JSON. Il controllo `gdacsStatus` della #60 aveva segnalato il guasto.
+- **#62**: immagine di base `node:24-alpine` aggiornata (correzioni di sicurezza, tra cui brotli) in `Dockerfile`, `Dockerfile.relay` e `docker/Dockerfile.redis-rest`. Le prime due erano state cambiate direttamente sul server il 27/10, fuori da Git, e avrebbero bloccato il deploy successivo; la terza era rimasta indietro.
+
+## 15 ottobre 2026
+
+- **#61**: via i riferimenti visibili all'upstream: link Blog, Docs e Status a worldmonitor.app nel menu mobile, numero di versione dell'upstream nell'intestazione, titolo e nome del sito «World Monitor» (scheda del browser, metadati), contatto di sicurezza (`.well-known/security.txt` indicava l'email dello sviluppatore dell'upstream). «Light/Dark Mode» → «Tema chiaro/scuro». Le pagine di scoperta per agenti restano: sono legate alla build e ai test dell'upstream (#116 della tesi).
+- **#60**: `/api/health` segnala quando GDACS non risponde. Il seeder degli eventi naturali scrive `natural:gdacs-status:v1` solo se GDACS ha risposto; se fallisce per 3 ore, il controllo `gdacsStatus` diventa vecchio (#146 della tesi).
+- **#59**: nella vista tesi il selettore dei livelli della mappa offre solo i livelli del modello (nodi critici, stretti, rotte, eventi naturali, incendi, meteo, clima, conflitti UCDP, cavi, condotte, traffico navale, sanzioni, giorno/notte). Siti nucleari, irradiatori, spazioporti, basi, zone di conflitto statiche e gli altri livelli ereditati restano nella dashboard completa.
+- **#58**: Impostazioni ripulite. Tolte le schede API Keys e MCP Clients (funzioni a pagamento dell'upstream, senza backend qui), il modello IA locale del browser con la «memoria dei titoli», l'invito all'app desktop, il gruppo Media (flussi video spenti) e il link al Discord di WorldMonitor. Lingue: solo italiano e inglese. Nella vista tesi non c'è più la scheda Fonti (i feed di notizie servono solo alla dashboard completa). Il token admin delle notifiche si vede solo da amministratore. Etichette in italiano («Segnali e allerte», «Sanzioni e designazioni», categorie dei pannelli, «Impulso sugli eventi»).
+- **#57**: la «Full dashboard» non compare più nell'intestazione: la apre un link nella scheda Admin delle Impostazioni (solo amministratori) e resta raggiungibile con `?app=customs`. Descrizioni delle app in italiano.
+- **#56**: bibliografia di Research rigenerata dalla tesi: sei fonti di dati nuove (Open-Meteo, NASA EONET, NOAA NHC, WTO Timeseries, lista UE delle sanzioni finanziarie, CELLAR), 91 voci in tutto.
+- **#55**: GDACS risponde 404 quando un tipo di evento non ha eventi correnti (vulcani, 15/10): il seeder lo legge come lista vuota, non come errore. Primo giro dopo la #54: 26 eventi invece di 21.
+- **#54**: GDACS torna a funzionare. Dall'ultima modifica dell'API (in tutti i log disponibili, dal 14/10 mattina) l'endpoint `MAP` rispondeva 400 senza il parametro `eventtype`, e il seeder pubblicava lo stesso «OK» con i soli eventi EONET e NOAA: la vista tesi non riceveva eruzioni, alluvioni, siccità e incendi da GDACS. Ora c'è una richiesta per tipo di evento.
+- **#53**: OSINT e Catena del rischio mostrano per gli stretti solo la variazione dei transiti sulla settimana precedente (IMF PortWatch). Il numero di «navi oggi» veniva dal flusso AIS in tempo reale del relay, con copertura parziale degli stretti (0 a Suez il 15/10), e non era un conteggio dei transiti.
+- **#52**: la vista tesi non scarica più nel bootstrap i dati che nessun suo pannello usa: registri di oleodotti, gasdotti e depositi, notizie sul clima, politiche sulla crisi energetica (circa 640 KB del livello lento). Se si accende il layer delle pipeline, la mappa usa la geometria statica. La dashboard completa (`?app=customs`) è invariata.
+- **#51**: Alert feed: al posto di «Risk %» e «✨ AI Reasoning» ogni scheda mostra la fonte e la severità dichiarata dalla fonte, più un pulsante «Dettagli» (descrizione, fonte, link). Il «Risk %» non era un punteggio: il campo `score` del digest vale 0 e la percentuale veniva da una tabella fissa (alta = 85%). Corretto anche un inserimento di testo non escapato. Sanzioni: il numero nel titolo segue la scheda aperta (UE o OFAC).
+- **#50**: OSINT organizzato in tre schede (Nodi critici, Beni strategici, Ultimi segnali) con il numero di righe; la scheda aperta viene ricordata dal browser. Le app OSINT, Research e Policy scorrono in verticale: il CSS della dashboard bloccava lo scorrimento della pagina.
+- **#49**: il bootstrap non scarica più i dati dei gruppi spenti (borsa, macro, tech, indici di consumo, extra upstream): la SPA li elenca in `omit=` e il server li salta. Il tempo di risposta cresceva con la dimensione (circa 3,5 ms per KB, 2-4 s per livello); i dati omessi erano circa un terzo del totale.
+- **#48**: aggiunto `src/apps/boot.ts`, rimasto fuori dal commit della #46. Senza il file i deploy della #46 e della #47 fallivano in compilazione e la produzione era rimasta alla #45.
+- **#47** (#86 della tesi): il bootstrap della dashboard parte subito dopo il login, in parallelo a regole e preferenze, e `App.init` riusa la stessa richiesta. Si risparmia un giro di richieste (primo pannello da 1,24 a 0,95 s nella sonda). I limiti di 6 e 12 s restano: sul server il bootstrap risponde in 0,2-0,8 s.
+- **#46** (#87 della tesi): OSINT, Research e Policy non scaricano più il codice della dashboard (mappa, pannelli, loader). JavaScript caricato da 7,8 a 3,7 MB; la vista tesi è invariata.
+- **#45** (#90, #102 della tesi): salute e carico.
+  - Energia e gas ogni 6 ore nel livello `context`: stoccaggi GIE, JODI petrolio e gas, EIA, prezzi dell'energia, Ember, carenze di carburante, Hormuz, interruzioni nei porti.
+  - Spenti due gruppi nuovi di perimetro (`src/config/scope.ts`): **macro** (BIS, BCE, FRED, FSI, curve dei rendimenti, cambi, BLS, calendario USA, macro della Cina) e **upstreamExtra** (gare d'appalto, Cina, resilienza, sanità, radiazioni, CO₂ e ghiacci, minacce cyber, interruzioni internet, aviazione, stato dei servizi, advisory, proteste, sfollati, sintesi umanitaria).
+  - Questi gruppi escono da pannelli, livelli della mappa, cron, cicli del relay (Cyber, Spending, ServiceStatuses) e `/api/health`. I pannelli dell'instabilità dei paesi restano, ma senza questi dati.
+
+## 14 ottobre 2026
+
+- **#44**: il proxy `redis-rest` accetta richieste fino a 16 MB invece di 1 MB. Con il limite precedente il seeder OFAC falliva a ogni giro scrivendo il suo indice di circa 2,1 MB, e la scheda USA delle sanzioni non si aggiornava.
+- **#43** (#92 della tesi): Sanctions pressure con la scheda "UE" (predefinita) accanto a "USA (OFAC)". La lista consolidata UE delle sanzioni finanziarie, aggregata: soggetti per regime, enti per paese, nuove designazioni negli ultimi 30 giorni e data dell'ultima. Solo conteggi, nessun dato personale. Nuovo seeder `seed-eu-sanctions` nel livello `slow`; il seeder OFAC ora ha il nome esatto nel cron.
+- **#42** (#91 della tesi): Trade Policy su UE e Italia per gli 8 beni. Scheda "Importazioni UE/IT" con importazioni e primi fornitori (Eurostat Comext DS-045409, 2025) e scheda "Dazi UE" con dazio MFN e preferenziale minimo per sottovoce HS6 (WTO, 2024). Nella vista tesi solo queste due; le schede USA restano nella Full dashboard. OSINT prende i fornitori dell'Italia da Comext (8 beni su 8). Nuovo seeder `seed-eu-trade` nel livello `context`.
+- **#41**: le previsioni (`seed-forecasts`, LLM DeepSeek dalle `FORECAST_LLM_*`) si calcolano solo nelle 24 ore dopo che qualcuno ha aperto il pannello Previsioni (`POST /api/forecast/viewed`); altrimenti il giro orario si ferma senza chiamare l'LLM. `FORECAST_ALWAYS_RUN=1` ripristina il comportamento precedente.
+- **#40**: Policy, nuova scheda iniziale "Beni × misure": per ognuno degli 8 beni, le misure del registro con lo stesso codice HS (verificate prima, con stato) e gli atti UE recenti che lo nominano.
+- **#39**: Policy, scheda "Atti UE recenti": regolamenti, decisioni e direttive degli ultimi 30 giorni che nominano uno degli 8 beni o una misura commerciale, dall'endpoint SPARQL dell'Ufficio delle pubblicazioni (nuovo seeder `seed-policy-eu-acts`, livello `slow`). Il workflow n8n 06 non trovava nulla, perché EUR-Lex blocca le richieste automatiche. *Server:* lancio una tantum facoltativo, altrimenti si riempie al giro `slow` successivo.
+- **#38**: OSINT riscritto come strato "Segnali" del modello: tabella dei 12 nodi (inneschi entro 300 km, transiti, clima della zona vicina, stato della catena), tabella degli 8 beni (prezzi, primi fornitori dell'Italia da Comtrade, misure del registro Policy) e ultimi segnali sui nodi. Nuovo endpoint `/api/osint/signals`; il digest n8n per le notifiche non cambia.
+- **#37**: World Brief (#100 della tesi). Se la sintesi viene scartata da un controllo editoriale, si fa un secondo tentativo con una nota sulla regola violata (una chiamata LLM in più). Se fallisce anche quello, si pubblica la sintesi ridotta a un titolo invece di conservare la precedente. I controlli non cambiano.
+- **#36**: il job informativo "data" dei test (suite ereditata, non bloccante) ha un limite di 20 minuti: senza limite restava appeso fino a 6 ore e, dopo una serie di merge, bloccava i runner e quindi il deploy.
+- **#35**: le normali climatiche 1991-2020 (Open-Meteo) si scaricano una zona alla volta, all'inizio del giro settimanale e con un tempo massimo proprio: prima venivano bloccate dai 429 di Open-Meteo, e senza di esse il pannello climate restava vuoto. *Server:* serve un lancio manuale una tantum per non aspettare domenica.
+- **#34**: il tooltip "Fonti dei dati" di Alert feed e OSINT dice che il workflow n8n 01 (notizie GDELT) non esiste nell'istanza, come risulta dal log di `n8n-sync`.
+- **#33**: questo changelog; autorizzazione permanente al merge per gli agenti, registrata in `AGENTS.md`.
+- **#32**: icona "Fonti dei dati" accanto al titolo di ogni pannello della vista tesi, sulla mappa e in ogni sezione di OSINT, Research e Policy. Il tooltip cita la fonte esatta, l'indirizzo chiamato dal codice e il file che la chiama. Registro in `src/config/data-sources.ts`, da aggiornare quando un pannello cambia fonte.
+- **#31**: i pannelli di notizie rispettano perimetro, regole admin e allowlist dell'app. La vista tesi mostra solo i suoi 12 pannelli; spariscono ovunque `finance`, `tech`, `ai` e `layoffs`.
+- **#30**: tolti la pipeline GDELT con adjudicator LLM mai usata e le rotte `/api/trigger-ingestion` e `/api/customs-events`, che restituiva coordinate casuali. L'Alert feed legge solo il digest n8n.
+- **#29**: tolto il tema "Conflitti (ACLED)" dalle Impostazioni → Notifiche e dal workflow n8n 07. Al merge l'Action `n8n-sync` aggiorna il nodo nell'istanza.
+- **#28**: il monitor inneschi legge i terremoti da Redis (`thesis:triggers:v1`), scritti ogni ora da `seed-thesis-triggers` (EMSC, USGS di riserva) nel livello `thesis`. *Server:* nessuna azione obbligatoria, la chiave si scrive al primo giro orario.
+- **#27**: niente Google Fonts bloccanti né preconnect a `maps.worldmonitor.app`; il carattere arabo si carica solo con l'arabo.
+- **#26**: la vista tesi non carica più segnali d'intelligence, macro e borsa che non mostra. Nella sonda d'avvio le chiamate passano da 55 a 33.
+- **#25**: regola "niente righe di attribuzione" nei commit e nelle PR (`CLAUDE.md`, `.claude/settings.json`).
+- **#24**: con `OPENALEX_API_KEY` le Novità accademiche di Research cercano prima su OpenAlex, poi su Crossref.
+- **#23**: spenti per sempre cinque gruppi ereditati: finanza speculativa e mercati, tech/startup, indici di consumo, webcam e dirette, militare (`src/config/scope.ts`).
+- **#22**: sintesi dei gruppi di notizie sbloccate in modalità self-hosted (via il controllo "Pro" dell'upstream).
+- **#21**: PortWatch ogni 6 ore (livello `context`); la scheda Punti di strozzatura distingue "in caricamento" da "nessun dato".
+- **#20**: World Brief senza il falso positivo del validatore; soglie di salute a 90 minuti per i seeder orari; README nuovo.
+- **#16**: modelli LLM in un solo punto (`scripts/_llm-models.mjs`): Claude Haiku 5.5 veloce, Mistral Large 4 qualità; usi di mercato ereditati spenti.
+
+## 13 ottobre 2026
+
+- **#19**: testi pubblici (`llms.txt`, `llms-full.txt`, `ai-search.md`) riscritti su Risk Sentinel; OSINT senza ACLED e senza score v0.
+- **#18**: registro Policy con le misure del Cap. 3 come modulatori e uno stato di verifica per ogni voce.
+- **#17**: bibliografia di Research generata dal repository della tesi, copertura per strato del modello, conferenze sfoltite.
+- **#15**: Groq rimosso dal fork.
+- **#14**: stabilità dopo il fermo del 12-13/10: limitatore delle chiamate in uscita, watchdog, limiti del bootstrap, tetto di memoria dei seeder.
+- **#13**: avvio più leggero, distanze dai limiti di placca allineate alla tesi, bibliografia e conferenze, livello cron `context`.
+
+## 8-10 ottobre 2026
+
+- **#10**: pannello Risposta e scenari (prospettiva futura, proof of concept).
+- **#9**: `CLAUDE.md` tracciato nel repository (contesto di ricerca per ogni agente).
+- **#8**: ACLED disattivato ovunque (la licenza esclude l'uso con IA/LLM); i conflitti vengono da UCDP.
+- **#7**: livello cron `thesis` orario (terremoti, eventi naturali, anomalie climatiche).
+- **#6** e **#5**: piattaforma allineata al modello a sei strati: catena di rischio, inneschi misurati, beni strategici, vista tesi predefinita.
+- **#4**: `sentinel-adm` spostato fuori dal repository (ramo `archive/sentinel-adm`).
+
+## Giugno 2026
+
+- **#3** e **#1**: correzione del deploy su Netlify (segreti tolti dal codice). Netlify non è più usato: la produzione è sulla VPS Contabo.
+
+## Aperte (non unite)
+
+- **#11**: script della caratterizzazione del pericolo del Cap. 3.
+- **#12** (bozza): regola degli inneschi basata sull'intensità prevista, in attesa del via delle tutor.

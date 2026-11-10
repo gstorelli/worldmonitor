@@ -6,7 +6,7 @@
  * the app switcher, the logout control and the credits footer.
  */
 
-import { ACTIVE_APP, APPS, switchAppHref } from '@/config/apps';
+import { ACTIVE_APP, switchAppHref, switcherApps } from '@/config/apps';
 import type { WorkspaceLoader } from './types';
 
 const GITHUB_URL = 'https://github.com/gstorelli/worldmonitor';
@@ -21,7 +21,7 @@ export async function mountAppShell(container: HTMLElement, loadWorkspace: Works
         </div>
         <div class="header-right">
           <div class="rs-app-switcher">
-            ${APPS.map(
+            ${switcherApps().map(
               (app) =>
                 `<a class="rs-app-link${app.id === ACTIVE_APP.id ? ' active' : ''}" href="${switchAppHref(app.id)}" title="${app.description}">${app.label}</a>`,
             ).join('')}

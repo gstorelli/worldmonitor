@@ -54,8 +54,13 @@ services:
       LLM_API_URL: "${LLM_API_URL:-}"
       LLM_API_KEY: "${LLM_API_KEY:-}"
       LLM_MODEL: "${LLM_MODEL:-}"
-      GROQ_API_KEY: "${GROQ_API_KEY:-}"
       OPENROUTER_API_KEY: "${OPENROUTER_API_KEY:-}"
+      # Model tiers and OpenRouter base (scripts/_llm-models.mjs); empty = defaults.
+      LLM_FAST_MODEL: "${LLM_FAST_MODEL:-}"
+      LLM_QUALITY_MODEL: "${LLM_QUALITY_MODEL:-}"
+      LLM_REASONING_MODEL: "${LLM_REASONING_MODEL:-}"
+      OPENROUTER_BASE_URL: "${OPENROUTER_BASE_URL:-}"
+      LLM_INHERITED_MARKET_FEATURES: "${LLM_INHERITED_MARKET_FEATURES:-}"
       # n8n ingestion auth (Risk Sentinel): required by POST /api/n8n/ingest
       # when set. Generate with: openssl rand -hex 32
       N8N_INGEST_SECRET: "${N8N_INGEST_SECRET:-}"
@@ -79,6 +84,10 @@ services:
       # Zotero Web API v3 (Source Validation panel) — https://www.zotero.org/settings/keys
       ZOTERO_API_KEY: "${ZOTERO_API_KEY:-}"
       ZOTERO_USER_ID: "${ZOTERO_USER_ID:-}"
+      # OpenAlex (Research → "Novità accademiche") — https://openalex.org/settings/api
+      # With a key OpenAlex is searched first; without it Crossref is.
+      OPENALEX_API_KEY: "${OPENALEX_API_KEY:-}"
+      CROSSREF_MAILTO: "${CROSSREF_MAILTO:-}"
       # Data source API keys (optional — features degrade gracefully)
       AISSTREAM_API_KEY: "${AISSTREAM_API_KEY:-}"
       FINNHUB_API_KEY: "${FINNHUB_API_KEY:-}"
@@ -92,7 +101,7 @@ services:
     # Docker secrets (recommended for API keys — keeps them out of docker inspect).
     # Create secrets/ dir with one file per key, then uncomment below.
     # secrets:
-    #   - GROQ_API_KEY
+    #   - OPENROUTER_API_KEY
     #   - AISSTREAM_API_KEY
     #   - FINNHUB_API_KEY
     #   - FRED_API_KEY
@@ -168,10 +177,10 @@ services:
     restart: unless-stopped
 
 # Docker secrets — uncomment and point to your secret files.
-# Example: echo "gsk_abc123" > secrets/groq_api_key.txt
+# Example: echo "sk-or-..." > secrets/openrouter_api_key.txt
 # secrets:
-#   GROQ_API_KEY:
-#     file: ./secrets/groq_api_key.txt
+#   OPENROUTER_API_KEY:
+#     file: ./secrets/openrouter_api_key.txt
 #   AISSTREAM_API_KEY:
 #     file: ./secrets/aisstream_api_key.txt
 #   FINNHUB_API_KEY:

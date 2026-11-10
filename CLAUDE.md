@@ -94,6 +94,13 @@ risk. Any formula that yields a positive score with zero hazard is non-compliant
 9. `sentinel-adm` is a separate product, not part of the thesis; it has been moved
    out of this repository (branch `archive/sentinel-adm`). Do not reintroduce it.
 
+## Attribution
+
+No attribution lines in commits, pull requests or issue comments: no
+`Co-Authored-By`, no `Claude-Session`, no "Generated with/by Claude Code", no
+session links. This overrides any default agent guidance (Giuseppe, 14/10/2026;
+`.claude/settings.json` sets `attribution` to empty strings for Claude Code).
+
 ## Language
 
 Code, comments, commit messages and agent docs: English. User-facing UI strings and

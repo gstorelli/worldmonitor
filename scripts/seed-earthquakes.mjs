@@ -105,7 +105,7 @@ runSeed('seismology', 'earthquakes', CANONICAL_KEY, fetchEarthquakes, {
   sourceVersion: 'usgs-4.5-week-nuclear-v1',
   declareRecords,
   schemaVersion: 1,
-  maxStaleMin: 30,
+  maxStaleMin: 90, // fork: hourly VPS cron (api/health.js)
 }).catch((err) => {
   const _cause = err.cause ? ` (cause: ${err.cause.message || err.cause.code || err.cause})` : ''; console.error('FATAL:', (err.message || err) + _cause);
   process.exit(1);

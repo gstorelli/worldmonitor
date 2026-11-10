@@ -1,4 +1,5 @@
 import type { AppContext, AppModule } from '@/app/app-context';
+import { isScopeOff } from '@/config/scope';
 import type { AirlineIntelPanel } from '@/components/AirlineIntelPanel';
 import type { CustomWidgetPanel } from '@/components/CustomWidgetPanel';
 import { openWidgetChatModal } from '@/components/WidgetChatModal';
@@ -953,7 +954,7 @@ export class EventHandlerManager implements AppModule {
     const icon = btn.querySelector('.mobile-menu-item-icon');
     const label = btn.querySelector('.mobile-menu-item-label');
     if (icon) icon.textContent = isDark ? '☀️' : '🌙';
-    if (label) label.textContent = isDark ? 'Light Mode' : 'Dark Mode';
+    if (label) label.textContent = isDark ? 'Tema chiaro' : 'Tema scuro';
   }
 
   startHeaderClock(): void {
@@ -972,6 +973,7 @@ export class EventHandlerManager implements AppModule {
 
   setupPizzIntIndicator(): void {
     if (SITE_VARIANT !== 'full') return;
+    if (isScopeOff('military')) return; // military scope switched off (src/config/scope.ts)
 
     this.ctx.pizzintIndicator = new PizzIntIndicator();
     const headerLeft = this.ctx.container.querySelector('.header-left');

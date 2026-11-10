@@ -5,32 +5,16 @@ export interface CustomsEvent {
   title: string;
   description: string;
   explainability?: string;
+  /** Pipeline that produced the signal (n8n topic or source name). */
+  source?: string;
+  /** Severity label as given by the source (not a model risk score). */
+  sourceSeverity?: string;
+  url?: string;
   score: number;
   lat: number;
   lon: number;
   severity: 'critical' | 'high' | 'medium' | 'low';
   timestamp: number;
-}
-
-export async function fetchCustomsEvents(): Promise<CustomsEvent[]> {
-  try {
-    const url = toApiUrl('/api/customs-events');
-    const response = await fetch(url.toString(), {
-      headers: {
-        'Accept': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      console.error(`[CustomsEvents] HTTP ${response.status}`);
-      return [];
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error('[CustomsEvents] Fetch error:', error);
-    return [];
-  }
 }
 
 const SEVERITY_SCORES: Record<string, number> = {
@@ -44,10 +28,10 @@ const SEVERITY_SCORES: Record<string, number> = {
 };
 
 /**
- * Fallback feed for the Global Risk Alerts panel: the n8n digest
- * (risk_sentinel:n8n:* + policy monitor) reshaped as alert cards. The SQLite
- * customs-events table has no writer in the self-hosted deploy, so without
- * this the panel stays empty while the pipelines are producing signals.
+ * Feed of the Global Risk Alerts panel: the n8n digest
+ * (risk_sentinel:n8n:* + policy monitor) reshaped as alert cards. The former
+ * /api/customs-events SQLite route (random coordinates, written only by the
+ * removed sidecar ingestion pipeline) is gone.
  */
 export async function fetchDigestSignals(limit = 12): Promise<CustomsEvent[]> {
   try {
@@ -70,7 +54,8 @@ export async function fetchDigestSignals(limit = 12): Promise<CustomsEvent[]> {
     return sections
       .flatMap(section =>
         (section.items ?? []).map((item, index) => {
-          const severity = String(item.severity ?? 'moderate').toLowerCase();
+          // Open-Meteo sends proto enum names (ANOMALY_SEVERITY_NORMAL).
+          const severity = String(item.severity ?? 'moderate').toLowerCase().replace(/^anomaly_severity_/, '');
           const rawScore = Number(item.score ?? 0);
           const score = rawScore > 0 ? Math.min(rawScore, 1) : (SEVERITY_SCORES[severity] ?? 0.5);
           const level: CustomsEvent['severity'] =
@@ -83,6 +68,9 @@ export async function fetchDigestSignals(limit = 12): Promise<CustomsEvent[]> {
             title: String(item.title ?? 'Signal'),
             description: String(item.summary ?? ''),
             explainability: `Fonte: ${item.source ?? section.topic ?? 'n8n'} · severità ${severity}${item.url ? ` · ${item.url}` : ''}`,
+            source: String(item.source ?? section.title ?? section.topic ?? 'n8n'),
+            sourceSeverity: severity,
+            url: typeof item.url === 'string' && /^https?:\/\//.test(item.url) ? item.url : undefined,
             score,
             lat: 0,
             lon: 0,

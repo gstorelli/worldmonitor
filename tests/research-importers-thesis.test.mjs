@@ -7,7 +7,6 @@ const here = dirname(fileURLToPath(import.meta.url));
 const load = (name) => import(pathToFileURL(join(here, '..', 'src', 'apps', 'research', name)).href);
 
 const importers = await load('importers.ts');
-const thesis = await load('thesis.ts');
 const model = await load('model.ts');
 const calls = await load('calls.ts');
 const filters = await load('filters.ts');
@@ -71,12 +70,11 @@ describe('research importers', () => {
         venue: '',
         doi: null,
         url: '',
-        themeArea: '',
+        layers: [],
         summary: '',
         limitation: '',
-        contribution: '',
-        dimensions: [],
         verified: false,
+        verification: null,
       },
     ];
     const [assigned] = importers.assignRefs([{ ...importers.parseRis(ris)[0] }], existing);
@@ -86,7 +84,7 @@ describe('research importers', () => {
 
 describe('research state model', () => {
   it('merges overrides and combines curated + imported sources', () => {
-    const curated = [{ ref: 1, authors: 'A', year: 2020, title: 'T', type: 'journal', venue: 'V', doi: null, url: 'u', themeArea: 'A', summary: '', limitation: '', contribution: '', dimensions: [], verified: true }];
+    const curated = [{ ref: 1, authors: 'A', year: 2020, title: 'T', type: 'journal', venue: 'V', doi: null, url: 'u', layers: ['customs'], summary: '', limitation: '', verified: true, verification: 'P' }];
     const state = {
       notes: { '1': 'nota' },
       reading: { '1': { state: 'reading', priority: 'high', tags: ['customs'] } },
@@ -105,7 +103,7 @@ describe('research state model', () => {
 });
 
 describe('research filters workflow qualifiers', () => {
-  const source = { ref: 1, authors: 'Doe', year: 2024, title: 'T', type: 'journal', venue: 'V', doi: null, url: '', themeArea: 'A', summary: '', limitation: '', contribution: '', dimensions: [], verified: true };
+  const source = { ref: 1, authors: 'Doe', year: 2024, title: 'T', type: 'journal', venue: 'V', doi: null, url: '', layers: ['customs'], summary: '', limitation: '', verified: true, verification: 'P' };
   const reading = { state: 'reviewed', priority: 'high', tags: ['customs'] };
 
   it('filters by status, priority and tag', () => {
@@ -123,30 +121,12 @@ describe('research calls calendar', () => {
     assert.equal(calls.daysUntil('2026-01-11', now), 10);
     assert.equal(calls.daysUntil(null, now), null);
     const sorted = calls.callsForThemes([], now);
-    assert.ok(sorted.length >= 10);
-  });
-});
-
-describe('research thesis generators', () => {
-  const source = { ref: 1, authors: 'Doe, J.', year: 2024, title: 'Customs Risk', type: 'journal', venue: 'Journal of Trade', doi: '10.1/x', url: 'https://x', themeArea: 'A', summary: '', limitation: '', contribution: '', dimensions: ['customsRelevance'], verified: true };
-  const state = { notes: { '1': 'Nota utile' }, reading: { '1': { state: 'reviewed', priority: 'high', tags: ['customs'] } }, overrides: {}, imported: [] };
-
-  it('generates Markdown with citations, notes and coverage table', () => {
-    const md = thesis.generateThesisMarkdown([source], state);
-    assert.match(md, /# Risk Sentinel — Literature review/);
-    assert.match(md, /## Tema A — Customs AI/);
-    assert.match(md, /Doe, J\. \(2024\)\. Customs Risk\./);
-    assert.match(md, /> Nota utile/);
-    assert.match(md, /stato: revisionata/);
-    assert.match(md, /## Copertura metodologica \(modello 8D\)/);
-    assert.match(md, /\| Commodity Sensitivity \| 0 \| — \|/);
-  });
-
-  it('generates LaTeX with escaping and theme filtering', () => {
-    const tex = thesis.generateThesisLatex([source], state, { themes: ['B'] });
-    assert.match(tex, /\\section\*\{Literature review/);
-    assert.ok(!tex.includes('Tema A'));
-    const texAll = thesis.generateThesisLatex([{ ...source, title: 'A & B_study' }], state);
-    assert.match(texAll, /A \\& B\\_study/);
+    // Pruned on 13/10/2026 to the venues pertinent to the thesis.
+    assert.equal(sorted.length, 8);
+    assert.ok(!sorted.some((call) => /neurips|acl/i.test(call.id)));
+    for (const call of sorted) {
+      for (const topic of call.themes) assert.ok(topic in calls.CALL_TOPICS, `${call.id}: unknown topic ${topic}`);
+    }
+    assert.deepEqual(calls.callsForThemes(['dogane'], now).map((call) => call.id).sort(), ['wco-picard', 'wco-tech']);
   });
 });

@@ -1,5 +1,7 @@
 import { getPersistentCache, setPersistentCache } from '@/services/persistent-cache';
 import { isDesktopRuntime, toApiUrl } from '@/services/runtime';
+import { OUT_OF_SCOPE_BOOTSTRAP } from '@/config/scope';
+import { ACTIVE_APP } from '@/config/apps';
 
 const hydrationCache = new Map<string, unknown>();
 const BOOTSTRAP_CACHE_PREFIX = 'bootstrap:tier:';
@@ -93,6 +95,16 @@ function combineHydrationSources(states: BootstrapTierHydrationState[]): Bootstr
   return 'mixed';
 }
 
+/**
+ * Tier URL without the keys of switched-off scope groups (src/config/scope.ts)
+ * and the keys the active app never reads (`bootstrapOmit` in src/config/apps.ts).
+ */
+export function bootstrapTierPath(tier: 'fast' | 'slow', appOmit: readonly string[] = ACTIVE_APP.bootstrapOmit ?? []): string {
+  const keys = [...new Set([...OUT_OF_SCOPE_BOOTSTRAP, ...appOmit])].sort();
+  const omit = keys.length ? `&omit=${keys.join(',')}` : '';
+  return `/api/bootstrap?tier=${tier}${omit}`;
+}
+
 async function fetchTier(tier: 'fast' | 'slow', signal: AbortSignal): Promise<BootstrapTierHydrationState> {
   if (typeof navigator !== 'undefined' && navigator.onLine === false) {
     const cached = await readCachedTier(tier, true); // age gate skipped: any snapshot beats blank offline
@@ -107,7 +119,7 @@ async function fetchTier(tier: 'fast' | 'slow', signal: AbortSignal): Promise<Bo
   let missingKeys: string[] = [];
 
   try {
-    const resp = await fetch(toApiUrl(`/api/bootstrap?tier=${tier}`), { signal });
+    const resp = await fetch(toApiUrl(bootstrapTierPath(tier)), { signal });
     if (resp.ok) {
       const payload = (await resp.json()) as {
         data?: Record<string, unknown>;
@@ -203,8 +215,13 @@ export async function fetchBootstrapData(): Promise<void> {
   //   digest server-side (~11 s measured on the Contabo VPS), so those budgets aborted the request and left
   //   the dashboard half-hydrated until the operator reloaded (with a now-warm cache). 12 s / 25 s cover the
   //   cold path with headroom; the retry below then absorbs any remaining transient slowness.
-  const fastMs = desktop ? 12_000 : 1_200;
-  const slowMs = desktop ? 25_000 : 3_000;
+  // - Risk Sentinel fork: the web build is served only by the self-hosted VPS stack (no CDN edge cache), so
+  //   the 1.2 s / 3 s upstream web budgets were tuned for an infrastructure this fork does not have. A production
+  //   HAR of 13/10/2026 shows all four bootstrap requests (two attempts x two tiers) aborted by the browser: the
+  //   app then wasted ~6.5 s and fell back to ~50 per-panel fetches. 6 s / 12 s let a warm self-hosted cache
+  //   answer in one shot; desktop keeps its larger cold-path budget.
+  const fastMs = desktop ? 12_000 : 6_000;
+  const slowMs = desktop ? 25_000 : 12_000;
 
   const completed = await runBootstrapAttempt(fastMs, slowMs);
   if (!completed) {
@@ -213,4 +230,22 @@ export async function fetchBootstrapData(): Promise<void> {
     await new Promise((resolve) => setTimeout(resolve, 1_500));
     await runBootstrapAttempt(fastMs, slowMs);
   }
+}
+
+// Risk Sentinel (thesis issue #86): main.ts starts the bootstrap right after
+// login, in parallel with the panel policy/prefs reads and the App module
+// download, instead of waiting for App.init(); App.init() then reuses it.
+let earlyBootstrap: Promise<void> | null = null;
+
+/** Start the bootstrap fetch early (web only: the desktop sidecar may not be ready yet). */
+export function prefetchBootstrapData(): void {
+  if (earlyBootstrap || isDesktopRuntime()) return;
+  earlyBootstrap = fetchBootstrapData().catch(() => {});
+}
+
+/** App.init(): the early fetch when there is one, a fresh fetch otherwise. */
+export function awaitBootstrapData(): Promise<void> {
+  const early = earlyBootstrap;
+  earlyBootstrap = null;
+  return early ?? fetchBootstrapData();
 }

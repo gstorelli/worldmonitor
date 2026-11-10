@@ -14,6 +14,7 @@
 
 import { extractFirstJsonObject, cleanJsonText } from '../_llm-json.mjs';
 import { buildLlmCallEvent, emitLlmEvents } from '../lib/llm-telemetry.cjs';
+import { getOpenRouterChatUrl, getLlmQualityModel } from '../_llm-models.mjs';
 
 const CHROME_UA = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
@@ -27,29 +28,29 @@ const DEFAULT_PROVIDERS = [
   {
     name: 'openrouter',
     envKey: 'OPENROUTER_API_KEY',
-    apiUrl: 'https://openrouter.ai/api/v1/chat/completions',
-    model: 'deepseek/deepseek-v4-flash',
+    get apiUrl() { return getOpenRouterChatUrl(); },
+    // Fork: quality-tier model from scripts/_llm-models.mjs (13/10/2026).
+    get model() { return getLlmQualityModel(); },
     timeout: 35_000,
     headers: (key) => ({
       Authorization: `Bearer ${key}`,
       'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://worldmonitor.app',
-      'X-Title': 'World Monitor',
+      'HTTP-Referer': 'https://risksentinel.opencyber.org',
+      'X-Title': 'Risk Sentinel',
       'User-Agent': CHROME_UA,
     }),
     extraBody: { reasoning: { enabled: false } },
   },
   {
-    name: 'groq',
-    envKey: 'GROQ_API_KEY',
-    apiUrl: 'https://api.groq.com/openai/v1/chat/completions',
-    model: 'llama-3.3-70b-versatile',
+    // Fork: optional OpenAI-compatible fallback (LLM_API_URL + LLM_API_KEY,
+    // model LLM_MODEL) in the slot Groq held upstream; unset by default, so
+    // production runs on OpenRouter alone. Groq was removed on 13/10/2026.
+    name: 'generic',
+    envKey: 'LLM_API_KEY',
+    get apiUrl() { return process.env.LLM_API_URL || ''; },
+    get model() { return process.env.LLM_MODEL || 'gpt-3.5-turbo'; },
     timeout: 25_000,
-    headers: (key) => ({
-      Authorization: `Bearer ${key}`,
-      'Content-Type': 'application/json',
-      'User-Agent': CHROME_UA,
-    }),
+    headers: (key) => ({ Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', 'User-Agent': CHROME_UA }),
   },
 ];
 

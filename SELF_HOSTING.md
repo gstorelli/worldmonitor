@@ -57,9 +57,8 @@ services:
   worldmonitor:
     environment:
       # 🤖 LLM — OpenRouter is tried FIRST (default model deepseek/deepseek-v4-flash).
-      # Groq is an OPTIONAL free fallback, not required. Configure at least one.
-      OPENROUTER_API_KEY: ""      # https://openrouter.ai (free tier ~50 req/day; add credits for headroom)
-      GROQ_API_KEY: ""            # https://console.groq.com (free, 14.4K req/day — recommended fallback against 429s)
+      # The Risk Sentinel fork has no Groq fallback (removed 13/10/2026).
+      OPENROUTER_API_KEY: ""      # https://openrouter.ai
 
       # 📊 Markets & Economics
       FINNHUB_API_KEY: ""         # https://finnhub.io (free tier) — primary equity gap + search
@@ -99,7 +98,7 @@ services:
 | Status | Keys |
 |--------|------|
 | 🟢 No key needed | Earthquakes, weather, natural events, UNHCR displacement, prediction markets, stablecoins, crypto, spending, climate anomalies, submarine cables, BIS data, cyber threats |
-| 🟢 Free signup | GROQ, FRED, EIA, NASA FIRMS, AISSTREAM, Finnhub, Alpha Vantage, AviationStack, ACLED, OpenRouter |
+| 🟢 Free signup | FRED, EIA, NASA FIRMS, AISSTREAM, Finnhub, Alpha Vantage, AviationStack, ACLED, OpenRouter |
 | 🟡 Free (limited) | OpenSky (higher rate limits with account) |
 | 🔴 Paid | Cloudflare Radar (internet outages) |
 

@@ -53,7 +53,7 @@ import { preloadCountryGeometry, getCountryNameByCode } from '@/services/country
 import { initI18n, t } from '@/services/i18n';
 
 import { computeDefaultDisabledSources, getLocaleBoostedSources, getTotalFeedCount } from '@/config/feeds';
-import { fetchBootstrapData, getBootstrapHydrationState, markBootstrapAsLive, type BootstrapHydrationState } from '@/services/bootstrap';
+import { awaitBootstrapData, getBootstrapHydrationState, markBootstrapAsLive, type BootstrapHydrationState } from '@/services/bootstrap';
 import { describeFreshness } from '@/services/persistent-cache';
 import { DesktopUpdater } from '@/app/desktop-updater';
 import { CountryIntelManager } from '@/app/country-intel';
@@ -237,8 +237,13 @@ export class App {
       tasks.push(wrapped);
     };
 
-    const shouldPrime = (id: string): boolean => forceAll || this.isPanelNearViewport(id);
-    const shouldPrimeAny = (ids: string[]): boolean => forceAll || this.isAnyPanelNearViewport(ids);
+    // Risk Sentinel: forceAll primes only panels that exist in the active app
+    // (same gate as DataLoaderManager.loadAllData). Without it the thesis view
+    // fetched FRED, BIS, government spending and oil analytics for panels it
+    // never creates.
+    const panelExists = (id: string): boolean => Boolean(this.state.panels[id]);
+    const shouldPrime = (id: string): boolean => (forceAll && panelExists(id)) || this.isPanelNearViewport(id);
+    const shouldPrimeAny = (ids: string[]): boolean => (forceAll && ids.some(panelExists)) || this.isAnyPanelNearViewport(ids);
 
     if (shouldPrime('service-status')) {
       const panel = this.state.panels['service-status'] as ServiceStatusPanel | undefined;
@@ -842,7 +847,7 @@ export class App {
     }
 
     // Hydrate in-memory cache from bootstrap endpoint (before panels construct and fetch)
-    await fetchBootstrapData();
+    await awaitBootstrapData();
     this.bootstrapHydrationState = getBootstrapHydrationState();
 
     // Verify OAuth OTT and hydrate auth session BEFORE any UI subscribes to auth state

@@ -6,6 +6,9 @@ import { h, replaceChildren, safeHtml } from '../utils/dom-utils';
 import { trackPanelResized } from '@/services/analytics';
 import { getAiFlowSettings } from '@/services/ai-flow-settings';
 import { PanelGateReason } from '@/services/panel-gating';
+import { getPanelSources } from '@/config/data-sources';
+import { FEEDS } from '@/config/feeds';
+import { createSourceInfo } from './source-info';
 
 export type PanelSeverity = 'critical' | 'high' | 'medium' | 'low' | 'none';
 
@@ -299,6 +302,11 @@ export class Panel {
       infoWrapper.appendChild(tooltip);
       headerLeft.appendChild(infoWrapper);
     }
+
+    // Risk Sentinel: "Fonti" icon with the exact data sources of the panel
+    // (src/config/data-sources.ts).
+    const sourceInfo = createSourceInfo(getPanelSources(options.id, FEEDS as Record<string, unknown>));
+    if (sourceInfo) headerLeft.appendChild(sourceInfo);
 
     // Add "new" badge element (hidden by default)
     if (options.trackActivity !== false) {

@@ -324,8 +324,14 @@ export class SupplyChainPanel extends Panel {
   }
 
   private renderChokepoints(): string {
-    if (!this.chokepointData || !this.chokepointData.chokepoints?.length) {
+    // null = no response yet (loading); an empty list = the server answered
+    // but has no transit data. The two used to share the "loading" text, so a
+    // panel with nothing to show looked like it was loading forever.
+    if (!this.chokepointData) {
       return `<div class="economic-empty">${t('components.supplyChain.noChokepoints')}</div>`;
+    }
+    if (!this.chokepointData.chokepoints?.length) {
+      return `<div class="economic-empty">${t('components.supplyChain.chokepointsEmpty')}</div>`;
     }
 
     // Scenario projection overlay: when a scenario is active, show the

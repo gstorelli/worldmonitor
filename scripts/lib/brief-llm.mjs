@@ -4,7 +4,7 @@
 // executive summary (`digest.lead` / `digest.threads` / `digest.signals`)
 // with Gemini 2.5 Flash output via the existing OpenRouter-backed
 // callLLM chain. The LLM provider is pinned to openrouter by
-// skipProviders:['ollama','groq'] so the brief's editorial voice
+// skipProviders:['ollama','generic'] so the brief's editorial voice
 // stays on one model across environments.
 //
 // Deliberately:
@@ -122,11 +122,11 @@ const DIGEST_PROSE_TTL_SEC = 4 * 60 * 60;
 const STORY_DESCRIPTION_TTL_SEC = 24 * 60 * 60;
 const WHY_MATTERS_CONCURRENCY = 5;
 
-// Pin to openrouter (google/gemini-2.5-flash until the #4944 U4 brief-voice
-// cutover, which is gated on the U3 shadow evaluation). Ollama isn't deployed
+// Pin to openrouter (fork: the quality-tier model of scripts/_llm-models.mjs,
+// via scripts/lib/llm-chain.cjs). Ollama isn't deployed
 // in Railway, and pinning keeps the brief's editorial voice on one model
-// across environments instead of drifting to the groq fallback.
-const BRIEF_LLM_SKIP_PROVIDERS = ['ollama', 'groq'];
+// across environments instead of drifting to a fallback model.
+const BRIEF_LLM_SKIP_PROVIDERS = ['ollama', 'generic'];
 
 // ── whyMatters (per story) ─────────────────────────────────────────────────
 // The pure helpers (`WHY_MATTERS_SYSTEM`, `buildWhyMattersUserPrompt` (aliased

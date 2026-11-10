@@ -857,6 +857,18 @@ export function validateNoHallucinatedProperNouns(summary, headline) {
     ) {
       found = true;
     }
+    // Risk Sentinel fork: a hyphenated compound of names ("Russia-Ukraine",
+    // "Israel-Hamas") is one token, so it never matched a source that names
+    // each side separately and the whole brief fell back to headlines
+    // (seed-insights log, 14/10/2026). Accept it only when EVERY part is
+    // itself a proper noun of the source; a compound with one invented side
+    // still rejects.
+    if (!found && summarySeq.length === 1 && summarySeq[0].includes('-')) {
+      const parts = summarySeq[0].split('-').filter(Boolean).map(normalizeToken);
+      if (parts.length >= 2 && parts.every((part) => headlineSequences.some((seq) => seq.includes(part)))) {
+        found = true;
+      }
+    }
     if (!found) {
       return { ok: false, hallucinated: summarySeq };
     }

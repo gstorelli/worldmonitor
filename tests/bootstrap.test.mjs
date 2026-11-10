@@ -247,14 +247,18 @@ describe('Frontend hydration (src/services/bootstrap.ts)', () => {
   });
 
   it('keeps web bootstrap tier timeouts within budget', () => {
-    const timeouts = Array.from(src.matchAll(/(\d[_\d]*)\)/g))
-      .map((m) => parseInt(m[1].replace(/_/g, ''), 10))
-      .filter((n) => n === 1200 || n === 3000);
-    assert.deepEqual(
-      timeouts.toSorted((a, b) => a - b),
-      [1200, 3000],
-      `Expected web bootstrap timeouts (fast=1200, slow=3000) — slow tier was bumped from 1.8s to 3.0s to avoid hydration-cascade aborts`,
-    );
+    // Risk Sentinel fork: web budgets are sized for the self-hosted VPS (no CDN edge
+    // cache). A production HAR of 13/10/2026 showed the upstream 1.2 s / 3 s budgets
+    // aborting every bootstrap request; see the comment in src/services/bootstrap.ts.
+    const read = (name) => {
+      const m = src.match(new RegExp(`const ${name} = desktop \\? ([\\d_]+) : ([\\d_]+);`));
+      assert.ok(m, `Missing ${name} desktop/web budget`);
+      return { desktop: parseInt(m[1].replace(/_/g, ''), 10), web: parseInt(m[2].replace(/_/g, ''), 10) };
+    };
+    const fast = read('fastMs');
+    const slow = read('slowMs');
+    assert.deepEqual([fast.web, slow.web], [6000, 12000], 'Expected web bootstrap timeouts fast=6000, slow=12000');
+    assert.ok(fast.web <= slow.web && slow.web <= slow.desktop, 'Web budgets must stay within the desktop cold-path budget');
   });
 
   it('allows longer bootstrap timeouts for desktop runtime', () => {

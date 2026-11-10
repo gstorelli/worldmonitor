@@ -19,8 +19,12 @@ globalThis.fetch = async (_url, opts) => {
     if (readFailure) throw new Error('redis unavailable');
     const key = body[1];
     const seeds = {
-      'risk_sentinel:n8n:acled': [{ title: 'Attacco al porto', severity: 'critical', severityScore: 90, country: 'YE', nearChokepoint: 'Bab el-Mandeb', url: 'https://x/1' }],
-      'risk_sentinel:n8n:usgs': [{ title: 'Sisma M6.2', severity: 'high', tradeImpactScore: 70, url: 'https://x/2' }],
+      // Fork: the retired ACLED key must not be read even if it still holds data.
+      'risk_sentinel:n8n:acled': [{ title: 'ACLED item', severity: 'critical', severityScore: 99, url: 'https://x/0' }],
+      'risk_sentinel:n8n:usgs': [
+        { title: 'Sisma M6.2', severity: 'high', tradeImpactScore: 70, url: 'https://x/2' },
+        { title: 'Sisma M7.1 vicino a Bab el-Mandeb', severity: 'critical', tradeImpactScore: 90, nearChokepoint: 'Bab el-Mandeb', url: 'https://x/1' },
+      ],
       'risk_sentinel:n8n:commodities': [{ symbol: 'CL=F', name: 'WTI', alertLevel: 'elevated', price: 71 }],
       'policy:monitor:v1': { items: [{ title: 'Regolamento UE dazi', url: 'https://x/3' }] },
       'notify:config:v1': {
@@ -50,7 +54,8 @@ describe('api/notify/digest contract', () => {
     assert.ok(Array.isArray(body.digest.sections));
     const chokepoints = body.digest.sections.find((s) => s.topic === 'chokepoints');
     assert.ok(chokepoints, 'chokepoints section present');
-    assert.equal(chokepoints.items[0].title, 'Attacco al porto', 'critical item ranks first');
+    assert.equal(chokepoints.items[0].title, 'Sisma M7.1 vicino a Bab el-Mandeb', 'critical item ranks first');
+    assert.ok(!chokepoints.items.some((item) => item.title === 'ACLED item'), 'the retired ACLED key is not read');
     const commodities = body.digest.sections.find((s) => s.topic === 'commodities');
     assert.equal(commodities.items[0].title, 'CL=F');
   });
@@ -60,6 +65,12 @@ describe('api/notify/digest contract', () => {
     const body = await res.json();
     const policy = body.digest.sections.find((s) => s.topic === 'policy');
     assert.equal(policy.items[0].title, 'Regolamento UE dazi');
+  });
+
+  it('no longer serves the ACLED-only conflicts topic', async () => {
+    const res = await digestHandler(new Request('https://x/api/notify/digest?topics=conflicts'));
+    const body = await res.json();
+    assert.equal(body.digest.sections.some((s) => s.topic === 'conflicts'), false);
   });
 
   it('filters unknown topics and caps the limit', async () => {

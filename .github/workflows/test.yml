@@ -35,6 +35,10 @@ jobs:
   data:
     name: data (informational)
     runs-on: ubuntu-latest
+    # The broader suite carries upstream tests that hang on this fork (thesis
+    # issue #96): without a cap each run held a runner for the 6-hour default,
+    # and after a burst of merges they starved the production deploy (14/10/2026).
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

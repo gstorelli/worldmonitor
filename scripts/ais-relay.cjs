@@ -508,6 +508,33 @@ async function bootSeedDelayMs(label, metaKey, intervalMs) {
   return 0;
 }
 
+// Risk Sentinel scope (14/10/2026, src/config/scope.ts): relay loops of
+// switched-off groups never start. USNI and PizzINT are military, WsbTickers
+// and SocialVelocity are retail-finance Reddit signals, TechEvents is the
+// upstream tech variant, DodoPrices is the removed payments provider.
+// RS_RELAY_DISABLED_LOOPS (comma list, "none" to clear) overrides the default.
+// 15/10/2026: Cyber (no API keys), Spending (US federal spending, macro) and
+// ServiceStatuses (upstream service status page) belong to the macro and
+// upstreamExtra scope groups.
+const RS_DEFAULT_DISABLED_LOOPS = ['USNI', 'PizzINT', 'WsbTickers', 'SocialVelocity', 'TechEvents', 'DodoPrices', 'Cyber', 'Spending', 'ServiceStatuses'];
+// Each starter of a listed loop checks rsLoopDisabled(label) before calling
+// startBootSeedLoop (kept untouched: tests evaluate its source in isolation).
+const RS_DISABLED_LOOPS = new Set(
+  process.env.RS_RELAY_DISABLED_LOOPS === 'none' ? []
+    : process.env.RS_RELAY_DISABLED_LOOPS
+      ? process.env.RS_RELAY_DISABLED_LOOPS.split(',').map((s) => s.trim()).filter(Boolean)
+      : RS_DEFAULT_DISABLED_LOOPS,
+);
+function rsLoopDisabled(label) {
+  if (!RS_DISABLED_LOOPS.has(label)) return false;
+  console.log(`[${label}] Seed loop disabled (out of Risk Sentinel scope)`);
+  return true;
+}
+// Finance scope (crypto, stablecoins, tokens, ETF flows, Gulf quotes) is off
+// unless RS_FINANCE_SCOPE=on. Stocks, commodities and sectors keep seeding:
+// the commodities panel shares that loader.
+const RS_FINANCE_ON = process.env.RS_FINANCE_SCOPE === 'on';
+
 function startBootSeedLoop(label, metaKey, intervalMs, seedFn, onInitialError, onSeedError = onInitialError) {
   let intervalStarted = false;
   const startInterval = () => {
@@ -2537,6 +2564,7 @@ const GULF_SYMBOLS = [
 const GULF_SEED_TTL = 5400; // 90min — survives 1 missed cycle
 
 async function seedGulfQuotes() {
+  if (!RS_FINANCE_ON) return 0; // finance scope switched off (src/config/scope.ts)
   const quotes = [];
   for (const meta of GULF_SYMBOLS) {
     const yahoo = await fetchYahooChartDirect(meta.symbol);
@@ -2584,6 +2612,7 @@ function parseEtfChart(chart, ticker, issuer) {
 }
 
 async function seedEtfFlows() {
+  if (!RS_FINANCE_ON) return 0; // finance scope switched off (src/config/scope.ts)
   const etfs = [];
   for (const { ticker, issuer } of ETF_LIST) {
     try {
@@ -2732,6 +2761,7 @@ function coingeckoEndpoint() {
 }
 
 async function seedCryptoQuotes() {
+  if (!RS_FINANCE_ON) return 0; // finance scope switched off (src/config/scope.ts)
   let data;
   try {
     const { base, headers } = coingeckoEndpoint();
@@ -2803,6 +2833,7 @@ async function fetchStablecoinCoinPaprika() {
 }
 
 async function seedStablecoinMarkets() {
+  if (!RS_FINANCE_ON) return 0; // finance scope switched off (src/config/scope.ts)
   let data;
   try {
     const { base, headers } = coingeckoEndpoint();
@@ -2835,6 +2866,7 @@ const SECTORS_LIST = _sectorsCfg.sectors;
 const SECTORS_SEED_TTL = 7200; // 2h — 1h buffer over 5min cron cadence (was 1h = 55min buffer)
 
 async function seedCryptoSectors() {
+  if (!RS_FINANCE_ON) return 0; // finance scope switched off (src/config/scope.ts)
   const allIds = [...new Set(SECTORS_LIST.flatMap((s) => s.tokens))];
   let data;
   try {
@@ -2905,6 +2937,7 @@ async function fetchTokenPanelsCoinPaprika(allIds) {
 }
 
 async function seedTokenPanels() {
+  if (!RS_FINANCE_ON) return 0; // finance scope switched off (src/config/scope.ts)
   const allIds = [...new Set([..._defiCfg.ids, ..._aiCfg.ids, ..._otherCfg.ids])];
   let data;
   try {
@@ -2988,6 +3021,8 @@ async function seedAllMarketDataOnce() {
   if (!equitySkipped) q = await seedMarketQuotes();
   const c = await seedCommodityQuotes();
   const s = await seedSectorSummary();
+  // Gulf, ETF, crypto, stablecoin and token seeders return 0 at once while the
+  // finance scope is switched off (RS_FINANCE_ON, see top of the market block).
   const g = await seedGulfQuotes();
   const e = await seedEtfFlows();
   const cr = await seedCryptoQuotes();
@@ -3397,6 +3432,7 @@ async function startCyberThreatsSeedLoop() {
     return;
   }
   console.log(`[Cyber] Seed loop starting (interval ${CYBER_SEED_INTERVAL_MS / 1000 / 60 / 60}h, urlhaus:${URLHAUS_AUTH_KEY ? 'yes' : 'no'} otx:${OTX_API_KEY ? 'yes' : 'no'} abuseipdb:${ABUSEIPDB_API_KEY ? 'yes' : 'no'})`);
+  if (rsLoopDisabled('Cyber')) return;
   startBootSeedLoop('Cyber', 'seed-meta:cyber:threats', CYBER_SEED_INTERVAL_MS, seedCyberThreats, (e) => console.warn('[Cyber] Initial seed error:', e?.message || e), (e) => console.warn('[Cyber] Seed error:', e?.message || e));
 }
 
@@ -3675,9 +3711,17 @@ function classifyCacheKey(title) {
 }
 
 // LLM provider fallback chain — mirrors seed-insights.mjs LLM_PROVIDERS
-// Order: ollama → openrouter → groq (canonical chain since #4944, mirrors
-// server/_shared/llm.ts: DeepSeek V4 Flash primary with reasoning disabled,
-// groq llama-3.3-70b-versatile as the free-tier/outage fallback).
+// Order: ollama → openrouter → generic. Groq removed from the fork on 13/10/2026.
+// Fork: headline classification is a fast-tier task. The relay image copies only
+// the files listed in Dockerfile.relay, so the defaults of scripts/_llm-models.mjs
+// are copied here (tests/llm-models-parity keeps them in step).
+const RELAY_DEFAULT_LLM_FAST_MODEL = 'anthropic/claude-haiku-5.5';
+const RELAY_DEFAULT_OPENROUTER_API_BASE = 'https://openrouter.ai/api/v1';
+function relayOpenRouterApiBase() {
+  const raw = (process.env.OPENROUTER_BASE_URL || '').trim();
+  if (!raw.startsWith('https://')) return RELAY_DEFAULT_OPENROUTER_API_BASE;
+  return raw.replace(/\/+$/, '');
+}
 const CLASSIFY_LLM_PROVIDERS = [
   {
     name: 'ollama',
@@ -3696,17 +3740,20 @@ const CLASSIFY_LLM_PROVIDERS = [
   {
     name: 'openrouter',
     envKey: 'OPENROUTER_API_KEY',
-    apiUrl: 'https://openrouter.ai/api/v1/chat/completions',
-    model: 'deepseek/deepseek-v4-flash',
-    headers: (key) => ({ Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://worldmonitor.app', 'X-Title': 'World Monitor', 'User-Agent': CHROME_UA }),
+    get apiUrl() { return `${relayOpenRouterApiBase()}/chat/completions`; },
+    get model() { return (process.env.LLM_FAST_MODEL || '').trim() || RELAY_DEFAULT_LLM_FAST_MODEL; },
+    headers: (key) => ({ Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://risksentinel.opencyber.org', 'X-Title': 'Risk Sentinel', 'User-Agent': CHROME_UA }),
     extraBody: { reasoning: { enabled: false } },
     timeout: 30000,
   },
   {
-    name: 'groq',
-    envKey: 'GROQ_API_KEY',
-    apiUrl: 'https://api.groq.com/openai/v1/chat/completions',
-    model: 'llama-3.3-70b-versatile',
+    // Fork: optional OpenAI-compatible fallback (LLM_API_URL + LLM_API_KEY,
+    // model LLM_MODEL) in the slot Groq held upstream; unset by default, so
+    // production runs on OpenRouter alone. Groq was removed on 13/10/2026.
+    name: 'generic',
+    envKey: 'LLM_API_KEY',
+    get apiUrl() { return process.env.LLM_API_URL || ''; },
+    get model() { return process.env.LLM_MODEL || 'gpt-3.5-turbo'; },
     headers: (key) => ({ Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', 'User-Agent': CHROME_UA }),
     timeout: 30000,
   },
@@ -4035,6 +4082,7 @@ async function seedServiceStatuses() {
 
 function startServiceStatusesSeedLoop() {
   console.log(`[ServiceStatuses] Seed loop starting (interval ${SERVICE_STATUSES_SEED_INTERVAL_MS / 1000 / 60}min)`);
+  if (rsLoopDisabled('ServiceStatuses')) return;
   startBootSeedLoop('ServiceStatuses', 'seed-meta:infra:service-statuses', SERVICE_STATUSES_SEED_INTERVAL_MS, seedServiceStatuses, (e) => console.warn('[ServiceStatuses] Initial seed error:', e?.message || e), (e) => console.warn('[ServiceStatuses] Seed error:', e?.message || e));
 }
 
@@ -5082,6 +5130,7 @@ async function startSpendingSeedLoop() {
     return;
   }
   console.log(`[Spending] Seed loop starting (interval ${SPENDING_SEED_INTERVAL_MS / 1000 / 60}min)`);
+  if (rsLoopDisabled('Spending')) return;
   startBootSeedLoop('Spending', 'seed-meta:economic:spending', SPENDING_SEED_INTERVAL_MS, seedUsaSpending, (e) => console.warn('[Spending] Initial seed error:', e?.message || e), (e) => console.warn('[Spending] Seed error:', e?.message || e));
 }
 
@@ -5399,6 +5448,7 @@ async function startTechEventsSeedLoop() {
     console.log('[TechEvents] Disabled (no Upstash Redis)');
     return;
   }
+  if (rsLoopDisabled('TechEvents')) return;
   console.log(`[TechEvents] Seed loop starting (interval ${TECH_EVENTS_SEED_INTERVAL_MS / 1000 / 60 / 60}h)`);
   startBootSeedLoop('TechEvents', 'seed-meta:research:tech-events', TECH_EVENTS_SEED_INTERVAL_MS, seedTechEvents, (e) => console.warn('[TechEvents] Initial seed error:', e?.message || e), (e) => console.warn('[TechEvents] Seed error:', e?.message || e));
 }
@@ -5839,6 +5889,7 @@ async function startUsniFleetSeedLoop() {
     console.log('[USNI] Disabled (no Upstash Redis)');
     return;
   }
+  if (rsLoopDisabled('USNI')) return;
   console.log(`[USNI] Seed loop starting (interval ${USNI_SEED_INTERVAL_MS / 1000 / 60 / 60}h)`);
   startBootSeedLoop('USNI', 'seed-meta:military:usni-fleet', USNI_SEED_INTERVAL_MS, seedUsniFleet, e => console.warn('[USNI] Initial seed error:', e?.message || e), e => console.warn('[USNI] Seed error:', e?.message || e));
 }
@@ -6281,6 +6332,7 @@ async function startSocialVelocitySeedLoop() {
     console.log('[SocialVelocity] Disabled (no Upstash Redis)');
     return;
   }
+  if (rsLoopDisabled('SocialVelocity')) return;
   console.log(`[SocialVelocity] Seed loop starting (interval ${SOCIAL_VELOCITY_INTERVAL_MS / 1000 / 60}min)`);
   startBootSeedLoop('SocialVelocity', SOCIAL_VELOCITY_SEED_META_KEY, SOCIAL_VELOCITY_INTERVAL_MS, seedSocialVelocity, e => console.warn('[SocialVelocity] Initial seed error:', e?.message || e), e => console.warn('[SocialVelocity] Seed error:', e?.message || e));
 }
@@ -6470,6 +6522,7 @@ async function startWsbTickersSeedLoop() {
     console.log('[WsbTickers] Disabled (no Upstash Redis)');
     return;
   }
+  if (rsLoopDisabled('WsbTickers')) return;
   console.log(`[WsbTickers] Seed loop starting (interval ${WSB_TICKERS_INTERVAL_MS / 1000 / 60}min)`);
   startBootSeedLoop('WsbTickers', 'seed-meta:intelligence:wsb-tickers', WSB_TICKERS_INTERVAL_MS, seedWsbTickers, e => console.warn('[WsbTickers] Initial seed error:', e?.message || e), e => console.warn('[WsbTickers] Seed error:', e?.message || e));
 }
@@ -6739,6 +6792,7 @@ function startPizzintSeedLoop() {
     console.log('[PizzINT] Disabled (no Upstash Redis)');
     return;
   }
+  if (rsLoopDisabled('PizzINT')) return;
   console.log(`[PizzINT] Seed loop starting (interval ${PIZZINT_SEED_INTERVAL_MS / 1000 / 60}min)`);
   startBootSeedLoop('PizzINT', 'seed-meta:intelligence:pizzint', PIZZINT_SEED_INTERVAL_MS, seedPizzint, (e) => console.warn('[PizzINT] Initial seed error:', e?.message || e), (e) => console.warn('[PizzINT] Seed error:', e?.message || e));
 }
@@ -6878,6 +6932,7 @@ async function seedDodoPrices() {
 function startDodoPriceSeedLoop() {
   if (!UPSTASH_ENABLED) { console.log('[DodoPrices] Disabled (no Upstash Redis)'); return; }
   if (!DODO_PRICE_API_KEY) { console.log('[DodoPrices] Disabled (no DODO_API_KEY)'); return; }
+  if (rsLoopDisabled('DodoPrices')) return;
   console.log(`[DodoPrices] Seed loop starting (interval ${DODO_PRICE_SEED_INTERVAL_MS / 1000 / 60}min)`);
   startBootSeedLoop('DodoPrices', 'seed-meta:product-catalog', DODO_PRICE_SEED_INTERVAL_MS, seedDodoPrices, (e) => console.warn('[DodoPrices] Initial seed error:', e?.message || e), (e) => console.warn('[DodoPrices] Seed error:', e?.message || e));
 }

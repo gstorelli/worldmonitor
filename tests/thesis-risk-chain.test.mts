@@ -1,8 +1,10 @@
 import { describe, it } from 'node:test';
+import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import {
   buildChains,
   buildNodeChain,
+  expectedIntensityAllen2012,
   gdacsAlertFromTitle,
   haversineKm,
   matchEventsToNode,
@@ -10,9 +12,9 @@ import {
   quakesToTriggers,
   type TriggerEvent,
 } from '../src/services/thesis/risk-chain.ts';
-import { STRATEGIC_GOODS, THESIS_NODES, TRIGGER_WORKING_RULES } from '../src/config/thesis-model.ts';
+import { STRATEGIC_GOODS, THESIS_NODES, TRIGGER_WORKING_RULES, nodeIntensityThreshold } from '../src/config/thesis-model.ts';
 import { NODE_HAZARDS } from '../src/config/node-hazards.ts';
-import { emscQueryUrl, parseEmsc, parseUsgs, usgsQueryUrl } from '../api/thesis/_catalogue.js';
+import { emscQueryUrl, fetchSeismicTriggers, parseEmsc, parseUsgs, usgsQueryUrl } from '../api/thesis/_catalogue.js';
 
 const node = (id: string) => {
   const n = THESIS_NODES.find((x) => x.id === id);
@@ -72,12 +74,40 @@ describe('trigger matching and gate rule', () => {
 
   it('keeps minor triggers at monitor and escalates significant ones to assess', () => {
     const hs = node('hsinchu');
-    const minor = quake({ lat: hs.lat, lon: hs.lon, magnitude: TRIGGER_WORKING_RULES.significantMw - 0.1 });
-    const major = quake({ id: 'big', lat: hs.lat + 0.5, lon: hs.lon, magnitude: TRIGGER_WORKING_RULES.significantMw });
+    const minor = quake({ lat: hs.lat + 1, lon: hs.lon, magnitude: 5.5, depthKm: 15 }); // ~111 km: weak shaking
+    const major = quake({ id: 'big', lat: hs.lat + 0.5, lon: hs.lon, magnitude: 6.5, depthKm: 15 }); // ~56 km
     assert.equal(buildNodeChain(hs, [minor], null).state, 'monitor');
     const chain = buildNodeChain(hs, [minor, major], null);
     assert.equal(chain.state, 'assess');
     assert.equal(chain.matches[0].event.id, 'big');
+  });
+
+  it('reproduces the intensity equation of the analysis scripts (Allen et al. 2012, Rhyp form)', () => {
+    // reference values from research/hazard-stats/hazard_lib.py
+    assert.ok(Math.abs(expectedIntensityAllen2012(7.0, 50) - 6.5369) < 1e-3);
+    assert.ok(Math.abs(expectedIntensityAllen2012(6.0, 20) - 6.4047) < 1e-3);
+  });
+
+  it('uses a lower intensity threshold for chip fabs than for straits', () => {
+    assert.equal(nodeIntensityThreshold(node('hsinchu')), TRIGGER_WORKING_RULES.intensityThreshold.chips);
+    assert.equal(nodeIntensityThreshold(node('suez')), TRIGGER_WORKING_RULES.intensityThreshold.default);
+    assert.ok(TRIGGER_WORKING_RULES.intensityThreshold.chips < TRIGGER_WORKING_RULES.intensityThreshold.default);
+  });
+
+  it('flags Hualien 2024 for the chip parks through expected intensity, not magnitude alone', () => {
+    const hualien = quake({ id: 'hualien', lat: 23.819, lon: 121.562, depthKm: 34.8, magnitude: 7.4 });
+    const [m] = matchEventsToNode(node('hsinchu'), [hualien]);
+    assert.ok(m.expectedIntensity !== undefined && Math.abs(m.expectedIntensity - 5.93) < 0.02);
+    assert.equal(buildNodeChain(node('hsinchu'), [hualien], null).state, 'assess');
+    assert.equal(buildNodeChain(node('tainan'), [hualien], null).state, 'assess');
+  });
+
+  it('does not escalate a deep earthquake that the old radius rule counted (Spain 1954)', () => {
+    const deep = quake({ id: 'deep', lat: 36.95, lon: -3.6, depthKm: 626, magnitude: 7.8 });
+    const [m] = matchEventsToNode(node('gibraltar'), [deep]);
+    assert.ok(m.distanceKm < TRIGGER_WORKING_RULES.radiusKm);
+    assert.ok(m.expectedIntensity !== undefined && m.expectedIntensity < 5);
+    assert.equal(buildNodeChain(node('gibraltar'), [deep], null).state, 'monitor');
   });
 
   it('treats GDACS orange/red alerts as significant non-seismic triggers', () => {
@@ -118,7 +148,8 @@ describe('earthquake catalogue normalisation', () => {
       { lat: 23.8, lon: 121.6, depth: 35, mag: 6.1, src: 'EMSC', place: 'TAIWAN' },
     );
     const triggers = quakesToTriggers(quakes);
-    assert.equal(buildNodeChain(node('hsinchu'), triggers, null).state, 'assess');
+    // Mw 6.1 at ~120 km and 35 km depth: expected intensity ~4 at Hsinchu, below the chip threshold
+    assert.equal(buildNodeChain(node('hsinchu'), triggers, null).state, 'monitor');
   });
 
   it('parses USGS FDSN GeoJSON', () => {
@@ -135,5 +166,53 @@ describe('earthquake catalogue normalisation', () => {
     const now = Date.parse('2026-10-08T12:00:00Z');
     assert.match(emscQueryUrl(now, 30, 4.5), /seismicportal\.eu.*minmag=4\.5.*starttime=2026-09-08T12%3A00%3A00/);
     assert.match(usgsQueryUrl(now, 30, 4.5), /earthquake\.usgs\.gov.*minmagnitude=4\.5/);
+  });
+});
+
+describe('seismic trigger fetch (endpoint and seeder)', () => {
+  const now = Date.parse('2026-10-08T12:00:00Z');
+  const emscBody = { features: [{ geometry: { coordinates: [121.6, 23.8, -35] },
+    properties: { unid: 'x1', time: '2026-10-01T10:00:00.0Z', lat: 23.8, lon: 121.6, depth: 35, mag: 6.1, magtype: 'mw', flynn_region: 'TAIWAN' } }] };
+  const usgsBody = { features: [{ id: 'us1', geometry: { coordinates: [121.56, 23.82, 34.8] },
+    properties: { mag: 7.4, magType: 'mww', place: 'Hualien', time: 1712102292173 } }] };
+  const reply = (status: number, body: unknown) => ({ status, ok: status >= 200 && status < 300, json: async () => body });
+
+  it('uses EMSC when it answers', async () => {
+    const calls: string[] = [];
+    const out = await fetchSeismicTriggers({ nowMs: now, fetchFn: async (url: string) => { calls.push(url); return reply(200, emscBody); } });
+    assert.equal(out.source, 'EMSC');
+    assert.equal(out.quakes.length, 1);
+    assert.equal(calls.length, 1);
+    assert.match(calls[0]!, /seismicportal\.eu/);
+    assert.deepEqual({ w: out.windowDays, m: out.minMagnitude, s: out.status }, { w: 30, m: 4.5, s: { emsc: 'ok' } });
+  });
+
+  it('falls back to USGS when EMSC fails', async () => {
+    const out = await fetchSeismicTriggers({ nowMs: now, fetchFn: async (url: string) => (/seismicportal/.test(url) ? reply(503, null) : reply(200, usgsBody)) });
+    assert.equal(out.source, 'USGS');
+    assert.equal(out.quakes[0]?.source, 'USGS');
+    assert.deepEqual(out.status, { emsc: 'error: HTTP 503', usgs: 'ok' });
+  });
+
+  it('returns no source when both catalogues fail', async () => {
+    const out = await fetchSeismicTriggers({ nowMs: now, fetchFn: async () => { throw new Error('offline'); } });
+    assert.equal(out.source, null);
+    assert.deepEqual(out.quakes, []);
+    assert.deepEqual(out.status, { emsc: 'error: offline', usgs: 'error: offline' });
+  });
+
+  it('treats EMSC 204 (no events) as an empty answer, not a failure', async () => {
+    const out = await fetchSeismicTriggers({ nowMs: now, fetchFn: async () => reply(204, null) });
+    assert.equal(out.source, 'EMSC');
+    assert.deepEqual(out.quakes, []);
+  });
+});
+
+describe('trigger catalogue mirror for the seeder', () => {
+  it('scripts/_thesis-catalogue.mjs is api/thesis/_catalogue.js plus its header', () => {
+    const api = readFileSync(new URL('../api/thesis/_catalogue.js', import.meta.url), 'utf8');
+    const mirror = readFileSync(new URL('../scripts/_thesis-catalogue.mjs', import.meta.url), 'utf8');
+    const body = mirror.split('\n').slice(4).join('\n');
+    assert.equal(body, api, 'copy api/thesis/_catalogue.js into scripts/_thesis-catalogue.mjs after the 4-line header');
   });
 });

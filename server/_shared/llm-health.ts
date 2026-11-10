@@ -9,6 +9,8 @@
 // The origin probe cannot answer (2): it GETs the bare origin, so a provider
 // that is up but does not serve the configured model ID still looks healthy.
 
+import { getOpenRouterChatUrl } from '../../scripts/_llm-models.mjs';
+
 const PROBE_TIMEOUT_MS = 2_000;
 const CACHE_TTL_MS = 60_000; // re-probe every 60s
 
@@ -282,11 +284,8 @@ export function warmHealthCache(): void {
     : undefined;
   if (ollamaUrl) providerUrls.push(ollamaUrl);
 
-  if (typeof process !== 'undefined' && process.env?.GROQ_API_KEY) {
-    providerUrls.push('https://api.groq.com/openai/v1/chat/completions');
-  }
   if (typeof process !== 'undefined' && process.env?.OPENROUTER_API_KEY) {
-    providerUrls.push('https://openrouter.ai/api/v1/chat/completions');
+    providerUrls.push(getOpenRouterChatUrl());
   }
 
   for (const url of providerUrls) {

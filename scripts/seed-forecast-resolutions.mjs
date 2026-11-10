@@ -25,6 +25,7 @@ import { BETS_HISTORY_KEY } from './_forecast-bets-keys.mjs';
 import { updateMarketSettlements } from './_forecast-market-settlements.mjs';
 import { callForecastLLM } from './seed-forecasts.mjs';
 import { readStoryTracksChunked, STORY_TRACK_HGETALL_BATCH } from './lib/story-track-batch-reader.mjs';
+import { getLlmFastModel, getLlmQualityModel } from './_llm-models.mjs';
 
 export const HISTORY_KEY = 'forecast:predictions:history:v1';
 export const RESOLUTIONS_KEY = 'forecast:resolutions:v1';
@@ -498,15 +499,20 @@ function createLiveJudgeModels(options = {}) {
       modelOverrides: {
         openrouter: process.env.FORECAST_RESOLUTION_JUDGE_MODEL_OPENROUTER
           || process.env.FORECAST_LLM_MODEL_OPENROUTER
-          || 'deepseek/deepseek-v4-flash',
+          || getLlmFastModel(),
       },
     }),
+    // Fork (13/10/2026): the second judge was Groq llama-3.3-70b. The project has
+    // no Groq account, so the pair never completed and every judged forecast
+    // stayed pending. The two judges now use the two model tiers of
+    // scripts/_llm-models.mjs, which are different model families (Anthropic
+    // and Mistral by default), so the dual-model agreement rule stays meaningful.
     (entry, archiveItems, nowMs) => callLiveJudgedModel(entry, archiveItems, nowMs, {
       ...common,
-      stage: 'forecast_resolution_judge_groq',
-      providerOrder: ['groq'],
+      stage: 'forecast_resolution_judge_openrouter_second',
+      providerOrder: ['openrouter'],
       modelOverrides: {
-        groq: process.env.FORECAST_RESOLUTION_JUDGE_MODEL_GROQ || 'llama-3.3-70b-versatile',
+        openrouter: process.env.FORECAST_RESOLUTION_JUDGE_MODEL_SECOND || getLlmQualityModel(),
       },
     }),
   ];

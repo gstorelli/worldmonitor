@@ -34,6 +34,10 @@ import {
 } from '../scripts/seed-forecasts.mjs';
 import { __testing__ as healthTesting } from '../api/health.js';
 
+// Fork (13/10/2026): the market-implications LLM stage is off unless this is
+// set (scripts/_llm-models.mjs); these tests exercise the stage itself.
+process.env.LLM_INHERITED_MARKET_FEATURES = 'true';
+
 const here = dirname(fileURLToPath(import.meta.url));
 const seederSource = readFileSync(resolve(here, '../scripts/seed-forecasts.mjs'), 'utf8');
 

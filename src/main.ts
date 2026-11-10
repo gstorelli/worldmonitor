@@ -5,7 +5,8 @@ import './styles/apps.css';
 import './apps/research/research.css';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import * as Sentry from '@sentry/browser';
-import { App } from './App';
+import { ACTIVE_APP } from '@/config/apps';
+import { hasStandaloneWorkspace } from '@/apps/registry';
 import { installUtmInterceptor } from './utils/utm';
 
 const sentryDsn = import.meta.env.VITE_SENTRY_DSN?.trim();
@@ -708,7 +709,6 @@ window.addEventListener('securitypolicyviolation', (e) => {
   });
 });
 
-import { debugGetCells, getCellCount } from '@/services/geo-convergence';
 import { initMetaTags } from '@/services/meta-tags';
 import { installRuntimeFetchPatch, installWebApiRedirect } from '@/services/runtime';
 import { loadDesktopSecrets } from '@/services/runtime-config';
@@ -780,28 +780,45 @@ if (urlParams.get('settings') === '1') {
     }
   );
 } else {
+  // Risk Sentinel (#87): the standalone apps (OSINT, Research, Policy) do not
+  // load the dashboard bundle. For the dashboard, its import starts now, in
+  // parallel with the auth check, so it adds no round trip.
+  const standalone = hasStandaloneWorkspace(ACTIVE_APP.id);
+  const appModule = standalone ? null : import('./App');
   void (async () => {
     // Risk Sentinel user auth gate: no-op unless the server has AUTH_REQUIRED=true.
     const { ensureAuthenticated, installLogoutControl } = await import('./services/user-auth');
     if (!(await ensureAuthenticated())) return;
-    const { loadPanelPolicy } = await import('./services/panel-policy');
-    await loadPanelPolicy();
-    const { hydratePanelPrefs } = await import('./services/user-panel-prefs');
-    await hydratePanelPrefs();
+    // #86: the dashboard bootstrap starts now, alongside policy/prefs and the App download.
+    if (!standalone) void import('./services/bootstrap').then((m) => m.prefetchBootstrapData());
+    // Independent reads (global panel policy, per-user prefs): fetch them in
+    // parallel instead of paying two sequential round trips before the app boots.
+    const [{ loadPanelPolicy }, { hydratePanelPrefs }] = await Promise.all([
+      import('./services/panel-policy'),
+      import('./services/user-panel-prefs'),
+    ]);
+    await Promise.all([loadPanelPolicy(), hydratePanelPrefs()]);
     const { seedAppDefaults } = await import('./services/app-selection');
     seedAppDefaults();
     installUtmInterceptor();
-    const app = new App('app');
-    await app.init();
+    if (appModule) {
+      const { App } = await appModule;
+      const app = new App('app');
+      await app.init();
+    } else {
+      const { bootStandaloneApp } = await import('./apps/boot');
+      await bootStandaloneApp('app');
+    }
     clearChunkReloadGuard(chunkReloadStorageKey);
     installLogoutControl();
   })().catch(console.error);
 }
 
 // Debug helpers for geo-convergence testing (remove in production)
+// Loaded on use: a static import pulled the map geography into every app.
 (window as unknown as Record<string, unknown>).geoDebug = {
-  cells: debugGetCells,
-  count: getCellCount,
+  cells: async () => (await import('@/services/geo-convergence')).debugGetCells(),
+  count: async () => (await import('@/services/geo-convergence')).getCellCount(),
 };
 
 // Beta mode toggle: type `beta=true` / `beta=false` in console

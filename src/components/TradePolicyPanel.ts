@@ -13,8 +13,48 @@ import { t } from '@/services/i18n';
 import { escapeHtml } from '@/utils/sanitize';
 import { isFeatureAvailable } from '@/services/runtime-config';
 import { isDesktopRuntime } from '@/services/runtime';
+import { ACTIVE_APP } from '@/config/apps';
+import { STRATEGIC_GOODS, localText } from '@/config/thesis-model';
 
-type TabId = 'restrictions' | 'tariffs' | 'flows' | 'barriers' | 'revenue' | 'comtrade';
+/** /api/trade/eu-goods (scripts/seed-eu-trade.mjs, thesis issue #91). */
+export interface EuImportSummary {
+  reporter: string;
+  year: number;
+  totalEur: number | null;
+  extraEuEur: number | null;
+  basis: string;
+  top: Array<{ code: string; label: string; valueEur: number; share: number | null }>;
+}
+export interface EuDutyLine { hs6: string; label: string; year: number; mfn: number | null; prefMin: number | null }
+export interface EuGoodsPayload {
+  available: boolean;
+  goods: Record<string, { imports: Record<string, EuImportSummary>; duties: EuDutyLine[] }>;
+}
+
+let countryNames: Intl.DisplayNames | undefined;
+try {
+  countryNames = new Intl.DisplayNames(['it'], { type: 'region' });
+} catch {
+  countryNames = undefined;
+}
+/** Eurostat geo codes that differ from ISO 3166 (Comext uses XS for Serbia). */
+const EUROSTAT_TO_ISO: Record<string, string> = { XS: 'RS' };
+function countryName(code: string): string {
+  try {
+    return countryNames?.of(EUROSTAT_TO_ISO[code] ?? code) ?? code;
+  } catch {
+    return code;
+  }
+}
+function eur(v: number | null): string {
+  if (v === null) return 'n.d.';
+  return v >= 1e9 ? `${(v / 1e9).toLocaleString('it-IT', { maximumFractionDigits: 1 })} mld €` : `${Math.round(v / 1e6).toLocaleString('it-IT')} mln €`;
+}
+function pct(v: number | null): string {
+  return v === null ? 'n.d.' : `${v.toLocaleString('it-IT', { maximumFractionDigits: 1 })}%`;
+}
+
+type TabId = 'eu-imports' | 'eu-duties' | 'restrictions' | 'tariffs' | 'flows' | 'barriers' | 'revenue' | 'comtrade';
 
 export class TradePolicyPanel extends Panel {
   private restrictionsData: GetTradeRestrictionsResponse | null = null;
@@ -23,7 +63,10 @@ export class TradePolicyPanel extends Panel {
   private barriersData: GetTradeBarriersResponse | null = null;
   private revenueData: GetCustomsRevenueResponse | null = null;
   private comtradeData: ListComtradeFlowsResponse | null = null;
-  private activeTab: TabId = 'restrictions';
+  private euGoods: EuGoodsPayload | null = null;
+  /** Thesis view: only the EU/Italy tabs on the 8 strategic goods (#91). */
+  private readonly euOnly = ACTIVE_APP.id === 'thesis';
+  private activeTab: TabId = ACTIVE_APP.id === 'thesis' ? 'eu-imports' : 'restrictions';
 
   constructor() {
     super({ id: 'trade-policy', title: t('panels.tradePolicy'), defaultRowSpan: 2, infoTooltip: t('components.tradePolicy.infoTooltip') });
@@ -36,6 +79,11 @@ export class TradePolicyPanel extends Panel {
         this.render();
       }
     });
+  }
+
+  public updateEuGoods(data: EuGoodsPayload): void {
+    this.euGoods = data;
+    this.render();
   }
 
   public updateRestrictions(data: GetTradeRestrictionsResponse): void {
@@ -71,25 +119,61 @@ export class TradePolicyPanel extends Panel {
     this.render();
   }
 
-  private render(): void {
+  private euTabButtons(): string {
+    return `<button class="panel-tab ${this.activeTab === 'eu-imports' ? 'active' : ''}" data-tab="eu-imports">Importazioni UE/IT</button>
+      <button class="panel-tab ${this.activeTab === 'eu-duties' ? 'active' : ''}" data-tab="eu-duties">Dazi UE</button>`;
+  }
+
+  private renderEu(tabsHtml: string): void {
+    const content = this.activeTab === 'eu-duties' ? this.renderEuDuties() : this.renderEuImports();
+    const source = this.activeTab === 'eu-duties'
+      ? 'WTO Timeseries, UE (918): HS_A_0010 dazio MFN medio, HS_P_0070 preferenziale minimo'
+      : 'Eurostat Comext DS-045409, valore in euro';
+    this.setContent(`
+      ${tabsHtml}
+      <div class="economic-content">${content}</div>
+      <div class="economic-footer"><span class="economic-source">${escapeHtml(source)}</span></div>
+    `);
+  }
+
+  private renderEuImports(): string {
+    if (!this.euGoods?.available) return '<div class="economic-empty">Dati UE non ancora disponibili: si aggiornano ogni 6 ore.</div>';
+    const line = (who: string, s: EuImportSummary | undefined): string => {
+      if (!s) return `<div><strong>${who}</strong> <span class="trade-muted">n.d.</span></div>`;
+      const top = s.top.map((t) => `${escapeHtml(countryName(t.code))} ${t.share !== null ? Math.round(t.share * 100) : '?'}%`).join(', ');
+      return `<div><strong>${who}</strong> ${eur(s.totalEur)} <span class="trade-muted">(${s.year}${s.reporter === 'EU27_2020' ? ', da fuori UE' : ''})</span>: ${top}</div>`;
+    };
+    return `<div class="trade-policy-note">Importazioni per bene e primi fornitori. Italia: quote sul totale (partner UE compresi). UE: quote sulle importazioni da fuori UE.</div>
+      <table class="trade-eu-table"><tbody>
+      ${STRATEGIC_GOODS.map((g) => {
+        const e = this.euGoods?.goods[g.hs];
+        return `<tr><th>HS ${escapeHtml(g.hs)}<br><span class="trade-muted">${escapeHtml(localText(g.label, 'it'))}</span></th><td>${line('IT', e?.imports.IT)}${line('UE', e?.imports.EU27_2020)}</td></tr>`;
+      }).join('')}
+      </tbody></table>`;
+  }
+
+  private renderEuDuties(): string {
+    if (!this.euGoods?.available) return '<div class="economic-empty">Dati UE non ancora disponibili: si aggiornano ogni 6 ore.</div>';
+    return `<div class="trade-policy-note">Dazio della tariffa doganale comune per sottovoce HS6: media semplice delle linee tariffarie (MFN, erga omnes) e dazio preferenziale più basso tra gli accordi. "n.d." per i dazi specifici (per quantità), come quelli del grano; "—" dove il dazio MFN è già zero. Le misure antidumping e le sanzioni sono in Policy.</div>
+      <table class="trade-eu-table"><thead><tr><th>Bene</th><th>Sottovoce HS6</th><th>MFN</th><th>Pref. min.</th></tr></thead><tbody>
+      ${STRATEGIC_GOODS.map((g) => {
+        const lines = this.euGoods?.goods[g.hs]?.duties ?? [];
+        if (!lines.length) return `<tr><th>HS ${escapeHtml(g.hs)}<br><span class="trade-muted">${escapeHtml(localText(g.label, 'it'))}</span></th><td colspan="3" class="trade-muted">nessun dato</td></tr>`;
+        return lines.map((l, i) => `<tr>${i === 0 ? `<th rowspan="${lines.length}">HS ${escapeHtml(g.hs)}<br><span class="trade-muted">${escapeHtml(localText(g.label, 'it'))}</span></th>` : ''}<td>${escapeHtml(l.hs6)} <span class="trade-muted">${escapeHtml(l.label)} (${l.year})</span></td><td>${pct(l.mfn)}</td><td>${l.prefMin === null && l.mfn === 0 ? '—' : pct(l.prefMin)}</td></tr>`).join('');
+      }).join('')}
+      </tbody></table>`;
+  }
+
+  private legacyTabsHtml(): string {
     const wtoAvailable = !isDesktopRuntime() || isFeatureAvailable('wtoTrade');
     const hasTariffs = wtoAvailable && this.tariffsData && this.tariffsData.datapoints?.length > 0;
     const hasFlows = wtoAvailable && this.flowsData && this.flowsData.flows?.length > 0;
     const hasBarriers = wtoAvailable && this.barriersData && this.barriersData.barriers?.length > 0;
     const hasRevenue = this.revenueData && this.revenueData.months?.length > 0;
     const hasComtrade = this.comtradeData && this.comtradeData.flows?.length > 0;
-
-    if (!wtoAvailable && !hasRevenue && !hasComtrade) {
-      this.setContent(`<div class="economic-empty">${t('components.tradePolicy.apiKeyMissing')}</div>`);
-      return;
-    }
-
-    if (!wtoAvailable && this.activeTab !== 'revenue' && this.activeTab !== 'comtrade') {
-      this.activeTab = 'revenue';
-    }
-
-    const tabsHtml = `
+    return `
       <div class="panel-tabs">
+        ${this.euTabButtons()}
         ${wtoAvailable ? `<button class="panel-tab ${this.activeTab === 'restrictions' ? 'active' : ''}" data-tab="restrictions">
           ${t('components.tradePolicy.overview')}
         </button>` : ''}
@@ -110,6 +194,31 @@ export class TradePolicyPanel extends Panel {
         </button>` : ''}
       </div>
     `;
+  }
+
+  private render(): void {
+    if (this.euOnly) {
+      this.renderEu(`<div class="panel-tabs">${this.euTabButtons()}</div>`);
+      return;
+    }
+    if (this.activeTab === 'eu-imports' || this.activeTab === 'eu-duties') {
+      this.renderEu(this.legacyTabsHtml());
+      return;
+    }
+    const wtoAvailable = !isDesktopRuntime() || isFeatureAvailable('wtoTrade');
+    const hasRevenue = this.revenueData && this.revenueData.months?.length > 0;
+    const hasComtrade = this.comtradeData && this.comtradeData.flows?.length > 0;
+
+    if (!wtoAvailable && !hasRevenue && !hasComtrade) {
+      this.setContent(`<div class="economic-empty">${t('components.tradePolicy.apiKeyMissing')}</div>`);
+      return;
+    }
+
+    if (!wtoAvailable && this.activeTab !== 'revenue' && this.activeTab !== 'comtrade') {
+      this.activeTab = 'revenue';
+    }
+
+    const tabsHtml = this.legacyTabsHtml();
 
     const activeHasData = this.activeTab === 'restrictions'
       ? (this.restrictionsData?.restrictions?.length ?? 0) > 0
