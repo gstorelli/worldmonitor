@@ -8,6 +8,7 @@ Formato di ogni voce: numero della PR, cosa cambia per chi usa il portale, event
 
 ## 10 novembre 2026
 
+- **#70**: `gem_pga_nodes.py` scrive anche le righe LaTeX della tabella del Supplementary del Cap. 3 (`tab_gem_nodes.tex`). Solo codice di ricerca.
 - **#69**: `research/hazard-stats/gem_pga_nodes.py` confronta i nodi con la mappa di pericolosità sismica GEM v2026.1 (PGA al 10% in 50 anni) e con i tassi di intensità del Cap. 3. Solo codice di ricerca: nessun effetto sul portale.
 - **#68**: torna la sintesi oraria delle notizie scritta dal modello (`newsInsights`). Mistral Large 4, il modello «di qualità» scelto il 13/10, ora rifiuta le richieste con il ragionamento spento (HTTP 400): il seeder pubblicava solo le notizie senza sintesi. Per questo modello si chiede il ragionamento al livello più basso, nascosto nella risposta, con 1024 token in più di margine. Vale anche per le chiamate di qualità del server. Il modello veloce (Claude Haiku 5.5) non cambia.
 - **#67**: prezzi dell'energia, segnali incrociati (OSINT) e interruzioni PortWatch non restano più vuoti per gran parte del tempo. I loro dati scadono dopo 1 ora, 30 minuti e 2 ore (cadenze pensate dall'upstream), ma giravano ogni 6 ore o ogni ora: ora i primi due girano ogni 20 minuti, le interruzioni ogni ora. Sono seeder da pochi secondi.
