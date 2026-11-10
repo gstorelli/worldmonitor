@@ -90,6 +90,11 @@ case "$TIER" in
     # EU/Italy imports (Eurostat Comext) and EU duties (WTO) for the 8 thesis
     # goods: Trade Policy panel and OSINT (thesis issue #91).
     run seed-eu-trade.mjs 300
+    # Natural triggers of the thesis map (10/11/2026): FIRMS fires around the
+    # critical nodes and climate disasters. Left to the weekly sweep they were
+    # stale six days in seven (health budgets 8h and 12h).
+    run seed-fire-detections.mjs 300
+    run seed-climate-disasters.mjs 120
     # Energy and gas (15/10/2026): crude and gas/LNG are thesis goods (2709,
     # 2711) and Hormuz/Suez are thesis nodes; seeded weekly they were empty
     # most of the week. Exact file names (no substring matches).
@@ -118,7 +123,7 @@ case "$TIER" in
     # media, military (14/10/2026); macro and upstreamExtra (15/10/2026).
     # They never run on this box.
     OUT_OF_SCOPE_SEEDERS="aaii-sentiment,crypto-quotes,crypto-sectors,etf-flows,stablecoin-markets,token-panels,prediction-markets,fear-greed,seed-cot.mjs,earnings-calendar,hyperliquid-flow,market-breadth,sec-8k-stream,sec-cik-map,china-stock-connect,china-corporate-disclosures,gold-etf-flows,gulf-quotes,bundle-market-backup,seed-research.mjs,bigmac,grocery-basket,consumer-prices,webcams,military-bases,military-cii,military-flights,military-maritime-news,iran-events,defense-patents,thermal-escalation,cross-strait-activity,seed-bis-data.mjs,seed-bis-extended.mjs,seed-bundle-macro.mjs,seed-bls-series.mjs,seed-cbr-rates.mjs,seed-china-policy-events.mjs,seed-economic-calendar.mjs,seed-fsi-eu.mjs,seed-yield-curve-eu.mjs,seed-bundle-ecb-eu.mjs,seed-ecb-short-rates.mjs,seed-eurostat-country-data.mjs,seed-fred-rates.mjs,seed-fx-yoy.mjs,seed-china-coverage-health.mjs,seed-china-decision-signals.mjs,seed-china-release-calendar.mjs,seed-health-air-quality.mjs,seed-co2-monitoring.mjs,seed-climate-ocean-ice.mjs,seed-cyber-threats.mjs,seed-internet-outages.mjs,seed-digest-notifications.mjs,seed-disease-outbreaks.mjs,seed-bundle-health.mjs,seed-vpd-tracker.mjs,seed-electricity-prices.mjs,seed-fatf-listing.mjs,seed-aviation.mjs,seed-global-tenders.mjs,seed-conflict-intel.mjs,seed-recall-benchmark.mjs,seed-radiation-watch.mjs,seed-recovery-import-hhi.mjs,seed-recovery-reexport-share.mjs,seed-bundle-resilience-recovery.mjs,seed-resilience-scores.mjs,seed-regional-snapshots.mjs,seed-regulatory-actions.mjs,seed-security-advisories.mjs,seed-service-statuses.mjs,seed-unrest-events.mjs,seed-energy-intelligence.mjs,seed-displacement-summary.mjs,seed-bundle-resilience.mjs,seed-bundle-resilience-validation.mjs,seed-bundle-static-ref.mjs,seed-infra.mjs,seed-usa-spending.mjs,seed-fx-rates.mjs"
-    export SEED_SKIP="seed-climate-zone-normals.mjs,seed-gie-gas-storage.mjs,seed-gas-storage-countries.mjs,seed-jodi-oil.mjs,seed-jodi-gas.mjs,seed-eia-petroleum.mjs,seed-economy.mjs,seed-energy-spine.mjs,seed-ember-electricity.mjs,seed-fuel-shortages.mjs,seed-hormuz.mjs,seed-portwatch-disruptions.mjs,seed-bundle-energy-sources.mjs,seed-eu-sanctions.mjs,seed-policy-eu-acts.mjs,seed-eu-trade.mjs,market-quotes,commodity,insights,forecasts,correlation,gdelt-intel,cross-source,chokepoint,ecb-fx,acled,sanctions,ucdp,earthquakes,thesis-triggers,natural-events,climate-anomalies,supply-chain-trade,seed-portwatch.mjs,${OUT_OF_SCOPE_SEEDERS}"
+    export SEED_SKIP="seed-climate-zone-normals.mjs,seed-fire-detections.mjs,seed-climate-disasters.mjs,seed-gie-gas-storage.mjs,seed-gas-storage-countries.mjs,seed-jodi-oil.mjs,seed-jodi-gas.mjs,seed-eia-petroleum.mjs,seed-economy.mjs,seed-energy-spine.mjs,seed-ember-electricity.mjs,seed-fuel-shortages.mjs,seed-hormuz.mjs,seed-portwatch-disruptions.mjs,seed-bundle-energy-sources.mjs,seed-eu-sanctions.mjs,seed-policy-eu-acts.mjs,seed-eu-trade.mjs,market-quotes,commodity,insights,forecasts,correlation,gdelt-intel,cross-source,chokepoint,ecb-fx,acled,sanctions,ucdp,earthquakes,thesis-triggers,natural-events,climate-anomalies,supply-chain-trade,seed-portwatch.mjs,${OUT_OF_SCOPE_SEEDERS}"
     run "" 240
     ;;
   *)

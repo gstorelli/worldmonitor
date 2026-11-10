@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { THESIS_NODES, bboxAround } from './_thesis-nodes.mjs';
 import { loadEnvFile, runSeed, CHROME_UA, sleep } from './_seed-utils.mjs';
 import { compactWildfireDashboardPayload, WILDFIRE_CANONICAL_DETECTION_LIMIT } from './_wildfire-dashboard.mjs';
 
@@ -7,19 +8,22 @@ loadEnvFile(import.meta.url);
 
 const CANONICAL_KEY = 'wildfire:fires:v1';
 const BOOTSTRAP_KEY = 'wildfire:fires-bootstrap:v1';
-const FIRMS_SOURCES = ['VIIRS_SNPP_NRT', 'VIIRS_NOAA20_NRT', 'VIIRS_NOAA21_NRT'];
+// Risk Sentinel (10/11/2026): VIIRS on Suomi-NPP has no NRT data after
+// 2/11/2026 (FIRMS data_availability), so only NOAA-20 and NOAA-21.
+const FIRMS_SOURCES = ['VIIRS_NOAA20_NRT', 'VIIRS_NOAA21_NRT'];
 
+// Risk Sentinel: fires are a trigger of the thesis model, so the monitored
+// regions are boxes of about 300 km around the critical nodes (the upstream
+// list was a set of conflict regions, now out of scope). The three Taiwan
+// nodes share one box.
+const TAIWAN_NODES = new Set(['taiwan-strait', 'hsinchu', 'tainan']);
 const MONITORED_REGIONS = {
-  'Ukraine': '22,44,40,53',
-  'Russia': '20,50,180,82',
-  'Iran': '44,25,63,40',
-  'Israel/Gaza': '34,29,36,34',
-  'Syria': '35,32,42,37',
-  'Taiwan': '119,21,123,26',
-  'North Korea': '124,37,131,43',
-  'Saudi Arabia': '34,16,56,32',
-  'Turkey': '26,36,45,42',
+  ...Object.fromEntries(THESIS_NODES.filter((n) => !TAIWAN_NODES.has(n.id)).map((n) => [n.name, bboxAround(n.lat, n.lon)])),
+  'Taiwan (stretto, Hsinchu, Tainan)': '117.5,20.5,124.5,27',
 };
+// Today and yesterday (UTC): at the early-morning run the current UTC day may
+// still have no processed passes, which left the layer empty (8/11/2026).
+const FIRMS_DAY_RANGE = 2;
 
 function mapConfidence(c) {
   switch ((c || '').toLowerCase()) {
@@ -53,7 +57,7 @@ function parseDetectedAt(acqDate, acqTime) {
 }
 
 async function fetchRegionSource(apiKey, regionName, bbox, source) {
-  const url = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${apiKey}/${source}/${bbox}/1`;
+  const url = `https://firms.modaps.eosdis.nasa.gov/api/area/csv/${apiKey}/${source}/${bbox}/${FIRMS_DAY_RANGE}`;
   let lastErr;
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
