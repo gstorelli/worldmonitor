@@ -20,6 +20,8 @@ export interface TriggerEvent {
   lon: number;
   /** Epoch milliseconds. */
   time: number;
+  /** End of the event for non-seismic triggers (GDACS todate), epoch ms; absent = instantaneous. */
+  endTime?: number;
   /** Moment or local magnitude for earthquakes. */
   magnitude?: number;
   magnitudeType?: string;

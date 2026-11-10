@@ -1,0 +1,68 @@
+# Year-2 retrospective protocol: machine-readable parameters.
+# Human-readable version and rationale: risk-sentinel-thesis,
+# docs/protocollo-anno2.md. Chapter 3, Section "Evaluation protocol for Year 2".
+#
+# STATUS: proposal v0.1 (11/11/2026), NOT frozen. It is frozen when the
+# supervisors approve it: the commit is then tagged `protocollo-anno2-v1` in
+# both repositories and no value below changes before the replay is run.
+# Values marked `sensitivity` are explored in the global sensitivity analysis;
+# the `primary` value is the one reported.
+
+version: "0.1"
+status: proposal
+
+replay:
+  period: { start: "2019-01-01", end: "2024-12-31" }   # PortWatch daily series start 2019-01-01 (verified 11/11/2026)
+
+scenarios:            # windows W_j (P3-17)
+  ever-given:  { nodes: [suez], window: ["2021-03-01", "2021-05-31"], onset: sudden }
+  hualien:     { nodes: [hsinchu, tainan], window: ["2024-03-15", "2024-05-31"], onset: sudden }
+  panama:      { nodes: [panama], window: ["2023-03-01", "2024-09-30"], onset: slow }
+  red-sea:     { nodes: [bab-el-mandeb, suez, gibraltar], window: ["2023-10-01", "2024-09-30"], onset: sudden, control: true }
+
+dating:               # onset of a disruption from PortWatch daily activity (P3-17)
+  smoothing_days: 7                     # x_n(t) = trailing 7-day mean of daily transits / port calls
+  baseline:
+    primary: { kind: trailing-median, from_days: -70, to_days: -14 }   # median of x_n over [t-70, t-14]
+    sensitivity: [{ kind: same-weeks-previous-years, years: 2 }]
+  delta: { primary: 0.25, sensitivity: [0.15, 0.35] }
+  persistence_days: 3                   # onset = first of 3 consecutive days with x_n < (1-delta) b_n
+  recovery: { fraction_of_delta: 0.5, persistence_days: 3 }           # end: x_n >= (1-delta/2) b_n for 3 days
+
+hazard:
+  intensity_threshold: { default: 6, chips: 5, sensitivity: [5, 7] }   # theta_H, same as the platform (worldmonitor #12)
+  intensity_to_unit: { zero_at: 4, one_at: 8 }                         # h = clamp((I - 4) / 4, 0, 1); sensitivity in GSA
+  gdacs_to_unit: { green: 0.0, orange: 0.5, red: 1.0 }
+  sequence: { method: gardner-knopoff-1974, status: pending-supervisor } # groups events: one sequence = one trigger episode (#144)
+  active_days: { primary: 7, sensitivity: [3, 14] }  # a seismic trigger stays active 7 days after its latest member at the node
+  radius_km: 300
+
+supply:
+  comext_dataset: DS-045409
+  as_of_annual_year_lag: { primary: 2, sensitivity: [1] }   # annual imports of year(t) - 2: certainly published at t
+  indicators: [origin-share, supplier-hhi]                  # S = mean of the two, both in [0, 1]
+
+customs:
+  indicator: incentive-channels-up      # share of the 3 misdeclaration channels with incentive up (open instance only)
+
+formulations:
+  reference: uniform-mean               # R0 = link * (H + S + C) / 3
+  F1: hazard-gated                      # R1 = R0 * 1[gate]
+  F2: geometric-mean                    # R2 = link * (H * S * C)^(1/3); evidence is a qualifier, not a factor
+  v0: historical-reference-only
+
+matching:             # P3-18
+  alert_level: { rule: matched-false-alarm-rate, target_per_node_year: 1.0 }
+  delta_pre_days: { sudden: 30, slow: 90 }
+  delta_post_days: 7
+
+availability:         # as-of information set I_t
+  earthquake_latency_hours: 1
+  gdacs: event-fromdate
+  comext_monthly_lag_months: 2          # used only for the frontier lead time, never inside I_t
+
+frontier_lead_time:   # issue #72: second lead time, at the EU frontier
+  series: comext-monthly-extra-eu-by-origin
+  baseline_months: 36
+  robust_z: 3.0
+  indicators: [value, origin-share, unit-value]
