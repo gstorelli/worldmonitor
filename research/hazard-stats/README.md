@@ -54,7 +54,7 @@ python make_figures.py out pb2002/ne_50m_land.geojson    # figure in out/figures
 `gem_pga_nodes.py` legge la PGA della GEM Global Seismic Hazard Map v2026.1 (10% di superamento in 50 anni, roccia con Vs30 = 800 m/s; Johnson et al. 2026, https://zenodo.org/records/20735384, CC BY-NC-SA 4.0, non inclusa nella repo) nel punto di griglia più vicino a ciascun nodo, con minimo e massimo entro 50 km, e la confronta per rango con i tassi di intensità attesa ≥ V e ≥ VI del Cap. 3 (`t1_node_seismic_statistics.csv`).
 
 ```bash
-python gem_pga_nodes.py gem_gshm_v2026.1.gpkg t1_node_seismic_statistics.csv s8_gem_pga_nodes.csv
+python gem_pga_nodes.py gem_gshm_v2026.1.gpkg t1_node_seismic_statistics.csv s8_gem_pga_nodes.csv tab_gem_nodes.tex
 ```
 
 Le due misure non sono la stessa grandezza: la PGA del GEM viene da un modello probabilistico completo (sorgenti, attenuazione, incertezze), i tassi del Cap. 3 dal catalogo storico in un punto. Il confronto serve a vedere se l'ordine dei nodi regge con un metodo indipendente.

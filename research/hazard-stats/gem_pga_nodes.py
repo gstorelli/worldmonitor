@@ -9,7 +9,10 @@ The GeoPackage (table v2026: lon, lat, pga in g, R-tree on geom) comes from
 https://zenodo.org/records/20735384 (CC BY-NC-SA 4.0): not in the repository.
 
 Usage:
-  python gem_pga_nodes.py <gem_gshm_v2026.1.gpkg> <t1_node_seismic_statistics.csv> <out.csv>
+  python gem_pga_nodes.py <gem_gshm_v2026.1.gpkg> <t1_node_seismic_statistics.csv> <out.csv> [tab_gem_nodes.tex]
+
+The optional fourth argument writes the LaTeX rows of the Supplementary table
+(read by \inputrows in Chapter 3).
 """
 import math
 import sqlite3
@@ -40,7 +43,31 @@ def spearman(a, b):
     return pd.Series(a).rank().corr(pd.Series(b).rank())
 
 
-def main(gpkg, t1_path, out_path):
+def fmt_rank(r):
+    return f"{r:.1f}" if r % 1 else f"{int(r)}"
+
+
+def fmt_period(t):
+    return "$>$1{,}000" if t > 1000 else f"{t:,.0f}".replace(",", "{,}") if t >= 100 else f"{t:.0f}"
+
+
+def write_tex_rows(out, path):
+    order = out.sort_values(["kind", "rank_pga"], key=lambda c: c.map({"strait": 0, "production": 1}) if c.name == "kind" else c)
+    lines = []
+    prev = None
+    for r in order.itertuples():
+        if prev is not None and r.kind != prev:
+            lines.append("\\midrule")
+        prev = r.kind
+        lines.append(
+            f"{r.node} & {r.pga_g:.2f} & {r.pga_g_min_50km:.2f}--{r.pga_g_max_50km:.2f} & "
+            f"{fmt_rank(r.rank_pga)} & {fmt_period(r.T_I6)} & {fmt_rank(r.rank_rate_I6)} \\\\"
+        )
+    with open(path, "w") as f:
+        f.write("\n".join(lines) + "\n")
+
+
+def main(gpkg, t1_path, out_path, tex_path=None):
     con = sqlite3.connect(f"file:{gpkg}?mode=ro", uri=True)
     rows = []
     for n in NODES_DF.itertuples():
@@ -54,6 +81,8 @@ def main(gpkg, t1_path, out_path):
     out["rank_pga"] = out["pga_g"].rank(ascending=False)
     out["rank_rate_I6"] = out["rate_I6"].rank(ascending=False)
     out.to_csv(out_path, index=False)
+    if tex_path:
+        write_tex_rows(out, tex_path)
     print(out[["node", "pga_g", "pga_g_min_50km", "pga_g_max_50km", "T_I6", "rank_pga", "rank_rate_I6"]].to_string(index=False))
     print(f"Spearman PGA vs rate I>=VI: {spearman(out.pga_g, out.rate_I6):.2f}")
     print(f"Spearman PGA vs rate I>=V:  {spearman(out.pga_g, out.rate_I5):.2f}")
@@ -63,4 +92,4 @@ def main(gpkg, t1_path, out_path):
 
 
 if __name__ == "__main__":
-    main(*sys.argv[1:4])
+    main(*sys.argv[1:5])
