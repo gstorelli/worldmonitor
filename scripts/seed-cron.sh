@@ -4,9 +4,9 @@
 # Cron stays dumb (cadence only); the sequencing lives here so it is versioned
 # and reviewable:
 #
-#   ./scripts/seed-cron.sh quotes   # market quotes + commodities         (every 20')
+#   ./scripts/seed-cron.sh quotes   # quotes, commodities, energy prices, cross-source (every 20')
 #   ./scripts/seed-cron.sh intel    # insights -> forecasts -> correlation (hourly)
-#   ./scripts/seed-cron.sh signals  # gdelt-intel, cross-source, chokepoints, FX (hourly)
+#   ./scripts/seed-cron.sh signals  # gdelt-intel, PortWatch disruptions, chokepoints, FX (hourly)
 #   ./scripts/seed-cron.sh slow     # sanctions + UCDP + EU acts          (every 6h)
 #   ./scripts/seed-cron.sh thesis   # thesis triggers: EMSC/USGS quakes, GDACS/EONET, climate (hourly)
 #   ./scripts/seed-cron.sh context  # context panels: trade policy, shipping, PortWatch transits (every 6h)
@@ -41,6 +41,11 @@ case "$TIER" in
   quotes)
     run market-quotes 180
     run commodity 180
+    # Short-TTL keys (10/11/2026): energy prices live 1h and cross-source
+    # signals 30 min, designed upstream for 15-30 min cadences. Hourly or 6-hourly
+    # runs left them expired most of the time (health EMPTY). Both take seconds.
+    run seed-economy.mjs 240
+    run cross-source 240
     ;;
   intel)
     # Ordered on purpose: forecasts and correlation both read a fresh news:insights.
@@ -50,7 +55,8 @@ case "$TIER" in
     ;;
   signals)
     run gdelt-intel 240
-    run cross-source 240
+    # PortWatch disruptions: key TTL 2h, health budget 150 min (10/11/2026).
+    run seed-portwatch-disruptions.mjs 240
     run chokepoint 180
     run ecb-fx 180
     ;;
@@ -103,12 +109,10 @@ case "$TIER" in
     run seed-jodi-oil.mjs 240
     run seed-jodi-gas.mjs 240
     run seed-eia-petroleum.mjs 240
-    run seed-economy.mjs 240
     run seed-energy-spine.mjs 240
     run seed-ember-electricity.mjs 240
     run seed-fuel-shortages.mjs 240
     run seed-hormuz.mjs 240
-    run seed-portwatch-disruptions.mjs 240
     ;;
   full)
     # Climate zone normals (1991-2020, Open-Meteo) first and on their own: one
