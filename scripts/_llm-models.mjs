@@ -42,6 +42,23 @@ export function getLlmQualityModel() {
   return readEnv('LLM_QUALITY_MODEL') || DEFAULT_LLM_QUALITY_MODEL;
 }
 
+// Models whose provider rejects "reasoning off" (10/11/2026: Mistral answers
+// HTTP 400 "reasoning_effort none is not supported", accepted values low,
+// medium, high). For them the "no reasoning" request asks for the lowest effort
+// with the reasoning text excluded from the response, and adds headroom to
+// max_tokens: on a three-sentence brief Mistral Large 4 spent 380-470 reasoning
+// tokens at effort low, which would otherwise eat the whole output budget.
+export const REASONING_ALWAYS_ON_MODELS = Object.freeze(new Set(['mistralai/mistral-large-4-0']));
+export const REASONING_HEADROOM_TOKENS = 1024;
+
+/** OpenRouter body fields for a call that should not reason (or as little as the model allows). */
+export function reasoningOffParams(model) {
+  if (REASONING_ALWAYS_ON_MODELS.has(model)) {
+    return { reasoning: { effort: 'low', exclude: true }, maxTokensHeadroom: REASONING_HEADROOM_TOKENS };
+  }
+  return { reasoning: { enabled: false }, maxTokensHeadroom: 0 };
+}
+
 /** OpenRouter API base without a trailing slash; only https bases are accepted. */
 export function getOpenRouterApiBase() {
   const raw = readEnv('OPENROUTER_BASE_URL');

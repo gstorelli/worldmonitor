@@ -54,7 +54,7 @@ import { buildLlmCallEvent, emitLlmEvents, flushPendingLlmEvents } from './lib/l
 // line above. PR #3836 review caught this. See skill
 // railway-deploy-gotchas/reference/nixpacks-root-dir-scripts-cross-dir-import-escape.
 import { validateNoHallucinatedProperNouns } from './shared/brief-llm-core.js';
-import { getOpenRouterChatUrl, getLlmQualityModel } from './_llm-models.mjs';
+import { getOpenRouterChatUrl, getLlmQualityModel, reasoningOffParams } from './_llm-models.mjs';
 
 // Hallucination validator rollout mode (PR-2 of brief-content-quality
 // regressions). `shadow` = log violations to Sentry but ship the LLM
@@ -450,7 +450,10 @@ const LLM_PROVIDERS = [
     // Fork: quality-tier model from scripts/_llm-models.mjs (13/10/2026).
     get model() { return getLlmQualityModel(); },
     headers: (key) => ({ 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://risksentinel.opencyber.org', 'X-Title': 'Risk Sentinel', 'User-Agent': CHROME_UA }),
-    extraBody: { reasoning: { enabled: false } },
+    // Fork (10/11/2026): Mistral Large 4 cannot switch reasoning off; see
+    // reasoningOffParams in scripts/_llm-models.mjs.
+    extraBodyFor: (model) => ({ reasoning: reasoningOffParams(model).reasoning }),
+    maxTokensHeadroom: (model) => reasoningOffParams(model).maxTokensHeadroom,
     timeout: 30_000, // fork: quality-tier prose, not yet measured on the VPS
   },
   {
@@ -557,9 +560,9 @@ async function callLLM(headline, options = {}) {
               { role: 'system', content: systemPrompt },
               { role: 'user', content: userPrompt },
             ],
-            max_tokens: maxTokens,
+            max_tokens: maxTokens + (provider.maxTokensHeadroom?.(model) ?? 0),
             temperature: 0.1,
-            ...provider.extraBody,
+            ...(provider.extraBodyFor ? provider.extraBodyFor(model) : provider.extraBody),
           }),
           signal: AbortSignal.timeout(Math.max(1, Math.min(provider.timeout, usable))),
         });
