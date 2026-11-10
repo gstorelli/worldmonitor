@@ -20,8 +20,11 @@ export const EMBER_ALL_KEY = 'energy:ember:v1:_all';
 export const EMBER_META_KEY = 'seed-meta:energy:ember';
 export const EMBER_TTL_SECONDS = 259200; // 72h = 3× daily cron interval
 
+// Risk Sentinel (10/11/2026): the long-format file on storage.googleapis.com is
+// frozen ("This file is no longer updated") and points to this release file,
+// one row per area, month and electricity source (parsed by parseEmberCsv).
 const EMBER_CSV_URL =
-  'https://storage.googleapis.com/emb-prod-bkt-publicdata/public-downloads/monthly_full_release_long_format.csv';
+  'https://files.ember-energy.org/public-downloads/generation/outputs/release_generation_monthly_global.csv';
 const LOCK_DOMAIN = 'energy:ember';
 const LOCK_TTL_MS = 20 * 60 * 1000; // 20 min
 const MIN_COUNTRIES = 60;
@@ -112,9 +115,33 @@ const COLS = {
   date: 'Date',
 };
 
+// Columns of the release file (2026): "Electricity source" and "Generation (TWh)"
+// instead of "Variable" / "Unit" / "Value"; the total is "Total generation".
+const RELEASE_COLS = {
+  iso3: 'ISO 3 code',
+  series: 'Electricity source',
+  value: 'Generation (TWh)',
+  date: 'Date',
+};
+const RELEASE_SERIES_NAMES = { 'Total generation': 'Total Generation' };
+
 export function parseEmberCsv(csvText) {
-  const rows = parseDelimitedText(csvText, ',');
-  if (rows.length === 0) throw new Error('Ember CSV: no data rows');
+  const raw = parseDelimitedText(csvText, ',');
+  if (raw.length === 0) throw new Error('Ember CSV: no data rows');
+  // Release format → long format rows, so the logic below is unchanged.
+  const isRelease = RELEASE_COLS.series in raw[0] && RELEASE_COLS.value in raw[0];
+  const rows = isRelease
+    ? raw.map((r) => {
+        const series = String(r[RELEASE_COLS.series] || '').trim();
+        return {
+          [COLS.iso3]: r[RELEASE_COLS.iso3],
+          [COLS.series]: RELEASE_SERIES_NAMES[series] ?? series,
+          [COLS.unit]: 'TWh',
+          [COLS.value]: r[RELEASE_COLS.value],
+          [COLS.date]: r[RELEASE_COLS.date],
+        };
+      })
+    : raw;
 
   // Schema sentinel — abort if Fossil series is missing entirely
   const hasFossil = rows.some((r) => String(r[COLS.series] || '').trim() === 'Fossil');
