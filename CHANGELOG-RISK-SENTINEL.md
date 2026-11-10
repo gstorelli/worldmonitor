@@ -6,6 +6,10 @@ Ogni merge su `main` ripubblica la produzione (`risksentinel.opencyber.org`). Ch
 
 Formato di ogni voce: numero della PR, cosa cambia per chi usa il portale, eventuale azione sul server dopo il merge.
 
+## 11 novembre 2026
+
+- **#71**: motore della catena per l'Anno 2 (`src/services/thesis/engine.ts`): i sei strati diventano grandezze calcolabili (legame nodo-bene, pericolo dall'intensità attesa, vulnerabilità di fornitura da Comext, incentivo doganale) e si calcolano le tre formulazioni del protocollo (riferimento uniforme, F1 con soglia sul pericolo, F2 moltiplicativa), con le informazioni disponibili a ogni istante. Le repliche si raggruppano in sequenze (Gardner-Knopoff). Parametri in `research/replay/protocol.yaml` (proposta, non congelata) e dimostrazione su Hualien 2024 (`research/replay/hualien-demo.mts`). Non cambia ancora nulla nel portale.
+
 ## 10 novembre 2026
 
 - **#70**: `gem_pga_nodes.py` scrive anche le righe LaTeX della tabella del Supplementary del Cap. 3 (`tab_gem_nodes.tex`). Solo codice di ricerca.
