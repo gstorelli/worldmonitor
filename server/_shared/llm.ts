@@ -11,6 +11,7 @@ import {
   getLlmQualityModel,
   getOpenRouterChatUrl,
   OPENROUTER_ATTRIBUTION_HEADERS,
+  reasoningOffParams,
 } from '../../scripts/_llm-models.mjs';
 
 export { getLlmFastModel, getLlmQualityModel } from '../../scripts/_llm-models.mjs';
@@ -36,6 +37,8 @@ export interface ProviderCredentials {
   model: string;
   headers: Record<string, string>;
   extraBody?: Record<string, unknown>;
+  /** Extra max_tokens for models that reason even when asked not to (see reasoningOffParams). */
+  maxTokensHeadroom?: number;
 }
 
 export type LlmProviderName = 'ollama' | 'openrouter' | 'generic';
@@ -97,10 +100,12 @@ export function getProviderCredentials(
   if (provider === 'openrouter') {
     const apiKey = process.env.OPENROUTER_API_KEY;
     if (!apiKey) return null;
+    const model = overrides.model || getLlmFastModel();
+    const reasoningOff = reasoningOffParams(model);
     return {
       // Fork: base URL and default (fast-tier) model come from scripts/_llm-models.mjs.
       apiUrl: getOpenRouterChatUrl(),
-      model: overrides.model || getLlmFastModel(),
+      model,
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
@@ -112,9 +117,10 @@ export function getProviderCredentials(
       // the model's own default apply. `provider` routing is always sent —
       // the China-provider exclusion is not optional (see the constant).
       extraBody: {
-        ...(overrides.enableReasoning ? {} : { reasoning: { enabled: false } }),
+        ...(overrides.enableReasoning ? {} : { reasoning: reasoningOff.reasoning }),
         provider: OPENROUTER_PROVIDER_ROUTING,
       },
+      maxTokensHeadroom: overrides.enableReasoning ? 0 : reasoningOff.maxTokensHeadroom,
     };
   }
 
@@ -452,7 +458,7 @@ export function callLlmReasoningStream(opts: LlmStreamOptions): ReadableStream<U
               model: creds.model,
               messages,
               temperature,
-              max_tokens: maxTokens,
+              max_tokens: maxTokens + (creds.maxTokensHeadroom ?? 0),
               stream: true,
             }),
             signal: activeController.signal,
@@ -628,7 +634,7 @@ export async function callLlm(opts: LlmCallOptions): Promise<LlmCallResult | nul
             model: creds.model,
             messages,
             temperature,
-            max_tokens: maxTokens,
+            max_tokens: maxTokens + (creds.maxTokensHeadroom ?? 0),
           }),
           // #5246: DeepSeek V4 Flash is bimodal — healthy calls finish near 2s,
           // while stalled calls hang to the old 25s clamp. Cut only this model's

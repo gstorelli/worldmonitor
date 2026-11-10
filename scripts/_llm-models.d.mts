@@ -13,3 +13,10 @@ export function getLlmQualityModel(): string;
 export function getOpenRouterApiBase(): string;
 export function getOpenRouterChatUrl(): string;
 export function isInheritedMarketLlmEnabled(): boolean;
+
+export const REASONING_ALWAYS_ON_MODELS: ReadonlySet<string>;
+export const REASONING_HEADROOM_TOKENS: number;
+export function reasoningOffParams(model: string): {
+  reasoning: { enabled: false } | { effort: 'low'; exclude: true };
+  maxTokensHeadroom: number;
+};

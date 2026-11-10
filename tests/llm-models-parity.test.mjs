@@ -112,3 +112,20 @@ describe('no runtime file pins a model outside the tiers', () => {
     }
   });
 });
+
+describe('reasoningOffParams (10/11/2026)', async () => {
+  const { reasoningOffParams, REASONING_HEADROOM_TOKENS } = await import('../scripts/_llm-models.mjs');
+  it('switches reasoning off where the provider allows it', () => {
+    assert.deepEqual(reasoningOffParams('anthropic/claude-haiku-5.5'), { reasoning: { enabled: false }, maxTokensHeadroom: 0 });
+  });
+  it('asks Mistral Large 4 for low, excluded reasoning with token headroom', () => {
+    assert.deepEqual(reasoningOffParams('mistralai/mistral-large-4-0'), {
+      reasoning: { effort: 'low', exclude: true },
+      maxTokensHeadroom: REASONING_HEADROOM_TOKENS,
+    });
+  });
+  it('is used by seed-insights and the server LLM client', () => {
+    assert.match(read('scripts/seed-insights.mjs'), /reasoningOffParams\(model\)/);
+    assert.match(read('server/_shared/llm.ts'), /reasoningOffParams\(model\)/);
+  });
+});
