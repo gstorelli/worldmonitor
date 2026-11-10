@@ -516,7 +516,10 @@ async function bootSeedDelayMs(label, metaKey, intervalMs) {
 // 15/10/2026: Cyber (no API keys), Spending (US federal spending, macro) and
 // ServiceStatuses (upstream service status page) belong to the macro and
 // upstreamExtra scope groups.
-const RS_DEFAULT_DISABLED_LOOPS = ['USNI', 'PizzINT', 'WsbTickers', 'SocialVelocity', 'TechEvents', 'DodoPrices', 'Cyber', 'Spending', 'ServiceStatuses'];
+// 10/11/2026: CII, CableHealth and Chokepoints are warm-pings of the upstream
+// API (api.worldmonitor.app), not of this deployment: they 401 and only send
+// traffic to another project. Re-pointing them is thesis issue #116.
+const RS_DEFAULT_DISABLED_LOOPS = ['USNI', 'PizzINT', 'WsbTickers', 'SocialVelocity', 'TechEvents', 'DodoPrices', 'Cyber', 'Spending', 'ServiceStatuses', 'CII', 'CableHealth', 'Chokepoints'];
 // Each starter of a listed loop checks rsLoopDisabled(label) before calling
 // startBootSeedLoop (kept untouched: tests evaluate its source in isolation).
 const RS_DISABLED_LOOPS = new Set(
@@ -4838,6 +4841,7 @@ async function seedCiiWarmPing() {
 }
 
 function startCiiWarmPingLoop() {
+  if (rsLoopDisabled('CII')) return;
   console.log(`[CII] Warm-ping loop starting (interval ${CII_WARM_PING_INTERVAL_MS / 1000 / 60}min)`);
   startBootSeedLoop('CII', 'seed-meta:intelligence:risk-scores', CII_WARM_PING_INTERVAL_MS, seedCiiWarmPing, (e) => console.warn('[CII] Initial warm-ping error:', e?.message || e), (e) => console.warn('[CII] Warm-ping error:', e?.message || e));
 }
@@ -4874,6 +4878,7 @@ async function seedChokepointWarmPing() {
 }
 
 function startChokepointWarmPingLoop() {
+  if (rsLoopDisabled('Chokepoints')) return;
   console.log(`[Chokepoints] Warm-ping loop starting (interval ${CHOKEPOINT_WARM_PING_INTERVAL_MS / 1000 / 60}min)`);
   startBootSeedLoop('Chokepoints', 'seed-meta:supply_chain:chokepoints', CHOKEPOINT_WARM_PING_INTERVAL_MS, seedChokepointWarmPing, (e) => console.warn('[Chokepoints] Initial warm-ping error:', e?.message || e), (e) => console.warn('[Chokepoints] Warm-ping error:', e?.message || e));
 }
@@ -4909,6 +4914,7 @@ async function seedCableHealthWarmPing() {
 }
 
 function startCableHealthWarmPingLoop() {
+  if (rsLoopDisabled('CableHealth')) return;
   console.log(`[CableHealth] Warm-ping loop starting (interval ${CABLE_HEALTH_WARM_PING_INTERVAL_MS / 1000 / 60}min)`);
   startBootSeedLoop('CableHealth', 'seed-meta:cable-health', CABLE_HEALTH_WARM_PING_INTERVAL_MS, seedCableHealthWarmPing, (e) => console.warn('[CableHealth] Initial warm-ping error:', e?.message || e), (e) => console.warn('[CableHealth] Warm-ping error:', e?.message || e));
 }

@@ -170,6 +170,20 @@ const OUT_OF_SCOPE_HEALTH_CHECKS = new Set([
   'regionalSnapshots', 'regulatoryActions', 'resilienceIntervals', 'resilienceRanking', 'securityAdvisories',
   'serviceStatuses', 'simulationOutcomeLatest', 'simulationPackageLatest', 'unrestEvents', 'energyIntelligence',
   'intelHistoryIngestEnergyIntelligence',
+  // 10/11/2026: macro leftovers (US federal spending, sovereign FX table with no
+  // consumer in src/) and keys whose producers warm-ping the upstream API at
+  // api.worldmonitor.app (relay CII and cable-health loops, seed-infra,
+  // relay news classification): they cannot work in the fork until those
+  // callers point at our own API, which is thesis issue #116.
+  'spending', 'sharedFxRates', 'riskScores', 'cableHealth', 'temporalAnomalies', 'newsThreatSummary',
+]);
+
+// Risk Sentinel (10/11/2026): forecasts run only within 24 h of a viewer opening
+// the panel (scripts/_forecast-viewer-gate.mjs, thesis decision of 14/10), so
+// their keys are idle by design most of the time. They read as on-demand
+// (counted in onDemandWarn) instead of EMPTY/STALE criticals.
+const VIEWER_GATED_CHECKS = new Set([
+  'forecasts', 'forecastsBootstrap', 'forecastFunnel', 'forecastResolutions', 'forecastScorecard', 'forecastBets',
 ]);
 function isOutOfScopeCheck(name) {
   return OUT_OF_SCOPE_HEALTH_CHECKS.has(name) || name.startsWith('consumerPricesCoverage');
@@ -2732,6 +2746,9 @@ export async function handleHealth(req, ctx, options = {}) {
       let entry = classifyKey(name, redisKey, opts, classifyCtx);
       if (name === 'chinaCoverage') {
         entry = composeChinaCoverageStatus(entry, chinaCoverageRaw, Boolean(chinaCoverageResult?.error));
+      }
+      if (VIEWER_GATED_CHECKS.has(name) && STATUS_COUNTS[entry.status] !== 'ok') {
+        entry = { ...entry, status: 'EMPTY_ON_DEMAND', viewerGated: true };
       }
       checks[name] = entry;
       if (typeof entry.contentFreshnessPendingUntil === 'string') {
