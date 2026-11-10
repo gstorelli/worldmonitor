@@ -82,6 +82,25 @@ function threeCountryFixture() {
 // ─── Tests ────────────────────────────────────────────────────────────────
 
 describe('parseEmberCsv', () => {
+  it('parses the 2026 release format (Electricity source, Generation (TWh))', () => {
+    const header = 'Area,ISO 3 code,Date,Area type,Electricity source,Is aggregated source,Generation (TWh),Share of generation (%)';
+    const rows = [
+      'Italy,ITA,2026-09-01,Country or economy,Total generation,True,20,100',
+      'Italy,ITA,2026-09-01,Country or economy,Fossil,True,10,50',
+      'Italy,ITA,2026-09-01,Country or economy,Renewables,True,8,40',
+      'Italy,ITA,2026-09-01,Country or economy,Gas,False,9,45',
+      'EU,,2026-09-01,Region,Fossil,True,100,40',
+    ];
+    const result = parseEmberCsv([header, ...rows].join('\n'));
+    const it_ = result.get('IT');
+    assert.ok(it_, 'should have IT');
+    assert.equal(it_.dataMonth, '2026-09');
+    assert.equal(it_.fossilShare, 50);
+    assert.equal(it_.renewShare, 40);
+    assert.equal(it_.gasShare, 45);
+    assert.equal(it_.demandTwh, 20);
+  });
+
   it('parses a minimal 3-country fixture', () => {
     const csv = threeCountryFixture();
     const result = parseEmberCsv(csv);

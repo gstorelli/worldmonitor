@@ -4,7 +4,9 @@
  * Seed script: fetches the FAO Food Price Index (FFPI) CSV and writes
  * the past 12 months to Upstash Redis.
  *
- * Source: https://www.fao.org/media/docs/worldfoodsituationlibraries/default-document-library/food_price_indices_data.csv
+ * Source: https://www.fao.org/media/docs/worldfoodsituationlibraries/wfs-library/food_price_indices_data.csv
+ * (moved from default-document-library in autumn 2026; the seeder falls back to
+ * the link published on the FFPI page if it moves again).
  * Released: first Friday of each month ~08:30 UTC
  *
  * Railway cron: 45 8 * * *   (daily at 08:45 UTC — over-seeds safely; FAO releases ~first Friday of month)
@@ -16,14 +18,30 @@ loadEnvFile(import.meta.url);
 
 const CANONICAL_KEY = 'economic:fao-ffpi:v1';
 const CACHE_TTL = 90 * 24 * 60 * 60; // 90 days — monthly seed, 3x interval per gold standard
-const CSV_URL = 'https://www.fao.org/media/docs/worldfoodsituationlibraries/default-document-library/food_price_indices_data.csv';
+const CSV_URL = 'https://www.fao.org/media/docs/worldfoodsituationlibraries/wfs-library/food_price_indices_data.csv';
+const FFPI_PAGE = 'https://www.fao.org/worldfoodsituation/foodpricesindex/en/';
+
+/** The CSV link published on the FFPI page (absolute URL), or null. */
+export function csvLinkFromPage(html) {
+  const m = String(html || '').match(/https?:\/\/[^"'\s]*food_price_indices_data\.csv[^"'\s]*/i);
+  return m ? m[0].replace(/&amp;/g, '&') : null;
+}
 const MONTHS_TO_KEEP = 12;
 
 async function fetchFaoFfpi() {
-  const resp = await globalThis.fetch(CSV_URL, {
+  let resp = await globalThis.fetch(CSV_URL, {
     headers: { 'User-Agent': CHROME_UA, 'Accept': 'text/csv,text/plain,*/*' },
     signal: AbortSignal.timeout(20_000),
   });
+  if (resp.status === 404) {
+    // File moved again: take the link from the FFPI page.
+    const page = await globalThis.fetch(FFPI_PAGE, { headers: { 'User-Agent': CHROME_UA }, signal: AbortSignal.timeout(30_000) });
+    const link = page.ok ? csvLinkFromPage(await page.text()) : null;
+    if (link) {
+      console.log(`  [FAO] CSV moved; using the link on the FFPI page`);
+      resp = await globalThis.fetch(link, { headers: { 'User-Agent': CHROME_UA, 'Accept': 'text/csv,text/plain,*/*' }, signal: AbortSignal.timeout(30_000) });
+    }
+  }
   if (!resp.ok) throw new Error(`FAO CSV HTTP ${resp.status}`);
 
   const raw = await resp.text();
