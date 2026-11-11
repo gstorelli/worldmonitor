@@ -491,6 +491,17 @@ export async function releaseLock(domain, runId) {
   const script = `if redis.call("get",KEYS[1]) == ARGV[1] then return redis.call("del",KEYS[1]) else return 0 end`;
   try {
     await redisCommand(url, token, ['EVAL', script, 1, lockKey, runId]);
+    return;
+  } catch {
+    // Fork (11/11/2026): the self-hosted REST proxy (docker/redis-rest-proxy.mjs)
+    // blocks EVAL by design, so the atomic release always failed and every seed
+    // lock expired by TTL. With GDELT's 2 h lock and an hourly cron, one run in
+    // two was skipped as "another seed run in progress". Fall back to GET +
+    // compare + DEL: not atomic, but the cron flock already serialises seeders.
+  }
+  try {
+    const body = await redisCommand(url, token, ['GET', lockKey]);
+    if (body?.result === runId) await redisCommand(url, token, ['DEL', lockKey]);
   } catch {
     // Best-effort release; lock will expire via TTL
   }
