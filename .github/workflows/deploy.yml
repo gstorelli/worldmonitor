@@ -82,6 +82,7 @@ jobs:
             docker network inspect nginx-proxy >/dev/null 2>&1 || docker network create nginx-proxy
 
             echo "==> git pull origin main"
+            OLD_HEAD="$(git rev-parse HEAD 2>/dev/null || true)"
             git fetch origin
             git pull --ff-only origin main
 
@@ -108,6 +109,29 @@ jobs:
               ${COMPOSE} ps
               ${COMPOSE} logs --tail=50 worldmonitor || true
               exit 1
+            fi
+
+            # Re-run the seeders changed by this deploy (11/11/2026), in the
+            # background and behind the cron lock, so a fixed seeder refills
+            # Redis without waiting for its tier. seed-cron.sh skips bundles,
+            # out-of-scope and deleted seeders.
+            # The lock belongs to the cron user and /tmp has
+            # fs.protected_regular=2: it is opened read-only and never created
+            # here (a lock created by this user would block the cron). The log
+            # goes to /tmp/rs-post-deploy.log, readable by the cron user.
+            echo "==> re-run seeders changed by this deploy"
+            CHANGED=""
+            if [ -n "${OLD_HEAD}" ] && [ "${OLD_HEAD}" != "$(git rev-parse HEAD)" ]; then
+              CHANGED="$(git diff --name-only "${OLD_HEAD}" HEAD -- 'scripts/seed-*.mjs' | xargs -r -n1 basename | tr '\n' ' ')"
+            fi
+            if [ -z "${CHANGED// /}" ]; then
+              echo "no seeder changed"
+            elif [ ! -r /tmp/rs-seed.lock ]; then
+              echo "seed lock /tmp/rs-seed.lock missing or unreadable: not re-running ${CHANGED}" | tee -a /tmp/rs-post-deploy.log
+            else
+              setsid nohup bash -c 'exec 9< /tmp/rs-seed.lock && flock -w 900 9 && echo "==> $(date -u +%FT%TZ) post-deploy: $*" && exec bash ./scripts/seed-cron.sh changed "$@"' _ ${CHANGED} \
+                >> /tmp/rs-post-deploy.log 2>&1 < /dev/null &
+              echo "started in background: ${CHANGED} (log /tmp/rs-post-deploy.log)"
             fi
 
             echo "==> stack status"

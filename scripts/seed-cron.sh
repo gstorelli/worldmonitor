@@ -11,6 +11,7 @@
 #   ./scripts/seed-cron.sh thesis   # thesis triggers: EMSC/USGS quakes, GDACS/EONET, climate (hourly)
 #   ./scripts/seed-cron.sh context  # context panels: trade policy, shipping, PortWatch transits (every 6h)
 #   ./scripts/seed-cron.sh full     # everything else                     (weekly)
+#   ./scripts/seed-cron.sh changed seed-x.mjs ...  # seeders changed by a deploy (deploy.yml)
 #
 # Rules that keep the box predictable:
 #   * one seeder at a time — the cron entry holds one shared flock;
@@ -37,7 +38,41 @@ run() {
   return 0
 }
 
+# Seeders of the scope groups switched off (src/config/scope.ts): finance,
+# tech/startup, consumer indices, live media, military (14/10/2026); macro and
+# upstreamExtra (15/10/2026). They never run on this box (full sweep and
+# post-deploy runs).
+OUT_OF_SCOPE_SEEDERS="aaii-sentiment,crypto-quotes,crypto-sectors,etf-flows,stablecoin-markets,token-panels,prediction-markets,fear-greed,seed-cot.mjs,earnings-calendar,hyperliquid-flow,market-breadth,sec-8k-stream,sec-cik-map,china-stock-connect,china-corporate-disclosures,gold-etf-flows,gulf-quotes,bundle-market-backup,seed-research.mjs,bigmac,grocery-basket,consumer-prices,webcams,military-bases,military-cii,military-flights,military-maritime-news,iran-events,defense-patents,thermal-escalation,cross-strait-activity,seed-bis-data.mjs,seed-bis-extended.mjs,seed-bundle-macro.mjs,seed-bls-series.mjs,seed-cbr-rates.mjs,seed-china-policy-events.mjs,seed-economic-calendar.mjs,seed-fsi-eu.mjs,seed-yield-curve-eu.mjs,seed-bundle-ecb-eu.mjs,seed-ecb-short-rates.mjs,seed-eurostat-country-data.mjs,seed-fred-rates.mjs,seed-fx-yoy.mjs,seed-china-coverage-health.mjs,seed-china-decision-signals.mjs,seed-china-release-calendar.mjs,seed-health-air-quality.mjs,seed-co2-monitoring.mjs,seed-climate-ocean-ice.mjs,seed-cyber-threats.mjs,seed-internet-outages.mjs,seed-digest-notifications.mjs,seed-disease-outbreaks.mjs,seed-bundle-health.mjs,seed-vpd-tracker.mjs,seed-electricity-prices.mjs,seed-fatf-listing.mjs,seed-aviation.mjs,seed-global-tenders.mjs,seed-conflict-intel.mjs,seed-recall-benchmark.mjs,seed-radiation-watch.mjs,seed-recovery-import-hhi.mjs,seed-recovery-reexport-share.mjs,seed-bundle-resilience-recovery.mjs,seed-resilience-scores.mjs,seed-regional-snapshots.mjs,seed-regulatory-actions.mjs,seed-security-advisories.mjs,seed-service-statuses.mjs,seed-unrest-events.mjs,seed-energy-intelligence.mjs,seed-displacement-summary.mjs,seed-bundle-resilience.mjs,seed-bundle-resilience-validation.mjs,seed-bundle-static-ref.mjs,seed-infra.mjs,seed-usa-spending.mjs,seed-fx-rates.mjs"
+
+# True when the seeder name matches an out-of-scope entry (same substring rule
+# as SEED_SKIP in seed-all.sh).
+out_of_scope() {
+  local name="$1" entry
+  IFS=',' read -ra entries <<< "$OUT_OF_SCOPE_SEEDERS"
+  for entry in "${entries[@]}"; do
+    [ -n "$entry" ] && [[ "$name" == *"$entry"* ]] && return 0
+  done
+  return 1
+}
+
 case "$TIER" in
+  changed)
+    # Post-deploy (deploy.yml, 11/11/2026): re-run the seeders whose file the
+    # deploy changed, so a fix reaches Redis without waiting for its tier.
+    # Bundles are skipped (they launch whole groups), as are out-of-scope and
+    # deleted seeders.
+    shift
+    for name in "$@"; do
+      case "$name" in
+        seed-bundle-*) echo "skip ${name}: bundle"; continue ;;
+        seed-*.mjs) ;;
+        *) echo "skip ${name}: not a seeder"; continue ;;
+      esac
+      if [ ! -f "${REPO_PATH}/scripts/${name}" ]; then echo "skip ${name}: deleted"; continue; fi
+      if out_of_scope "$name"; then echo "skip ${name}: out of scope"; continue; fi
+      run "$name" 300
+    done
+    ;;
   quotes)
     run market-quotes 180
     run commodity 180
@@ -121,17 +156,13 @@ case "$TIER" in
     # anomalies (thesis tier) fail. Key TTL 95 days, so one good weekly run
     # in a month is enough.
     run seed-climate-zone-normals.mjs 3000
-    # Everything without a tier of its own: the weekly catch-all.
-    # OUT_OF_SCOPE_SEEDERS lists the seeders of the scope groups switched off
-    # (src/config/scope.ts): finance, tech/startup, consumer indices, live
-    # media, military (14/10/2026); macro and upstreamExtra (15/10/2026).
-    # They never run on this box.
-    OUT_OF_SCOPE_SEEDERS="aaii-sentiment,crypto-quotes,crypto-sectors,etf-flows,stablecoin-markets,token-panels,prediction-markets,fear-greed,seed-cot.mjs,earnings-calendar,hyperliquid-flow,market-breadth,sec-8k-stream,sec-cik-map,china-stock-connect,china-corporate-disclosures,gold-etf-flows,gulf-quotes,bundle-market-backup,seed-research.mjs,bigmac,grocery-basket,consumer-prices,webcams,military-bases,military-cii,military-flights,military-maritime-news,iran-events,defense-patents,thermal-escalation,cross-strait-activity,seed-bis-data.mjs,seed-bis-extended.mjs,seed-bundle-macro.mjs,seed-bls-series.mjs,seed-cbr-rates.mjs,seed-china-policy-events.mjs,seed-economic-calendar.mjs,seed-fsi-eu.mjs,seed-yield-curve-eu.mjs,seed-bundle-ecb-eu.mjs,seed-ecb-short-rates.mjs,seed-eurostat-country-data.mjs,seed-fred-rates.mjs,seed-fx-yoy.mjs,seed-china-coverage-health.mjs,seed-china-decision-signals.mjs,seed-china-release-calendar.mjs,seed-health-air-quality.mjs,seed-co2-monitoring.mjs,seed-climate-ocean-ice.mjs,seed-cyber-threats.mjs,seed-internet-outages.mjs,seed-digest-notifications.mjs,seed-disease-outbreaks.mjs,seed-bundle-health.mjs,seed-vpd-tracker.mjs,seed-electricity-prices.mjs,seed-fatf-listing.mjs,seed-aviation.mjs,seed-global-tenders.mjs,seed-conflict-intel.mjs,seed-recall-benchmark.mjs,seed-radiation-watch.mjs,seed-recovery-import-hhi.mjs,seed-recovery-reexport-share.mjs,seed-bundle-resilience-recovery.mjs,seed-resilience-scores.mjs,seed-regional-snapshots.mjs,seed-regulatory-actions.mjs,seed-security-advisories.mjs,seed-service-statuses.mjs,seed-unrest-events.mjs,seed-energy-intelligence.mjs,seed-displacement-summary.mjs,seed-bundle-resilience.mjs,seed-bundle-resilience-validation.mjs,seed-bundle-static-ref.mjs,seed-infra.mjs,seed-usa-spending.mjs,seed-fx-rates.mjs"
+    # Everything without a tier of its own: the weekly catch-all, without the
+    # OUT_OF_SCOPE_SEEDERS (defined above).
     export SEED_SKIP="seed-climate-zone-normals.mjs,seed-fire-detections.mjs,seed-climate-disasters.mjs,seed-gie-gas-storage.mjs,seed-gas-storage-countries.mjs,seed-jodi-oil.mjs,seed-jodi-gas.mjs,seed-eia-petroleum.mjs,seed-economy.mjs,seed-energy-spine.mjs,seed-ember-electricity.mjs,seed-fuel-shortages.mjs,seed-hormuz.mjs,seed-portwatch-disruptions.mjs,seed-bundle-energy-sources.mjs,seed-eu-sanctions.mjs,seed-policy-eu-acts.mjs,seed-eu-trade.mjs,market-quotes,commodity,insights,forecasts,correlation,gdelt-intel,cross-source,chokepoint,ecb-fx,acled,sanctions,ucdp,earthquakes,thesis-triggers,natural-events,climate-anomalies,supply-chain-trade,seed-portwatch.mjs,${OUT_OF_SCOPE_SEEDERS}"
     run "" 240
     ;;
   *)
-    echo "usage: seed-cron.sh {quotes|intel|signals|slow|thesis|context|full}" >&2
+    echo "usage: seed-cron.sh {quotes|intel|signals|slow|thesis|context|full|changed <seeder.mjs>...}" >&2
     exit 2
     ;;
 esac
