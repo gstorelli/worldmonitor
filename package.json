@@ -41,7 +41,7 @@
     "test:e2e:full": "cross-env VITE_VARIANT=full playwright test",
     "test:e2e:runtime": "cross-env VITE_VARIANT=full playwright test e2e/runtime-fetch.spec.ts",
     "test:e2e": "npm run test:e2e:runtime && npm run test:e2e:full",
-    "test:data": "tsx --test tests/*.test.mjs tests/*.test.mts",
+    "test:data": "tsx --test --test-timeout=60000 --test-concurrency=2 tests/*.test.mjs tests/*.test.mts",
     "test:dom": "vitest run --config vitest.dom.config.mts",
     "dryrun:resilience": "node --import tsx/esm scripts/dry-run-resilience-rebalance.mjs",
     "test:feeds": "node scripts/validate-rss-feeds.mjs",
