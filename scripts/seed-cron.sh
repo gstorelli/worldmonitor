@@ -113,6 +113,10 @@ case "$TIER" in
     run thesis-triggers 180
     run natural-events 240
     run climate-anomalies 300
+    # FIRMS fires around the nodes (11/11/2026): the key lives 2 h by upstream
+    # design (a dead feed must turn the health check red), so the seeder runs
+    # hourly here instead of every 6 h; ~2.5 min, 20 FIRMS calls.
+    run seed-fire-detections.mjs 300
     ;;
   context)
     # Context panels allowed in the thesis view (trade-policy, supply-chain).
@@ -131,11 +135,17 @@ case "$TIER" in
     # EU/Italy imports (Eurostat Comext) and EU duties (WTO) for the 8 thesis
     # goods: Trade Policy panel and OSINT (thesis issue #91).
     run seed-eu-trade.mjs 300
-    # Natural triggers of the thesis map (10/11/2026): FIRMS fires around the
-    # critical nodes and climate disasters. Left to the weekly sweep they were
-    # stale six days in seven (health budgets 8h and 12h).
-    run seed-fire-detections.mjs 300
+    # Climate disasters of the thesis map (10/11/2026; fires moved to the
+    # hourly thesis tier on 11/11). Left to the weekly sweep they were stale
+    # six days in seven.
     run seed-climate-disasters.mjs 120
+    # Once a day, in the 06:05 run (server time): Comtrade flows and PortWatch
+    # port activity keep their keys 3 days but ran only in the weekly sweep, so
+    # they were empty four days in seven (11/11/2026). ~5 and ~3 min.
+    if [ "$(date +%H)" = "06" ]; then
+      run seed-trade-flows.mjs 600
+      run seed-portwatch-port-activity.mjs 600
+    fi
     # Energy and gas (15/10/2026): crude and gas/LNG are thesis goods (2709,
     # 2711) and Hormuz/Suez are thesis nodes; seeded weekly they were empty
     # most of the week. Exact file names (no substring matches).
@@ -158,7 +168,7 @@ case "$TIER" in
     run seed-climate-zone-normals.mjs 3000
     # Everything without a tier of its own: the weekly catch-all, without the
     # OUT_OF_SCOPE_SEEDERS (defined above).
-    export SEED_SKIP="seed-climate-zone-normals.mjs,seed-fire-detections.mjs,seed-climate-disasters.mjs,seed-gie-gas-storage.mjs,seed-gas-storage-countries.mjs,seed-jodi-oil.mjs,seed-jodi-gas.mjs,seed-eia-petroleum.mjs,seed-economy.mjs,seed-energy-spine.mjs,seed-ember-electricity.mjs,seed-fuel-shortages.mjs,seed-hormuz.mjs,seed-portwatch-disruptions.mjs,seed-bundle-energy-sources.mjs,seed-eu-sanctions.mjs,seed-policy-eu-acts.mjs,seed-eu-trade.mjs,market-quotes,commodity,insights,forecasts,correlation,gdelt-intel,cross-source,chokepoint,ecb-fx,acled,sanctions,ucdp,earthquakes,thesis-triggers,natural-events,climate-anomalies,supply-chain-trade,seed-portwatch.mjs,${OUT_OF_SCOPE_SEEDERS}"
+    export SEED_SKIP="seed-climate-zone-normals.mjs,seed-trade-flows.mjs,seed-portwatch-port-activity.mjs,seed-bundle-portwatch-port-activity.mjs,seed-fire-detections.mjs,seed-climate-disasters.mjs,seed-gie-gas-storage.mjs,seed-gas-storage-countries.mjs,seed-jodi-oil.mjs,seed-jodi-gas.mjs,seed-eia-petroleum.mjs,seed-economy.mjs,seed-energy-spine.mjs,seed-ember-electricity.mjs,seed-fuel-shortages.mjs,seed-hormuz.mjs,seed-portwatch-disruptions.mjs,seed-bundle-energy-sources.mjs,seed-eu-sanctions.mjs,seed-policy-eu-acts.mjs,seed-eu-trade.mjs,market-quotes,commodity,insights,forecasts,correlation,gdelt-intel,cross-source,chokepoint,ecb-fx,acled,sanctions,ucdp,earthquakes,thesis-triggers,natural-events,climate-anomalies,supply-chain-trade,seed-portwatch.mjs,${OUT_OF_SCOPE_SEEDERS}"
     run "" 240
     ;;
   *)
