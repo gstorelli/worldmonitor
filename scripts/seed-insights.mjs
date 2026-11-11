@@ -588,7 +588,8 @@ async function callLLM(headline, options = {}) {
       };
       const rawText = json.choices?.[0]?.message?.content?.trim();
       if (!rawText) {
-        console.warn(`  ${provider.name}: empty response`);
+        // finish_reason "length" with reasoning tokens = the reasoning ate the budget.
+        console.warn(`  ${provider.name}: empty response (finish_reason=${json.choices?.[0]?.finish_reason ?? 'n/a'}, completion_tokens=${usage.tokensCompletion}, reasoning_tokens=${json.usage?.completion_tokens_details?.reasoning_tokens ?? 'n/a'})`);
         record(false, { ...usage, reason: 'empty' });
         continue;
       }
