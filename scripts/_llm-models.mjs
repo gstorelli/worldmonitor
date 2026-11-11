@@ -47,9 +47,11 @@ export function getLlmQualityModel() {
 // medium, high). For them the "no reasoning" request asks for the lowest effort
 // with the reasoning text excluded from the response, and adds headroom to
 // max_tokens: on a three-sentence brief Mistral Large 4 spent 380-470 reasoning
-// tokens at effort low, which would otherwise eat the whole output budget.
+// tokens at effort low on a short prompt, and about 1,455 on a prompt of 120
+// headlines (11/11/2026: with 1,024 of headroom the answer was cut, finish_reason
+// "length", empty content). 4,096 leaves about 2.7 times the observed need.
 export const REASONING_ALWAYS_ON_MODELS = Object.freeze(new Set(['mistralai/mistral-large-4-0']));
-export const REASONING_HEADROOM_TOKENS = 1024;
+export const REASONING_HEADROOM_TOKENS = 4096;
 
 /** OpenRouter body fields for a call that should not reason (or as little as the model allows). */
 export function reasoningOffParams(model) {
