@@ -8,6 +8,7 @@ Formato di ogni voce: numero della PR, cosa cambia per chi usa il portale, event
 
 ## 13 novembre 2026
 
+- **#83**: il registro di Policy passa allo schema 3, pensato per diventare un registro datato delle misure: per ogni voce numero CELEX, entrata in vigore, scadenza, origini, codici NC, canali di falsa dichiarazione, tipo di misura, stato («verificata», «in riesame», «da verificare»). I campi sono compilati solo dove il valore era già scritto nella voce, gli altri restano vuoti in attesa della verifica sui testi ufficiali. Tolte 12 frasi che attribuivano a Risk Sentinel capacità che non ha. Nuovo test dello schema e script per il mirror.
 - **#82**: le soglie dell'intensità e i parametri del protocollo dell'Anno 2 hanno una sola fonte (`src/config/thesis-protocol.ts`), usata da piattaforma, motore e pannelli; la regola della soglia (V per i chip, VI per gli altri) esiste ora una volta sola. Nessun valore cambia.
 
 ## 12 novembre 2026
