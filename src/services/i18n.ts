@@ -22,10 +22,15 @@ const SUPPORTED_LANGUAGE_SET = new Set<SupportedLanguage>(SUPPORTED_LANGUAGES);
 const loadedLanguages = new Set<SupportedLanguage>();
 
 // Lazy-load only the locale that's actually needed — all others stay out of the bundle.
-const localeModules = import.meta.glob<TranslationDictionary>(
-  ['../locales/*.json', '!../locales/en.json'],
-  { import: 'default' },
-);
+// Vite rewrites the glob call and defines import.meta.env; under plain node
+// (tests loading the app modules through tsx) neither exists, so the guard
+// keeps the module importable there without changing the browser bundle.
+const localeModules: Record<string, () => Promise<TranslationDictionary>> = import.meta.env
+  ? import.meta.glob<TranslationDictionary>(
+    ['../locales/*.json', '!../locales/en.json'],
+    { import: 'default' },
+  )
+  : {};
 
 const RTL_LANGUAGES = new Set(['ar']);
 

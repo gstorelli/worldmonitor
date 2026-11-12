@@ -10,10 +10,14 @@ const root = resolve(here, '..');
 const registry = await import(pathToFileURL(join(root, 'src', 'apps', 'registry.ts')).href);
 
 const WORKSPACES = [
-  { id: 'osint', file: join(root, 'src', 'apps', 'osint', 'workspace.ts'), exportName: 'createOsintWorkspace', endpoint: '/api/notify/digest' },
+  { id: 'osint', file: join(root, 'src', 'apps', 'osint', 'workspace.ts'), exportName: 'createOsintWorkspace', endpoint: '/api/osint/signals' },
   { id: 'research', file: join(root, 'src', 'apps', 'research', 'workspace.ts'), exportName: 'createResearchWorkspace', endpoint: '/api/zotero/library' },
   { id: 'policy', file: join(root, 'src', 'apps', 'policy', 'workspace.ts'), exportName: 'createPolicyWorkspace', endpoint: '/api/policy/registry' },
 ];
+
+// Leaf components shared by the dashboard and the workspaces (no Panel, no
+// dashboard state): the "Fonti" icon cites the data sources of every section.
+const SHARED_COMPONENTS = new Set(['@/components/source-info']);
 
 describe('standalone app workspaces', () => {
   it('registers a workspace for osint/research/policy but not for the customs dashboard', () => {
@@ -38,7 +42,9 @@ describe('standalone app workspaces', () => {
       const source = readFileSync(spec.file, 'utf8');
       assert.match(source, new RegExp(`export function ${spec.exportName}`), `${spec.id} must export ${spec.exportName}`);
       assert.ok(source.includes(spec.endpoint), `${spec.id} must own its data endpoint (${spec.endpoint})`);
-      assert.ok(!source.includes("from '@/components"), `${spec.id} must not import dashboard components`);
+      const components = [...source.matchAll(/from '(@\/components[^']*)'/g)].map((m) => m[1]);
+      const dashboardComponents = components.filter((c) => !SHARED_COMPONENTS.has(c));
+      assert.deepEqual(dashboardComponents, [], `${spec.id} must not import dashboard components`);
       assert.ok(!source.includes("from '@/app/"), `${spec.id} must not import dashboard managers`);
     }
   });
