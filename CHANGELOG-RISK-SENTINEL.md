@@ -6,6 +6,10 @@ Ogni merge su `main` ripubblica la produzione (`risksentinel.opencyber.org`). Ch
 
 Formato di ogni voce: numero della PR, cosa cambia per chi usa il portale, eventuale azione sul server dopo il merge.
 
+## 12 novembre 2026
+
+- **#78**: sintesi delle notizie, tempi adeguati al modello di qualità: Mistral Large 4 ragiona circa 1.455 token prima di scrivere, e 30 secondi per tentativo andavano in timeout (giro delle 00:05 UTC). Ora 75 secondi per tentativo e 150 per il giro (blocco del seeder 300 secondi).
+
 ## 11 novembre 2026
 
 - **#77**: la suite completa dei test (`npm run test:data`) ha un tempo massimo di 60 secondi per test: prima un test appeso la bloccava, e il job «data (informational)» della CI finiva sempre annullato a 20 minuti. Nessun effetto sul portale.
