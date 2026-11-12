@@ -7,10 +7,12 @@ import { readFileSync } from 'node:fs';
 
 import {
   buildSources,
+  checkHygiene,
   cleanLatex,
   formatAuthors,
   parseBibtex,
   parseRegister,
+  sourceUrl,
 } from '../scripts/build-research-bibliography.mjs';
 
 const BIB = `
@@ -107,10 +109,114 @@ describe('build-research-bibliography', () => {
     const data = JSON.parse(readFileSync(new URL('../data/zotero-sources.json', import.meta.url), 'utf8'));
     assert.equal(data.schema_version, 2);
     for (const source of data.sources) {
-      assert.deepEqual(
-        Object.keys(source).sort(),
-        ['authors', 'doi', 'key', 'layers', 'limitation', 'ref', 'summary', 'title', 'type', 'url', 'venue', 'verification', 'verified', 'year'].sort(),
-      );
+      const keys = Object.keys(source);
+      for (const key of REQUIRED_FIELDS) assert.ok(keys.includes(key), `${source.key} lacks ${key}`);
+      for (const key of keys) {
+        assert.ok(REQUIRED_FIELDS.includes(key) || OPTIONAL_FIELDS.includes(key), `${source.key} has unexpected field ${key}`);
+      }
     }
+  });
+});
+
+// Schema v2 fields, plus the optional BibTeX fields added on 13/11/2026.
+const REQUIRED_FIELDS = ['authors', 'doi', 'key', 'layers', 'limitation', 'ref', 'summary', 'title', 'type', 'url', 'venue', 'verification', 'verified', 'year'];
+const OPTIONAL_FIELDS = ['entryType', 'volume', 'number', 'pages', 'howpublished', 'note'];
+
+const FIDELITY_BIB = String.raw`
+@misc{reg_2024_1252,
+  author       = {{European Parliament and Council of the European Union}},
+  title        = {Regulation (EU) 2024/1252},
+  howpublished = {Official Journal of the European Union, L series},
+  year         = {2024},
+  note         = {\url{http://data.europa.eu/eli/reg/2024/1252/oj}}
+}
+@misc{intesa_note_2024,
+  author       = {{Intesa Sanpaolo}},
+  title        = {Nota Mar Rosso},
+  howpublished = {Intesa Sanpaolo, Direzione Studi e Ricerche},
+  year         = {2024},
+  note         = {February 2024. \url{https://example.org/Nota\%20Mar_Rosso~1--2.pdf}}
+}
+@book{saltelli_global_2008,
+  author    = {Saltelli, Andrea and Ratto, Marco},
+  title     = {Global Sensitivity Analysis. {The} Primer},
+  publisher = {John Wiley \& Sons},
+  year      = {2008},
+  doi       = {10.1002/9780470725184}
+}
+@article{weichert_1980,
+  author  = {Weichert, Dieter H.},
+  title   = {Estimation of the earthquake recurrence parameters},
+  journal = {Bulletin of the Seismological Society of America},
+  volume  = {70},
+  number  = {4},
+  pages   = {1337--1346},
+  year    = {1980},
+  doi     = {10.1785/BSSA0700041337}
+}
+@article{weichert_copy_1980,
+  author  = {Weichert, D.},
+  title   = {Estimation of the earthquake recurrence parameters (copy)},
+  journal = {BSSA},
+  year    = {1980},
+  doi     = {10.1785/bssa0700041337}
+}
+@misc{dup_key_2024,
+  title = {Same key},
+  year  = {2024}
+}
+@misc{dup_key_2024,
+  title = {Same key, second entry},
+  year  = {2024}
+}`;
+
+describe('build-research-bibliography: fidelity and hygiene (13/11/2026)', () => {
+  const entries = parseBibtex(FIDELITY_BIB);
+  const byKey = Object.fromEntries(entries.map((entry) => [entry.key, entry]));
+  const misc = (fields) => ({ type: 'misc', key: 'k', fields });
+
+  it('reads the \\url{} inside note, the convention of most @misc entries', () => {
+    assert.equal(sourceUrl(byKey.reg_2024_1252), 'http://data.europa.eu/eli/reg/2024/1252/oj');
+    // LaTeX escapes are undone, but ~ and -- inside a URL are left alone.
+    assert.equal(sourceUrl(byKey.intesa_note_2024), 'https://example.org/Nota%20Mar_Rosso~1--2.pdf');
+    assert.equal(cleanLatex(byKey.intesa_note_2024.fields.note), 'February 2024. https://example.org/Nota%20Mar_Rosso~1--2.pdf');
+  });
+
+  it('keeps the precedence url > doi > howpublished/note url > arXiv', () => {
+    assert.equal(sourceUrl(misc({ url: 'https://a', doi: '10.1/x', note: String.raw`\url{https://n}` })), 'https://a');
+    assert.equal(sourceUrl(misc({ doi: '10.1/x', note: String.raw`\url{https://n}` })), 'https://doi.org/10.1/x');
+    assert.equal(sourceUrl(misc({ howpublished: String.raw`\url{https://h}`, note: String.raw`\url{https://n}` })), 'https://h');
+    assert.equal(sourceUrl(misc({ note: 'arXiv preprint arXiv:2511.03152' })), 'https://arxiv.org/abs/2511.03152');
+  });
+
+  it('keeps @book as book and carries volume, number, pages, howpublished and note', () => {
+    const sources = Object.fromEntries(buildSources(entries, new Map(), []).map((source) => [source.key, source]));
+    assert.equal(sources.saltelli_global_2008.type, 'book');
+    assert.equal(sources.saltelli_global_2008.entryType, 'book');
+    assert.equal(sources.saltelli_global_2008.venue, 'John Wiley & Sons');
+    assert.equal('volume' in sources.saltelli_global_2008, false, 'absent fields are left out');
+    assert.equal(sources.weichert_1980.volume, '70');
+    assert.equal(sources.weichert_1980.number, '4');
+    assert.equal(sources.weichert_1980.pages, '1337–1346');
+    assert.equal(sources.intesa_note_2024.howpublished, 'Intesa Sanpaolo, Direzione Studi e Ricerche');
+    assert.equal(sources.intesa_note_2024.note, 'February 2024. https://example.org/Nota%20Mar_Rosso~1--2.pdf');
+    // A note that is only the URL is not repeated (it is already `url`).
+    assert.equal(sources.reg_2024_1252.url, 'http://data.europa.eu/eli/reg/2024/1252/oj');
+    assert.equal(sources.reg_2024_1252.note, undefined);
+  });
+
+  it('reports duplicate DOIs (case-insensitive), duplicate keys and keys without a register row', () => {
+    const markdown = '## Metodo\n\n| Chiave | Verificato | Come |\n|---|---|---|\n| `weichert_1980` | x | T |\n';
+    const report = checkHygiene(entries, parseRegister(markdown, new Set(entries.map((e) => e.key))));
+    assert.deepEqual(report.duplicateDois, [{ doi: '10.1785/bssa0700041337', keys: ['weichert_1980', 'weichert_copy_1980'] }]);
+    assert.deepEqual(report.duplicateKeys, [{ key: 'dup_key_2024', count: 2 }]);
+    assert.deepEqual(report.missingRegister, ['reg_2024_1252', 'intesa_note_2024', 'saltelli_global_2008', 'weichert_copy_1980', 'dup_key_2024']);
+
+    const clean = parseBibtex(BIB);
+    assert.deepEqual(checkHygiene(clean, parseRegister(REGISTER, new Set(clean.map((e) => e.key)))), {
+      duplicateDois: [],
+      duplicateKeys: [],
+      missingRegister: [],
+    });
   });
 });
