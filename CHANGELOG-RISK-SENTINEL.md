@@ -6,6 +6,10 @@ Ogni merge su `main` ripubblica la produzione (`risksentinel.opencyber.org`). Ch
 
 Formato di ogni voce: numero della PR, cosa cambia per chi usa il portale, eventuale azione sul server dopo il merge.
 
+## 13 novembre 2026
+
+- **#82**: le soglie dell'intensità e i parametri del protocollo dell'Anno 2 hanno una sola fonte (`src/config/thesis-protocol.ts`), usata da piattaforma, motore e pannelli; la regola della soglia (V per i chip, VI per gli altri) esiste ora una volta sola. Nessun valore cambia.
+
 ## 12 novembre 2026
 
 - **#81**: nella «Catena di rischio», aprendo un nodo produttivo, compaiono gli «Strati misurati» secondo la proposta di protocollo dell'Anno 2: H dall'intensità attesa dell'innesco più forte (con la soglia del nodo), S da quota dei paesi del nodo e HHI dei fornitori (Comext), C dai canali di falsa dichiarazione con incentivo. I valori restano separati: nessun punteggio combinato finché il protocollo non è approvato.

@@ -8,7 +8,8 @@
  *  - nothing here is a weight or a score: the thresholds below are working
  *    choices of the thesis, documented as such, to be calibrated in Year 2.
  */
-import { NODE_HAZARDS, NODE_HAZARD_RADIUS_KM, type NodeHazard } from './node-hazards';
+import { NODE_HAZARDS, type NodeHazard } from './node-hazards';
+import { nodeThreshold, PROTOCOL_V0_1 } from './thesis-protocol';
 
 /** Bilingual text: the UI picks `it` or `en` from the active language. */
 export interface LocalText {
@@ -40,11 +41,11 @@ export interface SourcedFact {
  * the label of the magnitude filter of the trigger monitor.
  */
 export const TRIGGER_WORKING_RULES = {
-  /** Screening distance; also the distance limit of the intensity equation. */
-  radiusKm: NODE_HAZARD_RADIUS_KM,
+  /** Screening distance; also the distance limit of the intensity equation (protocol parameter). */
+  radiusKm: PROTOCOL_V0_1.radiusKm,
   significantMw: 6,
   /** Modified Mercalli intensity expected at the node that makes a quake significant. */
-  intensityThreshold: { default: 6, chips: 5 },
+  intensityThreshold: { default: PROTOCOL_V0_1.intensityThreshold.default, chips: PROTOCOL_V0_1.intensityThreshold.chips },
   /** Depth assumed when the catalogue gives none (km). */
   defaultDepthKm: 15,
   /** Live catalogue window (days) requested from /api/thesis/triggers. */
@@ -54,9 +55,9 @@ export const TRIGGER_WORKING_RULES = {
 
 export type TriggerRules = typeof TRIGGER_WORKING_RULES;
 
-/** Intensity threshold of a node: lower for semiconductor fabs (HS 8542). */
+/** Intensity threshold of a node: lower for semiconductor fabs (HS 8542). Delegates to nodeThreshold. */
 export function nodeIntensityThreshold(node: { goods?: readonly string[] }, rules: TriggerRules = TRIGGER_WORKING_RULES): number {
-  return node.goods?.includes('8542') ? rules.intensityThreshold.chips : rules.intensityThreshold.default;
+  return nodeThreshold(node, rules);
 }
 
 export interface ThesisNode extends NodeHazard {
