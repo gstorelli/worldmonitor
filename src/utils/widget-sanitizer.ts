@@ -20,11 +20,15 @@ const PURIFY_CONFIG = {
 
 const UNSAFE_STYLE_PATTERN = /url\s*\(|expression\s*\(|javascript\s*:|@import|behavior\s*:/i;
 
-DOMPurify.addHook('uponSanitizeAttribute', (_node, data) => {
-  if (data.attrName === 'style' && UNSAFE_STYLE_PATTERN.test(data.attrValue)) {
-    data.keepAttr = false;
-  }
-});
+// Without a DOM (node tests importing the app modules) DOMPurify is an inert
+// stub with no addHook; in the browser isSupported is true and the hook is set.
+if (DOMPurify.isSupported) {
+  DOMPurify.addHook('uponSanitizeAttribute', (_node, data) => {
+    if (data.attrName === 'style' && UNSAFE_STYLE_PATTERN.test(data.attrValue)) {
+      data.keepAttr = false;
+    }
+  });
+}
 
 export function sanitizeWidgetHtml(html: string): string {
   return DOMPurify.sanitize(html, PURIFY_CONFIG) as unknown as string;
