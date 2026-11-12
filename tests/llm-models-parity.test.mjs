@@ -32,7 +32,7 @@ describe('LLM model tiers (scripts/_llm-models.mjs)', () => {
   it('defaults to option B of the 13/10/2026 review and honours env overrides', () => {
     for (const k of ENV) delete process.env[k];
     assert.equal(DEFAULT_LLM_FAST_MODEL, 'anthropic/claude-haiku-5.5');
-    assert.equal(DEFAULT_LLM_QUALITY_MODEL, 'mistralai/mistral-large-4-0');
+    assert.equal(DEFAULT_LLM_QUALITY_MODEL, 'openai/gpt-6-luna');
     assert.equal(getLlmFastModel(), DEFAULT_LLM_FAST_MODEL);
     assert.equal(getLlmQualityModel(), DEFAULT_LLM_QUALITY_MODEL);
     process.env.LLM_FAST_MODEL = ' some/fast ';
