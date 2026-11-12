@@ -454,7 +454,10 @@ const LLM_PROVIDERS = [
     // reasoningOffParams in scripts/_llm-models.mjs.
     extraBodyFor: (model) => ({ reasoning: reasoningOffParams(model).reasoning }),
     maxTokensHeadroom: (model) => reasoningOffParams(model).maxTokensHeadroom,
-    timeout: 30_000, // fork: quality-tier prose, not yet measured on the VPS
+    // Fork (12/11/2026): measured on the VPS, Mistral Large 4 reasons ~1,455 tokens
+    // on the hourly prompt before ~900 tokens of brief at 50-65 tokens/s: 30 s
+    // timed out (00:05 UTC run). 75 s per attempt, inside the run budget below.
+    timeout: 75_000,
   },
   {
     // Fork: optional OpenAI-compatible fallback (LLM_API_URL + LLM_API_KEY,
@@ -478,7 +481,9 @@ const LLM_PROVIDERS = [
 const INSIGHTS_LLM_MAX_RETRIES = 2;
 const INSIGHTS_LLM_RETRY_BASE_MS = 1_000;
 const INSIGHTS_LLM_RETRY_AFTER_MAX_MS = 10_000;
-const INSIGHTS_LLM_CALL_BUDGET_MS = 60_000;
+// Fork (12/11/2026): 150 s (was 60 s) for the quality-tier reasoning model; the
+// seed lock below is raised to 300 s to cover it (cron tier timeout: 300 s).
+const INSIGHTS_LLM_CALL_BUDGET_MS = 150_000;
 const INSIGHTS_LLM_CALL_BUDGET_GUARD_MS = 5_000;
 
 let insightsLlmFetchForTests = null;
@@ -1154,6 +1159,7 @@ export { callLLM, __setInsightsLlmTransportForTests };
 
 if (_isDirectRun) {
   runSeed('news', 'insights', CANONICAL_KEY, fetchInsights, {
+    lockTtlMs: 300_000,
     validateFn: validateInsightsPayload,
     ttlSeconds: CACHE_TTL,
     sourceVersion: INSIGHTS_SOURCE_VERSION,
