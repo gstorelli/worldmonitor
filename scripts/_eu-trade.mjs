@@ -65,6 +65,37 @@ export function summariseImports(reporter, year, values, labels = {}) {
   };
 }
 
+/**
+ * Countries of the production nodes, by good (ISO2 = Comext partner codes).
+ * Mirror of NODE_ORIGINS and the node goods in src/services/thesis/engine.ts and
+ * src/config/thesis-model.ts (seeders cannot import src/); kept in step by
+ * tests/eu-trade-supply-parity.test.mts.
+ */
+export const GOOD_NODE_ORIGINS = Object.freeze({ '8542': ['TW'], '7403': ['CL'], '7502': ['ID'] });
+
+/**
+ * Supply-vulnerability indicators of the thesis model (layer 4) from one
+ * Comext answer for the EU27 (extra-EU imports by partner):
+ *  - hhi: Herfindahl-Hirschman index of the extra-EU suppliers, on shares of the
+ *    extra-EU total, as in the strategic-dependencies method of SWD(2021) 352;
+ *  - nodeOriginShare: share of extra-EU imports from the countries of the
+ *    production nodes of the good (null when the good has no production node).
+ * Same formulas as originShare/supplierHhi in src/services/thesis/engine.ts.
+ */
+export function supplyIndicators(values, origins = []) {
+  const extra = values?.EXT_EU27_2020;
+  if (!(extra > 0)) return null;
+  let hhi = 0;
+  let suppliers = 0;
+  for (const [code, v] of Object.entries(values)) {
+    if (!/^[A-Z]{2}$/.test(code) || EU27.has(code) || !(v > 0)) continue;
+    hhi += (v / extra) ** 2;
+    suppliers += 1;
+  }
+  const nodeOriginShare = origins.length ? origins.reduce((sum, o) => sum + (values[o] ?? 0), 0) / extra : null;
+  return { hhi: Math.min(1, hhi), suppliers, nodeOrigins: [...origins], nodeOriginShare };
+}
+
 export function wtoUrl(indicator, hs4, years) {
   const q = new URLSearchParams({ i: indicator, r: '918', pc: hs4, ps: years.join(','), fmt: 'json', mode: 'full', spc: 'true' });
   return `${WTO_BASE}?${q}`;

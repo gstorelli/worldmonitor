@@ -168,7 +168,6 @@ export const STRATEGIC_GOODS: readonly StrategicGood[] = [
     ],
     supply: [
       { text: { it: 'Cile: 5,3 dei 23 Mt di rame estratti nel mondo nel 2025', en: 'Chile: 5.3 of the 23 Mt of copper mined worldwide in 2025' }, source: USGS_MCS, url: USGS_MCS_URL, status: 'verified' },
-      todo('Dipendenza UE per origine: da calcolare su Comext', 'EU dependence by origin: to be computed on Comext'),
     ],
     modulators: [todo('Misure in vigore: da censire (TARIC, difesa commerciale)', 'Measures in force: to be listed (TARIC, trade defence)')],
     nodes: ['antofagasta'],
@@ -196,7 +195,9 @@ export const STRATEGIC_GOODS: readonly StrategicGood[] = [
     criticality: [
       { text: { it: 'Bauxite / allumina / alluminio: materia prima strategica e critica (CRMA)', en: 'Bauxite / alumina / aluminium: strategic and critical raw material (CRMA)' }, source: CRMA, url: CRMA_URL, status: 'verified' },
     ],
-    supply: [todo('Dipendenza UE per origine: da calcolare su Comext', 'EU dependence by origin: to be computed on Comext')],
+    // Dependence by origin and supplier concentration: measured live on Comext
+    // (scripts/seed-eu-trade.mjs, shown by StrategicGoodsPanel).
+    supply: [],
     modulators: [todo('Misure in vigore: da censire', 'Measures in force: to be listed')],
     nodes: [],
   },

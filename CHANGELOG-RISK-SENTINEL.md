@@ -8,6 +8,7 @@ Formato di ogni voce: numero della PR, cosa cambia per chi usa il portale, event
 
 ## 12 novembre 2026
 
+- **#80**: la vulnerabilità di fornitura (strato 4 del modello) diventa misurata. Il seeder Comext calcola per ogni bene la concentrazione dei fornitori extra-UE (HHI, come nel metodo SWD(2021) 352) e la quota dei paesi dei nodi produttivi, con le stesse formule del motore dell'Anno 2; «Beni strategici» li mostra accanto ai fatti con fonte. Tolte le voci «da calcolare su Comext» di rame e alluminio.
 - **#79**: il modello «di qualità» (sintesi delle notizie, digest, brief, secondo giudice) passa da Mistral Large 4 a GPT-6 Luna (`openai/gpt-6-luna`), scelta di Giuseppe del 12/11. Mistral Large 4 non accetta più il ragionamento spento e, sul prompt orario delle notizie, ragionava fino a 4.995 token senza scrivere nulla: la sintesi delle notizie era ferma dal 12/10. Prova sul server: GPT-6 Luna con ragionamento spento risponde in 5-16 secondi. Si può sempre cambiare con `LLM_QUALITY_MODEL` nel `.env`.
 - **#78**: sintesi delle notizie, tempi adeguati al modello di qualità: Mistral Large 4 ragiona circa 1.455 token prima di scrivere, e 30 secondi per tentativo andavano in timeout (giro delle 00:05 UTC). Ora 75 secondi per tentativo e 150 per il giro (blocco del seeder 300 secondi).
 

@@ -1816,7 +1816,13 @@
         "criticality": "EU criticality",
         "supply": "Supply vulnerability",
         "modulators": "Modulators in force",
-        "footer": "Sources: CRMA (Reg. (EU) 2024/1252) and JRC RMIS; SWD(2021) 352; Eurostat Comext; USGS MCS 2026; EU List of Common High Priority Items (Feb. 2024); AdSP MAM."
+        "footer": "Sources: CRMA (Reg. (EU) 2024/1252) and JRC RMIS; SWD(2021) 352; Eurostat Comext; USGS MCS 2026; EU List of Common High Priority Items (Feb. 2024); AdSP MAM.",
+        "measured": "Measured on Eurostat Comext ({{year}}, extra-EU imports)",
+        "extraEu": "Extra-EU imports and main suppliers",
+        "hhi": "Supplier concentration (HHI, 0 to 1)",
+        "suppliers": "{{n}} supplier countries",
+        "nodeShare": "Share of the node countries ({{origins}})",
+        "bnEur": "bn €"
       }
     },
     "nodeHazards": {
