@@ -18,6 +18,18 @@ export interface ResearchSource {
   verification?: string | null;
   summary?: string;
   limitation?: string;
+  /**
+   * Original BibTeX entry type (article, book, incollection, misc, ...) of
+   * entries generated from the thesis; absent for imports and older data.
+   * The fields below are copied from references.bib only when present, so the
+   * BibTeX export round-trips the main fields.
+   */
+  entryType?: string;
+  volume?: string;
+  number?: string;
+  pages?: string;
+  howpublished?: string;
+  note?: string;
 }
 
 export interface ZoteroItem {

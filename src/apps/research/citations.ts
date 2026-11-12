@@ -12,6 +12,8 @@ const BIBTEX_TYPE: Record<string, string> = {
   journal: 'article',
   conference: 'inproceedings',
   report: 'techreport',
+  book: 'book',
+  webpage: 'misc',
   preprint: 'misc',
   institutional: 'misc',
   software: 'misc',
@@ -21,6 +23,8 @@ const RIS_TYPE: Record<string, string> = {
   journal: 'JOUR',
   conference: 'CPAPER',
   report: 'RPRT',
+  book: 'BOOK',
+  webpage: 'ELEC',
   preprint: 'UNPB',
   institutional: 'RPRT',
   software: 'COMP',
@@ -78,10 +82,27 @@ function escapeBibtex(value: string): string {
     .replace(/[{}]/g, (match) => `\\${match}`);
 }
 
+/** BibTeX field that holds `venue`, by entry type (default: institution). */
+const VENUE_FIELD: Record<string, string> = {
+  article: 'journal',
+  inproceedings: 'booktitle',
+  incollection: 'booktitle',
+  book: 'publisher',
+  techreport: 'institution',
+};
+
+/** Page ranges are stored with an en dash; BibTeX wants `--`. */
+const bibtexPages = (pages: string): string => pages.replace(/\s*[–—-]+\s*/g, '--');
+
 export function formatBibtex(source: ResearchSource): string {
-  const entryType = BIBTEX_TYPE[source.type] ?? 'misc';
+  // The original entry type of the thesis .bib wins over the coarse `type`.
+  const entryType = (source.entryType && /^[a-z]+$/.test(source.entryType) ? source.entryType : null)
+    ?? BIBTEX_TYPE[source.type] ?? 'misc';
   const authors = splitAuthors(source.authors).join(' and ');
-  const venueField = entryType === 'article' ? 'journal' : entryType === 'inproceedings' ? 'booktitle' : 'institution';
+  // A @misc venue usually comes from howpublished: export it once.
+  const venueField = entryType === 'misc' && (!source.howpublished || source.howpublished === source.venue)
+    ? 'howpublished'
+    : VENUE_FIELD[entryType] ?? 'institution';
   const lines: string[] = [
     `@${entryType}{${citationKey(source)},`,
     `  author    = {${escapeBibtex(authors)}},`,
@@ -89,6 +110,11 @@ export function formatBibtex(source: ResearchSource): string {
     `  year      = {${source.year}},`,
   ];
   if (source.venue) lines.push(`  ${venueField} = {${escapeBibtex(source.venue)}},`);
+  if (source.volume) lines.push(`  volume    = {${escapeBibtex(source.volume)}},`);
+  if (source.number) lines.push(`  number    = {${escapeBibtex(source.number)}},`);
+  if (source.pages) lines.push(`  pages     = {${escapeBibtex(bibtexPages(source.pages))}},`);
+  if (source.howpublished && venueField !== 'howpublished') lines.push(`  howpublished = {${escapeBibtex(source.howpublished)}},`);
+  if (source.note) lines.push(`  note      = {${escapeBibtex(source.note)}},`);
   if (source.doi) lines.push(`  doi       = {${escapeBibtex(source.doi)}},`);
   if (source.url) lines.push(`  url       = {${escapeBibtex(source.url)}},`);
   // Drop the trailing comma of the last field.
@@ -103,6 +129,13 @@ export function formatRis(source: ResearchSource): string {
   lines.push(`TI  - ${source.title}`);
   lines.push(`PY  - ${source.year}`);
   if (source.venue) lines.push(`JO  - ${source.venue}`);
+  if (source.volume) lines.push(`VL  - ${source.volume}`);
+  if (source.number) lines.push(`IS  - ${source.number}`);
+  if (source.pages) {
+    const [start, end] = source.pages.split(/\s*[–—-]+\s*/);
+    if (start) lines.push(`SP  - ${start}`);
+    if (end) lines.push(`EP  - ${end}`);
+  }
   if (source.doi) lines.push(`DO  - ${source.doi}`);
   if (source.url) lines.push(`UR  - ${source.url}`);
   lines.push('ER  - ');

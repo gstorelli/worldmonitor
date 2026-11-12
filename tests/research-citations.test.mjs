@@ -62,6 +62,44 @@ describe('research citation formatting', () => {
     assert.match(ris, /ER {2}- $/);
   });
 
+  it('exports @book as @book and round-trips volume, number, pages and note (13/11/2026)', () => {
+    const book = citations.formatBibtex({ ...source, key: 'saltelli_global_2008', type: 'book', entryType: 'book', venue: 'John Wiley & Sons' });
+    assert.match(book, /^@book\{saltelli_global_2008,/);
+    assert.match(book, /publisher = \{John Wiley \\& Sons\}/);
+    // Older data without entryType: the coarse `book` type still maps to @book.
+    assert.match(citations.formatBibtex({ ...source, type: 'book' }), /^@book\{/);
+
+    const article = citations.formatBibtex({
+      ...source,
+      type: 'journal',
+      entryType: 'article',
+      venue: 'BSSA',
+      volume: '70',
+      number: '4',
+      pages: '1337–1346',
+      note: 'Accessed 8 October 2026',
+    });
+    assert.match(article, /journal = \{BSSA\}/);
+    assert.match(article, /volume {4}= \{70\}/);
+    assert.match(article, /number {4}= \{4\}/);
+    assert.match(article, /pages {5}= \{1337--1346\}/);
+    assert.match(article, /note {6}= \{Accessed 8 October 2026\}/);
+
+    const chapter = citations.formatBibtex({ ...source, type: 'conference', entryType: 'incollection', venue: 'Global Volcanic Hazards and Risk' });
+    assert.match(chapter, /^@incollection\{/);
+    assert.match(chapter, /booktitle = \{Global Volcanic Hazards and Risk\}/);
+
+    // @misc: the venue that came from howpublished is exported once, as howpublished.
+    const misc = citations.formatBibtex({ ...source, type: 'institutional', entryType: 'misc', venue: 'Smithsonian Institution', howpublished: 'Smithsonian Institution' });
+    assert.match(misc, /^@misc\{/);
+    assert.equal((misc.match(/Smithsonian Institution/g) ?? []).length, 1);
+    assert.match(misc, /howpublished = \{Smithsonian Institution\}/);
+
+    const ris = citations.formatRis({ ...source, type: 'book', volume: '70', pages: '1337–1346' });
+    assert.match(ris, /^TY {2}- BOOK/);
+    assert.match(ris, /VL {2}- 70\nSP {2}- 1337\nEP {2}- 1346/);
+  });
+
   it('exports collections and CSV with quoting', () => {
     const collection = citations.toBibtexCollection([source, { ...source, ref: 4, doi: null, url: 'https://x' }]);
     assert.equal((collection.match(/@techreport/g) ?? []).length, 2);
