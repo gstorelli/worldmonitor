@@ -41,10 +41,16 @@ interface PolicyEntry {
 
 export interface EuAct {
   celex: string;
+  /** Same as documentDate; kept for payloads written before it existed. */
   date: string;
+  /** Date of the act (cdm:work_date_document), not its entry into force. */
+  documentDate?: string;
+  /** Not read by the current query: always null until it is. */
+  inForceFrom?: string | null;
   title: string;
   url: string;
   goods: string[];
+  goodMatches?: { hs: string; match: 'cn' | 'keyword' }[];
   measures: string[];
 }
 
