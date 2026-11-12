@@ -5,7 +5,7 @@
 
 import { CHROME_UA, loadEnvFile, runSeed } from './_seed-utils.mjs';
 import {
-  EU_TRADE_KEY, THESIS_HS4, comextUrl, comextValuesByPartner, dutiesBySubheading, summariseImports, wtoUrl,
+  EU_TRADE_KEY, GOOD_NODE_ORIGINS, THESIS_HS4, comextUrl, comextValuesByPartner, dutiesBySubheading, summariseImports, supplyIndicators, wtoUrl,
 } from './_eu-trade.mjs';
 
 loadEnvFile(import.meta.url);
@@ -29,7 +29,11 @@ async function comextLatest(reporter, hs4) {
     const values = comextValuesByPartner(json);
     if (Object.keys(values).length) {
       const labels = json?.dimension?.partner?.category?.label ?? {};
-      return summariseImports(reporter, year, values, labels);
+      const summary = summariseImports(reporter, year, values, labels);
+      // Layer 4 of the thesis model (11/11/2026): supplier concentration and
+      // node-origin share, on extra-EU imports (EU27 only).
+      if (reporter === 'EU27_2020') summary.supply = supplyIndicators(values, GOOD_NODE_ORIGINS[hs4] ?? []);
+      return summary;
     }
     await sleep(500);
   }

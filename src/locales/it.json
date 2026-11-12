@@ -1647,7 +1647,13 @@
         "criticality": "Criticità UE",
         "supply": "Vulnerabilità di fornitura",
         "modulators": "Modulatori in vigore",
-        "footer": "Fonti: CRMA (Reg. (UE) 2024/1252) e JRC RMIS; SWD(2021) 352; Eurostat Comext; USGS MCS 2026; List of Common High Priority Items UE (feb. 2024); AdSP MAM."
+        "footer": "Fonti: CRMA (Reg. (UE) 2024/1252) e JRC RMIS; SWD(2021) 352; Eurostat Comext; USGS MCS 2026; List of Common High Priority Items UE (feb. 2024); AdSP MAM.",
+        "measured": "Misurato su Eurostat Comext ({{year}}, import extra-UE)",
+        "extraEu": "Import extra-UE e primi fornitori",
+        "hhi": "Concentrazione dei fornitori (HHI, da 0 a 1)",
+        "suppliers": "{{n}} paesi fornitori",
+        "nodeShare": "Quota dei paesi dei nodi ({{origins}})",
+        "bnEur": "mld €"
       }
     },
     "nodeHazards": {
