@@ -111,7 +111,7 @@ npm run lint:safe-html    # OPT-IN ONLY: see "Pre-Push" (fork baseline fails thi
 - **LLM models** (since 13/10/2026): chosen in ONE place, `scripts/_llm-models.mjs`.
   Fast tier `LLM_FAST_MODEL` (default `anthropic/claude-haiku-5.5`: classification,
   extraction, short summaries, forecasts); quality tier `LLM_QUALITY_MODEL` (default
-  `mistralai/mistral-large-4-0`: World Brief, digest prose, country/regional briefs,
+  `openai/gpt-6-luna` since 12/11/2026, was `mistralai/mistral-large-4-0`: World Brief, digest prose, country/regional briefs,
   second resolution judge, reasoning profile unless `LLM_REASONING_MODEL` is set).
   All uses are text-only. `OPENROUTER_BASE_URL=https://eu.openrouter.ai/api/v1`
   keeps inference in the EU (Business/Enterprise plans). Do not hardcode a model id

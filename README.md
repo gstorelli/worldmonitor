@@ -112,7 +112,7 @@ Si preferisce la fonte scientifica di riferimento, possibilmente europea o inter
 
 Nella vista della tesi **nessun pannello usa un LLM**: il nucleo del modello è fatto di dati strutturati e regole, e un LLM non misura mai il pericolo. Gli LLM servono la dashboard ereditata, le notifiche e alcuni testi di contesto (sintesi delle notizie, brief).
 
-- I modelli si scelgono in un solo punto, `scripts/_llm-models.mjs`, tramite OpenRouter: livello **veloce** `anthropic/claude-haiku-5.5` (classificazione, estrazione, testi brevi) e livello **qualità** `mistralai/mistral-large-4-0` (sintesi narrative, digest, brief, secondo giudice).
+- I modelli si scelgono in un solo punto, `scripts/_llm-models.mjs`, tramite OpenRouter: livello **veloce** `anthropic/claude-haiku-5.5` (classificazione, estrazione, testi brevi) e livello **qualità** `openai/gpt-6-luna` dal 12/11/2026 (sintesi narrative, digest, brief, secondo giudice; prima `mistralai/mistral-large-4-0`, che non accetta più il ragionamento spento).
 - Tutti gli usi sono **solo testo**.
 - Gli usi di mercato ereditati (analisi titoli, market implications, sintesi AI del brief di mercato) sono **spenti**.
 - La catena dei provider è `ollama → openrouter → generic`; Groq non è più usato.

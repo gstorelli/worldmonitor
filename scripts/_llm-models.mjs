@@ -6,7 +6,10 @@
 //   fast tier    — classification, extraction, short summaries:
 //                  anthropic/claude-haiku-5.5
 //   quality tier — narrative synthesis, digests, briefs, second judge:
-//                  mistralai/mistral-large-4-0
+//                  openai/gpt-6-luna (since 12/11/2026; was mistralai/mistral-large-4-0,
+//                  which no longer accepts reasoning off and, on the hourly news
+//                  prompt, spent up to 4,995 reasoning tokens and returned nothing:
+//                  decision of Giuseppe, thesis DECISIONI 12/11/2026)
 //
 // Both are text-only uses with structured (JSON) output; neither tier needs
 // multimodal input. Override per deployment with LLM_FAST_MODEL /
@@ -20,7 +23,7 @@
 // defaults; tests/llm-models-parity.test.mjs keeps the copies in step.
 
 export const DEFAULT_LLM_FAST_MODEL = 'anthropic/claude-haiku-5.5';
-export const DEFAULT_LLM_QUALITY_MODEL = 'mistralai/mistral-large-4-0';
+export const DEFAULT_LLM_QUALITY_MODEL = 'openai/gpt-6-luna';
 export const DEFAULT_OPENROUTER_API_BASE = 'https://openrouter.ai/api/v1';
 
 // Shown on the OpenRouter activity dashboard (upstream sent World Monitor's).

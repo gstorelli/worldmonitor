@@ -18,7 +18,7 @@ function stripReasoningPreamble(text) {
 }
 
 // Copies of scripts/_llm-models.mjs defaults (kept in step by tests/llm-models-parity).
-const DEFAULT_LLM_QUALITY_MODEL = 'mistralai/mistral-large-4-0';
+const DEFAULT_LLM_QUALITY_MODEL = 'openai/gpt-6-luna';
 const DEFAULT_OPENROUTER_API_BASE = 'https://openrouter.ai/api/v1';
 function openRouterApiBase() {
   const raw = (process.env.OPENROUTER_BASE_URL || '').trim();
