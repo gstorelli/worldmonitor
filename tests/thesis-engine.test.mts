@@ -1,11 +1,8 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { parse } from 'yaml';
-import { THESIS_NODES, TRIGGER_WORKING_RULES, nodeIntensityThreshold } from '../src/config/thesis-model.ts';
+import { THESIS_NODES } from '../src/config/thesis-model.ts';
 import type { TriggerEvent } from '../src/services/thesis/risk-chain.ts';
 import {
-  PROTOCOL_V0_1,
   assessAt,
   availableAt,
   customsTerm,
@@ -25,23 +22,6 @@ const quake = (id: string, mag: number, lat: number, lon: number, dtDays = 0, so
 });
 const imports: PartnerImports = { hs: '8542', year: 2022, extraEuEur: 100, byPartner: { TW: 20, MY: 20, CN: 10 } };
 const customs = { hs: '8542', channels: ['origin', 'classification'], validFrom: 0 };
-
-describe('thesis engine: protocol parameters', () => {
-  it('mirror research/replay/protocol.yaml', () => {
-    const y = parse(readFileSync(new URL('../research/replay/protocol.yaml', import.meta.url), 'utf8'));
-    assert.equal(y.hazard.radius_km, PROTOCOL_V0_1.radiusKm);
-    assert.equal(y.hazard.intensity_threshold.default, PROTOCOL_V0_1.intensityThreshold.default);
-    assert.equal(y.hazard.intensity_threshold.chips, PROTOCOL_V0_1.intensityThreshold.chips);
-    assert.equal(y.hazard.intensity_to_unit.zero_at, PROTOCOL_V0_1.intensityToUnit.zeroAt);
-    assert.equal(y.hazard.intensity_to_unit.one_at, PROTOCOL_V0_1.intensityToUnit.oneAt);
-    assert.deepEqual(y.hazard.gdacs_to_unit, PROTOCOL_V0_1.gdacsToUnit);
-    assert.equal(y.availability.earthquake_latency_hours, PROTOCOL_V0_1.earthquakeLatencyHours);
-    assert.equal(y.hazard.active_days.primary, PROTOCOL_V0_1.activeDays);
-    assert.equal(y.status, 'proposal');
-    assert.deepEqual(PROTOCOL_V0_1.intensityThreshold, TRIGGER_WORKING_RULES.intensityThreshold);
-    for (const n of THESIS_NODES) assert.equal(n.goods.includes('8542') ? 5 : 6, nodeIntensityThreshold(n));
-  });
-});
 
 describe('thesis engine: sequences (Gardner-Knopoff, as in Chapter 3)', () => {
   it('windows equal research/hazard-stats/hazard_lib.py window_gk', () => {

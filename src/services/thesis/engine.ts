@@ -22,36 +22,13 @@
  * comparison. The platform never shows R0 as a risk; only F1 and F2 comply.
  */
 import type { ThesisNode } from '@/config/thesis-model';
+import { nodeThreshold, PROTOCOL_V0_1, type EngineParams } from '@/config/thesis-protocol';
 import { expectedIntensityAt, haversineKm, type TriggerEvent } from './risk-chain';
 
 // ------------------------------------------------------------------ parameters
 
-/** Mirror of research/replay/protocol.yaml (primary values); tests keep them in step. */
-export interface EngineParams {
-  radiusKm: number;
-  intensityThreshold: { default: number; chips: number };
-  intensityToUnit: { zeroAt: number; oneAt: number };
-  gdacsToUnit: { green: number; orange: number; red: number };
-  earthquakeLatencyHours: number;
-  /**
-   * Days a seismic trigger stays active after its latest member at the node
-   * (not the Gardner-Knopoff time window, which only groups events: for Mw 7.4
-   * it is 946 days and would keep an alert open for years).
-   */
-  activeDays: number;
-  /** Foreshock window as a fraction of the aftershock time window (1 = symmetric, as in Chapter 3). */
-  foreshockFraction: number;
-}
-
-export const PROTOCOL_V0_1: EngineParams = {
-  radiusKm: 300,
-  intensityThreshold: { default: 6, chips: 5 },
-  intensityToUnit: { zeroAt: 4, oneAt: 8 },
-  gdacsToUnit: { green: 0, orange: 0.5, red: 1 },
-  earthquakeLatencyHours: 1,
-  activeDays: 7,
-  foreshockFraction: 1,
-};
+// Moved to src/config/thesis-protocol.ts (single source); re-exported for compatibility.
+export { PROTOCOL_V0_1, type EngineParams } from '@/config/thesis-protocol';
 
 // ------------------------------------------------------------------ registry
 
@@ -155,8 +132,7 @@ export function hazardOfSequence(
   seq: TriggerSequence,
   p: EngineParams = PROTOCOL_V0_1,
 ): HazardTerm | null {
-  // Same rule as nodeIntensityThreshold in thesis-model.ts (lower threshold for chip fabs).
-  const threshold = node.goods?.includes('8542') ? p.intensityThreshold.chips : p.intensityThreshold.default;
+  const threshold = nodeThreshold(node, p);
   let best: HazardTerm | null = null;
   for (const e of seq.members) {
     const d = haversineKm(node.lat, node.lon, e.lat, e.lon);
@@ -207,12 +183,17 @@ export function supplierHhi(imports: PartnerImports): number | null {
   return clamp01(hhi);
 }
 
+/** S from the two indicators: mean of the node-origin share and of the supplier HHI. */
+export function supplyFromIndicators(share: number, hhi: number): number {
+  return (share + hhi) / 2;
+}
+
 export function supplyTerm(imports: PartnerImports | null, origins: readonly string[] | null): { s: number | null; share: number | null; hhi: number | null } {
   if (!imports || !origins?.length) return { s: null, share: null, hhi: null };
   const share = originShare(imports, origins);
   const hhi = supplierHhi(imports);
   if (share === null || hhi === null) return { s: null, share, hhi };
-  return { s: (share + hhi) / 2, share, hhi };
+  return { s: supplyFromIndicators(share, hhi), share, hhi };
 }
 
 /** Misdeclaration channels with an incentive for a good AS OF the date of the assessment. */

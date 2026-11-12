@@ -7,7 +7,8 @@ import type { NodeChain } from '@/services/thesis/risk-chain';
 import { ago, eventIntensity, factItem, kindIcon, lt, nodeKindLabel, nodeName, sourceLink, stateBadge } from './thesis-ui';
 import { toApiUrl } from '@/services/runtime';
 import { GOOD_CHANNELS } from '@/config/thesis-response';
-import { intensityToUnit, NODE_ORIGINS } from '@/services/thesis/engine';
+import { intensityToUnit, NODE_ORIGINS, supplyFromIndicators } from '@/services/thesis/engine';
+import { nodeThreshold } from '@/config/thesis-protocol';
 
 /** Layer-4 indicators of /api/trade/eu-goods (scripts/seed-eu-trade.mjs, EU27). */
 interface MeasuredSupply {
@@ -76,7 +77,7 @@ export class RiskChainPanel extends Panel {
     const num = (x: number, d = 2) => x.toFixed(d).replace('.', ',');
     const pct = (x: number) => `${(x * 100).toFixed(1).replace('.', ',')}%`;
     const best = c.matches.filter((m) => typeof m.expectedIntensity === 'number').sort((a, b) => b.expectedIntensity! - a.expectedIntensity!)[0];
-    const threshold = c.node.goods.includes('8542') ? TRIGGER_WORKING_RULES.intensityThreshold.chips : TRIGGER_WORKING_RULES.intensityThreshold.default;
+    const threshold = nodeThreshold(c.node, TRIGGER_WORKING_RULES);
     const h = best
       ? t('components.thesis.layers.hazard', { i: num(best.expectedIntensity!, 1), h: num(intensityToUnit(best.expectedIntensity!)), th: String(threshold) })
       : t('components.thesis.layers.hazardNone');
@@ -84,7 +85,7 @@ export class RiskChainPanel extends Panel {
       const m = this.measured[hs]?.supply;
       const origins = (NODE_ORIGINS[c.node.id] ?? []).join(', ');
       const sLine = m && m.nodeOriginShare !== null
-        ? t('components.thesis.layers.supply', { origins, share: pct(m.nodeOriginShare), hhi: num(m.hhi, 3), s: num((m.nodeOriginShare + m.hhi) / 2), year: String(this.measured[hs]!.year) })
+        ? t('components.thesis.layers.supply', { origins, share: pct(m.nodeOriginShare), hhi: num(m.hhi, 3), s: num(supplyFromIndicators(m.nodeOriginShare, m.hhi)), year: String(this.measured[hs]!.year) })
         : t('components.thesis.layers.supplyNone');
       const channels = GOOD_CHANNELS.find((g) => g.hs === hs)?.channels ?? null;
       const cLine = channels
