@@ -1823,6 +1823,16 @@
         "suppliers": "{{n}} supplier countries",
         "nodeShare": "Share of the node countries ({{origins}})",
         "bnEur": "bn €"
+      },
+      "layers": {
+        "title": "Measured layers (Year-2 protocol, proposal)",
+        "hazard": "expected intensity {{i}} at the node (threshold {{th}}) → H = {{h}}",
+        "hazardNone": "no trigger with a computable intensity → H = 0",
+        "supply": "share of {{origins}} {{share}}, HHI {{hhi}} → S = {{s}} (Comext {{year}})",
+        "supplyNone": "Comext data not available",
+        "customs": "{{n}} of 3 channels with an incentive ({{list}}) → C = {{c}}",
+        "customsNone": "measures not listed yet",
+        "note": "Values of the single layers according to the Year-2 protocol proposal: they are not combined into a score until the protocol is approved. Customs vulnerability here is only the incentive (public data)."
       }
     },
     "nodeHazards": {

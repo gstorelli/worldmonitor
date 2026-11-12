@@ -1654,6 +1654,16 @@
         "suppliers": "{{n}} paesi fornitori",
         "nodeShare": "Quota dei paesi dei nodi ({{origins}})",
         "bnEur": "mld €"
+      },
+      "layers": {
+        "title": "Strati misurati (protocollo dell'Anno 2, proposta)",
+        "hazard": "intensità attesa {{i}} sul nodo (soglia {{th}}) → H = {{h}}",
+        "hazardNone": "nessun innesco con intensità calcolabile → H = 0",
+        "supply": "quota di {{origins}} {{share}}, HHI {{hhi}} → S = {{s}} (Comext {{year}})",
+        "supplyNone": "dati Comext non disponibili",
+        "customs": "{{n}} canali su 3 con incentivo ({{list}}) → C = {{c}}",
+        "customsNone": "misure non ancora elencate",
+        "note": "Valori dei singoli strati secondo la proposta di protocollo dell'Anno 2: non sono combinati in un punteggio finché il protocollo non è approvato. La vulnerabilità doganale qui è solo l'incentivo (dati pubblici)."
       }
     },
     "nodeHazards": {

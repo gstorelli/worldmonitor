@@ -5,6 +5,15 @@ import { getStrategicGood, STRATEGIC_GOODS, TRIGGER_WORKING_RULES } from '@/conf
 import { getThesisSnapshot, onThesisSnapshot, type ThesisSnapshot } from '@/services/thesis/snapshot';
 import type { NodeChain } from '@/services/thesis/risk-chain';
 import { ago, eventIntensity, factItem, kindIcon, lt, nodeKindLabel, nodeName, sourceLink, stateBadge } from './thesis-ui';
+import { toApiUrl } from '@/services/runtime';
+import { GOOD_CHANNELS } from '@/config/thesis-response';
+import { intensityToUnit, NODE_ORIGINS } from '@/services/thesis/engine';
+
+/** Layer-4 indicators of /api/trade/eu-goods (scripts/seed-eu-trade.mjs, EU27). */
+interface MeasuredSupply {
+  year: number;
+  supply?: { hhi: number; nodeOrigins: string[]; nodeOriginShare: number | null } | null;
+}
 
 const REFRESH_MS = 10 * 60_000;
 const STATE_ORDER = { assess: 0, monitor: 1, none: 2 } as const;
@@ -20,6 +29,7 @@ export class RiskChainPanel extends Panel {
   private timer: ReturnType<typeof setInterval> | null = null;
   private unsubscribe: (() => void) | null = null;
   private onNodeClick?: (lat: number, lon: number) => void;
+  private measured: Record<string, MeasuredSupply> = {};
 
   constructor() {
     super({
@@ -38,6 +48,53 @@ export class RiskChainPanel extends Panel {
     void this.refresh();
     this.timer = setInterval(() => void this.refresh(true), REFRESH_MS);
     this.content.addEventListener('click', (ev) => this.handleClick(ev));
+    void this.loadMeasured();
+  }
+
+  private async loadMeasured(): Promise<void> {
+    try {
+      const res = await fetch(toApiUrl('/api/trade/eu-goods'), { credentials: 'same-origin', headers: { Accept: 'application/json' } });
+      if (!res.ok) return;
+      const body = (await res.json()) as { available?: boolean; goods?: Record<string, { imports?: Record<string, MeasuredSupply> }> };
+      if (!body.available || !body.goods) return;
+      for (const [hs, g] of Object.entries(body.goods)) if (g.imports?.EU27_2020) this.measured[hs] = g.imports.EU27_2020;
+      this.render();
+    } catch {
+      // Measured layers are an addition; the chain works without them.
+    }
+  }
+
+  /**
+   * Values of the layers for a production node, as defined by the Year-2
+   * protocol proposal (thesis docs/protocollo-anno2.md, engine.ts): H from the
+   * expected intensity, S = mean of node-origin share and supplier HHI, C =
+   * share of misdeclaration channels with an incentive. They are NOT combined
+   * into a score until the protocol is approved.
+   */
+  private measuredLayers(c: NodeChain): string {
+    if (c.node.kind !== 'production' || !c.node.goods.length) return '';
+    const num = (x: number, d = 2) => x.toFixed(d).replace('.', ',');
+    const pct = (x: number) => `${(x * 100).toFixed(1).replace('.', ',')}%`;
+    const best = c.matches.filter((m) => typeof m.expectedIntensity === 'number').sort((a, b) => b.expectedIntensity! - a.expectedIntensity!)[0];
+    const threshold = c.node.goods.includes('8542') ? TRIGGER_WORKING_RULES.intensityThreshold.chips : TRIGGER_WORKING_RULES.intensityThreshold.default;
+    const h = best
+      ? t('components.thesis.layers.hazard', { i: num(best.expectedIntensity!, 1), h: num(intensityToUnit(best.expectedIntensity!)), th: String(threshold) })
+      : t('components.thesis.layers.hazardNone');
+    const items = c.node.goods.map((hs) => {
+      const m = this.measured[hs]?.supply;
+      const origins = (NODE_ORIGINS[c.node.id] ?? []).join(', ');
+      const sLine = m && m.nodeOriginShare !== null
+        ? t('components.thesis.layers.supply', { origins, share: pct(m.nodeOriginShare), hhi: num(m.hhi, 3), s: num((m.nodeOriginShare + m.hhi) / 2), year: String(this.measured[hs]!.year) })
+        : t('components.thesis.layers.supplyNone');
+      const channels = GOOD_CHANNELS.find((g) => g.hs === hs)?.channels ?? null;
+      const cLine = channels
+        ? t('components.thesis.layers.customs', { n: String(channels.length), list: channels.map((ch) => t(`components.thesis.response.channel.${ch}`)).join(', '), c: num(channels.length / 3) })
+        : t('components.thesis.layers.customsNone');
+      return `<li><span class="thesis-hs">HS ${escapeHtml(hs)}</span> S: ${escapeHtml(sLine)}</li><li><span class="thesis-hs">HS ${escapeHtml(hs)}</span> C: ${escapeHtml(cLine)}</li>`;
+    });
+    return `<div class="thesis-detail-h">${escapeHtml(t('components.thesis.layers.title'))}</div>
+      <ul class="thesis-facts"><li>H: ${escapeHtml(h)}</li>${items.join('')}</ul>
+      <p class="thesis-muted">${escapeHtml(t('components.thesis.layers.note'))}</p>`;
   }
 
   public setNodeClickHandler(handler: (lat: number, lon: number) => void): void {
@@ -136,6 +193,7 @@ export class RiskChainPanel extends Panel {
         <div class="thesis-detail-h">${escapeHtml(t('components.thesis.layer.trigger'))}</div>${events}
         <div class="thesis-detail-h">${escapeHtml(t('components.thesis.layer.hazard'))}</div><p>${hazard}</p>
         ${goods ? `<div class="thesis-detail-h">${escapeHtml(t('components.thesis.layer.goods'))}</div>${goods}` : `<p class="thesis-muted">${escapeHtml(t('components.thesis.chain.goodsTbdDetail'))}</p>`}
+        ${this.measuredLayers(c)}
         <div class="thesis-detail-h">${escapeHtml(t('components.thesis.layer.customs'))}</div>
         <p class="thesis-muted">${escapeHtml(t('components.thesis.chain.customsTbd'))}</p>
       </div></td></tr>`;
