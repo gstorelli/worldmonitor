@@ -368,14 +368,23 @@ export const WORKSPACE_SOURCES: Record<string, DataSource[]> = {
     { ...GDACS, what: 'Colonna Inneschi: eventi naturali vicino al nodo' },
     { ...EONET, what: 'Colonna Inneschi: eventi naturali vicino al nodo' },
     { ...NHC, what: 'Colonna Inneschi: cicloni tropicali vicino al nodo' },
+    { ...THESIS_REGISTRY, what: 'Colonna Catena: regola del modello (nessun innesco → nessun rischio)' },
+  ],
+  'osint.signals': [
     { ...PORTWATCH, what: 'Colonna Transiti: variazione dei transiti rispetto alla settimana precedente' },
     {
-      what: 'Colonna Clima: anomalia di temperatura e precipitazione degli ultimi 7 giorni nella zona monitorata più vicina (entro il raggio di lavoro)',
-      source: 'Open-Meteo, Historical Weather API (workflow n8n 03, 15 zone)',
+      what: 'Colonna Anomalia climatica: media degli ultimi 7 giorni ERA5 meno la normale mensile della zona più vicina (entro il raggio di lavoro)',
+      source: 'Open-Meteo, Historical Weather API (archivio ERA5)',
       url: 'https://archive-api.open-meteo.com/v1/archive',
-      code: 'n8n-workflows/03-climate-anomalies-ingestion.json; api/osint/signals.js',
+      code: 'scripts/seed-climate-anomalies.mjs; api/osint/signals.js',
+      note: 'Il periodo delle normali è quello dichiarato dal seeder (campo baseline di /api/osint/signals).',
     },
-    { ...THESIS_REGISTRY, what: 'Colonna Catena: regola del modello (nessun innesco → nessun rischio)' },
+    {
+      what: 'Approvvigionamento UE: HHI dei fornitori extra-UE e quota dalle origini dei nodi, per bene',
+      source: 'Eurostat Comext, dataset DS-045409 (importazioni extra-UE dell\u2019UE27)',
+      url: 'https://ec.europa.eu/eurostat/api/comext/dissemination/statistics/1.0/data/DS-045409',
+      code: 'scripts/seed-eu-trade.mjs; scripts/_eu-trade.mjs; api/osint/signals.js',
+    },
   ],
   'osint.goods': [
     {
@@ -397,7 +406,7 @@ export const WORKSPACE_SOURCES: Record<string, DataSource[]> = {
     },
   ],
   'osint.feed': [
-    { ...EMSC_TRIGGERS, what: 'Terremoti vicino ai nodi, dal più recente' },
+    { ...EMSC_TRIGGERS, what: 'Terremoti vicino ai nodi, una riga per sequenza (Gardner-Knopoff, provvisorio), dalla più recente' },
     { ...GDACS, what: 'Eventi naturali vicino ai nodi' },
     { ...EONET, what: 'Eventi naturali vicino ai nodi' },
     { ...NHC, what: 'Cicloni tropicali vicino ai nodi' },
