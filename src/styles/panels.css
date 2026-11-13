@@ -3357,6 +3357,28 @@ a.hub-top-story {
   background: color-mix(in srgb, var(--accent) 14%, transparent);
 }
 
+/* Status chip of a policy-register modulator (verificata / in riesame / da verificare). */
+.thesis-reg-chip {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 3px;
+  white-space: nowrap;
+  border: 1px solid currentColor;
+}
+
+.thesis-reg-ok {
+  color: var(--semantic-positive);
+}
+
+.thesis-reg-review {
+  color: var(--semantic-elevated);
+}
+
+.thesis-reg-wip {
+  color: var(--text-muted);
+}
+
 .thesis-note {
   font-size: 11px;
   line-height: 1.4;

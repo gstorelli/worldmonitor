@@ -2,8 +2,14 @@ import { Panel } from './Panel';
 import { escapeHtml } from '@/utils/sanitize';
 import { t } from '@/services/i18n';
 import { STRATEGIC_GOODS, type StrategicGood } from '@/config/thesis-model';
-import { factItem, lt, nodeName } from './thesis-ui';
+import { factItem, lt, nodeName, sourceLink } from './thesis-ui';
 import { toApiUrl } from '@/services/runtime';
+import { registryModulatorsFor, type RegistryEntryLike } from '@/services/thesis/modulators';
+import policyRegistry from '../../data/policy-registry.json';
+
+const REGISTRY_ENTRIES: readonly RegistryEntryLike[] = policyRegistry.entries;
+
+const STATUS_KEY: Record<string, string> = { verificata: 'statusVerified', 'in-riesame': 'statusReview' };
 
 /** Supply-vulnerability indicators written by scripts/seed-eu-trade.mjs (EU27, extra-EU imports). */
 interface MeasuredSupply {
@@ -16,7 +22,9 @@ interface MeasuredSupply {
 /**
  * Strategic goods of the perimeter with their EU criticality, supply
  * vulnerability evidence and modulators in force. Static, sourced data:
- * every fact is either verified (with its source) or an explicit to-do.
+ * every fact is either verified (with its source) or an explicit to-do. The
+ * modulators come first from the dated policy register (data/policy-registry.json)
+ * with their verification status, then the hand-written facts of thesis-model.ts.
  */
 export class StrategicGoodsPanel extends Panel {
   private open = new Set<string>(['8542']);
@@ -84,10 +92,29 @@ export class StrategicGoodsPanel extends Panel {
     return `<div class="thesis-detail-h">${escapeHtml(title)}</div><ul class="thesis-facts">${facts.map(factItem).join('')}</ul>`;
   }
 
+  /** One register modulator: status chip, title, CELEX or reference, dates (null → "da verificare"), link. */
+  private registryItem(e: RegistryEntryLike): string {
+    const r = (key: string, vars?: Record<string, string>) => t(`components.thesis.goods.registry.${key}`, vars);
+    const ok = e.statusCode === 'verificata';
+    const chip = `<span class="thesis-reg-chip thesis-reg-${ok ? 'ok' : e.statusCode === 'in-riesame' ? 'review' : 'wip'}">${escapeHtml(r(STATUS_KEY[e.statusCode ?? ''] ?? 'statusUnverified'))}</span>`;
+    const ref = e.celex ? `CELEX ${e.celex}` : (e.reference ?? r('unverified'));
+    const date = (v: string | null | undefined) => v ?? r('unverified');
+    const dates = `${r('inForceFrom')}: ${date(e.inForceFrom)} · ${r('expiresOn')}: ${date(e.expiresOn)}`;
+    const title = e.title.split(' — ')[0] ?? e.title;
+    return `<li class="thesis-fact ${ok ? 'thesis-fact-ok' : 'thesis-fact-todo'}"><span class="thesis-fact-mark">${ok ? '✓' : '◌'}</span><span>${chip} ${escapeHtml(title)} <span class="thesis-fact-src">${sourceLink(ref, e.url)} · ${escapeHtml(dates)}</span></span></li>`;
+  }
+
+  private modulatorsSection(g: StrategicGood, registry: readonly RegistryEntryLike[]): string {
+    if (!registry.length && !g.modulators.length) return '';
+    return `<div class="thesis-detail-h">${escapeHtml(t('components.thesis.goods.modulators'))}</div><ul class="thesis-facts">${registry.map((e) => this.registryItem(e)).join('')}${g.modulators.map(factItem).join('')}</ul>`;
+  }
+
   private card(g: StrategicGood): string {
     const isOpen = this.open.has(g.hs);
-    const verified = [...g.criticality, ...g.supply, ...g.modulators].filter((f) => f.status === 'verified').length;
-    const total = g.criticality.length + g.supply.length + g.modulators.length;
+    const registry = registryModulatorsFor(REGISTRY_ENTRIES, g.hs);
+    const verified = [...g.criticality, ...g.supply, ...g.modulators].filter((f) => f.status === 'verified').length
+      + registry.filter((e) => e.statusCode === 'verificata').length;
+    const total = g.criticality.length + g.supply.length + g.modulators.length + registry.length;
     const nodes = g.nodes.length ? g.nodes.map((id) => escapeHtml(nodeName(id))).join(', ') : escapeHtml(t('components.thesis.goods.noNodes'));
     return `<div class="thesis-goodcard${isOpen ? ' open' : ''}">
       <div class="thesis-goodcard-head" data-hs="${escapeHtml(g.hs)}">
@@ -104,7 +131,7 @@ export class StrategicGoodsPanel extends Panel {
         ${this.section(t('components.thesis.goods.criticality'), g.criticality)}
         ${this.section(t('components.thesis.goods.supply'), g.supply)}
         ${this.measuredBlock(g.hs)}
-        ${this.section(t('components.thesis.goods.modulators'), g.modulators)}
+        ${this.modulatorsSection(g, registry)}
       </div>`
           : ''
       }

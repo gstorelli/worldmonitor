@@ -85,6 +85,20 @@ const NODE_GOODS: Record<string, string[]> = {
   tainan: ['8542'],
 };
 
+/**
+ * Countries where a production node lies (ISO 3166-1 alpha-2, the partner codes
+ * of Comext). Straits have no origin of their own: which origins ship through a
+ * strait is not yet specified, so their supply term is not computable.
+ * Mirrored by GOOD_NODE_ORIGINS in scripts/_eu-trade.mjs (parity test).
+ */
+export const NODE_ORIGINS: Readonly<Record<string, readonly string[]>> = {
+  antofagasta: ['CL'],
+  morowali: ['ID'],
+  'weda-bay': ['ID'],
+  hsinchu: ['TW'],
+  tainan: ['TW'],
+};
+
 export const THESIS_NODES: readonly ThesisNode[] = NODE_HAZARDS.map((n) => ({
   ...n,
   chokepointId: CHOKEPOINT_IDS[n.id] ?? null,
@@ -100,7 +114,12 @@ export interface StrategicGood {
   criticality: SourcedFact[];
   /** Supply vulnerability evidence (dependence, concentration). */
   supply: SourcedFact[];
-  /** Modulators in force: trade defence, sanctions, producer-country policy. */
+  /**
+   * Hand-written modulators (trade defence, sanctions, producer-country policy).
+   * The dated register data/policy-registry.json is the source of the measures
+   * in force: a "da censire" placeholder stays only while no verified register
+   * entry covers the HS heading (tests/thesis-modulators.test.mts).
+   */
   modulators: SourcedFact[];
   /** Production-area nodes of the perimeter. */
   nodes: string[];
@@ -199,7 +218,8 @@ export const STRATEGIC_GOODS: readonly StrategicGood[] = [
     // Dependence by origin and supplier concentration: measured live on Comext
     // (scripts/seed-eu-trade.mjs, shown by StrategicGoodsPanel).
     supply: [],
-    modulators: [todo('Misure in vigore: da censire', 'Measures in force: to be listed')],
+    // Measures in force: read from data/policy-registry.json (verified register entries, StrategicGoodsPanel).
+    modulators: [],
     nodes: [],
   },
   {
@@ -208,7 +228,8 @@ export const STRATEGIC_GOODS: readonly StrategicGood[] = [
     detail: { it: 'sottovoci e derivati (2710) da dettagliare nel Cap. 3', en: 'subheadings and derivatives (2710) to be detailed in Ch. 3' },
     criticality: [todo('Fuori dal CRMA: indicatore di fornitura da costruire (SWD(2021) 352)', 'Outside the CRMA: supply indicator to be built (SWD(2021) 352)')],
     supply: [todo('Dipendenza UE e Italia per origine e rotta: da calcolare (Comext, PortWatch)', 'EU and Italian dependence by origin and route: to be computed (Comext, PortWatch)')],
-    modulators: [todo('Sanzioni e price cap: da censire con fonte', 'Sanctions and price cap: to be listed with sources')],
+    // Measures in force: read from data/policy-registry.json (verified register entries, StrategicGoodsPanel).
+    modulators: [],
     nodes: [],
   },
   {
@@ -216,7 +237,8 @@ export const STRATEGIC_GOODS: readonly StrategicGood[] = [
     label: { it: 'Gas naturale e GNL', en: 'Natural gas and LNG' },
     criticality: [todo('Fuori dal CRMA: indicatore di fornitura da costruire (SWD(2021) 352)', 'Outside the CRMA: supply indicator to be built (SWD(2021) 352)')],
     supply: [todo('Dipendenza UE e Italia per origine e rotta: da calcolare', 'EU and Italian dependence by origin and route: to be computed')],
-    modulators: [todo('Misure in vigore: da censire', 'Measures in force: to be listed')],
+    // Measures in force: read from data/policy-registry.json (verified register entries, StrategicGoodsPanel).
+    modulators: [],
     nodes: [],
   },
   {
@@ -239,7 +261,8 @@ export const STRATEGIC_GOODS: readonly StrategicGood[] = [
       { text: { it: 'Porto di Bari, gen–set 2025: prodotti chimici +27%', en: 'Port of Bari, Jan–Sep 2025: chemical products +27%' }, source: ADSP, url: ADSP_URL, status: 'verified' },
       todo('Flussi dell’Ufficio di Bari per HS e origine: dato ADM (Anno 3)', 'Bari office flows by HS and origin: ADM data (Year 3)'),
     ],
-    modulators: [todo('Misure in vigore: da censire', 'Measures in force: to be listed')],
+    // Measures in force: read from data/policy-registry.json (verified register entries, StrategicGoodsPanel).
+    modulators: [],
     nodes: [],
     pilot: true,
   },

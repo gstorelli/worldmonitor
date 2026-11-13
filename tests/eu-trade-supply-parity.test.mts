@@ -1,10 +1,14 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { GOOD_NODE_ORIGINS, supplyIndicators } from '../scripts/_eu-trade.mjs';
-import { THESIS_NODES } from '../src/config/thesis-model.ts';
-import { NODE_ORIGINS, originShare, supplierHhi } from '../src/services/thesis/engine.ts';
+import { NODE_ORIGINS, THESIS_NODES } from '../src/config/thesis-model.ts';
+import { NODE_ORIGINS as ENGINE_NODE_ORIGINS, originShare, supplierHhi } from '../src/services/thesis/engine.ts';
 
 describe('supply indicators: seeder mirror of the thesis engine', () => {
+  it('the engine re-exports NODE_ORIGINS from the thesis model', () => {
+    assert.equal(ENGINE_NODE_ORIGINS, NODE_ORIGINS);
+  });
+
   it('good -> node origins equals the production nodes of the registry', () => {
     const derived: Record<string, string[]> = {};
     for (const n of THESIS_NODES) for (const hs of n.goods) derived[hs] = [...new Set([...(derived[hs] ?? []), ...(NODE_ORIGINS[n.id] ?? [])])];

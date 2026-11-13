@@ -161,7 +161,14 @@ export const PANEL_SOURCES: Record<string, DataSource[]> = {
       note: 'Valori calcolati offline, come nella Tab. 3.4 della tesi.',
     },
   ],
-  'strategic-goods': factSources(strategicGoodsFacts(), 'Criticità UE, fornitura e misure dei beni (fonte indicata voce per voce)', 'src/config/thesis-model.ts'),
+  'strategic-goods': [
+    ...factSources(strategicGoodsFacts(), 'Criticità UE, fornitura e misure dei beni (fonte indicata voce per voce)', 'src/config/thesis-model.ts'),
+    {
+      what: 'Modulatori in vigore: voci del registro Policy con lo stesso codice HS e il loro stato di verifica',
+      source: 'Registro normativo del portale (fonti primarie voce per voce)',
+      code: 'data/policy-registry.json; src/services/thesis/modulators.ts',
+    },
+  ],
   'response-outlook': [
     {
       what: 'Risposte suggerite (proof of concept): regole del prototipo, nessun dato esterno',
