@@ -46,6 +46,7 @@ import {
   VERIFICATION_LEVELS,
 } from './layers';
 import type { ResearchPayload, ResearchSource, ZoteroItem } from './types';
+import { type CitationGraph, docLabel, formatPlaceholder, formatUse, isCitationGraph, placeholdersByDoc, usesOf } from './usage';
 
 const LAYER_QUERIES: Record<string, string> = Object.fromEntries(MODEL_LAYERS.map((layer) => [layer.id, layer.query]));
 
@@ -101,6 +102,7 @@ const SORT_COLUMNS: { key: SortKey; label: string }[] = [
 
 export function createResearchWorkspace(): AppWorkspace {
   let curated: ResearchSource[] = [];
+  let citationGraph: CitationGraph | null = null;
   let library: ZoteroItem[] = [];
   let zoteroConfigured = false;
   let fetchedAt = '';
@@ -147,6 +149,7 @@ export function createResearchWorkspace(): AppWorkspace {
       }
 
       curated = Array.isArray(payload.sources) ? payload.sources : [];
+      citationGraph = isCitationGraph(payload.citations) ? payload.citations : null;
       library = Array.isArray(payload.library) ? payload.library : [];
       zoteroConfigured = Boolean(payload.zoteroConfigured);
       fetchedAt = payload.fetchedAt ?? new Date().toISOString();
@@ -244,6 +247,7 @@ export function createResearchWorkspace(): AppWorkspace {
             </div>
           </div>
 
+          ${renderUsage(source)}
           ${source.summary ? `<h3>Sintesi</h3><p>${escapeHtml(source.summary)}</p>` : ''}
           ${source.limitation ? `<h3>Limiti</h3><p>${escapeHtml(source.limitation)}</p>` : ''}
           ${source.verified ? `<p class="rs-meta">Verifica: ${escapeHtml(VERIFICATION_LABELS[source.verification ?? ''] ?? 'registrata')}. Il dettaglio di cosa è stato verificato è nel registro privato della tesi (docs/FONTI_VERIFICATE.md).</p>` : ''}
@@ -252,6 +256,27 @@ export function createResearchWorkspace(): AppWorkspace {
             ${source.url ? `<a class="rs-link" href="${escapeHtml(source.url)}" target="_blank" rel="noopener">Fonte ↗</a>` : ''}
           </div>
         `;
+      };
+
+      const renderUsage = (source: ResearchSource): string => {
+        if (!citationGraph || !source.key) return '';
+        const uses = usesOf(citationGraph, source.key);
+        return `<p class="rs-meta rs-usage"><strong>Usata in:</strong> ${
+          uses.length
+            ? uses.map((use) => escapeHtml(formatUse(use))).join(', ')
+            : 'non citata nei capitoli né nella rassegna'
+        }</p>`;
+      };
+
+      const renderGaps = (): string => {
+        if (!citationGraph) return '';
+        const { placeholders, missing, uncited } = citationGraph;
+        return `
+          <section class="rs-gaps">
+            <h3>Lacune</h3>
+            <p class="rs-meta">Segnaposto aperti nella tesi: ${placeholdersByDoc(citationGraph).map((entry) => `${escapeHtml(docLabel(entry.doc))} ${entry.count}`).join(' · ')}. Chiavi citate ma assenti dal .bib: ${missing.length ? missing.map((key) => `<code>${escapeHtml(key)}</code>`).join(', ') : 'nessuna'}. Voci del .bib mai citate: ${uncited.length ? uncited.map((key) => `<code>${escapeHtml(key)}</code>`).join(', ') : 'nessuna'}.</p>
+            ${placeholders.length ? `<ul class="rs-gaps-list">${placeholders.map((p) => `<li>${escapeHtml(formatPlaceholder(p))}</li>`).join('')}</ul>` : ''}
+          </section>`;
       };
 
       // ── Coverage ──────────────────────────────────────────────────────────
@@ -310,6 +335,7 @@ export function createResearchWorkspace(): AppWorkspace {
             <section><h3>Tipi</h3>${bars(types)}</section>
             <section><h3>Anni</h3>${bars(years)}</section>
           </div>
+          ${renderGaps()}
         `;
       };
 
