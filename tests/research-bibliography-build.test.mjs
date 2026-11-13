@@ -12,6 +12,7 @@ import {
   formatAuthors,
   parseBibtex,
   parseRegister,
+  readLayerOverrides,
   sourceUrl,
 } from '../scripts/build-research-bibliography.mjs';
 
@@ -84,6 +85,27 @@ describe('build-research-bibliography', () => {
     assert.equal(byKey.eurostat_comext_2026.url, 'https://ec.europa.eu/eurostat/comext');
     assert.equal(byKey.eurostat_comext_2026.type, 'institutional');
     assert.equal(byKey.white_multi_2025.url, 'https://doi.org/10.5194/nhess-25-4263-2025');
+  });
+
+  it('applies per-source layer overrides after the section default (13/11/2026)', () => {
+    const overrides = readLayerOverrides({ overrides: { white_multi_2025: ['signal'], empty_key: [] } });
+    assert.deepEqual([...overrides.keys()], ['white_multi_2025'], 'empty lists are ignored');
+    const byKey = Object.fromEntries(buildSources(entries, register, [], overrides).map((source) => [source.key, source]));
+    assert.deepEqual(byKey.white_multi_2025.layers, ['signal']);
+    assert.deepEqual(byKey.eurostat_comext_2026.layers, ['node', 'good'], 'sources without an override keep the section default');
+  });
+
+  it('the committed overrides keep GDELT and UCDP out of the trigger layer', () => {
+    const json = JSON.parse(readFileSync(new URL('../data/research-layer-overrides.json', import.meta.url), 'utf8'));
+    const overrides = readLayerOverrides(json);
+    for (const key of ['gdelt_data_2026', 'ucdp_ged_2026']) {
+      assert.ok(overrides.get(key)?.includes('signal'), `${key} is a signal`);
+      assert.ok(!overrides.get(key)?.includes('trigger'), `${key} is never a trigger`);
+    }
+    const data = JSON.parse(readFileSync(new URL('../data/zotero-sources.json', import.meta.url), 'utf8'));
+    for (const source of data.sources.filter((s) => overrides.has(s.key))) {
+      assert.deepEqual(source.layers, overrides.get(source.key), `${source.key}: generated layers follow the override`);
+    }
   });
 
   it('omits sources marked "Da non usare" and never copies the private notes', () => {

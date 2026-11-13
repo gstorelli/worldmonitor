@@ -1,0 +1,11 @@
+{
+  "$comment": "Per-source layer overrides for scripts/build-research-bibliography.mjs: bib key -> full layer list, replacing the default layers of the register section. Only overrides justified by the rules of the thesis model (CLAUDE.md of both repositories) belong here; layer ids must be listed in src/config/thesis-layers.ts. Doubtful sources keep the section default.",
+  "overrides": {
+    "gdelt_data_2026": ["signal"],
+    "ucdp_ged_2026": ["signal"]
+  },
+  "reasons": {
+    "gdelt_data_2026": "GDELT is a signal, never a trigger or a hazard measure (CLAUDE.md, rule 4).",
+    "ucdp_ged_2026": "Conflict events are a signal or a modulator, a trigger only when they interrupt a node (CLAUDE.md). The register row does not state the modulator role, so only signal is set."
+  }
+}

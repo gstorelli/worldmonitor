@@ -12,8 +12,10 @@ export default [
     "venue": "",
     "doi": null,
     "url": "https://taxation-customs.ec.europa.eu/customs/customs-risk-management/customs-risk-management-framework-crmf_en",
+    "entryType": "misc",
+    "note": "Accessed 8 October 2026",
     "layers": [
-      "customs"
+      "customs-vulnerability"
     ],
     "verified": true,
     "verification": "P",
@@ -30,6 +32,8 @@ export default [
     "venue": "",
     "doi": null,
     "url": "https://portwatch.imf.org/pages/data-and-methodology",
+    "entryType": "misc",
+    "note": "Accessed 8 October 2026",
     "layers": [
       "node",
       "good"
@@ -45,12 +49,13 @@ export default [
     "authors": "European Commission. Joint Research Centre; Anderson, D.; Belcineanu, A. I.; Tzvetkova, M.",
     "year": 2025,
     "title": "AI for border management and customs controls",
-    "type": "report",
+    "type": "book",
     "venue": "Publications Office of the European Union",
     "doi": "10.2760/1286492",
     "url": "https://doi.org/10.2760/1286492",
+    "entryType": "book",
     "layers": [
-      "customs"
+      "customs-vulnerability"
     ],
     "verified": true,
     "verification": "P",
@@ -66,12 +71,14 @@ export default [
     "type": "institutional",
     "venue": "",
     "doi": null,
-    "url": "",
+    "url": "https://n8n.io",
+    "entryType": "misc",
+    "note": "Software. https://n8n.io. Accessed 13 November 2026",
     "layers": [
-      "platform"
+      "method"
     ],
-    "verified": false,
-    "verification": null,
+    "verified": true,
+    "verification": "P",
     "summary": "Piattaforma open-source di automazione workflow per l'orchestrazione di sorgenti eterogenee e servizi AI.",
     "limitation": "General-purpose: nessuna capacità doganale, nessuna Knowledge Graph integration, nessun reasoning LLM nativo."
   },
@@ -85,6 +92,10 @@ export default [
     "venue": "Journal of Shipping and Trade",
     "doi": "10.1186/s41072-024-00170-3",
     "url": "https://doi.org/10.1186/s41072-024-00170-3",
+    "entryType": "article",
+    "volume": "9",
+    "number": "1",
+    "pages": "11",
     "layers": [
       "node",
       "good"
@@ -104,8 +115,10 @@ export default [
     "venue": "arXiv preprint arXiv:2311.10922",
     "doi": null,
     "url": "https://arxiv.org/abs/2311.10922",
+    "entryType": "misc",
+    "howpublished": "arXiv preprint arXiv:2311.10922",
     "layers": [
-      "customs"
+      "customs-vulnerability"
     ],
     "verified": true,
     "verification": "P",
@@ -122,8 +135,10 @@ export default [
     "venue": "arXiv preprint arXiv:2109.14155",
     "doi": null,
     "url": "https://arxiv.org/abs/2109.14155",
+    "entryType": "misc",
+    "howpublished": "arXiv preprint arXiv:2109.14155",
     "layers": [
-      "customs"
+      "customs-vulnerability"
     ],
     "verified": true,
     "verification": "P",
@@ -140,8 +155,9 @@ export default [
     "venue": "AI & Society",
     "doi": "10.1007/s00146-023-01635-y",
     "url": "https://doi.org/10.1007/s00146-023-01635-y",
+    "entryType": "article",
     "layers": [
-      "customs"
+      "customs-vulnerability"
     ],
     "verified": true,
     "verification": "P",
@@ -158,6 +174,8 @@ export default [
     "venue": "OECD Publishing",
     "doi": null,
     "url": "",
+    "entryType": "misc",
+    "howpublished": "OECD Publishing",
     "layers": [
       "node",
       "good"
@@ -177,8 +195,11 @@ export default [
     "venue": "World Customs Journal",
     "doi": "10.55596/001c.159458",
     "url": "https://doi.org/10.55596/001c.159458",
+    "entryType": "article",
+    "volume": "20",
+    "number": "1",
     "layers": [
-      "customs"
+      "customs-vulnerability"
     ],
     "verified": true,
     "verification": "P",
@@ -195,6 +216,10 @@ export default [
     "venue": "Journal of Management Information Systems",
     "doi": "10.2753/MIS0742-1222240302",
     "url": "https://doi.org/10.2753/MIS0742-1222240302",
+    "entryType": "article",
+    "volume": "24",
+    "number": "3",
+    "pages": "45–77",
     "layers": [
       "method"
     ],
@@ -213,6 +238,10 @@ export default [
     "venue": "Earth System Dynamics",
     "doi": "10.5194/esd-16-2295-2025",
     "url": "https://doi.org/10.5194/esd-16-2295-2025",
+    "entryType": "article",
+    "volume": "16",
+    "number": "6",
+    "pages": "2295–2311",
     "layers": [
       "trigger"
     ],
@@ -231,6 +260,10 @@ export default [
     "venue": "Nature Communications",
     "doi": "10.1038/s41467-025-65403-w",
     "url": "https://doi.org/10.1038/s41467-025-65403-w",
+    "entryType": "article",
+    "volume": "16",
+    "number": "1",
+    "pages": "10421",
     "layers": [
       "node",
       "good"
@@ -250,8 +283,11 @@ export default [
     "venue": "World Customs Journal",
     "doi": "10.55596/001c.131745",
     "url": "https://doi.org/10.55596/001c.131745",
+    "entryType": "article",
+    "volume": "19",
+    "number": "1",
     "layers": [
-      "customs"
+      "customs-vulnerability"
     ],
     "verified": true,
     "verification": "P",
@@ -268,6 +304,10 @@ export default [
     "venue": "Natural Hazards and Earth System Sciences",
     "doi": "10.5194/nhess-26-1325-2026",
     "url": "https://doi.org/10.5194/nhess-26-1325-2026",
+    "entryType": "article",
+    "volume": "26",
+    "number": "3",
+    "pages": "1325–1345",
     "layers": [
       "trigger"
     ],
@@ -286,8 +326,10 @@ export default [
     "venue": "Proceedings of the AAAI Conference on Artificial Intelligence (AAAI 2026)",
     "doi": null,
     "url": "https://arxiv.org/abs/2511.03152",
+    "entryType": "inproceedings",
+    "note": "arXiv preprint arXiv:2511.03152",
     "layers": [
-      "customs"
+      "customs-vulnerability"
     ],
     "verified": true,
     "verification": "P",
@@ -304,8 +346,9 @@ export default [
     "venue": "Proceedings of the 2023 CHI Conference on Human Factors in Computing Systems (CHI '23)",
     "doi": "10.1145/3544548.3581318",
     "url": "https://doi.org/10.1145/3544548.3581318",
+    "entryType": "inproceedings",
     "layers": [
-      "customs"
+      "customs-vulnerability"
     ],
     "verified": true,
     "verification": "P",
@@ -322,6 +365,10 @@ export default [
     "venue": "Natural Hazards and Earth System Sciences",
     "doi": "10.5194/nhess-25-4263-2025",
     "url": "https://doi.org/10.5194/nhess-25-4263-2025",
+    "entryType": "article",
+    "volume": "25",
+    "number": "11",
+    "pages": "4263–4281",
     "layers": [
       "trigger"
     ],
@@ -340,6 +387,10 @@ export default [
     "venue": "MIS Quarterly",
     "doi": null,
     "url": "",
+    "entryType": "article",
+    "volume": "28",
+    "number": "1",
+    "pages": "75–105",
     "layers": [
       "method"
     ],
@@ -358,6 +409,10 @@ export default [
     "venue": "Geochemistry, Geophysics, Geosystems",
     "doi": "10.1029/2001GC000252",
     "url": "https://doi.org/10.1029/2001GC000252",
+    "entryType": "article",
+    "volume": "4",
+    "number": "3",
+    "pages": "1027",
     "layers": [
       "trigger"
     ],
@@ -376,6 +431,8 @@ export default [
     "venue": "",
     "doi": "10.31905/D808B825",
     "url": "https://doi.org/10.31905/D808B825",
+    "entryType": "misc",
+    "note": "Version 12.1 (released 26 November 2025), downloaded 7 October 2026. Licence CC BY-SA 3.0",
     "layers": [
       "trigger"
     ],
@@ -394,6 +451,10 @@ export default [
     "venue": "Seismological Research Letters",
     "doi": "10.1785/0220130034",
     "url": "https://doi.org/10.1785/0220130034",
+    "entryType": "article",
+    "volume": "84",
+    "number": "5",
+    "pages": "810–815",
     "layers": [
       "trigger"
     ],
@@ -412,6 +473,10 @@ export default [
     "venue": "Earth System Science Data",
     "doi": "10.5194/essd-10-1877-2018",
     "url": "https://doi.org/10.5194/essd-10-1877-2018",
+    "entryType": "article",
+    "volume": "10",
+    "number": "4",
+    "pages": "1877–1899",
     "layers": [
       "trigger"
     ],
@@ -425,11 +490,14 @@ export default [
     "key": "gvp_votw_2026",
     "authors": "Global Volcanism Program",
     "year": 2026,
-    "title": "Volcanoes of the World (v. 5.4.0)",
+    "title": "Volcanoes of the World (v. 5.4.0; 7 Aug 2026)",
     "type": "institutional",
     "venue": "Smithsonian Institution",
     "doi": "10.5479/si.GVP.VOTW5-2026.5.4",
     "url": "https://doi.org/10.5479/si.GVP.VOTW5-2026.5.4",
+    "entryType": "misc",
+    "howpublished": "Smithsonian Institution",
+    "note": "Compiled by Venzke, E. Holocene volcano list of v. 5.4.0, downloaded 7 October 2026; Holocene eruption list of v. 5.3.5, file of 24 April 2026. DOI as given by the GVP citation guidance; not yet registered with Crossref on 15 October 2026",
     "layers": [
       "trigger"
     ],
@@ -448,6 +516,8 @@ export default [
     "venue": "",
     "doi": null,
     "url": "https://www.emdat.be",
+    "entryType": "misc",
+    "note": "UCLouvain, Brussels. Public data, version of 2 October 2026, downloaded 5 October 2026; records not redistributable",
     "layers": [
       "trigger"
     ],
@@ -466,6 +536,8 @@ export default [
     "venue": "",
     "doi": "10.5066/F7MS3QZH",
     "url": "https://doi.org/10.5066/F7MS3QZH",
+    "entryType": "misc",
+    "note": "Event us7000m9g4 (Hualien, Taiwan, 2 April 2024 UTC), accessed 8 October 2026",
     "layers": [
       "trigger"
     ],
@@ -484,6 +556,10 @@ export default [
     "venue": "Economic Geology",
     "doi": "10.2113/gsecongeo.105.1.3",
     "url": "https://doi.org/10.2113/gsecongeo.105.1.3",
+    "entryType": "article",
+    "volume": "105",
+    "number": "1",
+    "pages": "3–41",
     "layers": [
       "node"
     ],
@@ -502,6 +578,9 @@ export default [
     "venue": "Frontiers in Earth Science",
     "doi": "10.3389/feart.2021.761748",
     "url": "https://doi.org/10.3389/feart.2021.761748",
+    "entryType": "article",
+    "volume": "9",
+    "pages": "761748",
     "layers": [
       "node"
     ],
@@ -520,6 +599,8 @@ export default [
     "venue": "",
     "doi": null,
     "url": "https://pubs.usgs.gov/periodicals/mcs2026/",
+    "entryType": "misc",
+    "note": "Chapters Copper and Nickel (2025 estimates)",
     "layers": [
       "node",
       "good"
@@ -538,7 +619,9 @@ export default [
     "type": "institutional",
     "venue": "Official Journal of the European Union, L series",
     "doi": null,
-    "url": "",
+    "url": "http://data.europa.eu/eli/reg/2024/1252/oj",
+    "entryType": "misc",
+    "howpublished": "Official Journal of the European Union, L series",
     "layers": [
       "supply",
       "modulator"
@@ -557,7 +640,9 @@ export default [
     "type": "report",
     "venue": "Taipei Times, 4 April 2024",
     "doi": null,
-    "url": "",
+    "url": "https://www.taipeitimes.com/News/biz/archives/2024/04/04/2003815903",
+    "entryType": "misc",
+    "howpublished": "Taipei Times, 4 April 2024",
     "layers": [
       "node",
       "good"
@@ -576,7 +661,10 @@ export default [
     "type": "institutional",
     "venue": "United Nations Conference on Trade and Development, Geneva (UNCTAD/RMT/2025)",
     "doi": null,
-    "url": "",
+    "url": "https://unctad.org/meeting/launch-review-maritime-transport-2025",
+    "entryType": "misc",
+    "howpublished": "United Nations Conference on Trade and Development, Geneva (UNCTAD/RMT/2025)",
+    "note": "Statement on the share of trade carried by sea from the launch page: https://unctad.org/meeting/launch-review-maritime-transport-2025",
     "layers": [
       "node",
       "good"
@@ -595,7 +683,10 @@ export default [
     "type": "report",
     "venue": "Intesa Sanpaolo, Direzione Studi e Ricerche",
     "doi": null,
-    "url": "",
+    "url": "https://group.intesasanpaolo.com/content/dam/portalgroup/repository-documenti/research/it/industria/studi-di-settore/Nota%20Mar%20Rosso_febbraio%202024.pdf",
+    "entryType": "misc",
+    "howpublished": "Intesa Sanpaolo, Direzione Studi e Ricerche",
+    "note": "February 2024. https://group.intesasanpaolo.com/content/dam/portalgroup/repository-documenti/research/it/industria/studi-di-settore/Nota%20Mar%20Rosso_febbraio%202024.pdf",
     "layers": [
       "node",
       "good"
@@ -614,7 +705,9 @@ export default [
     "type": "institutional",
     "venue": "Intesa Sanpaolo, press summary of 17 April 2023",
     "doi": null,
-    "url": "",
+    "url": "https://group.intesasanpaolo.com/it/research/area-media/mercati/2023/srm-e-alexbank-rapporto-sul-canale-di-suez",
+    "entryType": "misc",
+    "howpublished": "Intesa Sanpaolo, press summary of 17 April 2023",
     "layers": [
       "node",
       "good"
@@ -633,7 +726,10 @@ export default [
     "type": "institutional",
     "venue": "Raw Materials Information System (RMIS)",
     "doi": null,
-    "url": "",
+    "url": "https://rmis.jrc.ec.europa.eu/critical-and-strategic-materials",
+    "entryType": "misc",
+    "howpublished": "Raw Materials Information System (RMIS)",
+    "note": "https://rmis.jrc.ec.europa.eu/critical-and-strategic-materials, accessed 8 October 2026",
     "layers": [
       "supply",
       "modulator"
@@ -652,7 +748,9 @@ export default [
     "type": "report",
     "venue": "Boston Consulting Group and Semiconductor Industry Association",
     "doi": null,
-    "url": "",
+    "url": "https://www.semiconductors.org/wp-content/uploads/2021/05/BCG-x-SIA-Strengthening-the-Global-Semiconductor-Value-Chain-April-2021_1.pdf",
+    "entryType": "misc",
+    "howpublished": "Boston Consulting Group and Semiconductor Industry Association",
     "layers": [
       "node",
       "good"
@@ -671,7 +769,9 @@ export default [
     "type": "institutional",
     "venue": "Communication COM(2022) 45 final, Brussels, 8 February 2022",
     "doi": null,
-    "url": "",
+    "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:52022DC0045",
+    "entryType": "misc",
+    "howpublished": "Communication COM(2022) 45 final, Brussels, 8 February 2022",
     "layers": [
       "node",
       "good"
@@ -691,6 +791,10 @@ export default [
     "venue": "Journal of Geophysical Research: Solid Earth",
     "doi": "10.1029/JB088iB11p09419",
     "url": "https://doi.org/10.1029/JB088iB11p09419",
+    "entryType": "article",
+    "volume": "88",
+    "number": "B11",
+    "pages": "9419–9435",
     "layers": [
       "node"
     ],
@@ -709,6 +813,10 @@ export default [
     "venue": "Journal of Asian Earth Sciences",
     "doi": "10.1016/S1367-9120(00)00040-7",
     "url": "https://doi.org/10.1016/S1367-9120(00)00040-7",
+    "entryType": "article",
+    "volume": "18",
+    "number": "6",
+    "pages": "781–808",
     "layers": [
       "node"
     ],
@@ -727,6 +835,10 @@ export default [
     "venue": "Applied Sciences",
     "doi": "10.3390/app12157586",
     "url": "https://doi.org/10.3390/app12157586",
+    "entryType": "article",
+    "volume": "12",
+    "number": "15",
+    "pages": "7586",
     "layers": [
       "node"
     ],
@@ -745,6 +857,9 @@ export default [
     "venue": "Physics of the Earth and Planetary Interiors",
     "doi": "10.1016/j.pepi.2014.06.005",
     "url": "https://doi.org/10.1016/j.pepi.2014.06.005",
+    "entryType": "article",
+    "volume": "239",
+    "pages": "33–47",
     "layers": [
       "trigger"
     ],
@@ -763,6 +878,10 @@ export default [
     "venue": "Physics of the Earth and Planetary Interiors",
     "doi": "10.1016/0031-9201(76)90073-X",
     "url": "https://doi.org/10.1016/0031-9201(76)90073-X",
+    "entryType": "article",
+    "volume": "13",
+    "number": "2",
+    "pages": "85–96",
     "layers": [
       "trigger"
     ],
@@ -780,7 +899,10 @@ export default [
     "type": "institutional",
     "venue": "Commission Staff Working Document SWD(2021) 352 final, Brussels, 5 May 2021",
     "doi": null,
-    "url": "",
+    "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:52021SC0352",
+    "entryType": "misc",
+    "howpublished": "Commission Staff Working Document SWD(2021) 352 final, Brussels, 5 May 2021",
+    "note": "Accompanying COM(2021) 350 final. https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:52021SC0352",
     "layers": [
       "supply",
       "modulator"
@@ -800,6 +922,8 @@ export default [
     "venue": "",
     "doi": null,
     "url": "",
+    "entryType": "misc",
+    "note": "Extra-EU imports of HS 8542 by partner, 2024, value in euro; extracted 8 October 2026 through the Comext dissemination API. Shares are own calculations",
     "layers": [
       "node",
       "good"
@@ -819,8 +943,11 @@ export default [
     "venue": "ADM, Rome",
     "doi": null,
     "url": "",
+    "entryType": "misc",
+    "howpublished": "ADM, Rome",
+    "note": "p. 10, note 6 (Circuito Doganale di Controllo)",
     "layers": [
-      "customs"
+      "customs-vulnerability"
     ],
     "verified": true,
     "verification": "S",
@@ -837,8 +964,11 @@ export default [
     "venue": "ADM, Rome",
     "doi": null,
     "url": "",
+    "entryType": "misc",
+    "howpublished": "ADM, Rome",
+    "note": "Centralised clearance (Article 179 UCC) and analysis of risks through the customs control circuit",
     "layers": [
-      "customs"
+      "customs-vulnerability"
     ],
     "verified": true,
     "verification": "S",
@@ -854,9 +984,11 @@ export default [
     "type": "institutional",
     "venue": "Special report 04/2021",
     "doi": null,
-    "url": "",
+    "url": "https://www.eca.europa.eu/Lists/ECADocuments/SR21_04/SR_Customs_controls_EN.pdf",
+    "entryType": "misc",
+    "howpublished": "Special report 04/2021",
     "layers": [
-      "customs"
+      "customs-vulnerability"
     ],
     "verified": true,
     "verification": "P",
@@ -872,7 +1004,10 @@ export default [
     "type": "report",
     "venue": "Port Economics, Management and Policy (online edition), chapter 11.1",
     "doi": null,
-    "url": "",
+    "url": "https://porteconomicsmanagement.org/pemp/contents/part11/ports-policies-and-politics/impact-red-sea-crisis-port-arrivals/",
+    "entryType": "misc",
+    "howpublished": "Port Economics, Management and Policy (online edition), chapter 11.1",
+    "note": "Based on IMF PortWatch data. https://porteconomicsmanagement.org/pemp/contents/part11/ports-policies-and-politics/impact-red-sea-crisis-port-arrivals/",
     "layers": [
       "node",
       "good"
@@ -891,7 +1026,9 @@ export default [
     "type": "institutional",
     "venue": "Lloyd's List, 20 March 2024",
     "doi": null,
-    "url": "",
+    "url": "https://www.lloydslist.com/LL1148603/Red-Sea-rerouting-hits-east-Mediterranean-transhipment-hubs",
+    "entryType": "misc",
+    "howpublished": "Lloyd's List, 20 March 2024",
     "layers": [
       "node",
       "good"
@@ -907,10 +1044,11 @@ export default [
     "authors": "Saltelli, A.; Ratto, M.; Andres, T.; Campolongo, F.; Cariboni, J.; Gatelli, D.; Saisana, M.; Tarantola, S.",
     "year": 2008,
     "title": "Global Sensitivity Analysis. The Primer",
-    "type": "report",
+    "type": "book",
     "venue": "John Wiley & Sons",
     "doi": "10.1002/9780470725184",
     "url": "https://doi.org/10.1002/9780470725184",
+    "entryType": "book",
     "layers": [
       "method"
     ],
@@ -929,6 +1067,10 @@ export default [
     "venue": "Journal of the Royal Statistical Society: Series A (Statistics in Society)",
     "doi": "10.1111/j.1467-985X.2005.00350.x",
     "url": "https://doi.org/10.1111/j.1467-985X.2005.00350.x",
+    "entryType": "article",
+    "volume": "168",
+    "number": "2",
+    "pages": "307–323",
     "layers": [
       "method"
     ],
@@ -946,7 +1088,9 @@ export default [
     "type": "institutional",
     "venue": "",
     "doi": null,
-    "url": "",
+    "url": "https://finance.ec.europa.eu/publications/list-common-high-priority-items_en",
+    "entryType": "misc",
+    "note": "Published 22 February 2024. https://finance.ec.europa.eu/publications/list-common-high-priority-items_en",
     "layers": [
       "supply",
       "modulator"
@@ -965,9 +1109,12 @@ export default [
     "type": "institutional",
     "venue": "Press release, Bari, 7 November 2025",
     "doi": null,
-    "url": "",
+    "url": "https://www.assoporti.it/media/16487/adsp-mare-adriatico-meridiodale-cs-07112025.pdf",
+    "entryType": "misc",
+    "howpublished": "Press release, Bari, 7 November 2025",
+    "note": "Copy hosted by Assoporti: https://www.assoporti.it/media/16487/adsp-mare-adriatico-meridiodale-cs-07112025.pdf",
     "layers": [
-      "customs"
+      "customs-vulnerability"
     ],
     "verified": true,
     "verification": "P",
@@ -984,6 +1131,11 @@ export default [
     "venue": "Bulletin of the Seismological Society of America",
     "doi": null,
     "url": "",
+    "entryType": "article",
+    "volume": "64",
+    "number": "5",
+    "pages": "1363–1367",
+    "note": "ADS bibcode 1974BuSSA..64.1363G",
     "layers": [
       "trigger"
     ],
@@ -1002,6 +1154,8 @@ export default [
     "venue": "Community Online Resource for Statistical Seismicity Analysis (CORSSA)",
     "doi": "10.5078/corssa-52382934",
     "url": "https://doi.org/10.5078/corssa-52382934",
+    "entryType": "misc",
+    "howpublished": "Community Online Resource for Statistical Seismicity Analysis (CORSSA)",
     "layers": [
       "trigger"
     ],
@@ -1020,6 +1174,10 @@ export default [
     "venue": "Geophysical Journal International",
     "doi": "10.1111/j.1365-246X.2012.05400.x",
     "url": "https://doi.org/10.1111/j.1365-246X.2012.05400.x",
+    "entryType": "article",
+    "volume": "189",
+    "number": "1",
+    "pages": "691–700",
     "layers": [
       "trigger"
     ],
@@ -1038,6 +1196,10 @@ export default [
     "venue": "Bulletin of the Seismological Society of America",
     "doi": "10.1785/0119990114",
     "url": "https://doi.org/10.1785/0119990114",
+    "entryType": "article",
+    "volume": "90",
+    "number": "4",
+    "pages": "859–869",
     "layers": [
       "trigger"
     ],
@@ -1056,6 +1218,10 @@ export default [
     "venue": "Bulletin of the Seismological Society of America",
     "doi": "10.1785/0120040007",
     "url": "https://doi.org/10.1785/0120040007",
+    "entryType": "article",
+    "volume": "95",
+    "number": "2",
+    "pages": "684–698",
     "layers": [
       "trigger"
     ],
@@ -1074,6 +1240,10 @@ export default [
     "venue": "Bulletin of the Seismological Society of America",
     "doi": null,
     "url": "",
+    "entryType": "article",
+    "volume": "70",
+    "number": "4",
+    "pages": "1337–1346",
     "layers": [
       "trigger"
     ],
@@ -1092,6 +1262,10 @@ export default [
     "venue": "Journal of Seismology",
     "doi": "10.1007/s10950-012-9278-7",
     "url": "https://doi.org/10.1007/s10950-012-9278-7",
+    "entryType": "article",
+    "volume": "16",
+    "number": "3",
+    "pages": "409–433",
     "layers": [
       "trigger"
     ],
@@ -1109,7 +1283,12 @@ export default [
     "type": "journal",
     "venue": "Bulletin of the Seismological Society of America",
     "doi": null,
-    "url": "",
+    "url": "https://www.usgs.gov/programs/earthquake-hazards/modified-mercalli-intensity-scale",
+    "entryType": "article",
+    "volume": "21",
+    "number": "4",
+    "pages": "277–283",
+    "note": "Attribution as given by USGS, The Modified Mercalli Intensity Scale, https://www.usgs.gov/programs/earthquake-hazards/modified-mercalli-intensity-scale",
     "layers": [
       "trigger"
     ],
@@ -1128,6 +1307,10 @@ export default [
     "venue": "Journal of Geophysical Research: Oceans",
     "doi": "10.1029/JC087iC02p01231",
     "url": "https://doi.org/10.1029/JC087iC02p01231",
+    "entryType": "article",
+    "volume": "87",
+    "number": "C2",
+    "pages": "1231–1238",
     "layers": [
       "trigger"
     ],
@@ -1146,6 +1329,8 @@ export default [
     "venue": "Global Volcanic Hazards and Risk",
     "doi": "10.1017/CBO9781316276273.006",
     "url": "https://doi.org/10.1017/CBO9781316276273.006",
+    "entryType": "incollection",
+    "pages": "223–232",
     "layers": [
       "trigger"
     ],
@@ -1164,6 +1349,8 @@ export default [
     "venue": "",
     "doi": null,
     "url": "https://github.com/gem/oq-engine",
+    "entryType": "misc",
+    "note": "Modules \\texttthazardlib/gsim/allen_2012_ipe.py and \\texttthmtk/seismicity/declusterer/distance_time_windows.py, accessed 10 October 2026. AGPL-3.0",
     "layers": [
       "trigger"
     ],
@@ -1182,6 +1369,8 @@ export default [
     "venue": "",
     "doi": null,
     "url": "https://github.com/fraxen/tectonicplates",
+    "entryType": "misc",
+    "note": "GeoJSON files PB2002_steps and PB2002_orogens, accessed 10 October 2026. Open Data Commons Attribution License",
     "layers": [
       "trigger"
     ],
@@ -1200,6 +1389,8 @@ export default [
     "venue": "",
     "doi": null,
     "url": "https://www.naturalearthdata.com",
+    "entryType": "misc",
+    "note": "Public domain; GeoJSON from https://github.com/nvkelso/natural-earth-vector, accessed 10 October 2026",
     "layers": [
       "trigger"
     ],
@@ -1217,7 +1408,10 @@ export default [
     "type": "report",
     "venue": "U.S. Energy Information Administration, Today in Energy, 16 June 2025",
     "doi": null,
-    "url": "",
+    "url": "https://www.eia.gov/todayinenergy/detail.php?id=65504",
+    "entryType": "misc",
+    "howpublished": "U.S. Energy Information Administration, Today in Energy, 16 June 2025",
+    "note": "https://www.eia.gov/todayinenergy/detail.php?id=65504, accessed 11 October 2026",
     "layers": [
       "node",
       "good"
@@ -1236,7 +1430,10 @@ export default [
     "type": "institutional",
     "venue": "WCO, Brussels",
     "doi": null,
-    "url": "",
+    "url": "https://www.wcoomd.org/en/topics/nomenclature/instrument-and-tools/hs-nomenclature-2022-edition.aspx",
+    "entryType": "misc",
+    "howpublished": "WCO, Brussels",
+    "note": "Chapters 10, 26, 27, 31, 72, 74, 75, 76 and 85, https://www.wcoomd.org/en/topics/nomenclature/instrument-and-tools/hs-nomenclature-2022-edition.aspx, accessed 11 October 2026",
     "layers": [
       "node",
       "good"
@@ -1256,6 +1453,8 @@ export default [
     "venue": "",
     "doi": null,
     "url": "",
+    "entryType": "misc",
+    "note": "Annual import values (euro) and quantities (kg) for the strategic goods of the thesis, all partners, extracted on 11 October 2026 through the Comext dissemination API with research/data-extraction/fetch_comext.py (repository gstorelli/worldmonitor, branch thesis-data-extract); shares and HHI are own calculations",
     "layers": [
       "node",
       "good"
@@ -1274,7 +1473,10 @@ export default [
     "type": "institutional",
     "venue": "Official Journal of the European Union, L series, 20.6.2025",
     "doi": null,
-    "url": "",
+    "url": "http://data.europa.eu/eli/reg/2025/1227/oj",
+    "entryType": "misc",
+    "howpublished": "Official Journal of the European Union, L series, 20.6.2025",
+    "note": "Article 1(2)-(3) and Annex II. http://data.europa.eu/eli/reg/2025/1227/oj",
     "layers": [
       "supply",
       "modulator"
@@ -1293,7 +1495,9 @@ export default [
     "type": "institutional",
     "venue": "Press release, 30 May 2024 (as republished by the EEAS)",
     "doi": null,
-    "url": "",
+    "url": "https://www.eeas.europa.eu/delegations/ukraine/council-sets-higher-tariffs-russian-and-belarusian-grain-products_en",
+    "entryType": "misc",
+    "howpublished": "Press release, 30 May 2024 (as republished by the EEAS)",
     "layers": [
       "supply",
       "modulator"
@@ -1312,9 +1516,12 @@ export default [
     "type": "institutional",
     "venue": "Department of Peace and Conflict Research, Uppsala University",
     "doi": null,
-    "url": "",
+    "url": "https://ucdp.uu.se/downloads/",
+    "entryType": "misc",
+    "howpublished": "Department of Peace and Conflict Research, Uppsala University",
+    "note": "https://ucdp.uu.se/downloads/; licence CC BY 4.0; accessed 11 October 2026",
     "layers": [
-      "trigger"
+      "signal"
     ],
     "verified": true,
     "verification": "P",
@@ -1330,7 +1537,10 @@ export default [
     "type": "institutional",
     "venue": "Climate Data Store",
     "doi": null,
-    "url": "",
+    "url": "https://cds.climate.copernicus.eu/datasets/reanalysis-era5-single-levels",
+    "entryType": "misc",
+    "howpublished": "Climate Data Store",
+    "note": "https://cds.climate.copernicus.eu/datasets/reanalysis-era5-single-levels; CC-BY licence; accessed 11 October 2026",
     "layers": [
       "trigger"
     ],
@@ -1348,7 +1558,10 @@ export default [
     "type": "institutional",
     "venue": "United Nations and European Commission",
     "doi": null,
-    "url": "",
+    "url": "https://www.gdacs.org/About/overview.aspx",
+    "entryType": "misc",
+    "howpublished": "United Nations and European Commission",
+    "note": "https://www.gdacs.org/About/overview.aspx, accessed 11 October 2026",
     "layers": [
       "trigger"
     ],
@@ -1366,7 +1579,9 @@ export default [
     "type": "institutional",
     "venue": "",
     "doi": null,
-    "url": "",
+    "url": "https://www.emsc-csem.org",
+    "entryType": "misc",
+    "note": "https://www.emsc-csem.org, accessed 11 October 2026",
     "layers": [
       "trigger"
     ],
@@ -1384,9 +1599,11 @@ export default [
     "type": "institutional",
     "venue": "",
     "doi": null,
-    "url": "",
+    "url": "https://www.gdeltproject.org/data.html",
+    "entryType": "misc",
+    "note": "https://www.gdeltproject.org/data.html, accessed 11 October 2026",
     "layers": [
-      "trigger"
+      "signal"
     ],
     "verified": true,
     "verification": "P",
@@ -1403,6 +1620,8 @@ export default [
     "venue": "Community Online Resource for Statistical Seismicity Analysis (CORSSA)",
     "doi": "10.5078/corssa-00180805",
     "url": "https://doi.org/10.5078/corssa-00180805",
+    "entryType": "misc",
+    "howpublished": "Community Online Resource for Statistical Seismicity Analysis (CORSSA)",
     "layers": [
       "trigger"
     ],
@@ -1420,7 +1639,10 @@ export default [
     "type": "institutional",
     "venue": "Official Journal of the European Union, L series",
     "doi": null,
-    "url": "",
+    "url": "http://data.europa.eu/eli/reg_impl/2021/2012/oj",
+    "entryType": "misc",
+    "howpublished": "Official Journal of the European Union, L series",
+    "note": "http://data.europa.eu/eli/reg_impl/2021/2012/oj; expiry date and any review to be checked",
     "layers": [
       "supply",
       "modulator"
@@ -1439,7 +1661,10 @@ export default [
     "type": "institutional",
     "venue": "Dispute settlement, case page",
     "doi": null,
-    "url": "",
+    "url": "https://www.wto.org/english/tratop_e/dispu_e/cases_e/ds592_e.htm",
+    "entryType": "misc",
+    "howpublished": "Dispute settlement, case page",
+    "note": "Panel report circulated 30 November 2022; appealed by Indonesia. https://www.wto.org/english/tratop_e/dispu_e/cases_e/ds592_e.htm",
     "layers": [
       "supply",
       "modulator"
@@ -1458,7 +1683,10 @@ export default [
     "type": "institutional",
     "venue": "UCLouvain, Brussels",
     "doi": null,
-    "url": "",
+    "url": "https://doc.emdat.be/docs/protocols/entry-criteria/",
+    "entryType": "misc",
+    "howpublished": "UCLouvain, Brussels",
+    "note": "https://doc.emdat.be/docs/protocols/entry-criteria/, accessed 11 October 2026",
     "layers": [
       "trigger"
     ],
@@ -1476,7 +1704,10 @@ export default [
     "type": "institutional",
     "venue": "Official Journal of the European Union, L series, 24.2.2025",
     "doi": null,
-    "url": "",
+    "url": "http://data.europa.eu/eli/reg/2025/395/oj",
+    "entryType": "misc",
+    "howpublished": "Official Journal of the European Union, L series, 24.2.2025",
+    "note": "Article 1(9) (Article 3i, paragraphs 3cg and 3ch) and Annex VI (CN 7601 added to Annex XXI). http://data.europa.eu/eli/reg/2025/395/oj",
     "layers": [
       "supply",
       "modulator"
@@ -1496,6 +1727,9 @@ export default [
     "venue": "TSMC, Hsinchu",
     "doi": null,
     "url": "",
+    "entryType": "misc",
+    "howpublished": "TSMC, Hsinchu",
+    "note": "Letter to shareholders (2-nm fabs in the Hsinchu and Kaohsiung science parks) and contact information (fab addresses)",
     "layers": [
       "node",
       "good"
@@ -1515,6 +1749,9 @@ export default [
     "venue": "EUR-Lex, CELEX 02014R0833-20260724",
     "doi": null,
     "url": "",
+    "entryType": "misc",
+    "howpublished": "EUR-Lex, CELEX 02014R0833-20260724",
+    "note": "Consolidated version of 24 July 2026 (Italian). Articles 3 quaterdecies (crude oil and petroleum products, Annex XXV) and 3 novodecies bis (liquefied natural gas)",
     "layers": [
       "supply",
       "modulator"
@@ -1534,6 +1771,9 @@ export default [
     "venue": "Official Journal of the European Union, L series, 23.10.2025",
     "doi": null,
     "url": "",
+    "entryType": "misc",
+    "howpublished": "Official Journal of the European Union, L series, 23.10.2025",
+    "note": "Amendment M38 of the consolidated text, introducing the prohibition on Russian LNG",
     "layers": [
       "supply",
       "modulator"
@@ -1553,6 +1793,9 @@ export default [
     "venue": "Extract of 5 October 2026",
     "doi": null,
     "url": "",
+    "entryType": "misc",
+    "howpublished": "Extract of 5 October 2026",
+    "note": "Measures in force on 5 October 2026 for CN codes of headings 1001, 2603, 2604, 2709, 2710, 2711, 3102, 3105, 7202 60, 7403, 7501, 7502, 7601 and 8542 (third-country duties, measures for Russia and Belarus, anti-dumping, CBAM)",
     "layers": [
       "node",
       "good"
@@ -1571,7 +1814,9 @@ export default [
     "type": "institutional",
     "venue": "",
     "doi": null,
-    "url": "",
+    "url": "https://open-meteo.com/en/docs/historical-weather-api",
+    "entryType": "misc",
+    "note": "Reanalysis from ERA5 (0.25\\textdegree, from 1940), ERA5-Land and ECMWF IFS; free API for non-commercial use; https://open-meteo.com/en/docs/historical-weather-api, accessed 15 October 2026",
     "layers": [
       "trigger"
     ],
@@ -1589,7 +1834,9 @@ export default [
     "type": "institutional",
     "venue": "",
     "doi": null,
-    "url": "",
+    "url": "https://eonet.gsfc.nasa.gov/docs/v3",
+    "entryType": "misc",
+    "note": "https://eonet.gsfc.nasa.gov/docs/v3, accessed 15 October 2026",
     "layers": [
       "trigger"
     ],
@@ -1607,7 +1854,9 @@ export default [
     "type": "institutional",
     "venue": "",
     "doi": null,
-    "url": "",
+    "url": "https://www.nhc.noaa.gov/gis/",
+    "entryType": "misc",
+    "note": "https://www.nhc.noaa.gov/gis/, accessed 15 October 2026",
     "layers": [
       "trigger"
     ],
@@ -1625,7 +1874,9 @@ export default [
     "type": "institutional",
     "venue": "",
     "doi": null,
-    "url": "",
+    "url": "https://apiportal.wto.org/",
+    "entryType": "misc",
+    "note": "Indicators HS_A_0010 (MFN applied duty, simple average) and HS_P_0070 (lowest preferential duty); https://apiportal.wto.org/, accessed 15 October 2026",
     "layers": [
       "supply",
       "modulator"
@@ -1644,7 +1895,10 @@ export default [
     "type": "institutional",
     "venue": "data.europa.eu",
     "doi": null,
-    "url": "",
+    "url": "https://data.europa.eu/data/datasets/consolidated-list-of-persons-groups-and-entities-subject-to-eu-financial-sanctions",
+    "entryType": "misc",
+    "howpublished": "data.europa.eu",
+    "note": "Reuse under Commission Decision 2011/833/EU; https://data.europa.eu/data/datasets/consolidated-list-of-persons-groups-and-entities-subject-to-eu-financial-sanctions, accessed 15 October 2026",
     "layers": [
       "supply",
       "modulator"
@@ -1663,10 +1917,32 @@ export default [
     "type": "institutional",
     "venue": "",
     "doi": null,
-    "url": "",
+    "url": "https://publications.europa.eu/webapi/rdf/sparql",
+    "entryType": "misc",
+    "note": "https://publications.europa.eu/webapi/rdf/sparql, accessed 15 October 2026",
     "layers": [
       "supply",
       "modulator"
+    ],
+    "verified": true,
+    "verification": "P",
+    "summary": "",
+    "limitation": ""
+  },
+  {
+    "ref": 93,
+    "key": "johnson_gem_2026",
+    "authors": "Johnson, K.; Bayliss, K.; Villani, M.; Brooks, C.; Styron, R.; Simionato, M.; Chen, Y.-S.; Rood, A.; Pagani, M.",
+    "year": 2026,
+    "title": "Global Earthquake Model (GEM) Global Seismic Hazard Map (version 2026.1)",
+    "type": "report",
+    "venue": "Zenodo",
+    "doi": "10.5281/zenodo.20735384",
+    "url": "https://doi.org/10.5281/zenodo.20735384",
+    "entryType": "misc",
+    "note": "Dataset, released 23 June 2026. Licence CC BY-NC-SA 4.0",
+    "layers": [
+      "trigger"
     ],
     "verified": true,
     "verification": "P",
