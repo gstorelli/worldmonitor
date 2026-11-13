@@ -134,6 +134,13 @@ export const RESPONSE_ACTIONS: readonly ResponseAction[] = [
  * Channels through which scarcity of each good is most likely to turn into
  * misdeclaration, with the modulator that motivates them. Goods whose measures
  * are not yet listed get no channel: the PoC says so instead of guessing.
+ *
+ * DECLARED FALLBACK of the customs layer C. The engine derives C as of a date
+ * from the dated Policy register (data/policy-registry.json, schema v3) via
+ * src/services/thesis/customs-registry.ts; these hand-written values are used
+ * only when no verified, in-force register measure with channels covers the
+ * good, with provenance 'fallback'. They have NO dated basis (no entry into
+ * force), so they are provisional and must not be read as measures in force.
  */
 export interface GoodChannels {
   hs: string;
@@ -184,7 +191,16 @@ export const POLICY_SCENARIOS: readonly PolicyScenario[] = [
       it: 'L’antidumping UE sull’inox laminato a freddo da India e Indonesia scade senza rinnovo',
       en: 'The EU anti-dumping duty on cold-rolled stainless steel from India and Indonesia expires without renewal',
     },
-    basis: { text: { it: 'Misura in vigore (prodotto a valle del nichel)', en: 'Measure in force (downstream of nickel)' }, source: 'Reg. di esecuzione (UE) 2021/2012', status: 'verified' },
+    // Aligned with the Policy register entry eu-reg-2021-2012-inox (statusCode 'in-riesame', verifiedOn null).
+    basis: {
+      text: {
+        it: 'Prodotto a valle del nichel. Nel registro: in riesame, scadenza 19/11/2026; avviso di apertura del riesame in GU C da trovare',
+        en: 'Downstream of nickel. In the register: under review, expiry 19/11/2026; notice of initiation of the review in the OJ C still to be found',
+      },
+      source: 'Reg. di esecuzione (UE) 2021/2012',
+      url: 'http://data.europa.eu/eli/reg_impl/2021/2012/oj',
+      status: 'todo',
+    },
   },
   {
     id: 'indonesia-ban-lifted',

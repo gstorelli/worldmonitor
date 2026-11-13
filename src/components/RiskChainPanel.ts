@@ -6,7 +6,8 @@ import { getThesisSnapshot, onThesisSnapshot, type ThesisSnapshot } from '@/serv
 import type { NodeChain } from '@/services/thesis/risk-chain';
 import { ago, eventIntensity, factItem, kindIcon, lt, nodeKindLabel, nodeName, sourceLink, stateBadge } from './thesis-ui';
 import { toApiUrl } from '@/services/runtime';
-import { GOOD_CHANNELS } from '@/config/thesis-response';
+import { customsAsOf, toEngineCustoms } from '@/services/thesis/customs-registry';
+import policyRegistry from '../../data/policy-registry.json';
 import { intensityToUnit, NODE_ORIGINS, supplyFromIndicators } from '@/services/thesis/engine';
 import { nodeThreshold } from '@/config/thesis-protocol';
 
@@ -87,10 +88,12 @@ export class RiskChainPanel extends Panel {
       const sLine = m && m.nodeOriginShare !== null
         ? t('components.thesis.layers.supply', { origins, share: pct(m.nodeOriginShare), hhi: num(m.hhi, 3), s: num(supplyFromIndicators(m.nodeOriginShare, m.hhi)), year: String(this.measured[hs]!.year) })
         : t('components.thesis.layers.supplyNone');
-      const channels = GOOD_CHANNELS.find((g) => g.hs === hs)?.channels ?? null;
+      const cust = customsAsOf(policyRegistry, hs, Date.now());
+      // Live panel: the undated fallback is shown as a provisional present-day value.
+      const channels = toEngineCustoms(cust, hs, { fallback: 'live' }).channels;
       const cLine = channels
-        ? t('components.thesis.layers.customs', { n: String(channels.length), list: channels.map((ch) => t(`components.thesis.response.channel.${ch}`)).join(', '), c: num(channels.length / 3) })
-        : t('components.thesis.layers.customsNone');
+        ? `${t('components.thesis.layers.customs', { n: String(channels.length), list: channels.map((ch) => t(`components.thesis.response.channel.${ch}`)).join(', '), c: num(channels.length / 3) })} (${t(`components.thesis.layers.customsProvenance.${cust.provenance}`)})`
+        : t('components.thesis.layers.customsProvenance.none');
       return `<li><span class="thesis-hs">HS ${escapeHtml(hs)}</span> S: ${escapeHtml(sLine)}</li><li><span class="thesis-hs">HS ${escapeHtml(hs)}</span> C: ${escapeHtml(cLine)}</li>`;
     });
     return `<div class="thesis-detail-h">${escapeHtml(t('components.thesis.layers.title'))}</div>

@@ -1662,7 +1662,11 @@
         "supply": "quota di {{origins}} {{share}}, HHI {{hhi}} → S = {{s}} (Comext {{year}})",
         "supplyNone": "dati Comext non disponibili",
         "customs": "{{n}} canali su 3 con incentivo ({{list}}) → C = {{c}}",
-        "customsNone": "misure non ancora elencate",
+        "customsProvenance": {
+          "registry": "dal registro datato",
+          "fallback": "valore provvisorio, senza data di entrata in vigore",
+          "none": "misure non elencate: C non calcolabile"
+        },
         "note": "Valori dei singoli strati secondo la proposta di protocollo dell'Anno 2: non sono combinati in un punteggio finché il protocollo non è approvato. La vulnerabilità doganale qui è solo l'incentivo (dati pubblici)."
       }
     },
