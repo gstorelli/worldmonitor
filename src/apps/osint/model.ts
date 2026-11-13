@@ -8,6 +8,8 @@
  */
 
 import type { ThesisNode, StrategicGood } from '@/config/thesis-model';
+import { PROTOCOL_V0_1 } from '@/config/thesis-protocol';
+import { sequencesGardnerKnopoff } from '@/services/thesis/engine';
 import type { NodeChain, TriggerEvent } from '@/services/thesis/risk-chain';
 import { haversineKm } from '@/services/thesis/risk-chain';
 
@@ -35,12 +37,39 @@ export interface OsintComtradeProduct {
   suppliers: Array<{ iso2: string | null; code: number | null; share: number | null }>;
 }
 
+/** v2: ERA5 daily mean of the last 7 days minus the zone's monthly normal (values only, no thresholds). */
+export interface OsintEra5Zone {
+  zone: string;
+  lat: number;
+  lon: number;
+  tempDelta: number | null;
+  precipDelta: number | null;
+  period: string;
+}
+
+export interface OsintEuSupplyProduct {
+  hs4: string;
+  year: number | null;
+  extraEuEur: number | null;
+  supply: { hhi: number | null; nodeOrigins: string[]; nodeOriginShare: number | null } | null;
+}
+
+export interface OsintSource {
+  status: string;
+  fetchedAt: string | null;
+  source: string;
+}
+
 export interface OsintSignalsPayload {
   generatedAt: string;
   status: Record<string, string>;
   quotes: OsintQuote[];
-  climate: OsintClimateZone[];
+  /** v1 (n8n workflow 03), kept by the API for one release; no longer rendered. */
+  climate?: OsintClimateZone[];
   comtradeIT: { reporter: string; fetchedAt: string | null; products: OsintComtradeProduct[] };
+  climateEra5?: { baseline: string | null; sourceVersion: string | null; zones: OsintEra5Zone[] };
+  euSupply?: { reporter: string; basis: string; products: OsintEuSupplyProduct[] };
+  sources?: Record<string, OsintSource>;
 }
 
 export interface CommodityMeta {
@@ -57,16 +86,11 @@ export interface PolicyEntryLike {
   status?: string;
 }
 
-// --- Climate --------------------------------------------------------------------
+// --- Nodes --------------------------------------------------------------------
 
-/** "Normal" in the Open-Meteo pipeline: no anomaly to report. */
-export function isClimateAnomaly(zone: OsintClimateZone): boolean {
-  return Boolean(zone.severity) && !/NORMAL$/.test(zone.severity);
-}
-
-/** Nearest monitored climate zone within `radiusKm` of the node, if any. */
-export function climateZoneForNode(node: Pick<ThesisNode, 'lat' | 'lon'>, zones: readonly OsintClimateZone[], radiusKm: number): { zone: OsintClimateZone; distanceKm: number } | null {
-  let best: { zone: OsintClimateZone; distanceKm: number } | null = null;
+/** Nearest zone within `radiusKm` of the node, if any (ERA5 zones in the Signals tab). */
+export function climateZoneForNode<Z extends { lat: number; lon: number }>(node: Pick<ThesisNode, 'lat' | 'lon'>, zones: readonly Z[], radiusKm: number): { zone: Z; distanceKm: number } | null {
+  let best: { zone: Z; distanceKm: number } | null = null;
   for (const zone of zones) {
     const d = haversineKm(node.lat, node.lon, zone.lat, zone.lon);
     if (d <= radiusKm && (!best || d < best.distanceKm)) best = { zone, distanceKm: d };
@@ -74,17 +98,13 @@ export function climateZoneForNode(node: Pick<ThesisNode, 'lat' | 'lon'>, zones:
   return best;
 }
 
-// --- Nodes --------------------------------------------------------------------
-
 export interface NodeRow {
   node: ThesisNode;
   state: NodeChain['state'];
   triggers: { count: number; significant: number; maxMagnitude: number | null; latest: TriggerEvent | null };
-  transit: NodeChain['transit'];
-  climate: { zone: OsintClimateZone; distanceKm: number } | null;
 }
 
-export function buildNodeRows(chains: readonly NodeChain[], zones: readonly OsintClimateZone[], radiusKm: number): NodeRow[] {
+export function buildNodeRows(chains: readonly NodeChain[]): NodeRow[] {
   return chains.map((chain) => {
     const events = chain.matches.map((m) => m.event);
     const magnitudes = events.map((e) => e.magnitude).filter((m): m is number => typeof m === 'number');
@@ -98,10 +118,69 @@ export function buildNodeRows(chains: readonly NodeChain[], zones: readonly Osin
         maxMagnitude: magnitudes.length ? Math.max(...magnitudes) : null,
         latest,
       },
-      transit: chain.transit,
-      climate: climateZoneForNode(chain.node, zones, radiusKm),
     };
   });
+}
+
+/**
+ * Header counts. Nodes overlap (Taiwan Strait, Hsinchu and Tainan, see
+ * src/config/node-hazards.ts), so an event reaching several nodes counts once.
+ */
+export function distinctTriggerCounts(chains: readonly NodeChain[]): { nodesHit: number; events: number; significant: number } {
+  const events = new Set<string>();
+  const significant = new Set<string>();
+  for (const chain of chains) {
+    for (const m of chain.matches) {
+      events.add(m.event.id);
+      if (m.significant) significant.add(m.event.id);
+    }
+  }
+  return { nodesHit: chains.filter((c) => c.matches.length > 0).length, events: events.size, significant: significant.size };
+}
+
+// --- Signals (anticipate or corroborate; never a trigger) -----------------------
+
+export interface SignalNodeRow {
+  node: ThesisNode;
+  transit: NodeChain['transit'];
+  era5: { zone: OsintEra5Zone; distanceKm: number } | null;
+}
+
+export function buildSignalNodeRows(chains: readonly NodeChain[], era5Zones: readonly OsintEra5Zone[], radiusKm: number): SignalNodeRow[] {
+  return chains.map((chain) => ({ node: chain.node, transit: chain.transit, era5: climateZoneForNode(chain.node, era5Zones, radiusKm) }));
+}
+
+export function buildSupplyRows(goods: readonly StrategicGood[], products: readonly OsintEuSupplyProduct[]): Array<{ good: StrategicGood; product: OsintEuSupplyProduct | null }> {
+  return goods.map((good) => ({ good, product: products.find((p) => p.hs4 === good.hs) ?? null }));
+}
+
+// --- Provenance ---------------------------------------------------------------
+
+export const SOURCE_UNAVAILABLE = 'fonte non disponibile';
+
+/** Only a 'hit' is a usable source; a 'miss', an 'error' or no record at all is not. */
+export function isSourceAvailable(src: OsintSource | undefined | null): boolean {
+  return src?.status === 'hit';
+}
+
+/** "aggiornato il 12/11/2026" for a hit, otherwise "fonte non disponibile". */
+export function provenanceStatus(src: OsintSource | undefined | null): string {
+  if (!src || !isSourceAvailable(src)) return SOURCE_UNAVAILABLE;
+  const d = src.fetchedAt ? new Date(src.fetchedAt) : null;
+  return d && Number.isFinite(d.getTime())
+    ? `aggiornato il ${d.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' })}`
+    : 'data di aggiornamento n.d.';
+}
+
+/** "Eurostat Comext DS-045409, aggiornato il 12/11/2026" or "fonte non disponibile". */
+export function provenanceText(src: OsintSource | undefined | null): string {
+  return src && isSourceAvailable(src) ? `${src.source}, ${provenanceStatus(src)}` : SOURCE_UNAVAILABLE;
+}
+
+/** Window of the earthquake catalogue actually loaded (EMSC 30 days, or the 7-day USGS fallback). */
+export function quakeWindowLabel(s: { quakeWindowDays: number; quakeSource: string | null }): string {
+  if (!s.quakeSource || !(s.quakeWindowDays > 0)) return 'catalogo dei terremoti non disponibile';
+  return `terremoti degli ultimi ${s.quakeWindowDays} giorn${s.quakeWindowDays === 1 ? 'o' : 'i'} (${s.quakeSource})`;
 }
 
 // --- Goods --------------------------------------------------------------------
@@ -169,37 +248,65 @@ export function importSentence(product: OsintComtradeProduct, displayNames?: { o
     .join(', ');
 }
 
-// --- Feed ---------------------------------------------------------------------
+// --- Trigger feed -------------------------------------------------------------
 
-export interface FeedItem {
-  time: number;
-  nodeName: string;
-  text: string;
-  url?: string;
-  source: string;
+export interface SequenceRow {
+  id: string;
+  mainshock: TriggerEvent;
+  memberCount: number;
+  /** Latest member, epoch ms: the feed is sorted on it, newest first. */
+  lastTime: number;
+  /** Nodes reached by at least one member, nearest distance first. */
+  nodes: Array<{ name: string; distanceKm: number; significant: boolean }>;
   significant: boolean;
+  text: string;
 }
 
-/** Recent events near the nodes, newest first (one entry per event and node). */
-export function buildFeed(chains: readonly NodeChain[], limit = 30): FeedItem[] {
-  const items: FeedItem[] = [];
+function eventText(e: TriggerEvent): string {
+  if (e.kind !== 'earthquake') return `${KIND_LABELS[e.kind] ?? e.kind}${e.alertLevel ? ` (allerta ${e.alertLevel})` : ''}`;
+  const type = e.magnitudeType ? e.magnitudeType : 'tipo di magnitudo n.d.';
+  return `Terremoto M${e.magnitude?.toFixed(1) ?? '?'} (${type})${e.depthKm != null ? `, ${Math.round(e.depthKm)} km di profondità` : ''}`;
+}
+
+/**
+ * One row per Gardner-Knopoff sequence (engine.sequencesGardnerKnopoff) of the
+ * events that reach at least one node, with the nodes it reaches. The grouping
+ * is provisional (#144).
+ */
+export function buildSequenceRows(chains: readonly NodeChain[], limit = 30, foreshockFraction = PROTOCOL_V0_1.foreshockFraction): SequenceRow[] {
+  const events = new Map<string, TriggerEvent>();
+  const reach = new Map<string, Array<{ name: string; distanceKm: number; significant: boolean }>>();
   for (const chain of chains) {
     for (const m of chain.matches) {
-      const e = m.event;
-      const what = e.kind === 'earthquake'
-        ? `Terremoto M${e.magnitude?.toFixed(1) ?? '?'}${e.depthKm != null ? `, ${Math.round(e.depthKm)} km di profondità` : ''}`
-        : `${KIND_LABELS[e.kind] ?? e.kind}${e.alertLevel ? ` (allerta ${e.alertLevel})` : ''}`;
-      items.push({
-        time: e.time,
-        nodeName: chain.node.name,
-        text: `${what} a ${Math.round(m.distanceKm)} km — ${e.title}`,
-        url: e.url,
-        source: e.source,
-        significant: m.significant,
-      });
+      events.set(m.event.id, m.event);
+      const list = reach.get(m.event.id) ?? [];
+      list.push({ name: chain.node.name, distanceKm: m.distanceKm, significant: m.significant });
+      reach.set(m.event.id, list);
     }
   }
-  return items.sort((a, b) => b.time - a.time).slice(0, limit);
+  return sequencesGardnerKnopoff([...events.values()], foreshockFraction)
+    .map((seq) => {
+      const byNode = new Map<string, { name: string; distanceKm: number; significant: boolean }>();
+      for (const e of seq.members) {
+        for (const r of reach.get(e.id) ?? []) {
+          const prev = byNode.get(r.name);
+          byNode.set(r.name, { name: r.name, distanceKm: Math.min(prev?.distanceKm ?? Infinity, r.distanceKm), significant: Boolean(prev?.significant) || r.significant });
+        }
+      }
+      const nodes = [...byNode.values()].sort((a, b) => a.distanceKm - b.distanceKm);
+      const n = seq.members.length;
+      return {
+        id: seq.id,
+        mainshock: seq.mainshock,
+        memberCount: n,
+        lastTime: Math.max(...seq.members.map((e) => e.time)),
+        nodes,
+        significant: nodes.some((x) => x.significant),
+        text: `${eventText(seq.mainshock)} — ${seq.mainshock.title}${n > 1 ? ` · ${n} eventi nella sequenza` : ''}`,
+      };
+    })
+    .sort((a, b) => b.lastTime - a.lastTime)
+    .slice(0, limit);
 }
 
 const KIND_LABELS: Record<string, string> = {
