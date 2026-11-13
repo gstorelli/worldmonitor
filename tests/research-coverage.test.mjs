@@ -35,6 +35,20 @@ describe('research layer coverage', () => {
     assert.equal(layers.resolveLayer('Innesco'), 'trigger');
     assert.equal(layers.resolveLayer('vulnerabilità di'), 'supply');
     assert.equal(layers.resolveLayer('nothing'), null);
+    // 13/11/2026: customs vulnerability and customs risk are separate layers;
+    // the legacy 'customs' id resolves to customs vulnerability.
+    assert.equal(layers.resolveLayer('customs'), 'customs-vulnerability');
+    assert.equal(layers.resolveLayer('rischio'), 'customs-risk');
+    assert.equal(layers.resolveLayer('segnale'), 'signal');
+  });
+
+  it('reads legacy layer ids saved before 13/11 as their current id', () => {
+    assert.deepEqual(layers.sourceLayers(source(1, { layers: ['customs', 'customs-vulnerability'] })), ['customs-vulnerability']);
+    const table = layers.computeLayerCoverage([source(1, { layers: ['customs'] }), source(2, { layers: ['signal'] })]);
+    assert.equal(table.find((entry) => entry.id === 'customs-vulnerability').count, 1);
+    assert.equal(table.find((entry) => entry.id === 'customs-risk').count, 0);
+    assert.equal(table.find((entry) => entry.id === 'signal').count, 1);
+    assert.ok(!table.some((entry) => entry.id === 'customs'));
   });
 
   it('counts sources per layer and verification level, and reports weak layers', () => {
@@ -42,8 +56,8 @@ describe('research layer coverage', () => {
       source(1, { layers: ['trigger'], verification: 'T' }),
       source(2, { layers: ['trigger'], verification: 'P' }),
       source(3, { layers: ['node', 'good'], verification: 'API' }),
-      source(4, { layers: ['customs'], verification: 'S' }),
-      source(5, { layers: ['customs'], verified: false, verification: null }),
+      source(4, { layers: ['customs-vulnerability'], verification: 'S' }),
+      source(5, { layers: ['customs-vulnerability'], verified: false, verification: null }),
     ];
     const table = layers.computeLayerCoverage(sources);
     assert.equal(table.length, layers.MODEL_LAYERS.length);
@@ -51,12 +65,13 @@ describe('research layer coverage', () => {
     assert.equal(trigger.count, 2);
     assert.deepEqual(trigger.refs, [1, 2]);
     assert.deepEqual({ T: trigger.byLevel.T, P: trigger.byLevel.P }, { T: 1, P: 1 });
-    const customs = table.find((entry) => entry.id === 'customs');
+    const customs = table.find((entry) => entry.id === 'customs-vulnerability');
     assert.deepEqual({ S: customs.byLevel.S, none: customs.byLevel.none }, { S: 1, none: 1 });
 
     const { empty, noFullText } = layers.findWeakLayers(table);
     assert.ok(empty.some((entry) => entry.id === 'supply'));
-    assert.deepEqual(noFullText.map((entry) => entry.id), ['customs']);
+    assert.ok(empty.some((entry) => entry.id === 'customs-risk'));
+    assert.deepEqual(noFullText.map((entry) => entry.id), ['customs-vulnerability']);
   });
 
   it('builds layer, type and year distributions sorted for display', () => {
@@ -81,7 +96,8 @@ describe('research bibliography filters', () => {
     assert.equal(query.type, 'report');
     assert.equal(query.verification, 'T');
     assert.equal(query.text, 'border controls');
-    assert.equal(filters.parseResearchQuery('theme:customs').layer, 'customs', 'theme: is an alias of layer:');
+    assert.equal(filters.parseResearchQuery('theme:supply').layer, 'supply', 'theme: is an alias of layer:');
+    assert.equal(filters.parseResearchQuery('layer:customs').layer, 'customs-vulnerability', 'legacy id');
   });
 
   it('matches on layer and verification level', () => {
@@ -107,7 +123,7 @@ describe('research bibliography filters', () => {
   });
 
   it('sorts by year, title and layer in both directions', () => {
-    const sources = [source(1, { year: 2021, title: 'B', layers: ['trigger'] }), source(2, { year: 2025, title: 'A', layers: ['customs'] })];
+    const sources = [source(1, { year: 2021, title: 'B', layers: ['trigger'] }), source(2, { year: 2025, title: 'A', layers: ['customs-vulnerability'] })];
     assert.deepEqual(filters.sortSources(sources, 'year', 'desc').map((entry) => entry.ref), [2, 1]);
     assert.deepEqual(filters.sortSources(sources, 'title', 'asc').map((entry) => entry.ref), [2, 1]);
     assert.deepEqual(filters.sortSources(sources, 'layers', 'asc').map((entry) => entry.ref), [2, 1]);

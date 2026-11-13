@@ -27,14 +27,20 @@ import { fileURLToPath } from 'node:url';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT_JSON = resolve(ROOT, 'data/zotero-sources.json');
 const OUT_MIRROR = resolve(ROOT, 'api/zotero/_sources-data.js');
+const OVERRIDES_JSON = resolve(ROOT, 'data/research-layer-overrides.json');
 
-// Register section -> layers of the six-layer model (plus method/platform).
+// Register section -> default layers of the six-layer model (plus signals and
+// method/platform). Layer ids must be listed in src/config/thesis-layers.ts
+// (tests/thesis-layers-parity.test.mts); this script cannot import from src/.
+// Since 13/11/2026 the customs section maps to customs vulnerability only:
+// customs risk (the pre-arrival alert) is a separate layer, set per source in
+// data/research-layer-overrides.json.
 export const SECTION_LAYERS = {
   'Pericoli, cataloghi e metodi sismologici': ['trigger'],
   'Geologia dei nodi produttivi': ['node'],
   'Nodi, commercio e beni strategici': ['node', 'good'],
   'Criticità UE e misure (modulatori)': ['supply', 'modulator'],
-  'Dogana e IA per le dogane': ['customs'],
+  'Dogana e IA per le dogane': ['customs-vulnerability'],
   Metodo: ['method'],
 };
 const EXCLUDED_SECTIONS = new Set(['Da non usare']);
@@ -241,7 +247,18 @@ export function parseRegister(markdown, bibKeys) {
 
 const normTitle = (t) => cleanLatex(t).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
 
-export function buildSources(entries, register, previous = []) {
+/**
+ * Per-source layer overrides (data/research-layer-overrides.json): bib key ->
+ * the full layer list of that source, which replaces the section default (e.g.
+ * GDELT and UCDP are signals, never triggers, although the register files them
+ * with the hazard catalogues).
+ */
+export function readLayerOverrides(json) {
+  const raw = json?.overrides ?? {};
+  return new Map(Object.entries(raw).filter(([, layers]) => Array.isArray(layers) && layers.length));
+}
+
+export function buildSources(entries, register, previous = [], overrides = new Map()) {
   const prevByKey = new Map(previous.filter((s) => s.key).map((s) => [s.key, s]));
   const prevByDoi = new Map(previous.filter((s) => s.doi).map((s) => [String(s.doi).toLowerCase(), s]));
   const prevByTitle = new Map(previous.map((s) => [normTitle(s.title), s]));
@@ -256,7 +273,8 @@ export function buildSources(entries, register, previous = []) {
       ?? (doi ? prevByDoi.get(doi.toLowerCase()) : undefined)
       ?? prevByTitle.get(normTitle(title));
     const url = sourceUrl(entry);
-    const layers = [...new Set((reg?.sections ?? []).flatMap((s) => SECTION_LAYERS[s] ?? []))];
+    const sectionLayers = [...new Set((reg?.sections ?? []).flatMap((s) => SECTION_LAYERS[s] ?? []))];
+    const layers = overrides.get(entry.key) ?? sectionLayers;
     const verified = Boolean(reg) && !reg.sections.every((s) => UNVERIFIED_SECTIONS.has(s));
     out.push({
       ref: prev?.ref ?? nextRef++,
@@ -333,7 +351,12 @@ function main() {
     process.exit(problems.length ? 1 : 0);
   }
   const previous = JSON.parse(readFileSync(OUT_JSON, 'utf8')).sources ?? [];
-  const sources = buildSources(entries, register, previous);
+  const overrides = readLayerOverrides(JSON.parse(readFileSync(OVERRIDES_JSON, 'utf8')));
+  const bibKeys = new Set(entries.map((e) => e.key));
+  for (const key of overrides.keys()) {
+    if (!bibKeys.has(key)) console.error(`warning: layer override for a key not in the .bib: ${key}`);
+  }
+  const sources = buildSources(entries, register, previous, overrides);
   const today = new Date().toISOString().slice(0, 10);
   const payload = {
     $comment:

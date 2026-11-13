@@ -3,11 +3,15 @@
  * (13/10/2026: replaces the A-E theme areas and the v0 8-dimension matrix,
  * whose weights the thesis declares unjustified).
  *
- * The layer of a source comes from the section of the thesis verification
- * register (docs/FONTI_VERIFICATE.md) it is filed under; see
- * scripts/build-research-bibliography.mjs. Pure data and helpers (unit-tested).
+ * The layer list is the canonical one of src/config/thesis-layers.ts (13/11/2026:
+ * customs vulnerability and customs risk separated, signals added). The layer of
+ * a source comes from the section of the thesis verification register
+ * (docs/FONTI_VERIFICATE.md) it is filed under, corrected per source by
+ * data/research-layer-overrides.json; see scripts/build-research-bibliography.mjs.
+ * Pure data and helpers (unit-tested).
  */
 
+import { canonicalLayerId, THESIS_LAYERS } from '@/config/thesis-layers';
 import type { ResearchSource } from './types';
 
 export interface ModelLayer {
@@ -19,16 +23,27 @@ export interface ModelLayer {
   query: string;
 }
 
-export const MODEL_LAYERS: ModelLayer[] = [
-  { id: 'trigger', short: 'Innesco', label: 'Innesco', query: 'earthquake volcanic eruption hazard catalogue critical infrastructure' },
-  { id: 'node', short: 'Nodo', label: 'Nodo critico', query: 'maritime chokepoint port disruption natural hazard' },
-  { id: 'good', short: 'Bene', label: 'Bene strategico', query: 'critical raw materials semiconductors supply disruption' },
-  { id: 'supply', short: 'Fornitura', label: 'Vulnerabilità di fornitura', query: 'import dependence supplier concentration critical raw materials Europe' },
-  { id: 'modulator', short: 'Modulatore', label: 'Modulatore', query: 'export restrictions sanctions anti-dumping trade policy' },
-  { id: 'customs', short: 'Dogana', label: 'Vulnerabilità e rischio doganale', query: 'customs risk management artificial intelligence border control' },
-  { id: 'method', short: 'Metodo', label: 'Metodo', query: 'design science research global sensitivity analysis composite indicators' },
-  { id: 'platform', short: 'Piattaforma', label: 'Piattaforma', query: 'early warning system platform open data' },
-];
+// Default OpenAlex keywords per layer (search terms only, not claims).
+const LAYER_QUERIES: Record<string, string> = {
+  trigger: 'earthquake volcanic eruption hazard catalogue critical infrastructure',
+  node: 'maritime chokepoint port disruption natural hazard',
+  good: 'critical raw materials semiconductors supply disruption',
+  supply: 'import dependence supplier concentration critical raw materials Europe',
+  'customs-vulnerability': 'customs risk management artificial intelligence border control',
+  'customs-risk': 'customs risk targeting pre-arrival risk assessment',
+  modulator: 'export restrictions sanctions anti-dumping trade policy',
+  signal: 'event data news monitoring vessel traffic early warning signal',
+  method: 'design science research global sensitivity analysis composite indicators',
+  platform: 'early warning system platform open data',
+};
+
+/** Layers of the thesis model (src/config/thesis-layers.ts), with Italian labels. */
+export const MODEL_LAYERS: ModelLayer[] = THESIS_LAYERS.map((layer) => ({
+  id: layer.id,
+  label: layer.label.it,
+  short: layer.short.it,
+  query: LAYER_QUERIES[layer.id] ?? '',
+}));
 
 export const LAYER_LABELS: Record<string, string> = Object.fromEntries(MODEL_LAYERS.map((layer) => [layer.id, layer.label]));
 export const LAYER_SHORT_LABELS: Record<string, string> = Object.fromEntries(MODEL_LAYERS.map((layer) => [layer.id, layer.short]));
@@ -46,14 +61,15 @@ export const VERIFICATION_LABELS: Record<string, string> = {
 export function resolveLayer(value: string): string | null {
   const wanted = String(value ?? '').trim().toLowerCase();
   if (!wanted) return null;
-  const byId = MODEL_LAYERS.find((layer) => layer.id === wanted);
+  const byId = MODEL_LAYERS.find((layer) => layer.id === canonicalLayerId(wanted));
   if (byId) return byId.id;
   const byLabel = MODEL_LAYERS.find((layer) => layer.label.toLowerCase().startsWith(wanted));
   return byLabel?.id ?? null;
 }
 
+/** Layers of a source; legacy ids (e.g. 'customs' before 13/11/2026) are read as their current id. */
 export function sourceLayers(source: ResearchSource): string[] {
-  return Array.isArray(source.layers) ? source.layers : [];
+  return Array.isArray(source.layers) ? [...new Set(source.layers.map(canonicalLayerId))] : [];
 }
 
 export interface LayerCoverage {
