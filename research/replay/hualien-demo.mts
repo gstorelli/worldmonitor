@@ -62,8 +62,9 @@ for (const id of NODES) {
 const values = comextValuesByPartner(await fetchSaved(comextUrl('EU27_2020', HS, COMEXT_YEAR), `comext-${HS}-${COMEXT_YEAR}.json`)) as Record<string, number>;
 const byPartner = Object.fromEntries(Object.entries(values).filter(([c]) => /^[A-Z]{2}$/.test(c) && !EU27.has(c)));
 const imports: PartnerImports = { hs: HS, year: COMEXT_YEAR, extraEuEur: values.EXT_EU27_2020 ?? 0, byPartner };
-// Customs layer C as of each assessment time, from the dated Policy register
-// (fallback GOOD_CHANNELS, with no dated basis, when no register measure qualifies).
+// Customs layer C as of each assessment time, from the dated Policy register.
+// The undated GOOD_CHANNELS fallback is NOT used in a replay (fallback 'none'):
+// without a dated measure C is not computable, so F1/F2 are null.
 const customsAt = (t: number) => customsAsOf(policyRegistry, HS, t);
 
 const all = [...events.values()];
@@ -72,7 +73,7 @@ const t0 = Date.parse(`${START}T00:00:00Z`);
 const t1 = Date.parse(`${END}T23:00:00Z`);
 for (const id of NODES) {
   const node = THESIS_NODES.find((x) => x.id === id)!;
-  for (let t = t0; t <= t1; t += 3_600_000) rows.push(assessAt({ node, hs: HS, events: all, imports, customs: toEngineCustoms(customsAt(t), HS) }, t, 'EMSC'));
+  for (let t = t0; t <= t1; t += 3_600_000) rows.push(assessAt({ node, hs: HS, events: all, imports, customs: toEngineCustoms(customsAt(t), HS, { fallback: 'none' }) }, t, 'EMSC'));
 }
 
 const fmt = (x: number | null | undefined, d = 4) => (x === null || x === undefined ? '' : x.toFixed(d));
@@ -110,7 +111,7 @@ const summary = {
   supply: { hs: HS, year: COMEXT_YEAR, extraEuEur: imports.extraEuEur, shareTW: rows[0]?.supply.share, hhi: rows[0]?.supply.hhi },
   customs: (() => {
     const c = customsAt(t0);
-    return { channels: c.channels, provenance: c.provenance, measures: c.measures, validFrom: c.validFrom === null ? null : new Date(c.validFrom).toISOString() };
+    return { fallbackMode: 'none', computable: toEngineCustoms(c, HS, { fallback: 'none' }).channels !== null, channels: c.channels, provenance: c.provenance, measures: c.measures, validFrom: c.validFrom === null ? null : new Date(c.validFrom).toISOString() };
   })(),
   episodes,
   inputs: manifest,

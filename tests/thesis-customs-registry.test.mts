@@ -79,7 +79,25 @@ describe('customsAsOf (dated Policy register)', () => {
     assert.deepEqual(r.channels, fb.channels);
     assert.equal(r.validFrom, null);
     assert.deepEqual(r.measures, []);
-    assert.equal(customsTerm(toEngineCustoms(r, fb.hs), at('2025-06-01')), fb.channels.length / 3);
+  });
+
+  it('uses the undated fallback in the engine only in live mode', () => {
+    const fb = GOOD_CHANNELS[0]!;
+    const t = at('2021-03-23');
+    const r = customsAsOf(reg(), fb.hs, t);
+    assert.equal(r.provenance, 'fallback');
+    // Default and 'none': not computable in a replay, never 0.
+    assert.equal(toEngineCustoms(r, fb.hs).channels, null);
+    assert.equal(customsTerm(toEngineCustoms(r, fb.hs), t), null);
+    assert.equal(customsTerm(toEngineCustoms(r, fb.hs, { fallback: 'none' }), t), null);
+    // 'live': provisional present-day value.
+    assert.equal(customsTerm(toEngineCustoms(r, fb.hs, { fallback: 'live' }), t), fb.channels.length / 3);
+  });
+
+  it('fallback mode does not affect dated register measures', () => {
+    const r = customsAsOf(reg(entry({})), '9999', at('2025-06-01'));
+    assert.equal(customsTerm(toEngineCustoms(r, '9999', { fallback: 'none' }), at('2025-06-01')), 1 / 3);
+    assert.equal(customsTerm(toEngineCustoms(r, '9999', { fallback: 'live' }), at('2025-06-01')), 1 / 3);
   });
 
   it('a qualifying register measure takes precedence over the fallback', () => {

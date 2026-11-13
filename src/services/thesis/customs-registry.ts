@@ -15,6 +15,8 @@
  * (src/config/thesis-response.ts) is used with provenance 'fallback': those
  * values are hand-written and have NO dated basis (validFrom null). Otherwise
  * provenance is 'none' and channels are null: C is not computable, never 0.
+ * Whether the engine may use the fallback is decided by toEngineCustoms
+ * (default: not computable).
  *
  * Pure: no I/O, the register is passed in.
  */
@@ -84,12 +86,24 @@ export function customsAsOf(registry: CustomsRegistry | null, hs: string, t: num
 }
 
 /**
- * Adapter to the engine's CustomsAsOf. It is a snapshot at the date the result
- * was computed for: recompute it for each assessment time. The fallback has no
- * dated basis, so it is not bounded in time (validFrom = -Infinity) — this is
- * what the provenance 'fallback' flags. 'none' maps to null channels, so
- * customsTerm stays null.
+ * How an undated fallback enters the engine:
+ *  - 'none' (default): C is not computable (channels null). The fallback has no
+ *    dated entry into force, so using it at a past t would leak present-day
+ *    measures into replays (protocol, thesis docs/protocollo-anno2.md, section 4).
+ *  - 'live': the fallback is used as a provisional present-day value (live
+ *    panel only), not bounded in time (validFrom = -Infinity).
+ * The provenance of the result stays 'fallback' either way, for transparency.
  */
-export function toEngineCustoms(r: CustomsAsOfResult, hs: string): CustomsAsOf {
+export type FallbackMode = 'live' | 'none';
+
+/**
+ * Adapter to the engine's CustomsAsOf. It is a snapshot at the date the result
+ * was computed for: recompute it for each assessment time. Null channels keep
+ * customsTerm null.
+ */
+export function toEngineCustoms(r: CustomsAsOfResult, hs: string, opts: { fallback?: FallbackMode } = {}): CustomsAsOf {
+  if (r.provenance === 'fallback' && (opts.fallback ?? 'none') === 'none') {
+    return { hs, channels: null, validFrom: Number.NEGATIVE_INFINITY };
+  }
   return { hs, channels: r.channels, validFrom: r.validFrom ?? Number.NEGATIVE_INFINITY };
 }
