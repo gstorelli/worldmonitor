@@ -25,8 +25,8 @@
         "2711"
       ],
       "thesisKey": "reg_833_consolidated_2026",
-      "celex": "02014R0833-20260724",
-      "inForceFrom": null,
+      "celex": "32014R0833",
+      "inForceFrom": "2022-06-04",
       "expiresOn": null,
       "origins": [
         "RU"
@@ -38,7 +38,8 @@
       "channels": null,
       "kind": "origin-specific",
       "statusCode": "verificata",
-      "verifiedOn": "2026-10-13"
+      "verifiedOn": "2026-11-13",
+      "datesNote": "CELEX dell'atto di base; il testo consolidato letto è 02014R0833-20260724 (in reference). inForceFrom = entrata in vigore del Reg. (UE) 2022/879 (art. 2: giorno successivo alla pubblicazione in GU L 153 del 3/6/2022), che ha inserito l'art. 3 quaterdecies (greggio, Allegato XXV, voce 2709). Per i contratti conclusi prima del 4/6/2022 il divieto sul greggio NC 2709 00 si applica dal 5/12/2022 (art. 3 quaterdecies, par. 3, lett. a); greggio via oleodotto esente finché il Consiglio non decide (par. 3, lett. d). Condensato NC 2709 00 10 dal 1/1/2027 (par. 2 bis). GNL NC 2711 11 00 dal 25/4/2026, dal 1/1/2027 per i contratti di durata superiore a un anno conclusi prima del 17/6/2025 (art. 3 novodecies bis, parr. 1-2). Il testo non fissa una scadenza."
     },
     {
       "id": "eu-reg-2025-395-alluminio",
@@ -61,8 +62,8 @@
         "7601"
       ],
       "thesisKey": "reg_2025_395",
-      "celex": null,
-      "inForceFrom": null,
+      "celex": "32025R0395",
+      "inForceFrom": "2025-02-25",
       "expiresOn": null,
       "origins": [
         "RU"
@@ -71,7 +72,8 @@
       "channels": null,
       "kind": "origin-specific",
       "statusCode": "verificata",
-      "verifiedOn": "2026-10-13"
+      "verifiedOn": "2026-11-13",
+      "datesNote": "inForceFrom = entrata in vigore (art. 2: giorno successivo alla pubblicazione in GU L del 24/2/2025). La voce NC 7601 è aggiunta all'Allegato XXI (Allegato VI); il divieto dell'art. 3 decies, par. 1, riguarda le merci originarie della Russia o esportate dalla Russia. Deroghe: 275 000 t dal 25/2/2025 al 26/2/2026 (par. 3cg); contratti anteriori al 25/2/2025 eseguibili dal 26/2/2026 al 31/12/2026 entro 50 000 t (par. 3ch). Le date delle deroghe non sono una scadenza del divieto: expiresOn resta null."
     },
     {
       "id": "eu-reg-2025-1227-fertilizzanti",
@@ -94,20 +96,27 @@
         "3105"
       ],
       "thesisKey": "reg_2025_1227",
-      "celex": null,
-      "inForceFrom": null,
+      "celex": "32025R1227",
+      "inForceFrom": "2025-07-01",
       "expiresOn": null,
       "origins": [
         "RU",
         "BY"
       ],
       "cn": [
-        "3102"
+        "3102",
+        "310520",
+        "310530",
+        "310540",
+        "310551",
+        "310559",
+        "310590"
       ],
       "channels": null,
       "kind": "origin-specific",
       "statusCode": "verificata",
-      "verifiedOn": "2026-10-13"
+      "verifiedOn": "2026-11-13",
+      "datesNote": "inForceFrom = data di applicazione del dazio sui fertilizzanti (art. 1, par. 2, lett. a-b: dal 1/7/2025). Il regolamento entra in vigore il giorno successivo alla pubblicazione in GU L del 20/6/2025 (art. 4), cioè il 21/6/2025; per le merci dell'Allegato I si applica dal 20/7/2025. Codici NC dall'art. 1, par. 2: 3102 e 3105 20, 3105 30, 3105 40, 3105 51, 3105 59, 3105 90. Origini: merci originarie o esportate, direttamente o indirettamente, da Russia e Bielorussia (art. 1, par. 2). Il testo non fissa una scadenza: l'ultimo scaglione si applica dal 1/7/2028."
     },
     {
       "id": "eu-reg-2021-2012-inox",
@@ -128,15 +137,39 @@
       "role": "modulatore",
       "goods": [],
       "thesisKey": "reg_2021_2012",
-      "celex": null,
-      "inForceFrom": null,
-      "expiresOn": "2026-11-19",
-      "origins": null,
-      "cn": null,
+      "celex": "32021R2012",
+      "inForceFrom": "2021-11-19",
+      "expiresOn": null,
+      "origins": [
+        "IN",
+        "ID"
+      ],
+      "cn": [
+        "72193100",
+        "72193210",
+        "72193290",
+        "72193310",
+        "72193390",
+        "72193410",
+        "72193490",
+        "72193510",
+        "72193590",
+        "72199020",
+        "72199080",
+        "72202021",
+        "72202029",
+        "72202041",
+        "72202049",
+        "72202081",
+        "72202089",
+        "72209020",
+        "72209080"
+      ],
       "channels": null,
       "kind": "origin-specific",
       "statusCode": "in-riesame",
-      "verifiedOn": null
+      "verifiedOn": "2026-11-13",
+      "datesNote": "inForceFrom = entrata in vigore (art. 5: giorno successivo alla pubblicazione in GU L 410 del 18/11/2021). Codici NC e origini dall'art. 1, par. 1-2. L'avviso di imminente scadenza (GU C/2026/1026 del 20/2/2026) indicava la scadenza al 19/11/2026 alle ore 00:00, salvo apertura di un riesame. Il riesame in previsione della scadenza è stato aperto con l'avviso GU C/2026/4857 del 15/9/2026 (domanda di Eurofer del 29/6/2026; conclusione di norma entro 12 mesi e comunque non oltre 15 mesi dalla pubblicazione, punto 6). Per il Reg. (UE) 2016/1036, art. 11, par. 2, la misura resta in vigore in attesa dell'esito del riesame: expiresOn è quindi null (nessuna data di scadenza fissata)."
     },
     {
       "id": "eu-chpl-2024",
@@ -159,7 +192,7 @@
       ],
       "thesisKey": "chpl_2024",
       "celex": null,
-      "inForceFrom": null,
+      "inForceFrom": "2024-02-22",
       "expiresOn": null,
       "origins": null,
       "cn": [
@@ -171,7 +204,8 @@
       "channels": null,
       "kind": "sanctions-priority",
       "statusCode": "verificata",
-      "verifiedOn": null
+      "verifiedOn": "2026-11-13",
+      "datesNote": "Non è un atto giuridico ma un elenco della Commissione: inForceFrom = data di pubblicazione della versione di febbraio 2024 (pagina della DG FISMA: 22/2/2024, ultimo aggiornamento 22/2/2024). Il PDF dichiara che sostituisce la versione di settembre 2023 e che l'elenco sarà aggiornato periodicamente; nessuna scadenza. Le sottovoci 8542.31, 8542.32, 8542.33 e 8542.39 sono nel Tier 1."
     },
     {
       "id": "eu-cereali-russi-2024",
@@ -229,16 +263,19 @@
       ],
       "thesisKey": "wto_ds592",
       "celex": null,
-      "inForceFrom": null,
+      "inForceFrom": "2020-01-01",
       "expiresOn": null,
       "origins": [
         "ID"
       ],
-      "cn": null,
+      "cn": [
+        "260400"
+      ],
       "channels": null,
       "kind": "export-restriction",
       "statusCode": "verificata",
-      "verifiedOn": null
+      "verifiedOn": "2026-11-13",
+      "datesNote": "inForceFrom dal rapporto del panel WT/DS592/R del 30/11/2022, par. 2.9 (e par. 2.20): il Reg. MEMR n. 25/2018, modificato dal Reg. MEMR n. 11/2019, vieta l'esportazione di tutti i tipi di minerale di nichel dal 1/1/2020; il Reg. MOT n. 96/2019 la vieta dal 2/1/2020. Codice: minerale di nichel e concentrati, voce tariffaria indonesiana 2604.00.00 (par. 2.6) e HS 260400 (nota 48). Il testo dei regolamenti indonesiani non è stato letto direttamente. Nessuna scadenza."
     },
     {
       "id": "eu-crma-2024-1252",
