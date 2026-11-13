@@ -15,9 +15,22 @@ import { mountSourceInfo, sourceInfoSlot } from '@/components/source-info';
 import { STRATEGIC_GOODS, localText } from '@/config/thesis-model';
 import { escapeHtml } from '@/utils/sanitize';
 import type { AppWorkspace } from '../types';
-import { buildGoodsMeasures, isVerifiedStatus, shortTitle } from './model';
+import {
+  CHANNEL_LABELS,
+  type PolicyEntryLike,
+  buildGoodsMeasures,
+  daysUntil,
+  expiringSoon,
+  fieldOrUnverified,
+  groupByRole,
+  isVerified,
+  shortTitle,
+  statusChip,
+  UNVERIFIED_LABEL,
+} from './model';
 
-interface PolicyEntry {
+/** Schema v3 fields (statusCode, celex, inForceFrom, expiresOn, …) come from PolicyEntryLike. */
+interface PolicyEntry extends PolicyEntryLike {
   id: string;
   title: string;
   jurisdiction: string;
@@ -87,7 +100,41 @@ function actRow(act: EuAct): string {
 
 const JURISDICTION_LABELS: Record<string, string> = { eu: 'Unione Europea', it: 'Italia', wto: 'OMC (WTO)' };
 
-const isVerified = (entry: PolicyEntry): boolean => /^(verificata|in riesame)/i.test(entry.status ?? '');
+function statusChipHtml(entry: PolicyEntryLike): string {
+  const chip = statusChip(entry);
+  return `<span class="rs-chip rs-chip-${chip.tone}">${escapeHtml(chip.label)}</span>`;
+}
+
+function expiringChipHtml(entry: PolicyEntryLike, now: Date): string {
+  if (!expiringSoon(entry, now)) return '';
+  const days = daysUntil(entry.expiresOn, now) ?? 0;
+  return `<span class="rs-chip rs-chip-expiring">in scadenza (${days === 0 ? 'oggi' : days === 1 ? 'tra 1 giorno' : `tra ${days} giorni`})</span>`;
+}
+
+/** Escaped register field; "da verificare" is rendered dimmed. */
+function fieldHtml(value: string | readonly string[] | null | undefined, labels?: Record<string, string>): string {
+  const text = fieldOrUnverified(value, labels);
+  return text === UNVERIFIED_LABEL ? `<span class="rs-meta">${UNVERIFIED_LABEL}</span>` : escapeHtml(text);
+}
+
+/** Thesis HS headings (goods) plus the CN codes written in the entry; missing parts → "da verificare". */
+function cnCellHtml(entry: PolicyEntry): string {
+  const goods = entry.goods ?? [];
+  return goods.length ? `HS ${escapeHtml(goods.join(', '))}<br><span class="rs-meta">NC ${escapeHtml(fieldOrUnverified(entry.cn))}</span>` : fieldHtml(entry.cn);
+}
+
+function registryRow(entry: PolicyEntry, now: Date, selectedId: string): string {
+  const classes = [entry.id === selectedId ? 'active' : '', expiringSoon(entry, now) ? 'rs-pol-expiring' : ''].filter(Boolean).join(' ');
+  return `<tr data-id="${escapeHtml(entry.id)}"${classes ? ` class="${classes}"` : ''}>
+    <th scope="row">${escapeHtml(shortTitle(entry.title))}<br><span class="rs-meta">${escapeHtml(entry.celex ? `CELEX ${entry.celex}` : entry.reference)}</span></th>
+    <td>${cnCellHtml(entry)}</td>
+    <td>${fieldHtml(entry.origins)}</td>
+    <td>${fieldHtml(entry.inForceFrom)}</td>
+    <td>${fieldHtml(entry.expiresOn)}</td>
+    <td>${fieldHtml(entry.channels, CHANNEL_LABELS)}</td>
+    <td>${statusChipHtml(entry)} ${expiringChipHtml(entry, now)}</td>
+  </tr>`;
+}
 
 function monitorCard(item: Record<string, unknown>): string {
   const title = String(item.title ?? item.name ?? item.headline ?? item.reference ?? 'Aggiornamento normativo');
@@ -133,6 +180,7 @@ export function createPolicyWorkspace(): AppWorkspace {
       let activeTab: PolicyTab = 'goods';
       const tabClass = (tab: PolicyTab): string => `rs-tab${activeTab === tab ? ' active' : ''}`;
       const goodsRows = buildGoodsMeasures(STRATEGIC_GOODS, entries, acts);
+      const now = new Date();
       let selectedId = entries[0]?.id ?? '';
       let jurisdiction = 'ALL';
       let category = 'ALL';
@@ -149,6 +197,7 @@ export function createPolicyWorkspace(): AppWorkspace {
             <div class="rs-ws-stats">
               <div class="rs-stat"><span class="rs-stat-value">${entries.length}</span><span class="rs-stat-label">norme</span></div>
               <div class="rs-stat"><span class="rs-stat-value">${entries.filter(isVerified).length}</span><span class="rs-stat-label">verificate</span></div>
+              <div class="rs-stat"><span class="rs-stat-value">${entries.filter((e) => expiringSoon(e, now)).length}</span><span class="rs-stat-label">in scadenza (30 gg)</span></div>
               <div class="rs-stat"><span class="rs-stat-value">${acts.length}</span><span class="rs-stat-label">atti UE recenti</span></div>
               <div class="rs-stat"><span class="rs-stat-value">${jurisdictions.length}</span><span class="rs-stat-label">giurisdizioni</span></div>
             </div>
@@ -156,14 +205,14 @@ export function createPolicyWorkspace(): AppWorkspace {
 
           <div class="rs-tabs" role="tablist">
             <button class="${tabClass('goods')}" data-tab="goods" role="tab">Beni × misure</button>
-            <button class="${tabClass('registry')}" data-tab="registry" role="tab">Registro normativo</button>
+            <button class="${tabClass('registry')}" data-tab="registry" role="tab">Registro delle misure</button>
             <button class="${tabClass('monitor')}" data-tab="monitor" role="tab">Atti UE recenti</button>
           </div>
 
           <div class="rs-tab-panel" data-panel="goods"><div class="rs-tab-sources">Fonti dei dati ${sourceInfoSlot('policy.goods')}</div>
-            <p class="rs-meta">Per ogni bene strategico della tesi: le misure del registro con lo stesso codice HS (modulatori del modello) e gli atti UE degli ultimi 30 giorni che lo nominano nel titolo. Le voci "da verificare" non sono ancora controllate sul testo ufficiale.</p>
+            <p class="rs-meta">Per ogni bene strategico della tesi: i modulatori del registro con lo stesso codice HS, con stato e date, e gli atti UE degli ultimi 30 giorni che lo nominano nel titolo. Nessun punteggio: solo l'elenco. "Verificata" vuol dire controllata sul testo ufficiale; "in riesame" e "da verificare" non lo sono.</p>
             <div class="rs-osint-table-wrap"><table class="rs-osint-table">
-              <thead><tr><th>Bene</th><th>Misure nel registro</th><th>Atti UE recenti che lo nominano</th></tr></thead>
+              <thead><tr><th>Bene</th><th>Modulatori nel registro</th><th>Atti UE recenti che lo nominano</th></tr></thead>
               <tbody>${goodsRows
                 .map(
                   (row) => `<tr>
@@ -173,10 +222,10 @@ export function createPolicyWorkspace(): AppWorkspace {
                     ? row.measures
                         .map(
                           (m) => `<div class="rs-gm-item">${m.url ? `<a class="rs-link" href="${escapeHtml(m.url)}" target="_blank" rel="noopener">${escapeHtml(shortTitle(m.title))} ↗</a>` : escapeHtml(shortTitle(m.title))}
-                  <span class="rs-chip ${isVerifiedStatus(m.status) ? 'rs-chip-ok' : 'rs-chip-wip'}">${escapeHtml(isVerifiedStatus(m.status) ? 'verificata' : 'da verificare')}</span><br><span class="rs-meta">${escapeHtml(m.topic ?? '')}</span></div>`,
+                  ${statusChipHtml(m)} ${expiringChipHtml(m, now)}<br><span class="rs-meta">in vigore dal ${escapeHtml(fieldOrUnverified(m.inForceFrom))} · scadenza ${escapeHtml(fieldOrUnverified(m.expiresOn))}</span><br><span class="rs-meta">${escapeHtml(m.topic ?? '')}</span></div>`,
                         )
                         .join('')
-                    : '<span class="rs-meta">nessuna misura nel registro</span>'
+                    : '<span class="rs-meta">nessun modulatore nel registro</span>'
                 }</td>
                 <td>${
                   row.acts.length
@@ -202,17 +251,16 @@ export function createPolicyWorkspace(): AppWorkspace {
                 <option value="ALL">Tutte le voci</option>
                 <option value="modulatore">Modulatori (misure del Cap. 3)</option>
                 <option value="verified">Solo verificate</option>
-                <option value="unverified">Solo da verificare</option>
+                <option value="unverified">Solo non verificate (in riesame o da verificare)</option>
               </select>
               <select id="rsPolicyCategory" class="rs-select">
                 <option value="ALL">Tutte le categorie di rischio</option>
                 ${categories.map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`).join('')}
               </select>
             </div>
-            <div class="rs-ws-body">
-              <section class="rs-ws-list" id="rsPolicyList"></section>
-              <aside class="rs-ws-detail" id="rsPolicyDetail"></aside>
-            </div>
+            <p class="rs-meta">Registro datato: misura × codici NC × origini × date × canali × stato. I campi non scritti nel testo della voce restano "da verificare". In evidenza le misure in scadenza entro 30 giorni. Seleziona una riga per il dettaglio.</p>
+            <section id="rsPolicyList"></section>
+            <aside class="rs-ws-detail rs-pol-detail" id="rsPolicyDetail"></aside>
           </div>
 
           <div class="rs-tab-panel" data-panel="monitor" hidden><div class="rs-tab-sources">Fonti dei dati ${sourceInfoSlot('policy.monitor')}</div>
@@ -286,10 +334,11 @@ export function createPolicyWorkspace(): AppWorkspace {
           <div class="rs-detail-head">
             <span class="rs-chip">${escapeHtml(JURISDICTION_LABELS[entry.jurisdiction] ?? entry.jurisdiction)}</span>
             ${entry.role ? `<span class="rs-chip">${escapeHtml(entry.role)}</span>` : ''}
-            <span class="rs-chip ${isVerified(entry) ? 'rs-chip-ok' : 'rs-chip-wip'}">${escapeHtml(entry.status || 'da verificare')}</span>
+            ${statusChipHtml(entry)} ${expiringChipHtml(entry, now)}
           </div>
           <h2>${escapeHtml(entry.title)}</h2>
-          <p class="rs-meta">${escapeHtml(entry.reference)}</p>
+          <p class="rs-meta">${escapeHtml(entry.reference)}${entry.celex ? ` · CELEX ${escapeHtml(entry.celex)}` : ''}</p>
+          ${entry.status ? `<p class="rs-meta">Verifica: ${escapeHtml(entry.status)}</p>` : ''}
           <p class="rs-meta">${escapeHtml(entry.topic)}${(entry.goods ?? []).length ? ` · HS ${escapeHtml((entry.goods ?? []).join(', '))}` : ''}</p>
           <h3>Sintesi</h3><p>${escapeHtml(entry.summary)}</p>
           ${entry.gap ? `<h3>Gap regolatorio</h3><p>${escapeHtml(entry.gap)}</p>` : ''}
@@ -303,24 +352,21 @@ export function createPolicyWorkspace(): AppWorkspace {
         `;
       };
 
+      const registryTable = (title: string, rows: PolicyEntry[]): string =>
+        rows.length
+          ? `<h3 class="rs-pol-section">${escapeHtml(title)} <span class="rs-meta">(${rows.length})</span></h3>
+            <div class="rs-osint-table-wrap"><table class="rs-osint-table rs-pol-table">
+              <thead><tr><th>Misura</th><th>NC</th><th>Origini</th><th>In vigore dal</th><th>Scadenza</th><th>Canali</th><th>Stato</th></tr></thead>
+              <tbody>${rows.map((entry) => registryRow(entry, now, selectedId)).join('')}</tbody>
+            </table></div>`
+          : '';
+
       const renderList = () => {
-        const items = filtered();
-        listEl.innerHTML = items.length
-          ? items
-              .map(
-                (entry) => `
-            <button class="rs-list-item${entry.id === selectedId ? ' active' : ''}" data-id="${escapeHtml(entry.id)}">
-              <span class="rs-list-title">${escapeHtml(entry.title)}</span>
-              <span class="rs-list-sub">${escapeHtml(entry.reference)}</span>
-              <span class="rs-list-sub">${isVerified(entry) ? '✓ ' : '… '}${escapeHtml(entry.status || 'da verificare')}</span>
-              <span class="rs-list-tags">${(entry.riskCategories ?? [])
-                .slice(0, 3)
-                .map((value) => `<span class="rs-chip">${escapeHtml(value)}</span>`)
-                .join('')}</span>
-            </button>`,
-              )
-              .join('')
-          : '<div class="rs-empty">Nessuna norma corrisponde ai filtri.</div>';
+        const { measures, framework } = groupByRole(filtered());
+        listEl.innerHTML =
+          measures.length || framework.length
+            ? registryTable('Misure (modulatori per primi)', measures) + registryTable('Quadro normativo', framework)
+            : '<div class="rs-empty">Nessuna norma corrisponde ai filtri.</div>';
       };
 
       listEl.addEventListener('click', (event) => {

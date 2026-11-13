@@ -604,3 +604,47 @@
 .rs-gm-item + .rs-gm-item {
   border-top: 1px dashed var(--border-subtle);
 }
+
+/* Policy: dated register of measures (src/apps/policy/workspace.ts) */
+.rs-chip-ok {
+  color: var(--green);
+  border-color: var(--green);
+}
+
+.rs-chip-review {
+  color: var(--yellow);
+  border-color: var(--yellow);
+}
+
+.rs-chip-wip {
+  color: #9ca3af;
+  border-color: #263241;
+}
+
+.rs-chip-expiring {
+  color: var(--red);
+  border-color: var(--red);
+}
+
+.rs-pol-section {
+  margin: 14px 0 6px;
+  font-size: 13px;
+}
+
+.rs-pol-table tbody tr {
+  cursor: pointer;
+}
+
+.rs-pol-table tbody tr:hover,
+.rs-pol-table tbody tr.active {
+  background: var(--bg-secondary);
+}
+
+.rs-pol-table tbody tr.rs-pol-expiring > th {
+  box-shadow: inset 3px 0 0 var(--red);
+}
+
+.rs-pol-detail {
+  margin-top: 14px;
+  max-height: none;
+}
