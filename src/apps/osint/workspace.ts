@@ -8,9 +8,11 @@
  *
  *  - Nodes: measured triggers within the working radius (the same snapshot as
  *    the Risk Chain panel: EMSC, GDACS/EONET/NHC) and the chain state.
- *  - Goods: prices (Yahoo Finance; listed shares are flagged as indirect
- *    indicators), Italy's main suppliers (Eurostat Comext, UN Comtrade
- *    fallback) and the measures of the Policy registry for the same HS code.
+ *  - Goods: the measured layers S (EU27 extra-EU supply) and C (customs
+ *    channels as of now, dated Policy register), each with provenance and
+ *    never combined (./goods.ts); Italy's suppliers by partner country, intra-EU
+ *    included (Eurostat Comext, UN Comtrade fallback); prices (Yahoo Finance)
+ *    as indirect indicators.
  *  - Signals: vessel transits (IMF PortWatch) and the nearest ERA5 climate
  *    anomaly per node; EU supply indicators (HHI, node-origin share) per good.
  *  - Triggers: one row per Gardner-Knopoff sequence near the nodes.
@@ -24,8 +26,23 @@ import { switchAppHref } from '@/config/apps';
 import { COMMODITIES } from '@/config/markets';
 import { STRATEGIC_GOODS, TRIGGER_WORKING_RULES, localText } from '@/config/thesis-model';
 import { getThesisSnapshot } from '@/services/thesis/snapshot';
+import type { CustomsRegistryEntry } from '@/services/thesis/customs-registry';
 import { escapeHtml } from '@/utils/sanitize';
 import type { AppWorkspace } from '../types';
+import {
+  customsLayer,
+  customsText,
+  EU_SUPPLY_LABEL,
+  ITALY_SHARES_LABEL,
+  LAYERS_NOTE,
+  measureText,
+  NO_QUOTE,
+  PRICE_LABEL,
+  supplyLayer,
+  supplyText,
+  type CustomsLayer,
+  type SupplyLayer,
+} from './goods';
 import {
   buildGoodRows,
   buildNodeRows,
@@ -154,35 +171,47 @@ function comextImportsForItaly(eu: EuGoodsLike | null): OsintComtradeProduct[] {
   return out;
 }
 
-function goodRowHtml(row: GoodRow, policyHref: string, importsSource: string, ok: { quotes: boolean; imports: boolean; policy: boolean }): string {
-  const prices = !ok.quotes
+interface GoodLayersInput {
+  supply: SupplyLayer;
+  supplySrc: OsintSource | undefined;
+  customs: CustomsLayer | null;
+  importsSource: string;
+  ok: { quotes: boolean; imports: boolean };
+}
+
+/** One good: S and C as separate measured layers with provenance, then Italy's suppliers and the prices. */
+function goodRowHtml(row: GoodRow, policyHref: string, l: GoodLayersInput): string {
+  const supply = !isSourceAvailable(l.supplySrc)
+    ? unavailable
+    : `${escapeHtml(supplyText(l.supply))}<br><span class="rs-meta">${EU_SUPPLY_LABEL} · ${escapeHtml(provenanceText(l.supplySrc))}</span>`;
+  const c = l.customs;
+  const customs = !c
+    ? unavailable
+    : `${escapeHtml(customsText(c))}<br><span class="rs-meta">${escapeHtml(c.label)}${c.measures.length ? `: ${c.measures.map((m) => escapeHtml(measureText(m))).join('; ')}` : ''}${row.measures.length ? ` · <a class="rs-link" href="${escapeHtml(policyHref)}">${row.measures.length} voc${row.measures.length === 1 ? 'e' : 'i'} nel registro ↗</a>` : ''}</span>`;
+  const imports = !l.ok.imports
+    ? unavailable
+    : row.imports
+    ? `${escapeHtml(importSentence(row.imports, displayNames))}<br><span class="rs-meta">${ITALY_SHARES_LABEL} · ${escapeHtml(l.importsSource)}, anno ${row.imports.year ?? 'n.d.'}</span>`
+    : '<span class="rs-meta">dato non disponibile</span>';
+  const prices = !l.ok.quotes
     ? unavailable
     : row.prices.length
-    ? row.prices
+    ? `${row.prices
         .map((p) => {
           const change = p.change !== null ? `<span class="${p.change >= 0 ? 'rs-up' : 'rs-down'}">${fmtSigned(p.change, '%', 2)}</span>` : 'n.d.';
           const price = p.price !== null ? p.price.toLocaleString('it-IT', { maximumFractionDigits: 2 }) : 'n.d.';
-          const kind = p.kind === 'proxy' ? ' <span class="rs-chip rs-chip-dim" title="Titolo o ETF quotato, non il prezzo del bene">indiretto</span>' : '';
+          const kind = p.kind === 'proxy' ? ' <span class="rs-chip rs-chip-dim" title="Titolo o ETF quotato, non il prezzo del bene">titolo o ETF</span>' : '';
           return `${escapeHtml(p.name)} (${escapeHtml(p.symbol)}): ${price} · ${change}${kind}`;
         })
-        .join('<br>')
-    : '<span class="rs-meta">nessuna quotazione disponibile</span>';
-  const imports = !ok.imports
-    ? unavailable
-    : row.imports
-    ? `${escapeHtml(importSentence(row.imports, displayNames))}<br><span class="rs-meta">${escapeHtml(importsSource)}, anno ${row.imports.year ?? 'n.d.'}</span>`
-    : '<span class="rs-meta">dato non disponibile</span>';
-  const measures = !ok.policy
-    ? unavailable
-    : row.measures.length
-    ? `<a class="rs-link" href="${escapeHtml(policyHref)}">${row.measures.length} misur${row.measures.length === 1 ? 'a' : 'e'} nel registro ↗</a><br><span class="rs-meta">${row.measures.map((m) => escapeHtml(m.title.split(' — ')[0] ?? m.title)).join('; ')}</span>`
-    : '<span class="rs-meta">nessuna nel registro</span>';
+        .join('<br>')}<br><span class="rs-meta">${PRICE_LABEL} · Yahoo Finance</span>`
+    : `<span class="rs-meta">${NO_QUOTE}</span>`;
   return `
     <tr>
       <th scope="row">HS ${escapeHtml(row.good.hs)}<br><span class="rs-meta">${escapeHtml(localText(row.good.label, 'it'))}</span></th>
-      <td>${prices}</td>
+      <td>${supply}</td>
+      <td>${customs}</td>
       <td>${imports}</td>
-      <td>${measures}</td>
+      <td>${prices}</td>
     </tr>`;
 }
 
@@ -270,10 +299,10 @@ export function createOsintWorkspace(): AppWorkspace {
 
           <div class="rs-tab-panel" data-panel="goods" hidden>
             <div class="rs-tab-sources">Fonti dei dati ${sourceInfoSlot('osint.goods')}</div>
-            <p class="rs-meta rs-osint-note">Prezzi, fornitori dell'Italia, misure in vigore. I prezzi sono nell'unità di quotazione del contratto (per esempio il grano in centesimi di dollaro per bushel): come segnale conta la variazione. "Indiretto" indica un titolo o un ETF quotato, non il prezzo del bene.</p>
+            <p class="rs-meta rs-osint-note">Strati misurati per bene, ciascuno con la sua fonte: S (approvvigionamento UE27 dalle importazioni extra-UE) e C (canali doganali con incentivo, dal registro Policy). ${LAYERS_NOTE} I fornitori dell'Italia sono a parte: paese di provenienza, scambi intra-UE inclusi. I prezzi sono indicatori indiretti nell'unità di quotazione del contratto (per esempio il grano in centesimi di dollaro per bushel): conta la variazione.</p>
             <div class="rs-osint-table-wrap"><table class="rs-osint-table">
-              <thead><tr><th>Bene</th><th>Prezzo (variazione sulla chiusura precedente)</th><th>Principali fornitori dell'Italia</th><th>Misure (registro Policy)</th></tr></thead>
-              <tbody id="rsOsintGoods"><tr><td colspan="4" class="rs-loading">Caricamento…</td></tr></tbody>
+              <thead><tr><th>Bene</th><th>S, approvvigionamento (UE27, extra-UE)</th><th>C, canali doganali (registro Policy)</th><th>Principali fornitori dell'Italia</th><th>Prezzo (variazione sulla chiusura precedente)</th></tr></thead>
+              <tbody id="rsOsintGoods"><tr><td colspan="5" class="rs-loading">Caricamento…</td></tr></tbody>
             </table></div>
           </div>
 
@@ -328,7 +357,7 @@ export function createOsintWorkspace(): AppWorkspace {
             errors.push(`segnali: ${e instanceof Error ? e.message : String(e)}`);
             return null;
           }),
-          fetchJson<{ entries?: PolicyEntryLike[] }>('/api/policy/registry').catch((e: unknown) => {
+          fetchJson<{ entries?: Array<PolicyEntryLike & CustomsRegistryEntry> }>('/api/policy/registry').catch((e: unknown) => {
             errors.push(`registro Policy: ${e instanceof Error ? e.message : String(e)}`);
             return null;
           }),
@@ -370,12 +399,22 @@ export function createOsintWorkspace(): AppWorkspace {
         const comext = comextImportsForItaly(euGoods);
         const importsSource = comext.length ? 'Eurostat Comext' : 'UN Comtrade';
         const goodRows = buildGoodRows(STRATEGIC_GOODS, signals?.quotes ?? [], COMMODITIES, comext.length ? comext : signals?.comtradeIT.products ?? [], policy?.entries ?? []);
-        const goodsOk = {
-          quotes: isSourceAvailable(signals?.sources?.quotes),
-          imports: comext.length > 0 || isSourceAvailable(signals?.sources?.comtradeIT),
-          policy: policy !== null,
-        };
-        goodsEl.innerHTML = goodRows.map((row) => goodRowHtml(row, policyHref, importsSource, goodsOk)).join('');
+        const quotesOk = isSourceAvailable(signals?.sources?.quotes);
+        const importsOk = comext.length > 0 || isSourceAvailable(signals?.sources?.comtradeIT);
+        const euProducts = signals?.euSupply?.products ?? [];
+        const registry = policy ? { entries: policy.entries ?? [] } : null;
+        const now = Date.now();
+        goodsEl.innerHTML = goodRows
+          .map((row) =>
+            goodRowHtml(row, policyHref, {
+              supply: supplyLayer(euProducts.find((p) => p.hs4 === row.good.hs) ?? null),
+              supplySrc: signals?.sources?.euSupply,
+              customs: registry ? customsLayer(registry, row.good.hs, now) : null,
+              importsSource,
+              ok: { quotes: quotesOk, imports: importsOk },
+            }),
+          )
+          .join('');
 
         const feed = buildSequenceRows(chains);
         feedEl.innerHTML = feed.length
