@@ -191,15 +191,15 @@ export const POLICY_SCENARIOS: readonly PolicyScenario[] = [
       it: 'L’antidumping UE sull’inox laminato a freddo da India e Indonesia scade senza rinnovo',
       en: 'The EU anti-dumping duty on cold-rolled stainless steel from India and Indonesia expires without renewal',
     },
-    // Aligned with the Policy register entry eu-reg-2021-2012-inox (statusCode 'in-riesame', verifiedOn null).
+    // Aligned with the Policy register entry eu-reg-2021-2012-inox (statusCode 'in-riesame', official texts read 13/11/2026).
     basis: {
       text: {
-        it: 'Prodotto a valle del nichel. Nel registro: in riesame, scadenza 19/11/2026; avviso di apertura del riesame in GU C da trovare',
-        en: 'Downstream of nickel. In the register: under review, expiry 19/11/2026; notice of initiation of the review in the OJ C still to be found',
+        it: 'Prodotto a valle del nichel. Misura in vigore dal 19/11/2021; riesame in previsione della scadenza aperto il 15/9/2026 (GU C/2026/4857): resta in vigore fino all’esito',
+        en: 'Downstream of nickel. In force since 19/11/2021; expiry review opened on 15/9/2026 (OJ C/2026/4857): it stays in force until the outcome',
       },
       source: 'Reg. di esecuzione (UE) 2021/2012',
       url: 'http://data.europa.eu/eli/reg_impl/2021/2012/oj',
-      status: 'todo',
+      status: 'verified',
     },
   },
   {

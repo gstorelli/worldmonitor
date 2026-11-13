@@ -129,10 +129,10 @@ export default [
       "geopolitical"
     ],
     "chokepoints": [],
-    "summary": "Dazio antidumping definitivo con scadenza il 19/11/2026. Secondo una fonte secondaria (SteelOrbis, 16/9/2026), a settembre 2026 è stato aperto un riesame in previsione della scadenza su richiesta di EUROFER; durante il riesame i dazi restano in vigore (Reg. (UE) 2016/1036, art. 11, par. 2). L'avviso di apertura in GU C è ancora da trovare.",
+    "summary": "Dazio antidumping definitivo sui prodotti piani laminati a freddo di acciaio inossidabile originari di India e Indonesia (Reg. di esecuzione (UE) 2021/2012, in vigore dal 19/11/2021). L'avviso di imminente scadenza (GU C/2026/1026) indicava la scadenza al 19/11/2026; il riesame in previsione della scadenza è stato aperto con l'avviso GU C/2026/4857 del 15/9/2026, su domanda di Eurofer. In attesa dell'esito la misura resta in vigore (Reg. (UE) 2016/1036, art. 11, par. 2).",
     "gap": "",
     "customsImplication": "Modulatore sui prodotti piani in acciaio inossidabile, a valle della catena del nichel trattata nel Cap. 3: l'esito del riesame cambia la differenza di trattamento tra origini.",
-    "status": "in riesame (P + fonte secondaria; avviso in GU C da trovare)",
+    "status": "in riesame dal 15/9/2026 (avviso GU C/2026/4857; testi ufficiali letti il 13/11/2026)",
     "role": "modulatore",
     "goods": [],
     "thesisKey": "reg_2021_2012",
