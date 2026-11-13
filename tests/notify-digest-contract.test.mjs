@@ -11,6 +11,9 @@ process.env.UPSTASH_REDIS_REST_URL = 'https://fake-redis.example';
 process.env.UPSTASH_REDIS_REST_TOKEN = 'fake-token';
 process.env.N8N_INGEST_SECRET = 'test-secret';
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+const daysAgo = (n) => new Date(Date.now() - n * DAY_MS).toISOString().slice(0, 10);
+
 const writes = [];
 let readFailure = false;
 globalThis.fetch = async (_url, opts) => {
@@ -27,6 +30,34 @@ globalThis.fetch = async (_url, opts) => {
       ],
       'risk_sentinel:n8n:commodities': [{ symbol: 'CL=F', name: 'WTI', alertLevel: 'elevated', price: 71 }],
       'policy:monitor:v1': { items: [{ title: 'Regolamento UE dazi', url: 'https://x/3' }] },
+      // Shape written by scripts/seed-policy-eu-acts.mjs (classifier in
+      // scripts/_policy-eu-acts.mjs). CELEX numbers are fixtures.
+      'policy:eu-acts:v1': {
+        windowDays: 30,
+        scanned: 100,
+        acts: [
+          {
+            celex: '32026R9001', date: daysAgo(1), documentDate: daysAgo(1), inForceFrom: null,
+            title: 'Regolamento che modifica il dazio antidumping su alluminio greggio',
+            url: 'https://x/kw', goods: ['7601'], goodMatches: [{ hs: '7601', match: 'keyword' }], measures: ['antidumping'],
+          },
+          {
+            celex: '32026R9002', date: daysAgo(1), documentDate: daysAgo(1), inForceFrom: null,
+            title: 'Regolamento relativo ai prodotti del codice NC 7502 10 00',
+            url: 'https://x/cn', goods: ['7502'], goodMatches: [{ hs: '7502', match: 'cn' }], measures: [],
+          },
+          {
+            celex: '32026R9003', date: daysAgo(1), documentDate: daysAgo(1), inForceFrom: null,
+            title: 'Regolamento sui contingenti tariffari per prodotti tessili',
+            url: 'https://x/unrelated', goods: [], goodMatches: [], measures: ['dazi'],
+          },
+          {
+            celex: '32026R9004', date: daysAgo(20), documentDate: daysAgo(20), inForceFrom: null,
+            title: 'Regolamento relativo al codice NC 8542 31',
+            url: 'https://x/old', goods: ['8542'], goodMatches: [{ hs: '8542', match: 'cn' }], measures: [],
+          },
+        ],
+      },
       'notify:config:v1': {
         frequency: 'hourly',
         topics: ['chokepoints'],
@@ -43,7 +74,8 @@ globalThis.fetch = async (_url, opts) => {
   return new Response(JSON.stringify({ result: 'OK' }), { status: 200 });
 };
 
-const { default: digestHandler } = await import(pathToFileURL(resolve(root, 'api/notify/digest.js')).href);
+const { default: digestHandler, euActsWindow, THESIS_HEADINGS } = await import(pathToFileURL(resolve(root, 'api/notify/digest.js')).href);
+const { GOOD_KEYWORDS } = await import(pathToFileURL(resolve(root, 'scripts/_policy-eu-acts.mjs')).href);
 const { default: configHandler } = await import(pathToFileURL(resolve(root, 'api/notify/config.js')).href);
 
 describe('api/notify/digest contract', () => {
@@ -60,11 +92,52 @@ describe('api/notify/digest contract', () => {
     assert.equal(commodities.items[0].title, 'CL=F');
   });
 
-  it('policy topic reads the monitor items', async () => {
-    const res = await digestHandler(new Request('https://x/api/notify/digest?topics=policy'));
+  it('policy topic still reads the legacy monitor items', async () => {
+    const res = await digestHandler(new Request('https://x/api/notify/digest?topics=policy&limit=20'));
     const body = await res.json();
     const policy = body.digest.sections.find((s) => s.topic === 'policy');
-    assert.equal(policy.items[0].title, 'Regolamento UE dazi');
+    assert.ok(policy.items.some((item) => item.title === 'Regolamento UE dazi'));
+  });
+
+  it('policy topic includes CELLAR acts on thesis headings, CN-matched first, keyword flagged', async () => {
+    const res = await digestHandler(new Request('https://x/api/notify/digest?topics=policy&actsDays=1'));
+    const body = await res.json();
+    const policy = body.digest.sections.find((s) => s.topic === 'policy');
+    const acts = policy.items.filter((item) => item.source === 'eu-acts');
+    assert.deepEqual(acts.map((a) => a.celex), ['32026R9002', '32026R9001'], 'CN-matched act ranks first');
+    assert.equal(acts[0].match, 'cn');
+    assert.deepEqual(acts[0].goods, ['7502']);
+    assert.match(acts[0].title, /^\[NC 7502\] /);
+    assert.equal(acts[1].match, 'keyword');
+    assert.match(acts[1].title, /^\[parola chiave 7601\] /);
+    assert.match(acts[1].summary, /da verificare/);
+    assert.ok(!acts.some((a) => a.celex === '32026R9003'), 'an act on no thesis heading is excluded');
+    assert.ok(!acts.some((a) => a.celex === '32026R9004'), 'an act outside the window is excluded');
+    assert.equal(policy.items[0].source, 'eu-acts', 'CELLAR acts precede the legacy monitor');
+  });
+
+  it('a wider actsDays window reaches older acts, capped at the seeder window', async () => {
+    const res = await digestHandler(new Request('https://x/api/notify/digest?topics=policy&actsDays=999'));
+    const body = await res.json();
+    const acts = body.digest.sections.find((s) => s.topic === 'policy').items.filter((i) => i.source === 'eu-acts');
+    assert.ok(acts.some((a) => a.celex === '32026R9004'));
+  });
+
+  it('thesis headings mirror the CELLAR classifier goods', () => {
+    assert.deepEqual([...THESIS_HEADINGS].sort(), Object.keys(GOOD_KEYWORDS).sort());
+  });
+
+  it('EU-acts window does not overlap between consecutive sends', () => {
+    const at = (iso) => new Date(iso);
+    assert.deepEqual(euActsWindow(at('2026-11-13T07:05:00Z'), 'daily', null), { from: '2026-11-12', to: '2026-11-13' });
+    assert.deepEqual(euActsWindow(at('2026-11-14T07:05:00Z'), 'daily', null), { from: '2026-11-13', to: '2026-11-14' });
+    assert.deepEqual(euActsWindow(at('2026-11-16T07:05:00Z'), 'weekly', null), { from: '2026-11-09', to: '2026-11-16' });
+    // Hourly/realtime: acts only in the 07 UTC tick, never on the other ticks.
+    assert.deepEqual(euActsWindow(at('2026-11-13T07:05:00Z'), 'hourly', null), { from: '2026-11-12', to: '2026-11-13' });
+    assert.equal(euActsWindow(at('2026-11-13T08:05:00Z'), 'hourly', null), null);
+    assert.equal(euActsWindow(at('2026-11-13T13:05:00Z'), 'realtime', null), null);
+    // actsDays overrides frequency and hour gate.
+    assert.deepEqual(euActsWindow(at('2026-11-13T13:05:00Z'), 'hourly', 3), { from: '2026-11-10', to: '2026-11-13' });
   });
 
   it('no longer serves the ACLED-only conflicts topic', async () => {
