@@ -1831,7 +1831,11 @@
         "supply": "share of {{origins}} {{share}}, HHI {{hhi}} → S = {{s}} (Comext {{year}})",
         "supplyNone": "Comext data not available",
         "customs": "{{n}} of 3 channels with an incentive ({{list}}) → C = {{c}}",
-        "customsNone": "measures not listed yet",
+        "customsProvenance": {
+          "registry": "from the dated register",
+          "fallback": "provisional value, no date of entry into force",
+          "none": "measures not listed: C not computable"
+        },
         "note": "Values of the single layers according to the Year-2 protocol proposal: they are not combined into a score until the protocol is approved. Customs vulnerability here is only the incentive (public data)."
       }
     },

@@ -24,7 +24,8 @@ import { join } from 'node:path';
 import { parseEmsc, parseUsgs, EMSC_URL, USGS_URL, TRIGGERS_UA } from '../../api/thesis/_catalogue.js';
 import { comextUrl, comextValuesByPartner, EU27 } from '../../scripts/_eu-trade.mjs';
 import { THESIS_NODES } from '../../src/config/thesis-model.ts';
-import { GOOD_CHANNELS } from '../../src/config/thesis-response.ts';
+import { customsAsOf, toEngineCustoms } from '../../src/services/thesis/customs-registry.ts';
+import policyRegistry from '../../data/policy-registry.json' with { type: 'json' };
 import { quakesToTriggers, type TriggerEvent } from '../../src/services/thesis/risk-chain.ts';
 import { PROTOCOL_V0_1, assessAt, type Assessment, type PartnerImports } from '../../src/services/thesis/engine.ts';
 
@@ -33,7 +34,6 @@ const END = '2024-05-31';
 const NODES = ['hsinchu', 'tainan'];
 const HS = '8542';
 const COMEXT_YEAR = 2022;
-const CUSTOMS_VALID_FROM = Date.UTC(2024, 2, 1);
 const KM_PER_DEG = 111.19;
 
 const outDir = process.argv[2];
@@ -62,8 +62,9 @@ for (const id of NODES) {
 const values = comextValuesByPartner(await fetchSaved(comextUrl('EU27_2020', HS, COMEXT_YEAR), `comext-${HS}-${COMEXT_YEAR}.json`)) as Record<string, number>;
 const byPartner = Object.fromEntries(Object.entries(values).filter(([c]) => /^[A-Z]{2}$/.test(c) && !EU27.has(c)));
 const imports: PartnerImports = { hs: HS, year: COMEXT_YEAR, extraEuEur: values.EXT_EU27_2020 ?? 0, byPartner };
-const channels = GOOD_CHANNELS.find((g) => g.hs === HS)?.channels ?? null;
-const customs = { hs: HS, channels, validFrom: CUSTOMS_VALID_FROM };
+// Customs layer C as of each assessment time, from the dated Policy register
+// (fallback GOOD_CHANNELS, with no dated basis, when no register measure qualifies).
+const customsAt = (t: number) => customsAsOf(policyRegistry, HS, t);
 
 const all = [...events.values()];
 const rows: Assessment[] = [];
@@ -71,7 +72,7 @@ const t0 = Date.parse(`${START}T00:00:00Z`);
 const t1 = Date.parse(`${END}T23:00:00Z`);
 for (const id of NODES) {
   const node = THESIS_NODES.find((x) => x.id === id)!;
-  for (let t = t0; t <= t1; t += 3_600_000) rows.push(assessAt({ node, hs: HS, events: all, imports, customs }, t, 'EMSC'));
+  for (let t = t0; t <= t1; t += 3_600_000) rows.push(assessAt({ node, hs: HS, events: all, imports, customs: toEngineCustoms(customsAt(t), HS) }, t, 'EMSC'));
 }
 
 const fmt = (x: number | null | undefined, d = 4) => (x === null || x === undefined ? '' : x.toFixed(d));
@@ -107,7 +108,10 @@ const summary = {
   window: [START, END],
   events: { EMSC: all.filter((e) => e.source === 'EMSC').length, USGS: all.filter((e) => e.source === 'USGS').length },
   supply: { hs: HS, year: COMEXT_YEAR, extraEuEur: imports.extraEuEur, shareTW: rows[0]?.supply.share, hhi: rows[0]?.supply.hhi },
-  customs: { channels, validFrom: new Date(CUSTOMS_VALID_FROM).toISOString() },
+  customs: (() => {
+    const c = customsAt(t0);
+    return { channels: c.channels, provenance: c.provenance, measures: c.measures, validFrom: c.validFrom === null ? null : new Date(c.validFrom).toISOString() };
+  })(),
   episodes,
   inputs: manifest,
 };
