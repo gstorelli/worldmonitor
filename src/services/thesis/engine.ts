@@ -21,7 +21,7 @@
  * the Year-2 REFERENCE whose flaw the replay documents, computed only for the
  * comparison. The platform never shows R0 as a risk; only F1 and F2 comply.
  */
-import type { ThesisNode } from '@/config/thesis-model';
+import { NODE_ORIGINS, type ThesisNode } from '@/config/thesis-model';
 import { nodeThreshold, PROTOCOL_V0_1, type EngineParams } from '@/config/thesis-protocol';
 import { expectedIntensityAt, haversineKm, type TriggerEvent } from './risk-chain';
 
@@ -32,18 +32,8 @@ export { PROTOCOL_V0_1, type EngineParams } from '@/config/thesis-protocol';
 
 // ------------------------------------------------------------------ registry
 
-/**
- * Countries where a production node lies (ISO 3166-1 alpha-2, the partner codes
- * of Comext). Straits have no origin of their own: which origins ship through a
- * strait is not yet specified, so their supply term is not computable.
- */
-export const NODE_ORIGINS: Readonly<Record<string, readonly string[]>> = {
-  antofagasta: ['CL'],
-  morowali: ['ID'],
-  'weda-bay': ['ID'],
-  hsinchu: ['TW'],
-  tainan: ['TW'],
-};
+// NODE_ORIGINS moved to src/config/thesis-model.ts (single source); re-exported for compatibility.
+export { NODE_ORIGINS } from '@/config/thesis-model';
 
 // ------------------------------------------------------------------ sequences
 

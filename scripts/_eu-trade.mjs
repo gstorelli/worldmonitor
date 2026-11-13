@@ -67,8 +67,8 @@ export function summariseImports(reporter, year, values, labels = {}) {
 
 /**
  * Countries of the production nodes, by good (ISO2 = Comext partner codes).
- * Mirror of NODE_ORIGINS and the node goods in src/services/thesis/engine.ts and
- * src/config/thesis-model.ts (seeders cannot import src/); kept in step by
+ * Mirror of NODE_ORIGINS and the node goods in src/config/thesis-model.ts
+ * (seeders cannot import src/); kept in step by
  * tests/eu-trade-supply-parity.test.mts.
  */
 export const GOOD_NODE_ORIGINS = Object.freeze({ '8542': ['TW'], '7403': ['CL'], '7502': ['ID'] });

@@ -4,6 +4,7 @@
  */
 
 import type { StrategicGood } from '@/config/thesis-model';
+import { registryModulatorsFor } from '@/services/thesis/modulators';
 
 export interface PolicyEntryLike {
   id: string;
@@ -117,9 +118,7 @@ export function buildGoodsMeasures(
 ): GoodMeasuresRow[] {
   return goods.map((good) => ({
     good,
-    measures: entries
-      .filter((e) => e.role === 'modulatore' && Array.isArray(e.goods) && e.goods.includes(good.hs))
-      .sort((a, b) => Number(isVerified(b)) - Number(isVerified(a))),
+    measures: registryModulatorsFor(entries, good.hs),
     acts: acts.filter((a) => a.goods.includes(good.hs)).sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0)),
   }));
 }

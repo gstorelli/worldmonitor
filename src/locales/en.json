@@ -1822,7 +1822,15 @@
         "hhi": "Supplier concentration (HHI, 0 to 1)",
         "suppliers": "{{n}} supplier countries",
         "nodeShare": "Share of the node countries ({{origins}})",
-        "bnEur": "bn €"
+        "bnEur": "bn €",
+        "registry": {
+          "statusVerified": "verified",
+          "statusReview": "under review",
+          "statusUnverified": "to be verified",
+          "unverified": "to be verified",
+          "inForceFrom": "in force from",
+          "expiresOn": "expiry"
+        }
       },
       "layers": {
         "title": "Measured layers (Year-2 protocol, proposal)",
