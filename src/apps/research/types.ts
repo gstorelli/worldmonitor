@@ -1,5 +1,7 @@
 /** Shared shapes for the Research application (bibliography + Zotero). */
 
+import type { CitationGraph } from './usage';
+
 export interface ResearchSource {
   ref: number;
   /** BibTeX key in the thesis repository (thesis/references.bib); absent for imports. */
@@ -46,6 +48,8 @@ export interface ZoteroItem {
 
 export interface ResearchPayload {
   sources: ResearchSource[];
+  /** Where each bib key is cited in the thesis, and the open placeholders. */
+  citations?: CitationGraph | null;
   library: ZoteroItem[] | null;
   librarySource: string;
   zoteroConfigured: boolean;

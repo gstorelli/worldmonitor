@@ -11,6 +11,7 @@ describe('api/* edge data mirrors stay in sync with data/*.json', () => {
   const mirrors = [
     { source: 'data/policy-registry.json', key: 'entries', module: 'api/policy/_registry-data.js' },
     { source: 'data/zotero-sources.json', key: 'sources', module: 'api/zotero/_sources-data.js' },
+    { source: 'data/research-citations.json', key: undefined, module: 'api/zotero/_citations-data.js' },
     { source: 'data/hs-commodity-map.json', key: 'groups', module: 'api/trade/_hs-map-data.js' },
   ];
 
