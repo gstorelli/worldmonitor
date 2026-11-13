@@ -112,10 +112,14 @@ describe('Policy register data (data/policy-registry.json)', () => {
   const registry = JSON.parse(readFileSync(new URL('../data/policy-registry.json', import.meta.url), 'utf8'));
   const inox = registry.entries.find((e: { id: string }) => e.id === 'eu-reg-2021-2012-inox');
 
-  it('shows the stainless-steel anti-dumping as "in scadenza" and "in riesame", not verified', () => {
+  it('shows the stainless-steel anti-dumping as "in riesame" without an expiry date, not verified', () => {
+    // An expiry review was initiated (OJ C/2026/4857, 15/9/2026): under Art. 11(2) of
+    // Regulation (EU) 2016/1036 the measure stays in force pending the review, so the
+    // 19/11/2026 expiry announced in OJ C/2026/1026 no longer applies (expiresOn null).
     const now = new Date('2026-11-13T09:00:00Z');
-    assert.equal(inox.expiresOn, '2026-11-19');
-    assert.equal(expiringSoon(inox, now), true);
+    assert.equal(inox.expiresOn, null);
+    assert.equal(inox.inForceFrom, '2021-11-19');
+    assert.equal(expiringSoon(inox, now), false);
     assert.equal(statusChip(inox).label, 'in riesame');
     assert.equal(isVerified(inox), false);
   });
