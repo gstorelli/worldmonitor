@@ -106,10 +106,11 @@ const N8N_DIGEST: DataSource[] = [
     code: 'n8n-workflows/03-climate-anomalies-ingestion.json',
   },
   {
-    what: 'Tema “Monitor normativo UE”',
-    source: 'EUR-Lex, ricerca (workflow n8n 06)',
-    url: 'https://eur-lex.europa.eu/search.html',
-    code: 'n8n-workflows/06-policy-monitor.json',
+    what: 'Tema “Monitor normativo UE”: atti UE sulle 8 voci HS della tesi (prima quelli con codice NC nel titolo, poi quelli per parola chiave, segnalati)',
+    source: 'Ufficio delle pubblicazioni dell\u2019UE, endpoint SPARQL (CELLAR)',
+    url: 'https://publications.europa.eu/webapi/rdf/sparql',
+    code: 'scripts/seed-policy-eu-acts.mjs; api/notify/digest.js',
+    note: 'Sostituisce il workflow n8n 06 (ricerca EUR-Lex), dismesso il 12-13/11/2026.',
   },
 ];
 

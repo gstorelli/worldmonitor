@@ -10,7 +10,6 @@ Questa cartella contiene i workflow n8n per l'ingestion e il risk scoring dei da
 | 02 | `02-usgs-seismic-ingestion.json` | USGS GeoJSON | Ogni 1h | Terremoti M4.5+ con impatto su rotte commerciali |
 | 03 | `03-climate-anomalies-ingestion.json` | Open-Meteo Archive | Ogni 3h | Anomalie climatiche in 15 zone critiche per il commercio |
 | 04 | `04-commodity-prices-ingestion.json` | Yahoo Finance | Ogni 30min | Prezzi commodity con codici HS doganali |
-| 06 | `06-policy-monitor.json` | EUR-Lex (search) | Ogni giorno | Aggiornamenti normativi UE → `policy:monitor:v1` (Policy Analysis panel) |
 | 07 | `07-intelligence-notifications.json` | Notify config API | Ogni 1h | Delivery Telegram/email dei digest di intelligence |
 
 ### Workflow Legacy (riferimento, disattivati in produzione)
@@ -19,6 +18,7 @@ Questa cartella contiene i workflow n8n per l'ingestion e il risk scoring dei da
 |---|------|------|
 | 08 | `08-trade-monitor-legacy.json` | Prima generazione (RSS Google News). Output a vicolo cieco: il nodo finale "Format Alert" non spinge verso l'endpoint di ingestion. Sostituito da `01-gdelt-customs-ingestion.json`. |
 | 05 | `05-acled-conflict-ingestion-legacy.json` | ACLED disattivato: la licenza ACLED vieta l'uso dei dati con sistemi di IA/LLM. Non riattivare; i conflitti arrivano da UCDP (`scripts/seed-ucdp-events.mjs`). |
+| 06 | `06-policy-monitor.json` | Dismesso (12-13/11/2026): sostituito dal seeder CELLAR (`scripts/seed-policy-eu-acts.mjs`, chiave `policy:eu-acts:v1`, letta anche dal tema "Monitor normativo UE" di `api/notify/digest.js`). La ricerca EUR-Lex risponde alle richieste automatiche con una verifica anti-bot, quindi il workflow non trovava nulla. Il JSON resta come riferimento; `policy:monitor:v1` è letta ancora come sorgente legacy. |
 | 09 | `09-ai-enhanced-legacy.json` | Workflow LLM (DeepSeek via OpenRouter) con structured output parser instabile. Disattivato: la funzionalità di LLM-adjudication va portata nel backend nativo della piattaforma. |
 
 ## Come Importare
@@ -30,7 +30,8 @@ Questa cartella contiene i workflow n8n per l'ingestion e il risk scoring dei da
 5. Attiva il workflow
 
 > I workflow scrivono solo su chiavi Redis dedicate `risk_sentinel:n8n:*` (consumate dagli
-> endpoint `api/customs/*`) e su `policy:monitor:v1` (consumata da `api/policy/registry.js`).
+> endpoint `api/customs/*`) e su `policy:monitor:v1` (legacy, scritta solo dal workflow 06 dismesso;
+> consumata da `api/policy/registry.js` e `api/notify/digest.js`).
 > Non scrivono MAI sulle chiavi canoniche dei seeder nativi della piattaforma.
 
 ## Credenziali e Segreti
