@@ -3,6 +3,8 @@
  *
  * GET /api/zotero/library
  *   → { sources: <thesis bibliography from data/zotero-sources.json>,
+ *       citations: <where each source is cited in the thesis and the open
+ *       placeholders, from data/research-citations.json>,
  *       library: <live Zotero library cache>, librarySource: 'zotero'|'none' }
  *
  * The `sources` array is generated from the thesis repository by
@@ -13,6 +15,7 @@
  */
 
 import { getPublicCorsHeaders } from '../_cors.js';
+import citationGraph from './_citations-data.js';
 import zoteroSources from './_sources-data.js';
 
 const ZOTERO_CACHE_KEY = 'zotero:library:v1';
@@ -110,6 +113,7 @@ export default async function handler(request, context = {}) {
 
   const body = {
     sources,
+    citations: citationGraph && typeof citationGraph === 'object' ? citationGraph : null,
     library,
     librarySource,
     zoteroConfigured: Boolean(userId && apiKey),
